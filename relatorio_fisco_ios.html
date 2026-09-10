@@ -758,6 +758,7 @@
 
       this.value = '';
       renderizarFotos();
+      setTimeout(()=>window.centralAutosave?.(),0);
       if (avisouLimite) alert(`Limite de ${MAX_FOTOS} fotos atingido. As demais não foram incluídas.`);
     });
 
@@ -782,13 +783,14 @@
       if (!foto) return;
       try {
         const novo = await PhotoFramer.open(foto.original || foto.src, { aspect: 2, maxWidth: 1600, quality: .88, title: `Ajustar Foto ${index + 1}` });
-        if (novo) { foto.src = novo; renderizarFotos(); }
+        if (novo) { foto.src = novo; renderizarFotos(); setTimeout(()=>window.centralAutosave?.(),0); }
       } catch (e) { console.warn(e); alert('Não foi possível abrir o ajuste de enquadramento desta foto.'); }
     }
 
     function removerFoto(index) {
       fotosSelecionadas.splice(index, 1);
       renderizarFotos();
+      setTimeout(()=>window.centralAutosave?.(),0);
     }
 
     function limparFotos() {
@@ -796,16 +798,38 @@
       renderizarFotos();
     }
 
-    const FISCO_DRAFT_MEDIA_KEY='pmpb-transito-fisco-media-v1';
+    const FISCO_DRAFT_KEY='pmpb-transito-fisco-v2-draft';
+    const FISCO_DRAFT_MEDIA_KEY='pmpb-transito-fisco-media-v1'; // compatibilidade com rascunhos anteriores
+    const FISCO_FIELD_IDS=['globalBatalhao','globalCompanhia','data','hora','local','tipoOcorrencia','guarnicao','destino','relato','vitima','conduzida','material','veiculo','desfecho','observacoes'];
+    function fiscoDraftSnapshot(){
+      const campos={};
+      FISCO_FIELD_IDS.forEach(id=>{const e=document.getElementById(id);if(!e)return;campos[id]=(e.type==='checkbox'||e.type==='radio')?!!e.checked:e.value});
+      return {schema:'pmpb-transito-fisco-draft-v2',salvoEm:new Date().toISOString(),campos,fotos:fotosSelecionadas};
+    }
+    function aplicarCamposFisco(campos={}){
+      FISCO_FIELD_IDS.forEach(id=>{if(!(id in campos))return;const e=document.getElementById(id);if(!e)return;const v=campos[id];if(e.type==='checkbox'||e.type==='radio')e.checked=!!v;else e.value=v??'';e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('input',{bubbles:true}))});
+    }
+    function carregarFiscoLegado(){
+      let ok=false;
+      try{const raw=localStorage.getItem(FISCO_DRAFT_MEDIA_KEY);if(raw){const d=JSON.parse(raw);fotosSelecionadas=Array.isArray(d.fotos)?d.fotos.slice(0,MAX_FOTOS):[];ok=true}}catch(_){}
+      try{const gk='central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase(),raw=localStorage.getItem(gk);if(raw){const snap=JSON.parse(raw),campos={};FISCO_FIELD_IDS.forEach(id=>{const k='id:'+id;if(k in (snap.values||{}))campos[id]=snap.values[k]});aplicarCamposFisco(campos);ok=ok||Object.keys(campos).length>0}}catch(_){}
+      if(ok){renderizarFotos();ajustarTextareas();prepararCamposParaImpressao()}
+      return ok;
+    }
     window.centralReportSave=function(silent=false){
-      try{localStorage.setItem(FISCO_DRAFT_MEDIA_KEY,JSON.stringify({fotos:fotosSelecionadas,salvoEm:new Date().toISOString()}));return true}catch(e){if(!silent)alert('Não foi possível salvar as fotografias do rascunho neste aparelho.');return false}
+      try{localStorage.setItem(FISCO_DRAFT_KEY,JSON.stringify(fiscoDraftSnapshot()));return true}catch(e){if(!silent)alert('Não foi possível salvar o rascunho neste aparelho. Se houver fotos grandes, tente reduzir a quantidade ou o tamanho.');return false}
     };
     window.centralReportLoad=function(silent=false){
-      try{const raw=localStorage.getItem(FISCO_DRAFT_MEDIA_KEY);if(!raw)return false;const d=JSON.parse(raw);fotosSelecionadas=Array.isArray(d.fotos)?d.fotos.slice(0,MAX_FOTOS):[];renderizarFotos();return true}catch(e){if(!silent)alert('Não foi possível restaurar as fotografias do rascunho.');return false}
+      try{
+        const raw=localStorage.getItem(FISCO_DRAFT_KEY);
+        if(!raw)return carregarFiscoLegado();
+        const d=JSON.parse(raw);aplicarCamposFisco(d.campos||{});fotosSelecionadas=Array.isArray(d.fotos)?d.fotos.slice(0,MAX_FOTOS):[];renderizarFotos();ajustarTextareas();prepararCamposParaImpressao();return true;
+      }catch(e){if(!silent)alert('Não foi possível restaurar o rascunho.');return false}
     };
 
     function limparFormulario() {
       if (!confirm('Deseja limpar todos os campos do relatório?')) return;
+      try{localStorage.removeItem(FISCO_DRAFT_KEY);localStorage.removeItem(FISCO_DRAFT_MEDIA_KEY);localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase())}catch(_){}
       document.querySelectorAll('input, textarea').forEach(el => {
         if (el.type === 'date') el.value = dataLocalISO();
         else if (el.type === 'time') el.value = horaLocal();
