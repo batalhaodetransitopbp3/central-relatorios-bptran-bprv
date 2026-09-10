@@ -790,6 +790,7 @@
 
   <script>
     const DRAFT_KEY = 'bo_bptrans_1cprv_v2';
+    const BO_DRAFT_LAYOUT_VERSION = 'bo-layout-2026-09-10-v1'; // alterar quando a estrutura do formulário mudar
     function onlyDigits(v){ return (v || '').replace(/\D/g,''); }
     function maskDate(v){ const d = onlyDigits(v).slice(0,8); if(d.length<=2)return d; if(d.length<=4)return d.slice(0,2)+'/'+d.slice(2); return d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4); }
     function maskTime(v){ const d = onlyDigits(v).slice(0,4); if(d.length<=2)return d; return d.slice(0,2)+':'+d.slice(2); }
@@ -939,7 +940,7 @@
     function addArma(){ document.getElementById('semArma').checked=false; toggleList('semArma','armas','armaEmpty'); cloneTemplate('tplArma','armas'); }
     function addCartucho(){ document.getElementById('semCartucho').checked=false; toggleList('semCartucho','cartuchos','cartuchoEmpty'); cloneTemplate('tplCartucho','cartuchos'); }
     function addVeiculo(){ document.getElementById('semVeiculo').checked=false; toggleList('semVeiculo','veiculos','veiculoEmpty'); cloneTemplate('tplVeiculo','veiculos'); }
-    function removeCard(btn){ const card=btn.closest('.subcard'); if(card) card.remove(); refreshCounters(); updateAcusadoOptions(); atualizarOpcoesTestemunhasPM(); }
+    function removeCard(btn){ const card=btn.closest('.subcard'); if(card) card.remove(); refreshCounters(); updateAcusadoOptions(); atualizarOpcoesTestemunhasPM(); window.centralAutosave?.(); }
     function refreshCounters(){
       document.querySelectorAll('.guarnicao-card .subcard-head span').forEach((el,i)=>el.textContent='Guarnição '+(i+1));
       document.querySelectorAll('.acusado-card .subcard-head span').forEach((el,i)=>el.textContent='Acusado '+(i+1));
@@ -1039,11 +1040,11 @@
       });
     }
     function escapeHtml(str){ return String(str).replace(/[&<>'"]/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
-    function serializeForm(){ const original=document.getElementById('boForm'); const clone=original.cloneNode(true); clone.querySelectorAll('.print-render').forEach(el=>el.remove()); clone.querySelectorAll('[data-bound-mask],[data-bound-grow],[data-bound-update]').forEach(el=>{el.removeAttribute('data-bound-mask');el.removeAttribute('data-bound-grow');el.removeAttribute('data-bound-update');}); const src=original.querySelectorAll('input,textarea,select'); const dst=clone.querySelectorAll('input,textarea,select'); src.forEach((s,i)=>{ const d=dst[i]; if(!d)return; if(s.tagName==='TEXTAREA') d.textContent=s.value; else if(s.tagName==='SELECT'){ Array.from(d.options).forEach(o=>o.removeAttribute('selected')); if(s.selectedIndex>=0 && d.options[s.selectedIndex]) d.options[s.selectedIndex].setAttribute('selected','selected'); } else if(s.type==='checkbox'||s.type==='radio'){ if(s.checked)d.setAttribute('checked','checked'); else d.removeAttribute('checked'); } else d.setAttribute('value',s.value); }); return {html:clone.innerHTML}; }
+    function serializeForm(){ const original=document.getElementById('boForm'); const clone=original.cloneNode(true); clone.querySelectorAll('.print-render').forEach(el=>el.remove()); clone.querySelectorAll('[data-bound-mask],[data-bound-grow],[data-bound-update]').forEach(el=>{el.removeAttribute('data-bound-mask');el.removeAttribute('data-bound-grow');el.removeAttribute('data-bound-update');}); const src=original.querySelectorAll('input,textarea,select'); const dst=clone.querySelectorAll('input,textarea,select'); src.forEach((s,i)=>{ const d=dst[i]; if(!d)return; if(s.tagName==='TEXTAREA') d.textContent=s.value; else if(s.tagName==='SELECT'){ Array.from(d.options).forEach(o=>o.removeAttribute('selected')); if(s.selectedIndex>=0 && d.options[s.selectedIndex]) d.options[s.selectedIndex].setAttribute('selected','selected'); } else if(s.type==='checkbox'||s.type==='radio'){ if(s.checked)d.setAttribute('checked','checked'); else d.removeAttribute('checked'); } else d.setAttribute('value',s.value); }); return {schema:'bo-bptrans-draft-v3',layoutVersion:BO_DRAFT_LAYOUT_VERSION,savedAt:new Date().toISOString(),html:clone.innerHTML}; }
     function restoreForm(data){ if(!data || !data.html)return; document.getElementById('boForm').innerHTML=data.html; bind(); document.querySelectorAll('textarea').forEach(autoGrow); refreshCounters(); toggleSolicitante(); toggleEmpty('acusado'); toggleEmpty('vitima'); toggleEmpty('testemunha'); toggleList('semArma','armas','armaEmpty'); toggleList('semCartucho','cartuchos','cartuchoEmpty'); toggleList('semVeiculo','veiculos','veiculoEmpty'); toggleObjetos(); toggleResistencia(); updateAcusadoOptions(); updateResistenciaText(); }
     function saveDraft(silent=false){ localStorage.setItem(DRAFT_KEY, JSON.stringify(serializeForm())); if(!silent)alert('Rascunho salvo neste navegador.'); return true; }
-    function loadDraft(silent=false){ const raw=localStorage.getItem(DRAFT_KEY); if(!raw){if(!silent)alert('Não há rascunho salvo neste navegador.');return false;} restoreForm(JSON.parse(raw)); if(!silent)alert('Rascunho carregado.'); return true; }
-    function clearForm(){ if(!confirm('Deseja limpar todo o boletim? Essa ação apagará os dados preenchidos na tela.')) return; localStorage.removeItem(DRAFT_KEY); location.reload(); }
+    function loadDraft(silent=false){ const raw=localStorage.getItem(DRAFT_KEY); if(!raw){if(!silent)alert('Não há rascunho salvo neste navegador.');return false;} try{const data=JSON.parse(raw);if(data.layoutVersion&&data.layoutVersion!==BO_DRAFT_LAYOUT_VERSION){alert('Este rascunho foi criado em uma versão estrutural diferente do Boletim e não será carregado para evitar campos deslocados.');return false;}restoreForm(data);if(!data.layoutVersion)saveDraft(true);if(!silent)alert('Rascunho carregado.');return true;}catch(e){if(!silent)alert('Rascunho inválido ou incompatível.');return false;} }
+    function clearForm(){ if(!confirm('Deseja limpar todo o boletim? Essa ação apagará os dados preenchidos na tela.')) return; try{localStorage.removeItem(DRAFT_KEY);localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase())}catch(_){} location.reload(); }
     function clearPrintRenders(){ document.querySelectorAll('.print-render').forEach(el=>el.remove()); }
     function createPrintRenders(){
       clearPrintRenders();
