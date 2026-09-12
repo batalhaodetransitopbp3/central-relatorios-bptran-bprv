@@ -308,114 +308,71 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
 </style>
 <script id="v9-rco-passagem-auditoria-script">
 (function(){
-  'use strict';
-  const AUDIT_SCHEMA='pmpb-transito-auditoria-rco-v1', PASS_SCHEMA='pmpb-transito-passagem-rco-v1';
-  let auditMuted=true, auditState={schema:AUDIT_SCHEMA,version:1,activeSlot:1,events:[],passagens:[]};
-  const beforeValues=new WeakMap();
+  const AUDIT_SCHEMA='pmpb-transito-auditoria-rco-v2', PASS_SCHEMA='pmpb-transito-passagem-rco-v1';
   const clone=o=>{try{return JSON.parse(JSON.stringify(o))}catch(_){return o}};
   const text=v=>String(v??'').trim();
+  const escHtml=v=>text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const trim=(v,n=120)=>{v=text(v);return v.length>n?v.slice(0,n-1)+'…':v};
-  function normalize(a){
-    a=a&&typeof a==='object'?clone(a):{};
-    return {schema:AUDIT_SCHEMA,version:1,activeSlot:Number(a.activeSlot)===2?2:1,events:Array.isArray(a.events)?a.events.slice(-2000):[],passagens:Array.isArray(a.passagens)?a.passagens.slice(-100):[]};
-  }
-  function rows(){try{return typeof cpuPeopleData==='function'?cpuPeopleData():[]}catch(_){return []}}
-  function actor(slot=auditState.activeSlot){
-    slot=Number(slot)===2?2:1;const p=rows()[slot-1]||{};
-    return {slot:'CPU '+slot,nome:text(p.nome),posto:text(p.graduacao),matricula:text(p.matricula),turno:text(p.turno)};
-  }
-  function actorLabel(a){return [a.slot,[a.posto,a.nome].filter(Boolean).join(' '),a.matricula?('Mat. '+a.matricula):''].filter(Boolean).join(' — ')}
-  function log(tipo,item,antes,depois,detalhe){
-    if(auditMuted)return;
-    const ev={id:'aud-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),em:new Date().toISOString(),autor:actor(),tipo,item:text(item)||'Ação no relatório',antes:trim(antes,220),depois:trim(depois,220),detalhe:trim(detalhe,260)};
-    auditState.events.push(ev);if(auditState.events.length>2000)auditState.events.splice(0,auditState.events.length-2000);render();
-  }
-  function fieldValue(el){return el.type==='checkbox'?(el.checked?'Sim':'Não'):el.value}
-  function labelOf(el){
-    if(!el)return 'Campo';
-    const f=el.closest('.field');if(f){const l=f.querySelector('label');if(l&&text(l.textContent))return text(l.textContent)}
-    const tr=el.closest('tr');if(tr){const cells=[...tr.querySelectorAll('th,td')].map(x=>text(x.textContent)).filter(Boolean);if(cells.length)return cells.slice(0,2).join(' / ')}
-    if(el.dataset?.k)return el.dataset.k;if(el.dataset?.metric)return 'Produção operacional — '+el.dataset.metric;if(el.id)return el.id;return el.name||'Campo';
-  }
+  let auditMuted=true;
+  let auditState={schema:AUDIT_SCHEMA,version:2,activated:false,activeSlot:1,actors:{1:{},2:{}},events:[],passagens:[],snapshots:{cpu1AtPassage:null,cpu2Start:null,cpu2Current:null}};
+  const beforeValues=new WeakMap();
+  const baseCollect=typeof window.collectState==='function'?window.collectState:null;
+  const baseApply=typeof window.applyCpu==='function'?window.applyCpu:null;
+  const baseClear=typeof window.limparFormulario==='function'?window.limparFormulario:null;
+  function normalize(a){a=a&&typeof a==='object'?clone(a):{};return {schema:AUDIT_SCHEMA,version:2,activated:!!a.activated,activeSlot:Number(a.activeSlot)===2?2:1,actors:{1:{...(a.actors?.[1]||a.actors?.['1']||{})},2:{...(a.actors?.[2]||a.actors?.['2']||{})}},events:Array.isArray(a.events)?a.events.slice(-3000):[],passagens:Array.isArray(a.passagens)?a.passagens.slice(-100):[],snapshots:{cpu1AtPassage:a.snapshots?.cpu1AtPassage||null,cpu2Start:a.snapshots?.cpu2Start||null,cpu2Current:a.snapshots?.cpu2Current||null}}}
+  function people(){try{return typeof window.cpuPeopleData==='function'?window.cpuPeopleData():[]}catch(_){return []}}
+  function syncActors(){const ps=people();[1,2].forEach(slot=>{const p=ps[slot-1]||{};const a=auditState.actors[String(slot)]||{};if(p.nome)a.nome=p.nome;if(p.matricula)a.matricula=p.matricula;if(p.graduacao)a.graduacao=p.graduacao;if(p.turno)a.turno=p.turno;auditState.actors[String(slot)]=a})}
+  function actor(slot=auditState.activeSlot){slot=Number(slot)===2?2:1;syncActors();const a=auditState.actors[String(slot)]||{};return {slot:'CPU '+slot,nome:text(a.nome),matricula:text(a.matricula),graduacao:text(a.graduacao),turno:text(a.turno)}}
+  function actorLabel(a){return [a.slot,[a.graduacao,a.nome].filter(Boolean).join(' '),a.matricula].filter(Boolean).join(' — ')}
+  function log(tipo,item,antes,depois,detalhe){if(auditMuted||!auditState.activated)return;const ev={id:'aud-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),em:new Date().toISOString(),autor:actor(),tipo,item:text(item)||'Ação no relatório',antes:trim(antes,240),depois:trim(depois,240),detalhe:trim(detalhe,300)};auditState.events.push(ev);if(auditState.events.length>3000)auditState.events.splice(0,auditState.events.length-3000);render()}
+  function fieldValue(el){return el?.type==='checkbox'?(el.checked?'Sim':'Não'):text(el?.value)}
+  function labelOf(el){const f=el.closest('.field,td,.line');return text(f?.querySelector('label,span')?.textContent||el.dataset?.k||el.id||el.name||'Campo')}
+  function lockCpu1(){const row=document.querySelector('#cpuPeople tr:first-child');if(!row)return;row.classList.add('audit-locked-row');row.querySelectorAll('input,select').forEach(el=>{const s=el.parentElement?.querySelector('.print-value');if(s)s.textContent=el.options&&el.selectedIndex>=0?el.options[el.selectedIndex].text:el.value;el.disabled=true});row.querySelectorAll('button').forEach(b=>b.style.display='none')}
+  function unlockCpu2(){const rows=[...document.querySelectorAll('#cpuPeople tr')];rows.slice(1).forEach(row=>{row.classList.remove('audit-locked-row');row.querySelectorAll('input,select').forEach(el=>{el.disabled=false;el.hidden=false})})}
+  function ensureCpu2(){let rows=[...document.querySelectorAll('#cpuPeople tr')];rows.slice(1).forEach(r=>r.remove());if(typeof window.addCpuPerson==='function')window.addCpuPerson({turno:''});lockCpu1();unlockCpu2();toggleCpuAddButton()}
+  function toggleCpuAddButton(){const sec=document.querySelector('#cpuPeople')?.closest('section');const b=[...(sec?.querySelectorAll('button')||[])].find(x=>/\+\s*militar/i.test(x.textContent||''));if(b)b.hidden=!!auditState.activated}
+  function updateUiState(){lockCpu1IfNeeded();toggleCpuAddButton();const btn=document.getElementById('rcoAuditToggle');if(btn)btn.hidden=!auditState.activated;const status=document.getElementById('rcoAuditStatus');if(status)status.textContent=auditState.activated?('Auditoria ativa • '+actorLabel(actor())):'Auditoria será ativada na passagem de serviço.'}
+  function lockCpu1IfNeeded(){if(auditState.activated)lockCpu1()}
   function render(){
-    const card=document.getElementById('rcoAuditCard');if(!card)return;
-    const sel=document.getElementById('rcoAuditActor');if(sel)sel.value=String(auditState.activeSlot);
-    const status=document.getElementById('rcoAuditStatus');if(status)status.textContent='Autor em atividade: '+actorLabel(actor());
-    [1,2].forEach(slot=>{
-      const a=actor(slot), evs=auditState.events.filter(e=>e.autor?.slot==='CPU '+slot), box=document.getElementById('rcoAuditCpu'+slot);
-      if(box)box.innerHTML='<strong>CPU '+slot+'</strong><div>'+((a.posto||a.nome)?trim([a.posto,a.nome].filter(Boolean).join(' '),80):'Não cadastrado')+'</div><div>'+(a.matricula?('Matrícula: '+a.matricula):'')+'</div><div>'+evs.length+' registro(s) de autoria</div>';
-    });
-    const tb=document.getElementById('rcoAuditRows');if(tb){
-      const evs=auditState.events.slice(-120).reverse();
-      tb.innerHTML=evs.length?evs.map(e=>'<tr><td>'+new Date(e.em).toLocaleString('pt-BR')+'</td><td>'+trim(actorLabel(e.autor||{}),70)+'</td><td>'+trim(e.tipo,40)+'</td><td>'+trim(e.item,75)+'</td><td>'+trim(e.antes,65)+'</td><td>'+trim(e.depois,65)+'</td></tr>').join(''):'<tr><td colspan="6">Ainda não há registros de autoria.</td></tr>';
-    }
+    const card=document.getElementById('rcoAuditCard');if(!card)return;updateUiState();
+    [1,2].forEach(slot=>{const a=actor(slot),evs=auditState.events.filter(e=>e.autor?.slot==='CPU '+slot),box=document.getElementById('rcoAuditCpu'+slot);if(box)box.innerHTML='<strong>CPU '+slot+'</strong><div>'+escHtml([a.graduacao,a.nome].filter(Boolean).join(' ')||'Não identificado')+'</div><div>'+escHtml(a.matricula?('Matrícula: '+a.matricula):'')+'</div><div>'+evs.length+' alteração(ões) auditada(s)</div>'});
+    const tb=document.getElementById('rcoAuditRows');if(tb){const evs=auditState.events.slice(-150).reverse();tb.innerHTML=evs.length?evs.map(e=>'<tr><td>'+new Date(e.em).toLocaleString('pt-BR')+'</td><td>'+escHtml(trim(actorLabel(e.autor||{}),85))+'</td><td>'+escHtml(trim(e.tipo,40))+'</td><td>'+escHtml(trim(e.item,85))+'</td><td>'+escHtml(trim(e.antes,75))+'</td><td>'+escHtml(trim(e.depois,75))+'</td></tr>').join(''):'<tr><td colspan="6">A auditoria ainda não possui alterações posteriores à passagem.</td></tr>'}
   }
   function installUi(){
     const toolbar=document.querySelector('.toolbar.no-print');
     if(toolbar&&!document.getElementById('rcoPassagemFile')){
-      const frag=document.createDocumentFragment();
       const b1=document.createElement('button');b1.type='button';b1.className='secondary';b1.textContent='Realizar passagem de serviço';b1.onclick=()=>window.gerarPassagemServicoRco();
       const b2=document.createElement('button');b2.type='button';b2.className='secondary';b2.textContent='Receber Serviço';b2.onclick=()=>document.getElementById('rcoPassagemFile').click();
       const fi=document.createElement('input');fi.id='rcoPassagemFile';fi.type='file';fi.hidden=true;fi.accept='.json,application/json';fi.onchange=function(){window.receberPassagemServicoRco(this.files);this.value=''};
-      const ba=document.createElement('button');ba.type='button';ba.className='secondary';ba.textContent='Auditoria';ba.onclick=()=>{const c=document.getElementById('rcoAuditCard');if(c){c.hidden=!c.hidden;if(!c.hidden){render();c.scrollIntoView({behavior:'smooth',block:'start'})}}};
-      frag.append(b1,b2,fi,ba);
-      const p3=toolbar.querySelector('.p3-link');if(p3)toolbar.insertBefore(frag,p3);else toolbar.appendChild(frag);
+      const ba=document.createElement('button');ba.id='rcoAuditToggle';ba.type='button';ba.className='secondary';ba.textContent='Auditoria';ba.hidden=!auditState.activated;ba.onclick=()=>{const c=document.getElementById('rcoAuditCard');if(c){c.hidden=!c.hidden;if(!c.hidden){render();c.scrollIntoView({behavior:'smooth',block:'start'})}}};
+      const danger=toolbar.querySelector('.danger');[b1,b2,ba,fi].forEach(el=>danger?toolbar.insertBefore(el,danger):toolbar.appendChild(el));
     }
     if(!document.getElementById('rcoAuditCard')){
       const card=document.createElement('section');card.id='rcoAuditCard';card.className='card audit-card no-print';card.hidden=true;
-      card.innerHTML='<div class="audit-head"><div><h2 class="sec-title" style="margin:0">Auditoria de autoria — CPU 1 / CPU 2</h2><div class="audit-status" id="rcoAuditStatus"></div></div><div class="audit-controls"><label for="rcoAuditActor"><strong>CPU em atividade</strong></label><select id="rcoAuditActor"><option value="1">CPU 1</option><option value="2">CPU 2</option></select></div></div><div class="audit-summary"><div class="audit-person" id="rcoAuditCpu1"></div><div class="audit-person" id="rcoAuditCpu2"></div></div><div class="audit-log-wrap"><table class="audit-table"><thead><tr><th>Data/hora</th><th>Autor</th><th>Ação</th><th>Item</th><th>Antes</th><th>Depois</th></tr></thead><tbody id="rcoAuditRows"></tbody></table></div><div class="audit-note">A trilha é incorporada ao rascunho e ao arquivo de passagem. Ao receber uma passagem, o autor ativo muda automaticamente para CPU 2. Alterações posteriores ficam atribuídas ao CPU selecionado.</div>';
-      const cpuSec=[...document.querySelectorAll('section.card')].find(s=>/\b1\.\s*CPU\b/i.test(s.querySelector('.sec-title')?.textContent||''));
-      if(cpuSec)cpuSec.after(card);else document.querySelector('header.doc-head')?.after(card);
-      card.querySelector('#rcoAuditActor').addEventListener('change',e=>{auditState.activeSlot=Number(e.target.value)===2?2:1;render()});
+      card.innerHTML='<div class="audit-head"><div><h2 class="sec-title" style="margin:0">Auditoria de autoria — CPU 1 / CPU 2</h2><div class="audit-status" id="rcoAuditStatus"></div></div></div><div class="audit-summary"><div class="audit-person" id="rcoAuditCpu1"></div><div class="audit-person" id="rcoAuditCpu2"></div></div><div class="audit-log-wrap"><table class="audit-table"><thead><tr><th>Data/hora</th><th>Autor</th><th>Ação</th><th>Item</th><th>Antes</th><th>Depois</th></tr></thead><tbody id="rcoAuditRows"></tbody></table></div><div class="audit-note">A auditoria nasce somente na passagem. O estado completo do CPU 1 é preservado como fotografia de encerramento; após o recebimento, todas as alterações passam a pertencer ao CPU 2. A fotografia final do CPU 2 é incorporada ao relatório, alcançando inclusive inclusões programáticas/importadas.</div>';
+      document.querySelector('header.doc-head')?.after(card);
     }
-    render();
+    render();setTimeout(()=>window.centralInstallCompactMenus?.(),60)
   }
-  // Integra a trilha ao estado oficial do RCO sem alterar o contrato existente.
-  if(typeof window.collectState==='function'){
-    const base=window.collectState;window.collectState=function(){const p=base();p.auditoria=clone(auditState);return p};
-  }
-  if(typeof window.applyCpu==='function'){
-    const base=window.applyCpu;window.applyCpu=function(p){auditMuted=true;try{base(p);auditState=normalize(p?.auditoria||p?.state?.auditoria)}finally{auditMuted=false}render()};
-  }
-  if(typeof window.limparFormulario==='function'){
-    const base=window.limparFormulario;window.limparFormulario=function(){let before='';try{before=window.collectState?.()?.state?.reportId||''}catch(_){}const r=base();let after='';try{after=window.collectState?.()?.state?.reportId||''}catch(_){}if(before&&after&&before!==after){auditState=normalize(null);render()}return r};
-  }
-  if(typeof window.importarDados==='function'){
-    const base=window.importarDados;window.importarDados=async function(files){const qtd=Array.from(files||[]).length,r=await base(files);log('IMPORTAÇÃO','Relatório(s) de guarnição','','',qtd+' arquivo(s) selecionado(s)');return r};
-  }
-  if(typeof window.importarOperacoesDoDiaCpu==='function'){
-    const base=window.importarOperacoesDoDiaCpu;window.importarOperacoesDoDiaCpu=function(){const b=(document.getElementById('cpuOperations')?.children.length||0),r=base();setTimeout(()=>{const a=document.getElementById('cpuOperations')?.children.length||0;if(a!==b)log('IMPORTAÇÃO','Operações do dia',String(b),String(a),(a-b)+' nova(s) operação(ões)')},0);return r};
-  }
+  if(baseCollect){window.collectState=function(){const p=baseCollect();if(auditState.activated&&auditState.activeSlot===2)auditState.snapshots.cpu2Current=clone({...p,auditoria:undefined});p.auditoria=clone(auditState);return p}}
+  if(baseApply){window.applyCpu=function(p){auditMuted=true;try{baseApply(p);auditState=normalize(p?.auditoria||p?.state?.auditoria);if(auditState.activated){if(auditState.activeSlot===2)ensureCpu2();else lockCpu1()}}finally{auditMuted=!auditState.activated}render()}}
+  if(baseClear){window.limparFormulario=function(){const r=baseClear();auditState=normalize(null);auditMuted=true;render();return r}}
+  function dlJSON(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},300)}
+  function safeName(s,f='CPU'){return text(s).replace(/[\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||f}
+  function fmtDateFile(s){if(!s)return new Date().toLocaleDateString('pt-BR').replaceAll('/','.');const [y,m,d]=String(s).split('-');return d&&m&&y?`${d}.${m}.${y}`:s}
   window.gerarPassagemServicoRco=function(){
-    const a=actor();if(!a.nome&&!a.matricula){if(!confirm(a.slot+' ainda não possui identificação na tabela de CPU. Deseja gerar a passagem mesmo assim?'))return}
-    auditMuted=false;log('PASSAGEM','Passagem de serviço gerada','','',a.slot+' encerrou sua etapa de preenchimento');
-    const p=collectState(), marco={em:new Date().toISOString(),de:actorLabel(a),reportId:p?.state?.reportId||p?.reportId||''};auditState.passagens.push(marco);p.auditoria=clone(auditState);
-    try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){}
-    const data=p?.periodo?.inicio||'';dlJSON('PASSAGEM RCO - '+safeName(a.slot,'CPU')+' - '+fmtDateFile(data)+'.json',{schema:PASS_SCHEMA,schemaVersion:1,generatedAt:new Date().toISOString(),relatorio:p});
+    syncActors();const a=actor(1);if(!a.nome&&!a.matricula){alert('Identifique o CPU 1 no Campo 1 antes de realizar a passagem de serviço.');return}
+    const base=baseCollect?baseCollect():{};auditState.activated=true;auditState.activeSlot=1;auditState.actors['1']={...auditState.actors['1'],nome:a.nome,matricula:a.matricula,graduacao:a.graduacao,turno:a.turno};auditState.snapshots.cpu1AtPassage=clone({...base,auditoria:undefined});auditState.passagens.push({em:new Date().toISOString(),de:actorLabel(a),reportId:base?.state?.reportId||base?.reportId||''});
+    auditMuted=false;log('PASSAGEM','Encerramento do CPU 1','','','Estado completo preservado para auditoria');lockCpu1();render();
+    const p=window.collectState?window.collectState():base;const data=p?.periodo?.inicio||'';dlJSON('PASSAGEM RCO - '+safeName(a.nome||'CPU 1')+' - '+fmtDateFile(data)+'.json',{schema:PASS_SCHEMA,schemaVersion:2,generatedAt:new Date().toISOString(),relatorio:p});
+    try{window.salvarRascunho?.(true)}catch(_){}
+    alert('Passagem gerada. O cadastro do CPU 1 foi encerrado e bloqueado. A auditoria está ativa; o CPU 2 será aberto quando o serviço for recebido.');
   };
-  window.receberPassagemServicoRco=async function(files){
-    const f=Array.from(files||[])[0];if(!f)return;
-    try{
-      const p=JSON.parse(await f.text()),r=p?.schema===PASS_SCHEMA?p.relatorio:p;
-      if(r?.schema!=='pmpb-transito-cpu-v2')throw new Error('schema');
-      auditMuted=true;applyCpu(r);auditState=normalize(r.auditoria);auditState.activeSlot=2;auditMuted=false;
-      log('PASSAGEM','Serviço recebido','','', 'Arquivo: '+f.name);
-      try{salvarRascunho(true)}catch(_){}
-      render();alert('Serviço recebido. O RCO foi carregado integralmente e a autoria ativa foi definida como CPU 2. Confira/cadastre o segundo CPU antes de continuar.');
-    }catch(e){console.error(e);alert('Arquivo de passagem de serviço do RCO incompatível ou inválido.')}
-  };
-  document.addEventListener('focusin',e=>{const el=e.target;if(el.matches?.('input,select,textarea')&&!el.closest('#rcoAuditCard'))beforeValues.set(el,fieldValue(el))},true);
-  document.addEventListener('change',e=>{
-    if(auditMuted)return;const el=e.target;if(!el.matches?.('input,select,textarea')||el.closest('#rcoAuditCard')||el.id==='rcoPassagemFile')return;
-    const before=beforeValues.has(el)?beforeValues.get(el):'',after=fieldValue(el);if(String(before)===String(after))return;
-    log('ALTERAÇÃO',labelOf(el),before,after,'');beforeValues.set(el,after);
-  },true);
-  document.addEventListener('click',e=>{
-    if(auditMuted)return;const b=e.target.closest?.('button');if(!b||b.closest('#rcoAuditCard'))return;const t=text(b.textContent);
-    if(!t||/salvar rascunho|carregar rascunho|gerar pdf|consolidar p3|auditoria|realizar passagem|receber serviço/i.test(t))return;
-    if(/^\+|remover$|^×$|limpar$/i.test(t)){const ctx=b.closest('.entry,.gu-card,section')?.querySelector('.entry-title,.gu-title,.sec-title')?.textContent||'';setTimeout(()=>log('AÇÃO ESTRUTURAL',ctx||t,'',t,''),0)}
-  },true);
-  document.addEventListener('DOMContentLoaded',()=>{installUi();setTimeout(()=>{auditMuted=false;render()},80)});
+  window.receberPassagemServicoRco=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const x=JSON.parse(await f.text()),r=x?.relatorio||x;if(!r||!(r.schema||'').includes('cpu'))throw new Error('schema');auditMuted=true;baseApply(r);auditState=normalize(r.auditoria);auditState.activated=true;auditState.activeSlot=2;ensureCpu2();syncActors();auditState.snapshots.cpu2Start=clone(baseCollect?baseCollect():{});auditMuted=false;log('PASSAGEM','Início do CPU 2','','', 'Serviço recebido: '+f.name);render();try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralInstallCompactMenus?.(),40);alert('Serviço recebido. O CPU 1 permanece bloqueado para auditoria e foi aberto um novo cadastro para o CPU 2.');}catch(e){console.error(e);alert('Arquivo de passagem de serviço do RCO incompatível ou inválido.') }};
+  document.addEventListener('focusin',e=>{if(!auditState.activated)return;const el=e.target;if(el.matches?.('input,select,textarea')&&!el.closest('#rcoAuditCard')&&!el.closest('.audit-locked-row'))beforeValues.set(el,fieldValue(el))},true);
+  document.addEventListener('change',e=>{if(auditMuted||!auditState.activated)return;const el=e.target;if(!el.matches?.('input,select,textarea')||el.closest('#rcoAuditCard')||el.closest('.audit-locked-row')||el.id==='rcoPassagemFile')return;const before=beforeValues.get(el)??'',after=fieldValue(el);if(before!==after)log('ALTERAÇÃO',labelOf(el),before,after,'');beforeValues.set(el,after)},true);
+  document.addEventListener('click',e=>{if(auditMuted||!auditState.activated)return;const b=e.target.closest?.('button');if(!b||b.closest('#rcoAuditCard')||b.closest('.audit-locked-row'))return;const t=text(b.textContent);if(!t||/salvar rascunho|carregar rascunho|gerar pdf|consolidar p3|auditoria|realizar passagem|receber serviço|menu/i.test(t))return;if(/^\+|remover$|^×$|limpar|cadastrar relatório|importar operações/i.test(t)){const ctx=b.closest('.entry,section')?.querySelector('.entry-title,.sec-title')?.textContent||'';setTimeout(()=>log('AÇÃO ESTRUTURAL',ctx||t,'',t,''),0)}},true);
+  document.addEventListener('DOMContentLoaded',()=>{installUi();setTimeout(()=>{auditMuted=!auditState.activated;render()},80)});
 })();
 </script>
 
@@ -569,6 +526,57 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     try{const p=p3BuildPackage(),s=p.estatisticaP3||{};const el=m.querySelector('#p3Preview');if(el)el.textContent=`Prévia: ${(s.producao||[]).length} indicadores de produção • ${(s.veiculos||[]).length} veículo(s) detalhado(s) • ${(s.cirvcs||[]).length} CIRVC(s) • ${(s.podExecucao||[]).length} registro(s) de POD.`}catch(err){const el=m.querySelector('#p3Preview');if(el)el.textContent=err.message||String(err)}
     m.querySelector('#p3Remember').checked=true;m.classList.remove('hidden');setTimeout(()=>input.focus(),40);
   };
+})();
+</script>
+
+<style id="v9-2-audit-lock-style">
+.audit-locked-row input,.audit-locked-row select{display:none!important}.audit-locked-row .print-value{display:inline-block!important;min-height:18px;padding:4px 5px;border:1px solid #d5dee6;border-radius:5px;background:#f3f6f8;color:#405264}.audit-locked-row td:last-child{display:none!important}.audit-locked-row::after{content:''}
+.audit-resp-locked input{display:none!important}.audit-resp-locked .print-value{display:block!important;min-height:22px;padding:5px 6px;border:1px solid #d5dee6;border-radius:6px;background:#f3f6f8;color:#405264}.audit-resp-locked::after{content:'Responsável 1 encerrado';display:block;margin-top:3px;font-size:9px;font-weight:700;color:#6b7e8d}
+@media print{.audit-locked-row input,.audit-locked-row select,.audit-resp-locked input{display:none!important}.audit-locked-row .print-value,.audit-resp-locked .print-value{display:block!important}.audit-resp-locked::after{display:none!important}}
+</style>
+
+<style id="central-compact-menu-style">
+.central-action-menu{position:relative;display:inline-block;z-index:5000}
+.central-action-menu-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;min-width:42px!important;padding:0!important;border-radius:9px!important;font-size:22px!important;line-height:1!important;font-weight:800!important;cursor:pointer!important}
+.central-action-menu-panel{position:absolute;top:calc(100% + 6px);left:0;display:none;min-width:270px;max-width:min(92vw,350px);max-height:72vh;overflow:auto;padding:6px;border:1px solid #c7d5e0;border-radius:11px;background:#fff;box-shadow:0 12px 32px rgba(18,48,72,.22);z-index:5001}
+.central-action-menu.open .central-action-menu-panel{display:block}
+.central-action-menu-panel>button{display:flex!important;width:100%!important;min-height:38px!important;margin:0 0 5px!important;padding:8px 10px!important;align-items:center!important;justify-content:flex-start!important;text-align:left!important;white-space:normal!important;border-radius:8px!important;box-shadow:none!important}
+.central-action-menu-panel>button:last-child{margin-bottom:0!important}
+.central-action-menu-panel>button[hidden]{display:none!important}
+.central-action-menu-panel>.danger{margin-top:5px!important}
+.central-menu-title{padding:3px 6px 6px;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64788a}
+.toolbar-inner>.toolbar-spacer.central-menu-spacer-hidden{display:none!important}
+@media(max-width:620px){.central-action-menu-panel{position:fixed;top:58px;left:8px;right:8px;max-width:none;width:auto;max-height:78vh}.central-action-menu-toggle{width:44px!important;height:40px!important}}
+@media print{.central-action-menu{display:none!important}}
+</style>
+
+<script id="central-compact-menu-script">
+(function(){
+  function installCompactMenu(toolbar){
+    if(!toolbar||toolbar.dataset.compactMenuInstalled==='1')return;
+    const directButtons=[...toolbar.children].filter(el=>el.tagName==='BUTTON');
+    if(directButtons.length<5)return;
+    toolbar.dataset.compactMenuInstalled='1';
+    const wrap=document.createElement('div');wrap.className='central-action-menu';
+    const toggle=document.createElement('button');toggle.type='button';toggle.className='central-action-menu-toggle';toggle.setAttribute('aria-label','Abrir menu de ações');toggle.setAttribute('aria-expanded','false');toggle.title='Menu de ações';toggle.textContent='☰';
+    const panel=document.createElement('div');panel.className='central-action-menu-panel';panel.setAttribute('role','menu');
+    const title=document.createElement('div');title.className='central-menu-title';title.textContent='Ações';panel.appendChild(title);
+    directButtons.forEach(btn=>{btn.setAttribute('role','menuitem');panel.appendChild(btn)});
+    wrap.append(toggle,panel);toolbar.insertBefore(wrap,toolbar.firstChild);
+    const spacer=toolbar.querySelector(':scope > .toolbar-spacer');if(spacer)spacer.classList.add('central-menu-spacer-hidden');
+    function close(){wrap.classList.remove('open');toggle.setAttribute('aria-expanded','false')}
+    toggle.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const opening=!wrap.classList.contains('open');document.querySelectorAll('.central-action-menu.open').forEach(x=>x.classList.remove('open'));wrap.classList.toggle('open',opening);toggle.setAttribute('aria-expanded',String(opening))});
+    panel.addEventListener('click',e=>{if(e.target.closest('button'))setTimeout(close,0)});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target))close()});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  }
+  function run(){
+    document.querySelectorAll('.toolbar.no-print').forEach(tb=>{
+      const inner=tb.querySelector(':scope > .toolbar-inner');installCompactMenu(inner||tb);
+    });
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(run,30));
+  window.centralInstallCompactMenus=run;
 })();
 </script>
 </body></html>
