@@ -332,53 +332,39 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
 </style>
 <script id="v9-rsd-auditoria-script">
 (function(){
-  'use strict';
-  const AUDIT_SCHEMA='pmpb-transito-auditoria-rsd-v1';
-  let auditMuted=true,auditState={schema:AUDIT_SCHEMA,version:1,activeSlot:1,actors:{1:{},2:{}},events:[],passagens:[]};
-  const beforeValues=new WeakMap();
+  const AUDIT_SCHEMA='pmpb-transito-auditoria-rsd-v2';
   const clone=o=>{try{return JSON.parse(JSON.stringify(o))}catch(_){return o}};
   const text=v=>String(v??'').trim();
+  const escHtml=v=>text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const trim=(v,n=120)=>{v=text(v);return v.length>n?v.slice(0,n-1)+'…':v};
-  function normalize(a){a=a&&typeof a==='object'?clone(a):{};return {schema:AUDIT_SCHEMA,version:1,activeSlot:Number(a.activeSlot)===2?2:1,actors:{1:{...(a.actors?.[1]||a.actors?.['1']||{})},2:{...(a.actors?.[2]||a.actors?.['2']||{})}},events:Array.isArray(a.events)?a.events.slice(-2000):[],passagens:Array.isArray(a.passagens)?a.passagens.slice(-100):[]}}
-  function syncActorIdentity(force=false){
-    const slot=auditState.activeSlot,key=String(slot),a=auditState.actors[key]||{};
-    const nome=text(document.getElementById('responsavel')?.value),mat=text(document.getElementById('matriculaResponsavel')?.value);
-    if(force||slot===1||!a.nome&&!a.matricula){if(nome)a.nome=nome;if(mat)a.matricula=mat;auditState.actors[key]=a}
-  }
+  let auditMuted=true,auditState={schema:AUDIT_SCHEMA,version:2,activated:false,activeSlot:1,actors:{1:{},2:{}},events:[],passagens:[],snapshots:{responsavel1AtPassage:null,responsavel2Start:null,responsavel2Current:null}};
+  const beforeValues=new WeakMap();
+  const basePayload=typeof window.payloadV2==='function'?window.payloadV2:null;
+  const baseApply=typeof window.applyPayload==='function'?window.applyPayload:null;
+  const basePass=typeof window.gerarPassagemServico==='function'?window.gerarPassagemServico:null;
+  const baseReceive=typeof window.importarPassagemServico==='function'?window.importarPassagemServico:null;
+  const baseClear=typeof window.limparFormulario==='function'?window.limparFormulario:null;
+  function normalize(a){a=a&&typeof a==='object'?clone(a):{};return {schema:AUDIT_SCHEMA,version:2,activated:!!a.activated,activeSlot:Number(a.activeSlot)===2?2:1,actors:{1:{...(a.actors?.[1]||a.actors?.['1']||{})},2:{...(a.actors?.[2]||a.actors?.['2']||{})}},events:Array.isArray(a.events)?a.events.slice(-3000):[],passagens:Array.isArray(a.passagens)?a.passagens.slice(-100):[],snapshots:{responsavel1AtPassage:a.snapshots?.responsavel1AtPassage||null,responsavel2Start:a.snapshots?.responsavel2Start||null,responsavel2Current:a.snapshots?.responsavel2Current||null}}}
+  function syncActor(slot=auditState.activeSlot,force=false){slot=Number(slot)===2?2:1;const a=auditState.actors[String(slot)]||{},nome=text(document.getElementById('responsavel')?.value),mat=text(document.getElementById('matriculaResponsavel')?.value);if(force||!a.nome&&!a.matricula){if(nome)a.nome=nome;if(mat)a.matricula=mat;auditState.actors[String(slot)]=a}}
   function actor(slot=auditState.activeSlot){slot=Number(slot)===2?2:1;const a=auditState.actors[String(slot)]||{};return {slot:'Responsável '+slot,nome:text(a.nome),matricula:text(a.matricula)}}
-  function actorLabel(a){return [a.slot,a.nome,a.matricula?('Mat. '+a.matricula):''].filter(Boolean).join(' — ')}
-  function log(tipo,item,antes,depois,detalhe){if(auditMuted)return;const ev={id:'aud-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),em:new Date().toISOString(),autor:actor(),tipo,item:text(item)||'Ação no relatório',antes:trim(antes,220),depois:trim(depois,220),detalhe:trim(detalhe,260)};auditState.events.push(ev);if(auditState.events.length>2000)auditState.events.splice(0,auditState.events.length-2000);render()}
-  function fieldValue(el){return el.type==='checkbox'?(el.checked?'Sim':'Não'):el.value}
-  function labelOf(el){const f=el.closest('.field');if(f){const l=f.querySelector('label');if(l&&text(l.textContent))return text(l.textContent)}const tr=el.closest('tr');if(tr){const cells=[...tr.querySelectorAll('th,td')].map(x=>text(x.textContent)).filter(Boolean);if(cells.length)return cells.slice(0,2).join(' / ')}if(el.dataset?.k)return el.dataset.k;if(el.dataset?.prodG)return 'Produção operacional — '+el.dataset.prodG+' / '+(el.dataset.prodI||'');if(el.id)return el.id;return el.name||'Campo'}
-  function render(){
-    const card=document.getElementById('rsdAuditCard');if(!card)return;const sel=document.getElementById('rsdAuditActor');if(sel)sel.value=String(auditState.activeSlot);
-    const status=document.getElementById('rsdAuditStatus');if(status)status.textContent='Autor em atividade: '+actorLabel(actor());
-    [1,2].forEach(slot=>{const a=actor(slot),evs=auditState.events.filter(e=>e.autor?.slot==='Responsável '+slot),box=document.getElementById('rsdAuditResp'+slot);if(box)box.innerHTML='<strong>Responsável '+slot+'</strong><div>'+(a.nome||'Não identificado')+'</div><div>'+(a.matricula?('Matrícula: '+a.matricula):'')+'</div><div>'+evs.length+' registro(s) de autoria</div>'});
-    const tb=document.getElementById('rsdAuditRows');if(tb){const evs=auditState.events.slice(-120).reverse();tb.innerHTML=evs.length?evs.map(e=>'<tr><td>'+new Date(e.em).toLocaleString('pt-BR')+'</td><td>'+trim(actorLabel(e.autor||{}),70)+'</td><td>'+trim(e.tipo,40)+'</td><td>'+trim(e.item,75)+'</td><td>'+trim(e.antes,65)+'</td><td>'+trim(e.depois,65)+'</td></tr>').join(''):'<tr><td colspan="6">Ainda não há registros de autoria.</td></tr>'}
-  }
-  function installUi(){
-    const toolbar=document.querySelector('.toolbar.no-print');if(toolbar&&!document.getElementById('rsdAuditToggle')){const b=document.createElement('button');b.id='rsdAuditToggle';b.type='button';b.className='secondary';b.textContent='Auditoria';b.onclick=()=>{const c=document.getElementById('rsdAuditCard');if(c){c.hidden=!c.hidden;if(!c.hidden){render();c.scrollIntoView({behavior:'smooth',block:'start'})}}};const danger=toolbar.querySelector('.danger');if(danger)toolbar.insertBefore(b,danger);else toolbar.appendChild(b)}
-    if(!document.getElementById('rsdAuditCard')){const card=document.createElement('section');card.id='rsdAuditCard';card.className='card audit-card no-print';card.hidden=true;card.innerHTML='<div class="audit-head"><div><h2 class="sec-title" style="margin:0">Auditoria de autoria — passagem de serviço</h2><div class="audit-status" id="rsdAuditStatus"></div></div><div class="audit-controls"><label for="rsdAuditActor"><strong>Autor em atividade</strong></label><select id="rsdAuditActor"><option value="1">Responsável 1</option><option value="2">Responsável 2</option></select></div></div><div class="audit-summary"><div class="audit-person" id="rsdAuditResp1"></div><div class="audit-person" id="rsdAuditResp2"></div></div><div class="audit-log-wrap"><table class="audit-table"><thead><tr><th>Data/hora</th><th>Autor</th><th>Ação</th><th>Item</th><th>Antes</th><th>Depois</th></tr></thead><tbody id="rsdAuditRows"></tbody></table></div><div class="audit-note">A trilha acompanha o rascunho e a passagem de serviço. Ao receber um serviço, o autor ativo passa automaticamente para Responsável 2. Atualize o campo Responsável/Matrícula antes de continuar o preenchimento.</div>';document.querySelector('header.doc-head')?.after(card);card.querySelector('#rsdAuditActor').addEventListener('change',e=>{auditState.activeSlot=Number(e.target.value)===2?2:1;if(auditState.activeSlot===1)syncActorIdentity(false);render()})}
-    render();
-  }
-  if(typeof window.payloadV2==='function'){const base=window.payloadV2;window.payloadV2=function(){const p=base();p.auditoria=clone(auditState);return p}}
-  if(typeof window.applyPayload==='function'){const base=window.applyPayload;window.applyPayload=function(p){auditMuted=true;try{base(p);auditState=normalize(p?.auditoria);if(auditState.activeSlot===1)syncActorIdentity(false)}finally{auditMuted=false}render()}}
-  if(typeof window.limparFormulario==='function'){const base=window.limparFormulario;window.limparFormulario=function(){let before='';try{before=window.payloadV2?.()?.reportId||''}catch(_){}const r=base();let after='';try{after=window.payloadV2?.()?.reportId||''}catch(_){}if(before&&after&&before!==after){auditState=normalize(null);render()}return r}}
-  if(typeof window.gerarPassagemServico==='function'){
-    const base=window.gerarPassagemServico;window.gerarPassagemServico=function(){syncActorIdentity(false);log('PASSAGEM','Passagem de serviço gerada','','',actorLabel(actor())+' encerrou sua etapa de preenchimento');auditState.passagens.push({em:new Date().toISOString(),de:actorLabel(actor())});return base()};
-  }
-  if(typeof window.importarPassagemServico==='function'){
-    const base=window.importarPassagemServico;window.importarPassagemServico=async function(files){const f=Array.from(files||[])[0];const r=await base(files);auditState.activeSlot=2;auditMuted=false;log('PASSAGEM','Serviço recebido','','',f?('Arquivo: '+f.name):'');try{salvarRascunhoGuarnicao(true)}catch(_){}render();alert('Auditoria: a autoria ativa foi definida como Responsável 2. Atualize Responsável e Matrícula antes de continuar o serviço.');return r};
-  }
-  if(typeof window.importarOperacoesDoDia==='function'){const base=window.importarOperacoesDoDia;window.importarOperacoesDoDia=function(){const b=document.getElementById('operations')?.children.length||0,r=base();setTimeout(()=>{const a=document.getElementById('operations')?.children.length||0;if(a!==b)log('IMPORTAÇÃO','Operações do dia',String(b),String(a),(a-b)+' nova(s) operação(ões)')},0);return r}}
-  document.addEventListener('focusin',e=>{const el=e.target;if(el.matches?.('input,select,textarea')&&!el.closest('#rsdAuditCard'))beforeValues.set(el,fieldValue(el))},true);
-  document.addEventListener('change',e=>{
-    if(auditMuted)return;const el=e.target;if(!el.matches?.('input,select,textarea')||el.closest('#rsdAuditCard')||el.id==='importPassagem')return;
-    const before=beforeValues.has(el)?beforeValues.get(el):'',after=fieldValue(el);if(String(before)===String(after))return;
-    if(el.id==='responsavel'||el.id==='matriculaResponsavel')syncActorIdentity(true);log('ALTERAÇÃO',labelOf(el),before,after,'');beforeValues.set(el,after);
-  },true);
-  document.addEventListener('click',e=>{if(auditMuted)return;const b=e.target.closest?.('button');if(!b||b.closest('#rsdAuditCard'))return;const t=text(b.textContent);if(!t||/salvar rascunho|carregar rascunho|gerar apenas pdf|finalizar serviço|auditoria|realizar passagem|receber serviço/i.test(t))return;if(/^\+|remover$|^×$|limpar$/i.test(t)){const ctx=b.closest('.entry,section')?.querySelector('.entry-title,.sec-title')?.textContent||'';setTimeout(()=>log('AÇÃO ESTRUTURAL',ctx||t,'',t,''),0)}},true);
-  document.addEventListener('DOMContentLoaded',()=>{installUi();syncActorIdentity(false);setTimeout(()=>{auditMuted=false;render()},80)});
+  function actorLabel(a){return [a.slot,a.nome,a.matricula].filter(Boolean).join(' — ')}
+  function log(tipo,item,antes,depois,detalhe){if(auditMuted||!auditState.activated)return;const ev={id:'aud-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),em:new Date().toISOString(),autor:actor(),tipo,item:text(item)||'Ação no relatório',antes:trim(antes,240),depois:trim(depois,240),detalhe:trim(detalhe,300)};auditState.events.push(ev);if(auditState.events.length>3000)auditState.events.splice(0,auditState.events.length-3000);render()}
+  function fieldValue(el){return el?.type==='checkbox'?(el.checked?'Sim':'Não'):text(el?.value)}
+  function labelOf(el){const f=el.closest('.field,td,.line');return text(f?.querySelector('label,span')?.textContent||el.dataset?.k||el.id||el.name||'Campo')}
+  function lockResp1(){['responsavel','matriculaResponsavel'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const f=el.closest('.field');if(f)f.classList.add('audit-resp-locked');const s=f?.querySelector('.print-value');if(s)s.textContent=el.value;el.disabled=true})}
+  function openResp2(){['responsavel','matriculaResponsavel'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.disabled=false;el.value='';el.closest('.field')?.classList.remove('audit-resp-locked');const s=el.closest('.field')?.querySelector('.print-value');if(s)s.textContent=''});auditState.actors['2']={};}
+  function updateUi(){const btn=document.getElementById('rsdAuditToggle');if(btn)btn.hidden=!auditState.activated;const st=document.getElementById('rsdAuditStatus');if(st)st.textContent=auditState.activated?('Auditoria ativa • '+actorLabel(actor())):'Auditoria será ativada na passagem de serviço.';if(auditState.activated&&auditState.activeSlot===1)lockResp1()}
+  function render(){const card=document.getElementById('rsdAuditCard');if(!card)return;updateUi();[1,2].forEach(slot=>{const a=actor(slot),evs=auditState.events.filter(e=>e.autor?.slot==='Responsável '+slot),box=document.getElementById('rsdAuditResp'+slot);if(box)box.innerHTML='<strong>Responsável '+slot+'</strong><div>'+escHtml(a.nome||'Não identificado')+'</div><div>'+escHtml(a.matricula?('Matrícula: '+a.matricula):'')+'</div><div>'+evs.length+' alteração(ões) auditada(s)</div>'});const tb=document.getElementById('rsdAuditRows');if(tb){const evs=auditState.events.slice(-150).reverse();tb.innerHTML=evs.length?evs.map(e=>'<tr><td>'+new Date(e.em).toLocaleString('pt-BR')+'</td><td>'+escHtml(trim(actorLabel(e.autor||{}),85))+'</td><td>'+escHtml(trim(e.tipo,40))+'</td><td>'+escHtml(trim(e.item,85))+'</td><td>'+escHtml(trim(e.antes,75))+'</td><td>'+escHtml(trim(e.depois,75))+'</td></tr>').join(''):'<tr><td colspan="6">A auditoria ainda não possui alterações posteriores à passagem.</td></tr>'}}
+  function installUi(){const toolbar=document.querySelector('.toolbar.no-print');if(toolbar&&!document.getElementById('rsdAuditToggle')){const b=document.createElement('button');b.id='rsdAuditToggle';b.type='button';b.className='secondary';b.textContent='Auditoria';b.hidden=!auditState.activated;b.onclick=()=>{const c=document.getElementById('rsdAuditCard');if(c){c.hidden=!c.hidden;if(!c.hidden){render();c.scrollIntoView({behavior:'smooth',block:'start'})}}};const danger=toolbar.querySelector('.danger');if(danger)toolbar.insertBefore(b,danger);else toolbar.appendChild(b)}if(!document.getElementById('rsdAuditCard')){const card=document.createElement('section');card.id='rsdAuditCard';card.className='card audit-card no-print';card.hidden=true;card.innerHTML='<div class="audit-head"><div><h2 class="sec-title" style="margin:0">Auditoria de autoria — passagem de serviço</h2><div class="audit-status" id="rsdAuditStatus"></div></div></div><div class="audit-summary"><div class="audit-person" id="rsdAuditResp1"></div><div class="audit-person" id="rsdAuditResp2"></div></div><div class="audit-log-wrap"><table class="audit-table"><thead><tr><th>Data/hora</th><th>Autor</th><th>Ação</th><th>Item</th><th>Antes</th><th>Depois</th></tr></thead><tbody id="rsdAuditRows"></tbody></table></div><div class="audit-note">A auditoria começa somente quando o primeiro responsável realiza a passagem. Nesse momento o estado integral é preservado e sua identificação fica bloqueada. Ao receber o serviço, o campo Responsável é aberto em branco para o Responsável 2; todas as alterações posteriores e a fotografia final ficam vinculadas a ele.</div>';document.querySelector('header.doc-head')?.after(card)}render();setTimeout(()=>window.centralInstallCompactMenus?.(),60)}
+  if(basePayload){window.payloadV2=function(){const p=basePayload();if(auditState.activated&&auditState.activeSlot===2)auditState.snapshots.responsavel2Current=clone({...p,auditoria:undefined});p.auditoria=clone(auditState);return p}}
+  if(baseApply){window.applyPayload=function(p){auditMuted=true;try{baseApply(p);auditState=normalize(p?.auditoria);if(auditState.activated&&auditState.activeSlot===1)lockResp1()}finally{auditMuted=!auditState.activated}render()}}
+  if(baseClear){window.limparFormulario=function(){const r=baseClear();auditState=normalize(null);auditMuted=true;['responsavel','matriculaResponsavel'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false});render();return r}}
+  if(basePass){window.gerarPassagemServico=function(){if(!text(document.getElementById('guarnicao')?.value)){alert('Informe a guarnição antes de gerar a passagem de serviço.');return}const nome=text(document.getElementById('responsavel')?.value),mat=text(document.getElementById('matriculaResponsavel')?.value);if(!nome&&!mat){alert('Identifique o responsável antes de realizar a passagem de serviço.');return}syncActor(1,true);const base=basePayload?basePayload():{};auditState.activated=true;auditState.activeSlot=1;auditState.snapshots.responsavel1AtPassage=clone({...base,auditoria:undefined});auditState.passagens.push({em:new Date().toISOString(),de:actorLabel(actor(1))});auditMuted=false;log('PASSAGEM','Encerramento do Responsável 1','','','Estado completo preservado para auditoria');lockResp1();render();const r=basePass();try{window.salvarRascunhoGuarnicao?.(true)}catch(_){}alert('Passagem gerada. O Responsável 1 foi bloqueado e a auditoria está ativa. O novo responsável será aberto quando o serviço for recebido.');return r}}
+  if(baseReceive){window.importarPassagemServico=async function(files){const f=Array.from(files||[])[0];auditMuted=true;const r=await baseReceive(files);auditState=normalize(window.payloadV2?.()?.auditoria||auditState);auditState.activated=true;auditState.activeSlot=2;openResp2();auditState.snapshots.responsavel2Start=clone(basePayload?basePayload():{});auditMuted=false;log('PASSAGEM','Início do Responsável 2','','',f?('Serviço recebido: '+f.name):'Serviço recebido');render();try{window.salvarRascunhoGuarnicao?.(true)}catch(_){}setTimeout(()=>window.centralInstallCompactMenus?.(),40);alert('Serviço recebido. A identificação do Responsável 1 permanece preservada na auditoria e o campo foi aberto em branco para o Responsável 2.');return r}}
+  document.addEventListener('focusin',e=>{if(!auditState.activated)return;const el=e.target;if(el.matches?.('input,select,textarea')&&!el.closest('#rsdAuditCard')&&!el.disabled)beforeValues.set(el,fieldValue(el))},true);
+  document.addEventListener('change',e=>{if(auditMuted||!auditState.activated)return;const el=e.target;if(!el.matches?.('input,select,textarea')||el.closest('#rsdAuditCard')||el.disabled||el.id==='importPassagem')return;if(auditState.activeSlot===2&&(el.id==='responsavel'||el.id==='matriculaResponsavel'))syncActor(2,true);const before=beforeValues.get(el)??'',after=fieldValue(el);if(before!==after)log('ALTERAÇÃO',labelOf(el),before,after,'');beforeValues.set(el,after)},true);
+  document.addEventListener('click',e=>{if(auditMuted||!auditState.activated)return;const b=e.target.closest?.('button');if(!b||b.closest('#rsdAuditCard'))return;const t=text(b.textContent);if(!t||/salvar rascunho|carregar rascunho|gerar apenas pdf|finalizar serviço|auditoria|realizar passagem|receber serviço|menu/i.test(t))return;if(/^\+|remover$|^×$|limpar|importar operações/i.test(t)){const ctx=b.closest('.entry,section')?.querySelector('.entry-title,.sec-title')?.textContent||'';setTimeout(()=>log('AÇÃO ESTRUTURAL',ctx||t,'',t,''),0)}},true);
+  document.addEventListener('DOMContentLoaded',()=>{installUi();setTimeout(()=>{auditMuted=!auditState.activated;render()},80)});
 })();
 </script>
 
@@ -453,6 +439,57 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     window.addEventListener('beforeunload',e=>{if(centralDirty&&!centralSuppressExit){saveGeneric();saveSpecific();e.preventDefault();e.returnValue=''}});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+})();
+</script>
+
+<style id="v9-2-audit-lock-style">
+.audit-locked-row input,.audit-locked-row select{display:none!important}.audit-locked-row .print-value{display:inline-block!important;min-height:18px;padding:4px 5px;border:1px solid #d5dee6;border-radius:5px;background:#f3f6f8;color:#405264}.audit-locked-row td:last-child{display:none!important}.audit-locked-row::after{content:''}
+.audit-resp-locked input{display:none!important}.audit-resp-locked .print-value{display:block!important;min-height:22px;padding:5px 6px;border:1px solid #d5dee6;border-radius:6px;background:#f3f6f8;color:#405264}.audit-resp-locked::after{content:'Responsável 1 encerrado';display:block;margin-top:3px;font-size:9px;font-weight:700;color:#6b7e8d}
+@media print{.audit-locked-row input,.audit-locked-row select,.audit-resp-locked input{display:none!important}.audit-locked-row .print-value,.audit-resp-locked .print-value{display:block!important}.audit-resp-locked::after{display:none!important}}
+</style>
+
+<style id="central-compact-menu-style">
+.central-action-menu{position:relative;display:inline-block;z-index:5000}
+.central-action-menu-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;min-width:42px!important;padding:0!important;border-radius:9px!important;font-size:22px!important;line-height:1!important;font-weight:800!important;cursor:pointer!important}
+.central-action-menu-panel{position:absolute;top:calc(100% + 6px);left:0;display:none;min-width:270px;max-width:min(92vw,350px);max-height:72vh;overflow:auto;padding:6px;border:1px solid #c7d5e0;border-radius:11px;background:#fff;box-shadow:0 12px 32px rgba(18,48,72,.22);z-index:5001}
+.central-action-menu.open .central-action-menu-panel{display:block}
+.central-action-menu-panel>button{display:flex!important;width:100%!important;min-height:38px!important;margin:0 0 5px!important;padding:8px 10px!important;align-items:center!important;justify-content:flex-start!important;text-align:left!important;white-space:normal!important;border-radius:8px!important;box-shadow:none!important}
+.central-action-menu-panel>button:last-child{margin-bottom:0!important}
+.central-action-menu-panel>button[hidden]{display:none!important}
+.central-action-menu-panel>.danger{margin-top:5px!important}
+.central-menu-title{padding:3px 6px 6px;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64788a}
+.toolbar-inner>.toolbar-spacer.central-menu-spacer-hidden{display:none!important}
+@media(max-width:620px){.central-action-menu-panel{position:fixed;top:58px;left:8px;right:8px;max-width:none;width:auto;max-height:78vh}.central-action-menu-toggle{width:44px!important;height:40px!important}}
+@media print{.central-action-menu{display:none!important}}
+</style>
+
+<script id="central-compact-menu-script">
+(function(){
+  function installCompactMenu(toolbar){
+    if(!toolbar||toolbar.dataset.compactMenuInstalled==='1')return;
+    const directButtons=[...toolbar.children].filter(el=>el.tagName==='BUTTON');
+    if(directButtons.length<5)return;
+    toolbar.dataset.compactMenuInstalled='1';
+    const wrap=document.createElement('div');wrap.className='central-action-menu';
+    const toggle=document.createElement('button');toggle.type='button';toggle.className='central-action-menu-toggle';toggle.setAttribute('aria-label','Abrir menu de ações');toggle.setAttribute('aria-expanded','false');toggle.title='Menu de ações';toggle.textContent='☰';
+    const panel=document.createElement('div');panel.className='central-action-menu-panel';panel.setAttribute('role','menu');
+    const title=document.createElement('div');title.className='central-menu-title';title.textContent='Ações';panel.appendChild(title);
+    directButtons.forEach(btn=>{btn.setAttribute('role','menuitem');panel.appendChild(btn)});
+    wrap.append(toggle,panel);toolbar.insertBefore(wrap,toolbar.firstChild);
+    const spacer=toolbar.querySelector(':scope > .toolbar-spacer');if(spacer)spacer.classList.add('central-menu-spacer-hidden');
+    function close(){wrap.classList.remove('open');toggle.setAttribute('aria-expanded','false')}
+    toggle.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const opening=!wrap.classList.contains('open');document.querySelectorAll('.central-action-menu.open').forEach(x=>x.classList.remove('open'));wrap.classList.toggle('open',opening);toggle.setAttribute('aria-expanded',String(opening))});
+    panel.addEventListener('click',e=>{if(e.target.closest('button'))setTimeout(close,0)});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target))close()});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  }
+  function run(){
+    document.querySelectorAll('.toolbar.no-print').forEach(tb=>{
+      const inner=tb.querySelector(':scope > .toolbar-inner');installCompactMenu(inner||tb);
+    });
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(run,30));
+  window.centralInstallCompactMenus=run;
 })();
 </script>
 </body></html>
