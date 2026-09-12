@@ -819,8 +819,10 @@
 @media(max-width:620px){.service-state-bar{padding:5px}.service-state-bar button,.service-state-bar .central-home-link{flex:1 1 30%}.service-state-bar .state-note{width:100%;margin-left:0;text-align:center}}
 @media print{.service-state-bar{display:none!important}}
 </style>
+
+
 </head>
-<body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª</option><option value="2">2ª</option><option value="3">3ª</option><option value="4">4ª</option><option value="5">5ª</option></select></div></div>
+<body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª CPTran</option><option value="2">2ª CPTran</option><option value="3">3ª CPTran</option><option value="4">4ª CPTran</option><option value="5">5ª CPTran</option></select></div></div>
   <main class="page">
     <div class="toolbar">
       <span id="status" class="status">Pronto para preenchimento.</span>
@@ -934,7 +936,7 @@
 
         <div class="sec-title">1. Dados do Termo</div>
         <div class="grid g-term">
-          ${fieldHTML('Nº CIRVC', 'numeroTermo', 'text', 'readonly inputmode="numeric"')}
+          ${fieldHTML('Nº DO TERMO', 'numeroTermo', 'text', 'inputmode="numeric" placeholder="Digite o nº do termo do ARVC/DETRAN"')}
           ${fieldHTML('Data da entrega', 'dataEntrega', 'date')}
           ${fieldHTML('Horário', 'horaEntrega', 'text', 'inputmode="numeric" placeholder="hh:mm" data-hora="1"')}
           ${fieldHTML('Guarnição/VTR', 'guarnicaoVtr')}
@@ -1086,7 +1088,6 @@
         const key=gu.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'')||'SEM';
         grupos[key]=(grupos[key]||0)+1;
         const numero=String(grupos[key]).padStart(2,'0');
-        const numInput=card.querySelector('[data-name="numeroTermo"]');if(numInput)numInput.value=numero;
         const el = card.querySelector('.ordemAuto');
         if (el) el.textContent = `${numero} — ${gu}`;
       });
@@ -1420,7 +1421,7 @@ function prepareAndPrint() {
 </script>
 
 
-<script>window.syncInstitutionSpecific=function(){document.querySelectorAll('.pm-title').forEach(e=>{if(window.institutionHeader)e.innerHTML=institutionHeader()})};</script><script id="institution-config-script">(function(){const U={BPTran:{nome:'Batalhão Especializado de Polícia de Trânsito Urbano',cia:'CPTran'},BPRv:{nome:'Batalhão Especializado no Policiamento Rodoviário',cia:'CPRv'}};window.getInstitution=function(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',n=U[b]||U.BPTran,c=document.getElementById('globalCompanhia')?.value||'1';return {batalhao:b,nome:n.nome,companhia:`${c}ª ${n.cia}`,numero:c,curto:`${b} / ${c}ª ${n.cia}`,campo:`${b}/${c}ª${n.cia}`}};window.institutionHeader=function(){const u=getInstitution();return `POLÍCIA MILITAR DA PARAÍBA<br>${u.nome.toUpperCase()} - ${u.batalhao.toUpperCase()}<br>${u.companhia.toUpperCase()}`};function run(){if(typeof window.syncInstitutionSpecific==='function')window.syncInstitutionSpecific();}window.addEventListener('DOMContentLoaded',()=>{document.getElementById('globalBatalhao')?.addEventListener('change',run);document.getElementById('globalCompanhia')?.addEventListener('change',run);run()});})();</script>
+<script>window.syncInstitutionSpecific=function(){document.querySelectorAll('.pm-title').forEach(e=>{if(window.institutionHeader)e.innerHTML=institutionHeader()})};</script><script id="institution-config-script">(function(){const U={BPTran:{nome:'Batalhão Especializado de Polícia de Trânsito Urbano',cia:'CPTran'},BPRv:{nome:'Batalhão Especializado no Policiamento Rodoviário',cia:'CPRv'}};window.getInstitution=function(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',n=U[b]||U.BPTran,c=document.getElementById('globalCompanhia')?.value||'1';return {batalhao:b,nome:n.nome,companhia:`${c}ª ${n.cia}`,numero:c,curto:`${b} / ${c}ª ${n.cia}`,campo:`${b}/${c}ª${n.cia}`}};window.institutionHeader=function(){const u=getInstitution();return `POLÍCIA MILITAR DA PARAÍBA<br>${u.nome.toUpperCase()} - ${u.batalhao.toUpperCase()}<br>${u.companhia.toUpperCase()}`};function refreshCompanyLabels(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',tipo=(U[b]||U.BPTran).cia,sel=document.getElementById('globalCompanhia');if(sel)Array.from(sel.options).forEach(o=>o.textContent=`${Number(o.value)||1}ª ${tipo}`)}function run(){refreshCompanyLabels();if(typeof window.syncInstitutionSpecific==='function')window.syncInstitutionSpecific();}window.addEventListener('DOMContentLoaded',()=>{document.getElementById('globalBatalhao')?.addEventListener('change',run);document.getElementById('globalCompanhia')?.addEventListener('change',run);run()});})();</script>
 <script id="central-service-state-script">
 (function(){
   const path=(location.pathname.split('/').pop()||'relatorio').toLowerCase();
