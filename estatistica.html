@@ -1,10 +1,81 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Consolidação P3 — BPTran / BPRv</title>
-<style>:root{--navy:#17375e;--blue:#315f93;--soft:#edf4fb;--bg:#eef3f7;--card:#fff;--line:#ccd8e3;--text:#172333;--muted:#687789;--ok:#18745f;--warn:#9a6b17}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f8fafc,var(--bg));color:var(--text);font:14px/1.45 Arial,Helvetica,sans-serif}.page{max-width:1180px;margin:auto;padding:18px}.hero,.card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 7px 24px rgba(23,55,94,.07)}.hero{padding:22px;border-top:5px solid var(--navy)}h1{margin:0;color:var(--navy);font-size:27px}h2{color:var(--navy);font-size:17px;margin:0 0 8px}.sub{color:var(--muted);margin:6px 0 0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.btn,button{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:10px;padding:10px 13px;font-weight:800;text-decoration:none;cursor:pointer;background:linear-gradient(145deg,#4b78aa,var(--navy));color:#fff}.btn.secondary,button.secondary{background:#eef2f6;color:#22364d;border:1px solid #cbd6e0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.card{padding:16px}.tag{display:inline-block;background:#e8f1fa;color:#234f7a;font-weight:800;font-size:11px;border-radius:999px;padding:4px 8px}.rule{margin:10px 0;padding:10px;border-radius:9px;background:#f7fafc;border:1px solid #d8e2eb}.status{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.kpi{padding:11px;border:1px solid #d6e1eb;border-radius:10px;background:#fbfdff}.kpi b{display:block;font-size:20px;color:var(--navy)}.validator{margin-top:14px}.drop{border:2px dashed #a9bbca;border-radius:12px;padding:18px;text-align:center;background:#fbfdff}.drop input{max-width:100%}.result{margin-top:10px;display:none}.result.show{display:block}.ok{color:var(--ok);font-weight:800}.warn{color:var(--warn);font-weight:800}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th,td{border:1px solid #d5e0e9;padding:6px;text-align:left}th{background:#e8f1fa;color:#264d73}@media(max-width:760px){.page{padding:9px}.grid,.status{grid-template-columns:1fr}h1{font-size:22px}}</style></head>
-<body><main class="page"><section class="hero"><span class="tag">P3 • BPTran / BPRv</span><h1>Consolidação Estatística</h1><p class="sub">Estrutura administrativa para validar o pacote do RCO e consolidar produção, veículos, CIRVC e execução do Plano Operacional Diário.</p><div class="rule"><b>Estado da implantação:</b> a base e o pacote do RCO já estão preparados para a extensão v2. A gravação automática dos novos blocos no Google Sheets depende da publicação da extensão no Apps Script atual.</div><div class="actions"><a class="btn" href="relatorio_cpu.html">Abrir RCO</a><a class="btn secondary" href="index.html">Voltar à Central</a><a class="btn secondary" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM/edit">Abrir base P3</a></div></section>
-<div class="grid"><section class="card"><h2>1. Produção operacional</h2><p>Recebe todos os indicadores da tabela consolidada do RCO, separados por guarnição, data, Batalhão e Companhia. Os totais são derivados no banco, evitando dupla contagem.</p></section><section class="card"><h2>2. Veículos</h2><p>Registra tipo, ano, marca/modelo, valor FIPE e classificação individual.</p><div class="rule"><b>SIVA-R e CLONE:</b> contam como recuperados.<br><b>ADULTERAÇÃO:</b> permanece registrada, mas não incrementa o total de veículos recuperados.</div></section><section class="card"><h2>3. CIRVC</h2><p>Uma linha por remoção: data, hora, Nº do Termo, placa, guarnição, militar responsável e local onde o veículo foi deixado.</p></section><section class="card"><h2>4. Execução do POD</h2><p>Compara o local previsto com o local efetivamente executado, registra coordenadas, situação do cumprimento e justificativa da alteração, permitindo futura análise espacial dos pontos estratégicos.</p></section></div>
-<section class="card validator"><h2>Validador de pacote P3</h2><p class="sub">Use um JSON de pacote P3 para conferir a estrutura antes da consolidação. A validação é feita somente neste navegador.</p><div class="drop"><input id="file" type="file" accept="application/json,.json"><p>Selecione um arquivo JSON.</p></div><div id="result" class="result"><div class="status"><div class="kpi"><span>Produção</span><b id="kProd">0</b></div><div class="kpi"><span>Veículos</span><b id="kVeic">0</b></div><div class="kpi"><span>CIRVC</span><b id="kCirvc">0</b></div><div class="kpi"><span>POD</span><b id="kPod">0</b></div></div><div id="msg" class="rule"></div><table><thead><tr><th>Verificação</th><th>Resultado</th></tr></thead><tbody id="checks"></tbody></table></div></section>
-</main><script>
-const $=id=>document.getElementById(id);function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-$('file').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;let p;try{p=JSON.parse(await f.text())}catch(_){alert('JSON inválido.');return}const s=p.estatisticaP3||p;const prod=s.producao||[],veic=s.veiculos||[],cir=s.cirvcs||[],pod=s.podExecucao||[];$('kProd').textContent=prod.length;$('kVeic').textContent=veic.length;$('kCirvc').textContent=cir.length;$('kPod').textContent=pod.length;const checks=[];checks.push(['Schema estatístico',s.schema==='pmpb-p3-estatistica-v2'?'OK':(p.schemaExtension==='pmpb-p3-estatistica-v2'?'OK — extensão no pacote RCO':'Não identificado')]);checks.push(['Report ID',s.reportId||p.rco?.state?.reportId||'Ausente']);const adul=veic.filter(v=>String(v.tipoRecuperacaoDetalhada||'').includes('ADULTER')).filter(v=>v.contaComoRecuperado===true);checks.push(['Adulterações fora do total de recuperados',adul.length?'ATENÇÃO: '+adul.length+' registro(s) marcado(s) incorretamente':'OK']);const podAlt=pod.filter(x=>x.houveAlteracao===true||['Executado em local diverso','Executado parcialmente','Não executado'].includes(x.statusCumprimento));const podSemMotivo=podAlt.filter(x=>!String(x.motivoAlteracao||'').trim());checks.push(['POD alterado com justificativa',podSemMotivo.length?'ATENÇÃO: '+podSemMotivo.length+' sem justificativa':'OK']);$('checks').innerHTML=checks.map(([a,b])=>`<tr><td>${esc(a)}</td><td class="${String(b).startsWith('OK')?'ok':'warn'}">${esc(b)}</td></tr>`).join('');$('msg').innerHTML=`Pacote lido para <b>${esc(p.unidade?.batalhao||p.rco?.unidade?.batalhao||'unidade não informada')}</b> • <b>${esc(p.unidade?.companhia||p.rco?.unidade?.companhia||'companhia não informada')}</b>.`;$('result').classList.add('show')});
-</script></body></html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Consolidação P3 — BPTran / BPRv</title>
+<style>
+:root{--navy:#17375e;--blue:#315f93;--soft:#edf4fb;--bg:#eef3f7;--card:#fff;--line:#ccd8e3;--text:#172333;--muted:#687789;--ok:#18745f;--warn:#9a6b17;--danger:#a32626}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f8fafc,var(--bg));color:var(--text);font:14px/1.45 Arial,Helvetica,sans-serif}.page{max-width:1220px;margin:auto;padding:18px}.hero,.panel,.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 7px 24px rgba(23,55,94,.07)}.hero{padding:21px;border-top:5px solid var(--navy)}h1{margin:0;color:var(--navy);font-size:27px}h2{color:var(--navy);font-size:18px;margin:0 0 12px}.sub{color:var(--muted);margin:6px 0 0}.tag{display:inline-block;background:#e8f1fa;color:#234f7a;font-weight:800;font-size:11px;border-radius:999px;padding:4px 8px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.btn,button{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:10px;padding:10px 13px;font-weight:800;text-decoration:none;cursor:pointer;background:linear-gradient(145deg,#4b78aa,var(--navy));color:#fff}.btn.secondary,button.secondary{background:#eef2f6;color:#22364d;border:1px solid #cbd6e0}.filters{display:grid;grid-template-columns:1.1fr 1.1fr 1fr 1.3fr auto;gap:9px;align-items:end;margin-top:16px;padding:14px;background:#f7fafc;border:1px solid #d7e1ea;border-radius:12px}.field label{display:block;font-size:11px;font-weight:800;color:#526579;margin:0 0 4px}.field input,.field select{width:100%;border:1px solid #bccbd8;border-radius:9px;background:#fff;padding:9px;color:#172333;min-height:38px}.statusline{margin-top:11px;color:var(--muted);font-size:12px}.statusline.ok{color:var(--ok)}.statusline.err{color:var(--danger)}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-top:14px}.kpi{padding:15px}.kpi span{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.03em}.kpi b{display:block;margin-top:5px;color:var(--navy);font-size:25px;line-height:1.1}.kpi small{display:block;margin-top:5px;color:var(--muted)}.grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-top:12px}.panel{padding:16px}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric{border:1px solid #dbe4ec;border-radius:10px;padding:10px;background:#fbfdff;display:flex;justify-content:space-between;gap:12px;align-items:center}.metric span{color:#42566b}.metric b{font-size:17px;color:var(--navy)}.bars{display:grid;gap:9px}.barrow{display:grid;grid-template-columns:minmax(135px,1.2fr) 2fr auto;align-items:center;gap:8px}.barlabel{font-size:12px;color:#43566a}.bartrack{height:10px;border-radius:999px;background:#e7edf3;overflow:hidden}.barfill{height:100%;border-radius:999px;background:linear-gradient(90deg,#4d7fb0,#17375e);min-width:0}.barval{font-size:12px;font-weight:800;color:#17375e;min-width:28px;text-align:right}.empty{padding:18px;border:1px dashed #bccbd8;border-radius:10px;color:var(--muted);text-align:center;background:#fbfdff}.footnote{margin-top:12px;font-size:11px;color:var(--muted)}@media(max-width:900px){.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:560px){.page{padding:9px}h1{font-size:22px}.filters,.kpis,.metrics{grid-template-columns:1fr}.barrow{grid-template-columns:1fr auto}.bartrack{grid-column:1/-1;grid-row:2}}
+</style>
+</head>
+<body>
+<main class="page">
+<section class="hero">
+  <span class="tag">P3 • BPTran / BPRv</span>
+  <h1>Consolidação Estatística</h1>
+  <p class="sub">Painel de acompanhamento dos dados efetivamente consolidados pelos RCOs.</p>
+  <div class="actions">
+    <a class="btn secondary" href="index.html">Voltar à Central</a>
+    <a class="btn secondary" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM/edit">Abrir base P3</a>
+  </div>
+  <div class="filters">
+    <div class="field"><label for="dtIni">DE</label><input id="dtIni" type="date"></div>
+    <div class="field"><label for="dtFim">ATÉ</label><input id="dtFim" type="date"></div>
+    <div class="field"><label for="batalhao">BATALHÃO</label><select id="batalhao"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+    <div class="field"><label for="companhia">COMPANHIA</label><select id="companhia"><option value="">Todas</option></select></div>
+    <button id="atualizar" type="button">Atualizar painel</button>
+  </div>
+  <div id="status" class="statusline">Preparando painel…</div>
+</section>
+
+<section class="kpis">
+  <div class="kpi"><span>RCOs consolidados</span><b id="kRco">—</b><small>Relatórios únicos no período</small></div>
+  <div class="kpi"><span>Veículos recuperados</span><b id="kRec">—</b><small id="kRecSub">SIVA-R / clone</small></div>
+  <div class="kpi"><span>Valor estimado</span><b id="kFipe">—</b><small>FIPE dos recuperados cadastrados</small></div>
+  <div class="kpi"><span>Veículos removidos</span><b id="kCirvc">—</b><small>Registros CIRVC</small></div>
+  <div class="kpi"><span>Operações</span><b id="kOps">—</b><small>Operações registradas</small></div>
+  <div class="kpi"><span>POD executado</span><b id="kPod">—</b><small id="kPodSub">Registros acompanhados</small></div>
+  <div class="kpi"><span>Pessoas abordadas</span><b id="kPessoas">—</b><small>Produção operacional</small></div>
+  <div class="kpi"><span>AITs lavrados</span><b id="kAits">—</b><small>Total informado no RCO</small></div>
+</section>
+
+<div class="grid2">
+  <section class="panel">
+    <h2>Produção operacional em destaque</h2>
+    <div id="prodMetrics" class="metrics"><div class="empty">Aguardando dados…</div></div>
+  </section>
+  <section class="panel">
+    <h2>Execução do POD</h2>
+    <div id="podBars" class="bars"><div class="empty">Aguardando dados…</div></div>
+  </section>
+</div>
+<div class="grid2">
+  <section class="panel">
+    <h2>Veículos por classificação</h2>
+    <div id="vehicleBars" class="bars"><div class="empty">Aguardando dados…</div></div>
+  </section>
+  <section class="panel">
+    <h2>Resumo do período</h2>
+    <div id="summary" class="metrics"><div class="empty">Aguardando dados…</div></div>
+    <div class="footnote">O painel exibe apenas informações agregadas. Dados individualizados permanecem na Base P3.</div>
+  </section>
+</div>
+</main>
+<script>
+const ENDPOINT='https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';
+const $=id=>document.getElementById(id);
+const fmtInt=n=>Number(n||0).toLocaleString('pt-BR');
+const fmtMoney=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const companies={BPTran:['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran'],BPRv:['1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv']};
+function localIso(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
+function setInitialDates(){const now=new Date();$('dtFim').value=localIso(now);$('dtIni').value=localIso(new Date(now.getFullYear(),now.getMonth(),1))}
+function refreshCompanies(){const b=$('batalhao').value,c=$('companhia'),old=c.value;c.innerHTML='<option value="">Todas</option>';const list=b?companies[b]:[...companies.BPTran,...companies.BPRv];list.forEach(x=>c.insertAdjacentHTML('beforeend',`<option>${x}</option>`));if([...c.options].some(o=>o.value===old))c.value=old}
+function barHtml(obj){const entries=Object.entries(obj||{});if(!entries.length)return '<div class="empty">Sem registros no período selecionado.</div>';const max=Math.max(...entries.map(x=>Number(x[1]||0)),1);return entries.map(([label,val])=>`<div class="barrow"><div class="barlabel">${esc(label)}</div><div class="bartrack"><div class="barfill" style="width:${Math.max(0,Math.min(100,Number(val||0)/max*100))}%"></div></div><div class="barval">${fmtInt(val)}</div></div>`).join('')}
+function metricsHtml(obj){const entries=Object.entries(obj||{});if(!entries.length)return '<div class="empty">Sem produção no período selecionado.</div>';return entries.map(([label,val])=>`<div class="metric"><span>${esc(label)}</span><b>${fmtInt(val)}</b></div>`).join('')}
+function render(d){if(!d||d.ok===false){throw new Error(d?.message||'Não foi possível consultar a base P3.')}const k=d.kpis||{};$('kRco').textContent=fmtInt(k.rco);$('kRec').textContent=fmtInt(k.veiculosRecuperados);$('kRecSub').textContent=`${fmtInt(k.sivaR)} SIVA-R • ${fmtInt(k.clones)} clone(s)`;$('kFipe').textContent=fmtMoney(k.valorFipe);$('kCirvc').textContent=fmtInt(k.cirvc);$('kOps').textContent=fmtInt(k.operacoes);$('kPod').textContent=fmtInt(k.podAcompanhados);$('kPodSub').textContent=`${fmtInt(k.podAlterados)} com alteração de execução`;$('kPessoas').textContent=fmtInt(k.pessoasAbordadas);$('kAits').textContent=fmtInt(k.aits);$('prodMetrics').innerHTML=metricsHtml(d.producaoDestaque);$('podBars').innerHTML=barHtml(d.podStatus);$('vehicleBars').innerHTML=barHtml(d.veiculosClassificacao);$('summary').innerHTML=metricsHtml({'Testes de etilômetro':k.testesEtilometro,'Prisões':k.prisoes,'Armas apreendidas':k.armas,'Drogas apreendidas':k.drogas,'Ocorrências registradas':k.ocorrencias});$('status').className='statusline ok';$('status').textContent=`Atualizado em ${d.geradoEm||'agora'} • período ${d.periodo?.inicio||'—'} a ${d.periodo?.fim||'—'}`}
+function loadDashboard(){const cb='__p3dash_'+Date.now()+'_'+Math.floor(Math.random()*1e6);$('status').className='statusline';$('status').textContent='Consultando Base P3…';const qs=new URLSearchParams({action:'dashboard',callback:cb,from:$('dtIni').value,to:$('dtFim').value,batalhao:$('batalhao').value,companhia:$('companhia').value});const s=document.createElement('script');let timer;window[cb]=data=>{clearTimeout(timer);try{render(data)}catch(e){$('status').className='statusline err';$('status').textContent=e.message}finally{delete window[cb];s.remove()}};s.onerror=()=>{clearTimeout(timer);delete window[cb];s.remove();$('status').className='statusline err';$('status').textContent='Não foi possível carregar o painel. Confirme se o Apps Script v2 do dashboard foi publicado.'};timer=setTimeout(()=>s.onerror(),12000);s.src=ENDPOINT+'?'+qs.toString();document.body.appendChild(s)}
+$('batalhao').addEventListener('change',refreshCompanies);$('atualizar').addEventListener('click',loadDashboard);setInitialDates();refreshCompanies();loadDashboard();
+</script>
+</body></html>
