@@ -447,7 +447,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html">Central</a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
     }
-    document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
+    document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDir3cty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
     document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,180)}},true);
     document.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;const txt=(b.textContent||'').toLowerCase();if(/salvar rascunho|finalizar serviço|gerar apenas pdf|consolidar relatório|gerar pdf|exportar json|realizar passagem|receber serviço/.test(txt))setTimeout(()=>{centralDirty=false;saveGeneric()},100)},true);
     window.addEventListener('beforeunload',e=>{if(centralDirty&&!centralSuppressExit){saveGeneric();saveSpecific();e.preventDefault();e.returnValue=''}});
