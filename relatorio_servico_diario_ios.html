@@ -150,6 +150,24 @@ textarea{min-height:52px}
  .occurrence-description .print-value{display:block!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:break-word!important;height:auto!important;min-height:0!important}
 }
 </style>
+
+<style id="v9-4-ios-signature-overlay">
+/* iOS signature overlay: independent from the report layout so Safari cannot clip the writing area. */
+.signature-overlay-ios{position:fixed!important;inset:0!important;z-index:2147483000!important;background:#fff!important;overflow:hidden!important;overscroll-behavior:none!important;-webkit-overflow-scrolling:auto!important;touch-action:none!important}
+.signature-overlay-ios[hidden]{display:none!important}
+.signature-overlay-ios .sig-ios-title{position:absolute!important;z-index:3!important;top:calc(env(safe-area-inset-top) + 8px)!important;left:12px!important;right:12px!important;width:max-content!important;max-width:calc(100% - 24px)!important;padding:7px 10px!important;border-radius:10px!important;background:rgba(255,255,255,.86)!important;color:var(--navy)!important;font-size:15px!important;font-weight:900!important;pointer-events:none!important;box-shadow:0 2px 10px rgba(23,55,94,.10)!important}
+.signature-overlay-ios .sig-ios-canvas-wrap{position:absolute!important;left:0!important;right:0!important;top:0!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;background:#fff!important;overflow:hidden!important}
+.signature-overlay-ios canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;background:#fff!important;border:0!important;border-radius:0!important;touch-action:none!important;-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+.signature-overlay-ios .sig-ios-actions{position:absolute!important;z-index:4!important;left:10px!important;right:10px!important;bottom:calc(env(safe-area-inset-bottom) + 8px)!important;height:62px!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;padding:7px!important;border:1px solid #cbd6e0!important;border-radius:14px!important;background:rgba(255,255,255,.97)!important;box-shadow:0 7px 25px rgba(23,55,94,.16)!important;touch-action:manipulation!important}
+.signature-overlay-ios .sig-ios-actions button{position:relative!important;z-index:5!important;width:100%!important;height:46px!important;min-height:46px!important;margin:0!important;padding:8px 12px!important;pointer-events:auto!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important}
+html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
+/* On iOS the inline box is only a preview/launcher. Drawing happens in the independent full-screen overlay. */
+#assinatura{pointer-events:none!important}
+.signature-box .sig-actions{justify-content:flex-start!important}
+.signature-box #btnLimparAssinatura,.signature-box #btnSalvarAssinatura{display:none!important}
+.signature-box #btnAbrirAssinatura{display:inline-flex!important;width:auto!important}
+@media print{#signatureOverlayIOS{display:none!important}}
+</style>
 </head><body><main class="page">
 <div class="toolbar no-print">
 <button class="ok" onclick="finalizarServico()">Finalizar serviço</button>
@@ -188,6 +206,15 @@ textarea{min-height:52px}
 <section class="card"><div class="entry-head"><h2 class="sec-title" style="margin:0">Controle Interno de Remoção e Entrega de Veículo — CIRVC</h2><button class="small no-print" onclick="addArvc()">+ CIRVC</button></div><div class="empty-note" id="arvcs" data-empty="Não houve CIRVC passível de registro."></div></section>
 </div>
 <section class="card two-col"><div><h2 class="sec-title">Assinatura do responsável</h2><div class="signature-box"><div class="signature-full-title">Assinatura do responsável</div><canvas id="assinatura"></canvas><img alt="Assinatura" class="print-signature" id="assinaturaPrint"/><div class="sig-actions no-print"><button type="button" id="btnAbrirAssinatura" class="secondary signature-open-btn">Assinar em tela cheia</button><button type="button" id="btnLimparAssinatura" class="secondary">Limpar</button><button type="button" id="btnSalvarAssinatura" class="ok signature-done">Salvar assinatura</button></div></div></div><div><h2 class="sec-title">Assinatura digital Gov.br — opcional</h2><div class="gov-box">Espaço destinado à assinatura digital após a geração do PDF.</div></div></section>
+<div id="signatureOverlayIOS" class="signature-overlay-ios no-print" hidden aria-hidden="true">
+  <div class="sig-ios-title">Assinatura do responsável</div>
+  <div class="sig-ios-canvas-wrap"><canvas id="assinaturaFullscreenIOS"></canvas></div>
+  <div class="sig-ios-actions">
+    <button type="button" id="btnLimparAssinaturaIOS" class="secondary">Limpar</button>
+    <button type="button" id="btnSalvarAssinaturaIOS" class="ok">Salvar assinatura</button>
+  </div>
+</div>
+
 </main><script>
 const UNIT_TYPES={
  BPTran:{sigla:'BPTran',nome:'Batalhão Especializado de Polícia de Trânsito Urbano',cia:'CPTran'},
@@ -307,24 +334,39 @@ function syncAllPrint(){document.querySelectorAll('input,select,textarea').forEa
 function prepareAndPrint(){syncAllPrint();atualizarAssinaturaPrint();const old=document.title;document.title=nomePdf();window.print();setTimeout(()=>document.title=old,800)}
 function localISODate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function setToday(){if(!val('data'))document.getElementById('data').value=localISODate();atualizarDiaSemana()}
-// signature — iOS: tela de escrita ocupa todo o viewport; comandos ficam acima do canvas
-const canvas=document.getElementById('assinatura'),ctx=canvas.getContext('2d');let drawing=false,last=null,assinaturaData='',activePointerId=null,signatureIsFullscreen=false;
-function setupSignatureContext(dpr=1){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=2.2;ctx.strokeStyle='#111'}
-function drawSignatureContained(data){if(!data)return;const r=canvas.getBoundingClientRect();const im=new Image();im.onload=()=>{const scale=Math.min(r.width/im.naturalWidth,r.height/im.naturalHeight);const w=im.naturalWidth*scale,h=im.naturalHeight*scale,x=(r.width-w)/2,y=(r.height-h)/2;ctx.drawImage(im,x,y,w,h)};im.src=data}
-function cropSignatureData(){const w=canvas.width,h=canvas.height;if(!w||!h)return '';let img;try{img=ctx.getImageData(0,0,w,h)}catch(_){return canvas.toDataURL('image/png')}const d=img.data;let minX=w,minY=h,maxX=-1,maxY=-1;for(let y=0;y<h;y++){for(let x=0;x<w;x++){const a=d[(y*w+x)*4+3];if(a>8){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}}if(maxX<0)return '';const pad=Math.max(8,Math.round(Math.max(w,h)*0.012));minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);const cw=maxX-minX+1,ch=maxY-minY+1,tmp=document.createElement('canvas');tmp.width=cw;tmp.height=ch;tmp.getContext('2d').drawImage(canvas,minX,minY,cw,ch,0,0,cw,ch);return tmp.toDataURL('image/png')}
-function resizeCanvas(){if(drawing)return;const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;const dpr=Math.max(1,window.devicePixelRatio||1),prev=assinaturaData;canvas.width=Math.max(1,Math.round(r.width*dpr));canvas.height=Math.max(1,Math.round(r.height*dpr));setupSignatureContext(dpr);if(prev)drawSignatureContained(prev)}
-function pos(ev){const r=canvas.getBoundingClientRect();return [ev.clientX-r.left,ev.clientY-r.top]}
-function start(ev){if(ev.pointerType==='mouse'&&ev.button!==0)return;drawing=true;activePointerId=ev.pointerId??null;last=pos(ev);try{if(ev.pointerId!=null)canvas.setPointerCapture(ev.pointerId)}catch(_){}if(ev.cancelable)ev.preventDefault()}
-function move(ev){if(!drawing)return;if(activePointerId!=null&&ev.pointerId!=null&&ev.pointerId!==activePointerId)return;const p=pos(ev);ctx.beginPath();ctx.moveTo(...last);ctx.lineTo(...p);ctx.stroke();last=p;if(ev.cancelable)ev.preventDefault()}
-function end(ev={}){if(!drawing)return;drawing=false;assinaturaData=cropSignatureData();atualizarAssinaturaPrint();try{if(activePointerId!=null)canvas.releasePointerCapture(activePointerId)}catch(_){}activePointerId=null}
-function cancelarCapturaAssinatura(){if(drawing)end({});try{if(activePointerId!=null)canvas.releasePointerCapture(activePointerId)}catch(_){}activePointerId=null;drawing=false}
-if(window.PointerEvent){canvas.addEventListener('pointerdown',start,{passive:false});canvas.addEventListener('pointermove',move,{passive:false});canvas.addEventListener('pointerup',end,{passive:false});canvas.addEventListener('pointercancel',end,{passive:false});canvas.addEventListener('lostpointercapture',()=>{if(drawing)end({})})}else{let mouseDown=false;canvas.addEventListener('mousedown',e=>{mouseDown=true;start({clientX:e.clientX,clientY:e.clientY,button:e.button,preventDefault:()=>e.preventDefault()})});canvas.addEventListener('mousemove',e=>{if(mouseDown)move({clientX:e.clientX,clientY:e.clientY,preventDefault:()=>e.preventDefault()})});window.addEventListener('mouseup',()=>{if(mouseDown){mouseDown=false;end({})}});canvas.addEventListener('touchstart',e=>{const t=e.touches[0];start({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>e.preventDefault()})},{passive:false});canvas.addEventListener('touchmove',e=>{const t=e.touches[0];move({clientX:t.clientX,clientY:t.clientY,preventDefault:()=>e.preventDefault()})},{passive:false});canvas.addEventListener('touchend',()=>end({}),{passive:false});canvas.addEventListener('touchcancel',()=>end({}),{passive:false})}
-function abrirAssinaturaTelaCheia(){cancelarCapturaAssinatura();assinaturaData=assinaturaData||cropSignatureData();canvas.closest('.signature-box').classList.add('signature-fullscreen');document.body.classList.add('signature-open');signatureIsFullscreen=true;requestAnimationFrame(()=>requestAnimationFrame(resizeCanvas))}
-function fecharAssinaturaTelaCheia(){cancelarCapturaAssinatura();assinaturaData=cropSignatureData();canvas.closest('.signature-box').classList.remove('signature-fullscreen');document.body.classList.remove('signature-open');signatureIsFullscreen=false;setTimeout(resizeCanvas,50);atualizarAssinaturaPrint()}
-function limparAssinatura(){cancelarCapturaAssinatura();assinaturaData='';ctx.clearRect(0,0,canvas.width,canvas.height);atualizarAssinaturaPrint()}
+// signature — iOS v9.4: overlay independente, canvas de tela cheia e eventos touch nativos
+const canvas=document.getElementById('assinatura'),ctx=canvas.getContext('2d');
+const sigOverlay=document.getElementById('signatureOverlayIOS'),fullCanvas=document.getElementById('assinaturaFullscreenIOS'),fullCtx=fullCanvas.getContext('2d');
+let assinaturaData='',drawing=false,last=null,signatureIsFullscreen=false;
+function setupSigContext(context,dpr=1){context.setTransform(dpr,0,0,dpr,0,0);context.lineCap='round';context.lineJoin='round';context.lineWidth=2.4;context.strokeStyle='#111'}
+function drawDataOn(target,targetCtx,data){if(!data)return;const r=target.getBoundingClientRect();if(!r.width||!r.height)return;const im=new Image();im.onload=()=>{targetCtx.save();targetCtx.setTransform(1,0,0,1,0,0);targetCtx.clearRect(0,0,target.width,target.height);targetCtx.restore();const dpr=Math.max(1,window.devicePixelRatio||1);setupSigContext(targetCtx,dpr);const cssW=target.width/dpr,cssH=target.height/dpr;const scale=Math.min(cssW/im.naturalWidth,cssH/im.naturalHeight);const w=im.naturalWidth*scale,h=im.naturalHeight*scale,x=(cssW-w)/2,y=(cssH-h)/2;targetCtx.drawImage(im,x,y,w,h)};im.src=data}
+function canvasData(target,targetCtx){const w=target.width,h=target.height;if(!w||!h)return '';let img;try{img=targetCtx.getImageData(0,0,w,h)}catch(_){return target.toDataURL('image/png')}const d=img.data;let minX=w,minY=h,maxX=-1,maxY=-1;for(let y=0;y<h;y++){for(let x=0;x<w;x++){const a=d[(y*w+x)*4+3];if(a>8){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}}if(maxX<0)return '';const pad=Math.max(8,Math.round(Math.max(w,h)*.012));minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);const cw=maxX-minX+1,ch=maxY-minY+1,tmp=document.createElement('canvas');tmp.width=cw;tmp.height=ch;tmp.getContext('2d').drawImage(target,minX,minY,cw,ch,0,0,cw,ch);return tmp.toDataURL('image/png')}
+function resizeOne(target,targetCtx,data=''){const r=target.getBoundingClientRect();if(!r.width||!r.height)return;const dpr=Math.max(1,window.devicePixelRatio||1);target.width=Math.max(1,Math.round(r.width*dpr));target.height=Math.max(1,Math.round(r.height*dpr));setupSigContext(targetCtx,dpr);if(data)drawDataOn(target,targetCtx,data)}
+function resizeCanvas(){resizeOne(canvas,ctx,assinaturaData)}
 function atualizarAssinaturaPrint(){const im=document.getElementById('assinaturaPrint');if(assinaturaData){im.src=assinaturaData;im.style.visibility='visible';im.style.objectFit='contain'}else{im.removeAttribute('src');im.style.visibility='hidden'}}
-function bindSignatureButton(id,action){const b=document.getElementById(id);if(!b)return;let handled=false;const run=e=>{if(e){e.preventDefault();e.stopPropagation()}cancelarCapturaAssinatura();action();handled=true;setTimeout(()=>handled=false,350)};if(window.PointerEvent)b.addEventListener('pointerdown',run,{passive:false});else b.addEventListener('touchstart',run,{passive:false});b.addEventListener('click',e=>{if(handled){e.preventDefault();e.stopPropagation();return}run(e)})}
-bindSignatureButton('btnAbrirAssinatura',abrirAssinaturaTelaCheia);bindSignatureButton('btnLimparAssinatura',limparAssinatura);bindSignatureButton('btnSalvarAssinatura',fecharAssinaturaTelaCheia);
+function abrirAssinaturaTelaCheia(){assinaturaData=assinaturaData||canvasData(canvas,ctx);sigOverlay.hidden=false;sigOverlay.setAttribute('aria-hidden','false');document.documentElement.classList.add('sig-ios-open');document.body.classList.add('sig-ios-open');signatureIsFullscreen=true;requestAnimationFrame(()=>requestAnimationFrame(()=>resizeOne(fullCanvas,fullCtx,assinaturaData)))}
+function salvarAssinaturaIOS(){if(drawing)finishDraw();assinaturaData=canvasData(fullCanvas,fullCtx);sigOverlay.hidden=true;sigOverlay.setAttribute('aria-hidden','true');document.documentElement.classList.remove('sig-ios-open');document.body.classList.remove('sig-ios-open');signatureIsFullscreen=false;requestAnimationFrame(()=>{resizeOne(canvas,ctx,assinaturaData);atualizarAssinaturaPrint()})}
+function limparAssinaturaIOS(){drawing=false;last=null;fullCtx.save();fullCtx.setTransform(1,0,0,1,0,0);fullCtx.clearRect(0,0,fullCanvas.width,fullCanvas.height);fullCtx.restore();setupSigContext(fullCtx,Math.max(1,window.devicePixelRatio||1));assinaturaData='';atualizarAssinaturaPrint()}
+function limparAssinatura(){assinaturaData='';ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.restore();setupSigContext(ctx,Math.max(1,window.devicePixelRatio||1));atualizarAssinaturaPrint()}
+function sigPos(clientX,clientY){const r=fullCanvas.getBoundingClientRect();return [clientX-r.left,clientY-r.top]}
+function beginDraw(x,y){drawing=true;last=sigPos(x,y)}
+function continueDraw(x,y){if(!drawing)return;const p=sigPos(x,y);fullCtx.beginPath();fullCtx.moveTo(last[0],last[1]);fullCtx.lineTo(p[0],p[1]);fullCtx.stroke();last=p}
+function finishDraw(){drawing=false;last=null}
+// TouchEvents are used explicitly on iPhone/iPad; no pointer capture is used, avoiding Safari stealing taps from the action buttons.
+fullCanvas.addEventListener('touchstart',e=>{if(!e.touches.length)return;e.preventDefault();const t=e.touches[0];beginDraw(t.clientX,t.clientY)},{passive:false});
+fullCanvas.addEventListener('touchmove',e=>{if(!e.touches.length)return;e.preventDefault();const t=e.touches[0];continueDraw(t.clientX,t.clientY)},{passive:false});
+fullCanvas.addEventListener('touchend',e=>{e.preventDefault();finishDraw()},{passive:false});
+fullCanvas.addEventListener('touchcancel',e=>{e.preventDefault();finishDraw()},{passive:false});
+// Mouse fallback for desktop testing of the iOS file.
+fullCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;e.preventDefault();beginDraw(e.clientX,e.clientY)});
+fullCanvas.addEventListener('mousemove',e=>{if(drawing){e.preventDefault();continueDraw(e.clientX,e.clientY)}});
+window.addEventListener('mouseup',()=>finishDraw());
+document.getElementById('btnAbrirAssinatura').addEventListener('click',e=>{e.preventDefault();abrirAssinaturaTelaCheia()});
+document.getElementById('btnLimparAssinaturaIOS').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();limparAssinaturaIOS()});
+document.getElementById('btnSalvarAssinaturaIOS').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();salvarAssinaturaIOS()});
+// VisualViewport reacts correctly to Safari's dynamic top/bottom browser bars.
+if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{if(signatureIsFullscreen&&!drawing)setTimeout(()=>resizeOne(fullCanvas,fullCtx,assinaturaData||canvasData(fullCanvas,fullCtx)),40)})}
+
 function init(){renderProduction();bindCommon();setToday();document.getElementById('data').addEventListener('change',atualizarDiaSemana);document.querySelectorAll('[data-watermark]').forEach(e=>{e.addEventListener('input',()=>syncPrintValue(e));syncPrintValue(e)});window.addEventListener('resize',()=>{if(!drawing)setTimeout(resizeCanvas,120)});setTimeout(resizeCanvas,100);atualizarFiscoVisibility();toggleFiscoMode()}document.addEventListener('DOMContentLoaded',init);
 </script>
 
