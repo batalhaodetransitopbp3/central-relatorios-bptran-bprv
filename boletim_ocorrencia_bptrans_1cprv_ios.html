@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
   <meta name="format-detection" content="telephone=no" />
-  <title>Boletim de Ocorrência - BPTran / 1ª CPRv - iOS</title>
+  <title>Boletim de Ocorrência - BPTran / 1ª CPTran - iOS</title>
   <style>
     :root{
       --line:#111;
@@ -539,7 +539,7 @@
 @media print{.service-state-bar{display:none!important}}
 </style>
 </head>
-<body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª</option><option value="2">2ª</option><option value="3">3ª</option><option value="4">4ª</option><option value="5">5ª</option></select></div></div>
+<body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª CPTran</option><option value="2">2ª CPTran</option><option value="3">3ª CPTran</option><option value="4">4ª CPTran</option><option value="5">5ª CPTran</option></select></div></div>
   <main class="page">
     <div class="toolbar">
       <button type="button" onclick="prepareAndPrint()">Gerar PDF (iOS/Safari)</button>
@@ -567,7 +567,7 @@
           </colgroup>
           <tr>
             <td><label class="lbl">Nº FICHA</label><input id="ciopCopom" placeholder="Ex.: PM20XXXXXXXX" autocomplete="off"></td>
-            <td><label class="lbl">UOp/SUOp</label><input id="uopSuop" value="BPTran/1ªCPRv"></td>
+            <td><label class="lbl">UOp/SUOp</label><input id="uopSuop" value="BPTran/1ªCPTran"></td>
             <td><label class="lbl">Data da ocorrência</label><input id="dataOcorrencia" data-mask="date" placeholder="dd/mm/aaaa"></td>
             <td><label class="lbl">Hora</label><input id="horaOcorrencia" data-mask="time" placeholder="hh:mm"></td>
             <td><label class="lbl">Endereço completo (Rua, Nº, Bairro, Cidade e UF)</label><input id="enderecoOcorrencia"></td>
@@ -787,7 +787,7 @@
     <div class="subcard testemunha-card testemunha-pm-card">
       <div class="subcard-head"><span>Testemunha - Policial Militar</span><button type="button" class="small danger no-print" onclick="removeCard(this)">Remover</button></div>
       <div class="repeat-tools no-print"><label>Repetir integrante da guarnição:<select class="testemunha-pm-repetir" onchange="preencherTestemunhaPM(this)"><option value="">Selecionar motorista/patrulheiro...</option></select></label></div>
-      <table class="form"><colgroup><col style="width:48%"><col style="width:22%"><col style="width:30%"></colgroup><tr><td><label class="lbl">Nome/Grad./Matr.</label><input class="testemunha-pm-nome"></td><td><label class="lbl">Profissão</label><input value="Policial Militar"></td><td><label class="lbl">UOp/SUOp</label><input value="BPTran/1ªCPRv"></td></tr></table>
+      <table class="form"><colgroup><col style="width:48%"><col style="width:22%"><col style="width:30%"></colgroup><tr><td><label class="lbl">Nome/Grad./Matr.</label><input class="testemunha-pm-nome"></td><td><label class="lbl">Profissão</label><input value="Policial Militar"></td><td><label class="lbl">UOp/SUOp</label><input value="BPTran/1ªCPTran"></td></tr></table>
     </div>
   </template>
 
@@ -1134,7 +1134,7 @@
     window.addEventListener('afterprint', ()=>{ clearPrintRenders(); setTimeout(()=>{document.title=ORIGINAL_DOCUMENT_TITLE;},400); });
     document.addEventListener('DOMContentLoaded',()=>{ bind(); preencherDataOcorrenciaHoje(); addGuarnicao(); addAcusado(); addVitima(); addTestemunhaPM(); toggleSolicitante(); toggleList('semArma','armas','armaEmpty'); toggleList('semCartucho','cartuchos','cartuchoEmpty'); toggleList('semVeiculo','veiculos','veiculoEmpty'); toggleObjetos(); toggleResistencia(); atualizarOpcoesTestemunhasPM(); syncSignatureCards(); });
   </script>
-<script>window.syncInstitutionSpecific=function(){const u=getInstitution();const main=document.getElementById('uopSuop');if(main)main.value=u.campo;document.querySelectorAll('label.lbl').forEach(l=>{if((l.textContent||'').trim()==='UOp/SUOp'){const i=l.parentElement?.querySelector('input');if(i)i.value=u.campo}})};</script><script id="institution-config-script">(function(){const U={BPTran:{nome:'Batalhão Especializado de Polícia de Trânsito Urbano',cia:'CPTran'},BPRv:{nome:'Batalhão Especializado no Policiamento Rodoviário',cia:'CPRv'}};window.getInstitution=function(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',n=U[b]||U.BPTran,c=document.getElementById('globalCompanhia')?.value||'1';return {batalhao:b,nome:n.nome,companhia:`${c}ª ${n.cia}`,numero:c,curto:`${b} / ${c}ª ${n.cia}`,campo:`${b}/${c}ª${n.cia}`}};window.institutionHeader=function(){const u=getInstitution();return `POLÍCIA MILITAR DA PARAÍBA<br>${u.nome.toUpperCase()} - ${u.batalhao.toUpperCase()}<br>${u.companhia.toUpperCase()}`};function run(){if(typeof window.syncInstitutionSpecific==='function')window.syncInstitutionSpecific();}window.addEventListener('DOMContentLoaded',()=>{document.getElementById('globalBatalhao')?.addEventListener('change',run);document.getElementById('globalCompanhia')?.addEventListener('change',run);run()});})();</script>
+<script>window.syncInstitutionSpecific=function(){const u=getInstitution();const main=document.getElementById('uopSuop');if(main)main.value=u.campo;document.querySelectorAll('label.lbl').forEach(l=>{if((l.textContent||'').trim()==='UOp/SUOp'){const i=l.parentElement?.querySelector('input');if(i)i.value=u.campo}})};</script><script id="institution-config-script">(function(){const U={BPTran:{nome:'Batalhão Especializado de Polícia de Trânsito Urbano',cia:'CPTran'},BPRv:{nome:'Batalhão Especializado no Policiamento Rodoviário',cia:'CPRv'}};window.getInstitution=function(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',n=U[b]||U.BPTran,c=document.getElementById('globalCompanhia')?.value||'1';return {batalhao:b,nome:n.nome,companhia:`${c}ª ${n.cia}`,numero:c,curto:`${b} / ${c}ª ${n.cia}`,campo:`${b}/${c}ª${n.cia}`}};window.institutionHeader=function(){const u=getInstitution();return `POLÍCIA MILITAR DA PARAÍBA<br>${u.nome.toUpperCase()} - ${u.batalhao.toUpperCase()}<br>${u.companhia.toUpperCase()}`};function refreshCompanyLabels(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',tipo=(U[b]||U.BPTran).cia,sel=document.getElementById('globalCompanhia');if(sel)Array.from(sel.options).forEach(o=>o.textContent=`${Number(o.value)||1}ª ${tipo}`)}function run(){refreshCompanyLabels();if(typeof window.syncInstitutionSpecific==='function')window.syncInstitutionSpecific();}window.addEventListener('DOMContentLoaded',()=>{document.getElementById('globalBatalhao')?.addEventListener('change',run);document.getElementById('globalCompanhia')?.addEventListener('change',run);run()});})();</script>
 <script id="central-service-state-script">
 (function(){
   const path=(location.pathname.split('/').pop()||'relatorio').toLowerCase();
