@@ -2574,5 +2574,50 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
+
+<style id="central-compact-menu-style">
+.central-action-menu{position:relative;display:inline-block;z-index:5000}
+.central-action-menu-toggle{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:42px!important;height:38px!important;min-width:42px!important;padding:0!important;border-radius:9px!important;font-size:22px!important;line-height:1!important;font-weight:800!important;cursor:pointer!important}
+.central-action-menu-panel{position:absolute;top:calc(100% + 6px);left:0;display:none;min-width:270px;max-width:min(92vw,350px);max-height:72vh;overflow:auto;padding:6px;border:1px solid #c7d5e0;border-radius:11px;background:#fff;box-shadow:0 12px 32px rgba(18,48,72,.22);z-index:5001}
+.central-action-menu.open .central-action-menu-panel{display:block}
+.central-action-menu-panel>button{display:flex!important;width:100%!important;min-height:38px!important;margin:0 0 5px!important;padding:8px 10px!important;align-items:center!important;justify-content:flex-start!important;text-align:left!important;white-space:normal!important;border-radius:8px!important;box-shadow:none!important}
+.central-action-menu-panel>button:last-child{margin-bottom:0!important}
+.central-action-menu-panel>button[hidden]{display:none!important}
+.central-action-menu-panel>.danger{margin-top:5px!important}
+.central-menu-title{padding:3px 6px 6px;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64788a}
+.toolbar-inner>.toolbar-spacer.central-menu-spacer-hidden{display:none!important}
+@media(max-width:620px){.central-action-menu-panel{position:fixed;top:58px;left:8px;right:8px;max-width:none;width:auto;max-height:78vh}.central-action-menu-toggle{width:44px!important;height:40px!important}}
+@media print{.central-action-menu{display:none!important}}
+</style>
+
+<script id="central-compact-menu-script">
+(function(){
+  function installCompactMenu(toolbar){
+    if(!toolbar||toolbar.dataset.compactMenuInstalled==='1')return;
+    const directButtons=[...toolbar.children].filter(el=>el.tagName==='BUTTON');
+    if(directButtons.length<5)return;
+    toolbar.dataset.compactMenuInstalled='1';
+    const wrap=document.createElement('div');wrap.className='central-action-menu';
+    const toggle=document.createElement('button');toggle.type='button';toggle.className='central-action-menu-toggle';toggle.setAttribute('aria-label','Abrir menu de ações');toggle.setAttribute('aria-expanded','false');toggle.title='Menu de ações';toggle.textContent='☰';
+    const panel=document.createElement('div');panel.className='central-action-menu-panel';panel.setAttribute('role','menu');
+    const title=document.createElement('div');title.className='central-menu-title';title.textContent='Ações';panel.appendChild(title);
+    directButtons.forEach(btn=>{btn.setAttribute('role','menuitem');panel.appendChild(btn)});
+    wrap.append(toggle,panel);toolbar.insertBefore(wrap,toolbar.firstChild);
+    const spacer=toolbar.querySelector(':scope > .toolbar-spacer');if(spacer)spacer.classList.add('central-menu-spacer-hidden');
+    function close(){wrap.classList.remove('open');toggle.setAttribute('aria-expanded','false')}
+    toggle.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const opening=!wrap.classList.contains('open');document.querySelectorAll('.central-action-menu.open').forEach(x=>x.classList.remove('open'));wrap.classList.toggle('open',opening);toggle.setAttribute('aria-expanded',String(opening))});
+    panel.addEventListener('click',e=>{if(e.target.closest('button'))setTimeout(close,0)});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target))close()});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  }
+  function run(){
+    document.querySelectorAll('.toolbar.no-print').forEach(tb=>{
+      const inner=tb.querySelector(':scope > .toolbar-inner');installCompactMenu(inner||tb);
+    });
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(run,30));
+  window.centralInstallCompactMenus=run;
+})();
+</script>
 </body>
 </html>
