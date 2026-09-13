@@ -168,6 +168,60 @@ html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavio
 .signature-box #btnAbrirAssinatura{display:inline-flex!important;width:auto!important}
 @media print{#signatureOverlayIOS{display:none!important}}
 </style>
+
+<style id="ios-rsd-print-production-grid-fix-v98">
+/* Safari/iOS: a impressão em múltiplas colunas CSS pode expandir a produção para várias páginas.
+   Usa uma grade real de 3 colunas, preservando tipografia e conteúdo do RSD. */
+@media print{
+  #normalProduction{
+    break-inside:auto!important;
+    page-break-inside:auto!important;
+  }
+  #normalProduction .metric-wrap{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    grid-auto-flow:row!important;
+    align-items:start!important;
+    gap:2px 3px!important;
+    column-count:initial!important;
+    column-width:auto!important;
+    column-gap:normal!important;
+    width:100%!important;
+  }
+  #normalProduction .metric-table{
+    display:table!important;
+    width:100%!important;
+    min-width:0!important;
+    table-layout:fixed!important;
+    margin:0!important;
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+    align-self:start!important;
+  }
+  #normalProduction .metric-table th,
+  #normalProduction .metric-table td{
+    box-sizing:border-box!important;
+  }
+  #normalProduction .metric-table td:first-child{
+    width:auto!important;
+    overflow-wrap:anywhere!important;
+    word-break:normal!important;
+  }
+  #normalProduction .metric-table td:last-child{
+    width:38px!important;
+    min-width:38px!important;
+    max-width:38px!important;
+  }
+  #normalProduction .metric-table .print-value{
+    min-height:0!important;
+    padding:0!important;
+    border:0!important;
+    line-height:1.05!important;
+    text-align:center!important;
+  }
+}
+</style>
+
 </head><body><main class="page">
 <div class="toolbar no-print">
 <button class="ok" onclick="finalizarServico()">Finalizar serviço</button>
@@ -305,7 +359,7 @@ function exportarDadosGuarnicao(silent=false){if(!val('guarnicao')){if(!silent)a
 async function importarOperacaoJson(files){let ok=0;for(const f of Array.from(files||[])){try{const p=JSON.parse(await f.text());if(p.schema!=='pmpb-transito-operacao-v2'){alert(`Arquivo ${f.name} não é um relatório de operação compatível.`);continue}const st=operationToSummary(p);if(!document.querySelector(`#operations .entry[data-id="${CSS.escape(st.id)}"]`)){addOperationSummary(st);ok++}}catch(e){alert(`Não foi possível importar ${f.name}.`)}}if(ok)alert(`${ok} operação(ões) importada(s).`)}
 
 const OPERATIONS_STORE='pmpb-transito-operacoes-dia-v1';
-function operationToSummary(p){const sm=p.resumoCpu||p.resumo||{};return {id:p.reportId||uid('op'),nome:p.operacao?.nome||sm.nome||'',local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',turno:p.operacao?.turno||sm.turno||'',apreensoesVeiculos:sm.apreensoesVeiculos??0,totalAits:sm.totalAits??0,prisoes:sm.prisoes??0,statusCumprimento:'Não informado',localPrevisto:'',coordenadasPrevistas:'',motivoAlteracao:'',incluirNoCpu:'true'}}
+function operationToSummary(p){const sm=p.resumoCpu||p.resumo||{},pod=p.pod||{};return {id:p.reportId||uid('op'),nome:p.operacao?.nome||sm.nome||'',local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',turno:p.operacao?.turno||sm.turno||'',apreensoesVeiculos:sm.apreensoesVeiculos??0,totalAits:sm.totalAits??0,prisoes:sm.prisoes??0,statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',coordenadasPrevistas:pod.coordenadasPrevistas||sm.coordenadasPrevistas||'',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',incluirNoCpu:'true'}}
 function storedOperationIsValid(p){return !!(p?.reportId&&p?.operacao?.nome&&(p?.operacao?.modalidade==='Checkpoint / Blitz'||p?.local?.descricao||p?.local?.coordenadas))}
 function readStoredOperations(){try{const raw=JSON.parse(localStorage.getItem(OPERATIONS_STORE)||'[]');return Array.isArray(raw)?raw.filter(storedOperationIsValid):[]}catch(_){return []}}
 function importarOperacoesDoDia(){const data=val('data'),u=currentUnit();if(!data){alert('Informe a data do serviço.');return}const currentIds=new Set(Array.from(document.querySelectorAll('#operations .entry')).map(e=>e.dataset.id));const found=readStoredOperations().filter(p=>p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));let n=0;found.forEach(p=>{const x=operationToSummary(p);if(!currentIds.has(x.id)){addOperationSummary(x);currentIds.add(x.id);n++}});alert(n?`${n} operação(ões) do dia incorporada(s) ao relatório.`:'Não há novas operações registradas neste aparelho para a data e unidade selecionadas.')}
