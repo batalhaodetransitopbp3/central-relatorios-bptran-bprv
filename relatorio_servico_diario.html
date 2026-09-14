@@ -102,6 +102,8 @@ textarea{min-height:52px}
   .entry.compact-operation .field .print-value{border:0!important;padding:0!important;min-height:0!important;font-size:10.2px;white-space:normal!important}
   .entry.compact-operation .support-desc{flex:1 1 100%!important}
 }
+
+@media print{#fiscoToggleCard:not(.fisco-print-active){display:none!important}}
 </style>
 <style id="central-service-state-style">
 .service-state-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;padding:6px 8px;border:1px solid #d5e0e8;border-radius:10px;background:#f8fafc}
@@ -271,7 +273,7 @@ function addArvc(d={}){
 }
 function atualizarDiaSemana(){const v=val('data');const e=document.getElementById('diaSemana');if(!v){e.value='';return}const d=new Date(v+'T12:00:00');e.value=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][d.getDay()];syncPrintValue(e)}
 function atualizarFiscoVisibility(){const u=currentUnit();const show=u.batalhao==='BPRv'&&u.companhiaNumero===1;document.getElementById('fiscoToggleCard').classList.toggle('hidden',!show);if(!show){document.getElementById('fiscoAtivo').checked=false;toggleFiscoMode()}}
-function toggleFiscoMode(){const on=document.getElementById('fiscoAtivo').checked;document.getElementById('fiscoFields').classList.toggle('hidden',!on);document.getElementById('normalProduction').classList.toggle('hidden',on);document.getElementById('normalExtras').classList.toggle('hidden',on)}
+function toggleFiscoMode(){const on=document.getElementById('fiscoAtivo').checked;const card=document.getElementById('fiscoToggleCard');if(card)card.classList.toggle('fisco-print-active',on);document.getElementById('fiscoFields').classList.toggle('hidden',!on);document.getElementById('normalProduction').classList.toggle('hidden',on);document.getElementById('normalExtras').classList.toggle('hidden',on)}
 function collectDynamic(){const ocorrencias=entriesFrom('occurrences');const tcos=ocorrencias.filter(o=>o.tipo==='TCO').map(o=>({id:o.id,numero:o.numero||'',numeroTco:o.numeroTco||'',tipificacao:o.tipificacao||'',tcoSasp:o.tcoSasp||'Não'}));return {ocorrencias,operacoes:entriesFrom('operations').map(o=>({...o,incluirNoCpu:true})),veiculosRecuperados:entriesFrom('vehicles'),tcos,arvc:entriesFrom('arvcs')}}
 function payloadV2(){const u=currentUnit();const dyn=collectDynamic();return {schema:'pmpb-transito-servico-diario-v2',schemaVersion:2,reportId,generatedAt:new Date().toISOString(),tipoRelatorio:'servico-diario-guarnicao',unidade:u,servico:{data:val('data'),diaSemana:val('diaSemana')},guarnicao:{nome:val('guarnicao'),viatura:val('viatura'),responsavel:val('responsavel'),matricula:val('matriculaResponsavel'),efetivo:val('efetivo')},producao:collectProduction(),alteracoes:{viatura:val('altVtr'),servico:val('altServico'),materialCarga:val('altMaterial'),planoOperacionalDiario:val('planoOperacionalDiario')},observacoes:val('observacoes'),...dyn,fisco:{ativo:document.getElementById('fiscoAtivo').checked,quantidadeOcorrencias:num(val('fiscoQtd')),alteracoesEfetivo:val('fiscoAltEfetivo')}}}
 function exportarDadosGuarnicao(silent=false){if(!val('guarnicao')){if(!silent)alert('Informe o nome da guarnição antes de exportar.');return null}const p=payloadV2();dlJSON(`RSD - ${safeName(p.guarnicao.nome,'GUARNIÇÃO')} - ${fmtDateFile(p.servico.data)}.json`,p);return p}
