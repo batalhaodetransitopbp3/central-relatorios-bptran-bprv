@@ -224,6 +224,7 @@ html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavio
 }
 </style>
 
+<meta name="central-version" content="10.0-passagem-rsd-interoperavel">
 </head><body><main class="page">
 <div class="toolbar no-print">
 <button class="ok" onclick="finalizarServico()">Finalizar serviço</button>
@@ -364,9 +365,114 @@ const OPERATIONS_STORE='pmpb-transito-operacoes-dia-v1';
 function operationToSummary(p){const sm=p.resumoCpu||p.resumo||{},pod=p.pod||{};return {id:p.reportId||uid('op'),nome:p.operacao?.nome||sm.nome||'',local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',turno:p.operacao?.turno||sm.turno||'',apreensoesVeiculos:sm.apreensoesVeiculos??0,totalAits:sm.totalAits??0,prisoes:sm.prisoes??0,statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',coordenadasPrevistas:pod.coordenadasPrevistas||sm.coordenadasPrevistas||'',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',incluirNoCpu:'true'}}
 function storedOperationIsValid(p){return !!(p?.reportId&&p?.operacao?.nome&&(p?.operacao?.modalidade==='Checkpoint / Blitz'||p?.local?.descricao||p?.local?.coordenadas))}
 function readStoredOperations(){try{const raw=JSON.parse(localStorage.getItem(OPERATIONS_STORE)||'[]');return Array.isArray(raw)?raw.filter(storedOperationIsValid):[]}catch(_){return []}}
+
+// ===== PASSAGEM RSD v2 — interoperabilidade Android/iOS e operações cumulativas =====
+function rsdArrayCompat(v){if(Array.isArray(v))return v;if(!v)return [];if(typeof v==='object')return Object.values(v).filter(Boolean);return []}
+function rsdTextCompat(...vals){for(const v of vals){if(v!==undefined&&v!==null&&String(v).trim()!=='')return String(v)}return ''}
+function normalizarOcorrenciaRsd(o={}){
+  const tipo=rsdTextCompat(o.tipo,o.type,o.natureza,'Outro');
+  return {...o,
+    id:rsdTextCompat(o.id,o.registroId,o.ocorrenciaId)||uid('oc'),
+    data:rsdTextCompat(o.data,o.dataOcorrencia,o.date),
+    hora:rsdTextCompat(o.hora,o.horaOcorrencia,o.time),
+    numero:rsdTextCompat(o.numero,o.numeroOcorrencia,o.numeroFicha,o.ficha),
+    tipo:/^bopm$/i.test(tipo)?'BO':(/^tco$/i.test(tipo)?'TCO':(/^bst$/i.test(tipo)?'BST':tipo)),
+    descricao:rsdTextCompat(o.descricao,o.relato,o.resumo,o.descricaoOcorrencia),
+    tcoSasp:rsdTextCompat(o.tcoSasp,o.sasp,o.houveTcoSasp,o.numeroTco?'Sim':'Não'),
+    numeroTco:rsdTextCompat(o.numeroTco,o.tcoNumero,o.numeroTcoSasp),
+    tipificacao:rsdTextCompat(o.tipificacao,o.tipoPenal,o.enquadramento)
+  }
+}
+function normalizarOperacaoResumoRsd(o={}){
+  return {...o,
+    id:rsdTextCompat(o.id,o.reportId,o.registroId)||uid('op'),
+    nome:rsdTextCompat(o.nome,o.operacao,o.nomeOperacao),
+    local:rsdTextCompat(o.local,o.localExecutado,o.descricaoLocal),
+    coordenadas:rsdTextCompat(o.coordenadas,o.coordenadasExecutadas),
+    turno:rsdTextCompat(o.turno),
+    statusCumprimento:rsdTextCompat(o.statusCumprimento,o.statusPod,'Não informado'),
+    localPrevisto:rsdTextCompat(o.localPrevisto,o.localPod),
+    coordenadasPrevistas:rsdTextCompat(o.coordenadasPrevistas,o.coordenadasPod),
+    motivoAlteracao:rsdTextCompat(o.motivoAlteracao,o.motivoMudanca),
+    apreensoesVeiculos:o.apreensoesVeiculos??o.veiculos??0,
+    totalAits:o.totalAits??o.aits??0,
+    prisoes:o.prisoes??0,
+    incluirNoCpu:o.incluirNoCpu!==false
+  }
+}
+function operacoesLocaisDoServicoRsd(){
+  const data=val('data'),u=currentUnit();
+  return readStoredOperations().filter(p=>p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));
+}
+function mesclarResumosOperacoesRsd(resumos=[],detalhadas=[]){
+  const mapa=new Map();
+  rsdArrayCompat(detalhadas).forEach(p=>{if(storedOperationIsValid(p)){const s=operationToSummary(p);mapa.set(s.id,s)}});
+  rsdArrayCompat(resumos).map(normalizarOperacaoResumoRsd).forEach(s=>mapa.set(s.id,s));
+  return Array.from(mapa.values());
+}
+function salvarOperacoesRecebidasRsd(detalhadas=[]){
+  const recebidas=rsdArrayCompat(detalhadas).filter(storedOperationIsValid);if(!recebidas.length)return 0;
+  const mapa=new Map(readStoredOperations().map(p=>[p.reportId,p]));
+  recebidas.forEach(p=>mapa.set(p.reportId,p));
+  try{localStorage.setItem(OPERATIONS_STORE,JSON.stringify(Array.from(mapa.values())))}catch(_){}
+  return recebidas.length;
+}
+function normalizarRelatorioRecebidoRsd(input){
+  const wrapper=input||{};
+  let r=(wrapper.relatorio&&typeof wrapper.relatorio==='object')?wrapper.relatorio:wrapper;
+  if(!r||typeof r!=='object')throw new Error('payload');
+  const schema=String(r.schema||'');
+  if(schema&&schema!=='pmpb-transito-servico-diario-v2'&&!/^pmpb-transito-servico-diario-v\d+$/i.test(schema))throw new Error('schema');
+  r={...r};
+  r.ocorrencias=rsdArrayCompat(r.ocorrencias||r.ocorrencia||r.occurrences||r.ocorrenciasServico).map(normalizarOcorrenciaRsd);
+  r.tcos=rsdArrayCompat(r.tcos||r.tco||r.tcosSasp);
+  r.operacoes=rsdArrayCompat(r.operacoes||r.operations||r.operacoesResumo||r.resumoOperacoes).map(normalizarOperacaoResumoRsd);
+  r.veiculosRecuperados=rsdArrayCompat(r.veiculosRecuperados||r.veiculos||r.recoveredVehicles);
+  r.arvc=rsdArrayCompat(r.cirvc||r.arvc||r.cirvcs||r.remocoesVeiculos);
+  const detalhadas=rsdArrayCompat(r.operacoesAcumuladas||r.operacoesDetalhadas||wrapper.operacoesAcumuladas||wrapper.operacoesDetalhadas).filter(storedOperationIsValid);
+  r.operacoes=mesclarResumosOperacoesRsd(r.operacoes,detalhadas);
+  r.operacoesAcumuladas=detalhadas;
+  return {relatorio:r,integridade:wrapper.integridade||r.integridade||null,operacoesDetalhadas:detalhadas};
+}
+function contagemVisualRsd(){return {ocorrencias:document.querySelectorAll('#occurrences .entry').length,operacoes:document.querySelectorAll('#operations .entry').length,veiculosRecuperados:document.querySelectorAll('#vehicles .entry').length,cirvc:document.querySelectorAll('#arvcs .entry').length}}
+function conferirIntegridadePassagemRsd(esperado){
+  if(!esperado)return '';
+  const atual=contagemVisualRsd(),falhas=[];
+  ['ocorrencias','operacoes','veiculosRecuperados','cirvc'].forEach(k=>{if(Number.isFinite(Number(esperado[k]))&&Number(esperado[k])!==Number(atual[k]))falhas.push(`${k}: esperado ${esperado[k]}, recebido ${atual[k]}`)});
+  return falhas.join('; ');
+}
+function montarPassagemServicoRsd(){
+  const relatorio=payloadV2();
+  const detalhadas=operacoesLocaisDoServicoRsd();
+  relatorio.operacoes=mesclarResumosOperacoesRsd(relatorio.operacoes,detalhadas);
+  relatorio.operacoesAcumuladas=detalhadas;
+  const integridade={ocorrencias:rsdArrayCompat(relatorio.ocorrencias).length,operacoes:rsdArrayCompat(relatorio.operacoes).length,veiculosRecuperados:rsdArrayCompat(relatorio.veiculosRecuperados).length,cirvc:rsdArrayCompat(relatorio.cirvc||relatorio.arvc).length,operacoesDetalhadas:detalhadas.length};
+  return {schema:'pmpb-transito-passagem-rsd-v1',schemaVersion:2,formatoPassagem:'v2-interoperavel',generatedAt:new Date().toISOString(),origemPlataforma:/iphone|ipad|ipod/i.test(navigator.userAgent)?'iOS':'Android/Web',integridade,relatorio};
+}
+
 function importarOperacoesDoDia(){const data=val('data'),u=currentUnit();if(!data){alert('Informe a data do serviço.');return}const currentIds=new Set(Array.from(document.querySelectorAll('#operations .entry')).map(e=>e.dataset.id));const found=readStoredOperations().filter(p=>p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));let n=0;found.forEach(p=>{const x=operationToSummary(p);if(!currentIds.has(x.id)){addOperationSummary(x);currentIds.add(x.id);n++}});alert(n?`${n} operação(ões) do dia incorporada(s) ao relatório.`:'Não há novas operações registradas neste aparelho para a data e unidade selecionadas.')}
-function gerarPassagemServico(){if(!val('guarnicao')){alert('Informe a guarnição antes de gerar a passagem de serviço.');return}const wrap={schema:'pmpb-transito-passagem-rsd-v1',schemaVersion:1,generatedAt:new Date().toISOString(),relatorio:payloadV2()};dlJSON(`PASSAGEM RSD - ${safeName(val('guarnicao'),'GUARNIÇÃO')} - ${fmtDateFile(val('data'))}.json`,wrap)}
-async function importarPassagemServico(files){const f=Array.from(files||[])[0];if(!f)return;try{const p=JSON.parse(await f.text());const r=p.schema==='pmpb-transito-passagem-rsd-v1'?p.relatorio:p;if(r?.schema!=='pmpb-transito-servico-diario-v2')throw new Error('schema');if(r.reportId)reportId=r.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(r);salvarRascunhoGuarnicao(true)}catch(e){alert('Arquivo de passagem de serviço incompatível ou inválido.')}}
+function gerarPassagemServico(){
+ if(!val('guarnicao')){alert('Informe a guarnição antes de gerar a passagem de serviço.');return}
+ const wrap=montarPassagemServicoRsd();
+ dlJSON(`PASSAGEM RSD - ${safeName(val('guarnicao'),'GUARNIÇÃO')} - ${fmtDateFile(val('data'))}.json`,wrap);
+ return wrap;
+}
+async function importarPassagemServico(files){
+ const f=Array.from(files||[])[0];if(!f)return;
+ try{
+   const bruto=JSON.parse(await f.text());
+   const pacote=normalizarRelatorioRecebidoRsd(bruto),r=pacote.relatorio;
+   if(r.reportId)reportId=r.reportId;
+   localStorage.setItem(REPORT_ID_KEY,reportId);
+   applyPayload(r);
+   salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);
+   salvarRascunhoGuarnicao(true);
+   const falha=conferirIntegridadePassagemRsd(pacote.integridade);
+   if(falha){alert('Serviço recebido, porém a conferência automática encontrou divergência:\n\n'+falha+'\n\nNão finalize o serviço antes de conferir os registros.');}
+   else if(pacote.integridade){alert(`Serviço recebido e conferido: ${pacote.integridade.ocorrencias||0} ocorrência(s), ${pacote.integridade.operacoes||0} operação(ões), ${pacote.integridade.veiculosRecuperados||0} veículo(s) e ${pacote.integridade.cirvc||0} CIRVC(s).`);}
+   return r;
+ }catch(e){console.error(e);alert('Arquivo de passagem de serviço incompatível ou inválido. Nenhum dado foi apagado.')}
+}
 function validarFinalizacao(){
  const pendencias=[];
  if(!val('guarnicao'))pendencias.push('Guarnição');
