@@ -808,6 +808,14 @@
 </style>
 
 
+
+<style id="cirvc-v10-shared-refusal">
+.recebedor-recusa{margin:8px 0 2px;display:flex;align-items:center;gap:8px;font-weight:800;color:#334155}.recebedor-recusa input{width:18px;height:18px;min-height:18px}
+.receiver-refusal-print{display:none;margin-top:4px;font-weight:800;text-align:center;border-top:1px solid #9aa9b7;padding-top:4px}
+.signature-box.signature-refused{opacity:.55;background:#f4f6f8}.signature-box.signature-refused canvas{pointer-events:none}
+@media print{.recebedor-recusa{display:none!important}.receiver-refusal-print:not([hidden]){display:block!important}.signature-box.signature-refused canvas,.signature-box.signature-refused .print-signature{display:none!important}.signature-box.signature-refused{opacity:1!important;background:#fff!important;border:0!important}}
+</style>
+<meta name="central-version" content="10.0-cirvc-campos-comuns-recusa">
 </head>
 <body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª CPTran</option><option value="2">2ª CPTran</option><option value="3">3ª CPTran</option><option value="4">4ª CPTran</option><option value="5">5ª CPTran</option></select></div></div>
   <main class="page">
@@ -948,6 +956,8 @@
           ${fieldHTML('Função', 'recebedorFuncao')}
           ${fieldHTML('Matrícula', 'recebedorMatricula')}
         </div>
+        <label class="recebedor-recusa no-print"><input type="checkbox" data-name="recebedorRecusouAssinar" onchange="toggleRecusaRecebedor(this)"> O recebedor recusou a assinar</label>
+        <div class="receiver-refusal-print" data-refusal-print hidden>O recebedor recusou-se a assinar.</div>
 
         <div class="declaracao">
           Declaro, para fins de controle interno, que recebi o veículo acima identificado no local de destino informado, ficando registrada a sua entrega na data e horário constantes neste auto, ressalvadas as condições aparentes eventualmente descritas no campo de observações.
@@ -1025,11 +1035,12 @@
       Object.entries(data || {}).forEach(([k, v]) => {
         if (['assinatura', 'assinaturaResponsavel', 'assinaturaRecebedor', 'foto', 'fotos', 'fotosOriginais'].includes(k)) return;
         const el = section.querySelector(`[data-name="${k}"]`);
-        if (el && v !== undefined && v !== null) el.value = v;
+        if (el && v !== undefined && v !== null) { if(el.type==='checkbox') el.checked=!!v; else el.value = v; }
       });
       setFotos(section, data.fotos || (data.foto ? [data.foto] : []), data.fotosOriginais || data.fotos || (data.foto ? [data.foto] : []));
       inicializarAssinatura(section.querySelector('canvas.signature[data-name="assinaturaResponsavel"]'), data.assinaturaResponsavel || '');
       inicializarAssinatura(section.querySelector('canvas.signature[data-name="assinaturaRecebedor"]'), data.assinaturaRecebedor || data.assinatura || '');
+      const recusou=section.querySelector('[data-name="recebedorRecusouAssinar"]');if(recusou){recusou.checked=!!data.recebedorRecusouAssinar;toggleRecusaRecebedor(recusou);}
       section.querySelectorAll('[data-hora="1"]').forEach(bindHora);
       const guInput=section.querySelector('[data-name="guarnicaoVtr"]');if(guInput)guInput.addEventListener('input',()=>{atualizarOrdens();salvarCirvcsParaConsolidacao()});
       section.querySelectorAll('textarea').forEach(autoResizeTextarea);
@@ -1038,13 +1049,31 @@
       return section;
     }
 
+
+    function toggleRecusaRecebedor(input){
+      const card=input?.closest('.auto-card');if(!card)return;
+      const recusou=!!input.checked,canvas=card.querySelector('canvas.signature[data-name="assinaturaRecebedor"]'),box=canvas?.closest('.signature-box'),print=card.querySelector('[data-refusal-print]');
+      if(print)print.hidden=!recusou;
+      if(box)box.classList.toggle('signature-refused',recusou);
+      if(recusou&&canvas){canvas.dataset.signatureData='';const ctx=canvas.getContext('2d'),rect=canvas.getBoundingClientRect();ctx.clearRect(0,0,Math.max(rect.width,canvas.width),Math.max(rect.height,canvas.height));const img=box?.querySelector('.print-signature');if(img)img.removeAttribute('src');}
+    }
+    function dadosComunsNovoCirvc(anterior){
+      if(!anterior)return {};
+      const nomes=['dataEntrega','horaEntrega','guarnicaoVtr','militarResponsavel','localApreensao','localDestino','recebedorNome','recebedorFuncao','recebedorMatricula'];
+      const d={};nomes.forEach(nome=>{d[nome]=anterior.querySelector(`[data-name="${nome}"]`)?.value||''});
+      d.assinaturaResponsavel=anterior.querySelector('canvas.signature[data-name="assinaturaResponsavel"]')?.dataset.signatureData||'';
+      d.assinaturaRecebedor=anterior.querySelector('canvas.signature[data-name="assinaturaRecebedor"]')?.dataset.signatureData||'';
+      d.recebedorRecusouAssinar=!!anterior.querySelector('[data-name="recebedorRecusouAssinar"]')?.checked;
+      return d;
+    }
+
     function adicionarAuto() {
       const cards=Array.from(document.querySelectorAll('.auto-card'));
       const anterior=cards[cards.length-1];
-      const guarnicaoVtr=anterior?.querySelector('[data-name="guarnicaoVtr"]')?.value||'';
-      criarAuto({guarnicaoVtr});
+      const comuns=dadosComunsNovoCirvc(anterior);
+      criarAuto(comuns);
       salvarRascunho(true);salvarCirvcsParaConsolidacao();
-      setStatus('Novo CIRVC adicionado. A guarnição foi reaproveitada automaticamente.');
+      setStatus('Novo CIRVC adicionado. Dados comuns da entrega, recebedor e assinaturas foram reaproveitados; os dados do veículo permanecem em branco.');
     }
 
     function duplicarAuto(btn) {
@@ -1224,16 +1253,17 @@
           primeiraPendente ||= box;
           pendencias.push(`Auto ${idx + 1}: assinatura do militar responsável`);
         }
-        if (!recebedor?.dataset.signatureData) {
+        const recusou=!!card.querySelector('[data-name="recebedorRecusouAssinar"]')?.checked;
+        if (!recebedor?.dataset.signatureData && !recusou) {
           const box = recebedor?.closest('.signature-box');
           box?.classList.add('validation-error');
           primeiraPendente ||= box;
-          pendencias.push(`Auto ${idx + 1}: assinatura do recebedor`);
+          pendencias.push(`Auto ${idx + 1}: assinatura do recebedor ou marque que houve recusa`);
         }
       });
       if (pendencias.length) {
         primeiraPendente?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        alert('Antes de gerar o PDF, colha as duas assinaturas de cada veículo:\n\n' + pendencias.join('\n'));
+        alert('Antes de gerar o PDF, regularize as assinaturas indicadas. A assinatura do recebedor pode ser dispensada somente quando estiver marcada a opção de recusa:\n\n' + pendencias.join('\n'));
         return false;
       }
       return true;
@@ -1253,6 +1283,7 @@ function consolidarArvc(){salvarRascunho(true);salvarCirvcsParaConsolidacao();se
 function readCirvcStore(){try{const a=JSON.parse(localStorage.getItem(CIRVC_SERVICE_STORE)||'[]');return Array.isArray(a)?a:[]}catch(_){return []}}
 function salvarCirvcsParaConsolidacao(){try{const p=arvcPayloadCpu(),atuais=p.registros||[],antigos=readCirvcStore().filter(r=>r.sourceReportId!==cirvcReportId);localStorage.setItem(CIRVC_SERVICE_STORE,JSON.stringify([...antigos,...atuais]));return atuais}catch(e){return []}}
 function prepareAndPrint() {
+      document.querySelectorAll('[data-name="recebedorRecusouAssinar"]').forEach(toggleRecusaRecebedor);
       if (!validarAssinaturasAutos()) return;
       syncPrintValues();
       document.title = nomePdfAuto();
@@ -1264,7 +1295,7 @@ function prepareAndPrint() {
       section.querySelectorAll('[data-name]').forEach(el => {
         const name = el.dataset.name;
         if (['assinatura', 'assinaturaResponsavel', 'assinaturaRecebedor'].includes(name)) return;
-        dados[name] = el.value || '';
+        dados[name] = el.type==='checkbox' ? !!el.checked : (el.value || '');
       });
       const assinaturaResponsavel = section.querySelector('canvas.signature[data-name="assinaturaResponsavel"]');
       const assinaturaRecebedor = section.querySelector('canvas.signature[data-name="assinaturaRecebedor"]');
