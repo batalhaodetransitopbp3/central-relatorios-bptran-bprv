@@ -225,6 +225,64 @@ html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavio
 </style>
 
 <meta name="central-version" content="10.0-passagem-rsd-interoperavel">
+
+<style id="rsd-operation-mobile-fix-v1">
+/* Correção responsiva do bloco Operação/POD no RSD — Android e iOS */
+@media screen and (max-width: 900px){
+  .entry.compact-operation{overflow:hidden!important}
+  .entry.compact-operation .operation-summary-grid{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:8px!important;
+    width:100%!important;
+  }
+  .entry.compact-operation .operation-summary-grid>.field{
+    grid-column:1/-1!important;
+    min-width:0!important;
+    width:auto!important;
+    display:block!important;
+  }
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="nome"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="turno"]){
+    grid-column:span 1!important;
+  }
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="apreensoesVeiculos"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="totalAits"]){
+    grid-column:span 1!important;
+  }
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="prisoes"]){
+    grid-column:1/-1!important;
+  }
+  .entry.compact-operation .operation-summary-grid label{
+    display:block!important;
+    white-space:normal!important;
+    overflow-wrap:anywhere!important;
+    line-height:1.2!important;
+    margin:0 0 4px!important;
+  }
+  .entry.compact-operation .operation-summary-grid input,
+  .entry.compact-operation .operation-summary-grid select,
+  .entry.compact-operation .operation-summary-grid textarea{
+    box-sizing:border-box!important;
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+  }
+}
+@media screen and (max-width: 430px){
+  .entry.compact-operation .operation-summary-grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .entry.compact-operation .operation-summary-grid>.field,
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="nome"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="turno"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="apreensoesVeiculos"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="totalAits"]),
+  .entry.compact-operation .operation-summary-grid>.field:has([data-k="prisoes"]){
+    grid-column:1/-1!important;
+  }
+}
+</style>
 </head><body><main class="page">
 <div class="toolbar no-print">
 <button class="ok" onclick="finalizarServico()">Finalizar serviço</button>
