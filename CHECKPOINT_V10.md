@@ -105,18 +105,17 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Próximo passo obrigatório: substituir o `Code.gs` do projeto Apps Script pelo conteúdo atual de `apps_script_v10.gs` e atualizar a implantação existente para uma nova versão, mantendo a mesma URL `/exec`. Depois confirmar `?action=version` retornando `10.3.1`.
 
 ## Solução 50 — Registro da Guarnição em Serviço — 25/09/2026
-- Criado registro em nuvem da guarnição já no início do serviço, sem depender da finalização do RSD.
+- Escopo simplificado por decisão operacional: o registro da guarnição em serviço contém apenas **nome da guarnição + comandante (nome e matrícula)**. Não há cadastro individual de todos os componentes nem campo de turno para essa finalidade.
+- A lotação administrativa do comandante não restringe a pesquisa; o Cadastro Mestre é consultado globalmente.
+- A busca do comandante aceita matrícula completa ou nome/QRA.
 - Nova rota backend: `rsd-start` (CENTRAL_TOKEN).
-- Novo estado do RSD: `EM_SERVICO`; fluxo previsto: `EM_SERVICO → FINALIZADO → INCLUIDO_RCO`.
-- O mesmo `REPORT_ID` acompanha todo o ciclo. Atualizações em serviço e a finalização incrementam a versão do mesmo RSD, sem duplicação.
-- Criada a aba estruturada `RSD_COMPONENTES` na Base Estatística P3 para registrar individualmente os componentes da guarnição.
-- Cada componente registra matrícula, posto/graduação, nome, função, indicação de responsável pelo RSD, ordem e lotação administrativa de origem.
-- A busca de militar é global no Cadastro Mestre por matrícula, nome ou QRA; lotação não restringe o emprego em outra companhia.
-- RSD desktop e iOS passaram a possuir: turno do serviço, composição individual, funções (Comandante/Motorista/Patrulheiro/Apoio/Outra), definição do responsável e botão `Registrar guarnição no serviço`.
-- O momento real de `Início do serviço` é preservado localmente e enviado ao backend como `INICIADO_EM`.
-- O RCO desktop e iOS passa a listar guarnições/RSDs da nuvem com status `EM SERVIÇO`, permitindo adicionar a identificação antes do fechamento.
-- Quando a guarnição finalizar o RSD, o RCO sinaliza `NOVA VERSÃO` e atualiza a mesma origem sem dupla contagem, inclusive após fechar/reabrir o RCO.
-- O RCO bloqueia a consolidação para o P3 se houver origem adicionada ainda em `EM_SERVICO`.
+- Fluxo do mesmo `REPORT_ID`: `EM_SERVICO → FINALIZADO → INCLUIDO_RCO`.
+- O RCO pode adicionar a identificação da guarnição enquanto ela está `EM_SERVICO`; após a finalização, apresenta `NOVA VERSÃO` para substituir os dados sem duplicidade.
+- O RCO bloqueia a consolidação P3 enquanto houver origem adicionada ainda `EM_SERVICO`.
 - O backend não permite marcar RSD `EM_SERVICO` como `INCLUIDO_RCO`.
-- O botão antigo de arquivo permanece apenas como `Importar JSON (contingência)`.
-- Backend preparado na versão `10.4.0`; é necessária atualização da implantação do Apps Script antes da homologação desta solução.
+- JSON permanece apenas como contingência.
+- A aba temporária `RSD_COMPONENTES` foi removida da Base P3, pois deixou de ser necessária após a simplificação.
+- Correção de comunicação na v10.4.1: o HTML do Apps Script envia resposta também para `window.top`, e o frontend deixa de exigir igualdade entre `event.source` e o iframe externo, mantendo correlação por `requestId` único.
+- Backend preparado na versão `10.4.1`; é necessária atualização da implantação do Apps Script antes da nova homologação.
+
+
