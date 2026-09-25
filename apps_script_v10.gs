@@ -397,12 +397,19 @@ function rsdGet_(reportId) {
   return p;
 }
 function rsdMarkIncluded_(payload) {
-  var reportId=String(payload.reportId||''), rcoId=String(payload.rcoReportId||'');
-  var s=sheet_(P3_SHEET_ID,'RSD'), row=findOne_(s,'REPORT_ID',reportId);
-  if(!row) throw new Error('RSD não localizado.');
-  row.STATUS='INCLUIDO_RCO'; row.RCO_REPORT_ID=rcoId; row.INCLUIDO_RCO_EM=nowIso_(); row.SINCRONIZADO_EM=nowIso_();
-  upsert_(s,'REPORT_ID',reportId,row);
-  return {ok:true,message:'RSD marcado como incluído.',reportId:reportId};
+  var ids=payload.rsdReportIds||payload.reportIds||[];
+  if(!Array.isArray(ids))ids=[];
+  if(payload.reportId)ids.unshift(payload.reportId);
+  ids=ids.filter(Boolean);
+  if(!ids.length)throw new Error('Nenhum RSD informado.');
+  var rcoId=String(payload.rcoReportId||''),s=sheet_(P3_SHEET_ID,'RSD'),count=0;
+  ids.forEach(function(reportId){
+    var row=findOne_(s,'REPORT_ID',String(reportId));
+    if(!row)return;
+    row.STATUS='INCLUIDO_RCO';row.RCO_REPORT_ID=rcoId;row.INCLUIDO_RCO_EM=nowIso_();row.SINCRONIZADO_EM=nowIso_();
+    upsert_(s,'REPORT_ID',String(reportId),row);count++;
+  });
+  return {ok:true,message:count+' RSD(s) marcado(s) como incluído(s).',quantidade:count,rcoReportId:rcoId};
 }
 function syncRsdOperations_(r, reportId, batt, comp, version) {
   var ops=r.operacoes||[]; if(!Array.isArray(ops)) return;
