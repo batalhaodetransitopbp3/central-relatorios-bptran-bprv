@@ -2543,7 +2543,7 @@
     if(!confirm('Você tem certeza que deseja apagar todos os dados registrados e dar início a um novo serviço?'))return;
     centralSuppressExit=true;
     try{
-      const prefixes=['central-autosave::','pmpb-transito-','pmpb-operacao-','pmpb-central-','bo_bptrans_','checklist_','arvc_','acoes_educativas_','fisco_'];
+      const prefixes=['central-autosave::','pmpb-transito-','pmpb-operacao-','bo_bptrans_','checklist_','arvc_','acoes_educativas_','fisco_'];
       Object.keys(localStorage).forEach(k=>{if(prefixes.some(p=>k.startsWith(p)))localStorage.removeItem(k)});
       Object.keys(sessionStorage).forEach(k=>{if(prefixes.some(p=>k.startsWith(p)))sessionStorage.removeItem(k)});
     }catch(_){}
