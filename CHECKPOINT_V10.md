@@ -39,3 +39,20 @@ Publicar `apps_script_v10.gs` como **novo Google Apps Script Web App**, configur
 
 ## Regra de segurança
 Não substituir nem excluir o backend legado durante a homologação.
+
+## Auditoria de retomada — 25/09/2026
+- Repositório ativo confirmado: `batalhaodetransitopbp3/central-relatorios-bptran-bprv`, branch `main`.
+- Sintaxe do `apps_script_v10.gs` e do `central_cloud.js` validada novamente sem erros.
+- Todas as rotas v10 esperadas foram encontradas no backend; nenhuma rota esperada ficou ausente.
+- Bases reais do Google Sheets foram reabertas e conferidas:
+  - `BASE ESTATÍSTICA P3 - BPTran-BPRv`;
+  - `BASE CHECKLIST E MOTOMECANIZAÇÃO - BPTran-BPRv`.
+- Cabeçalhos reais de RCO, RSD, RSD_VIATURAS, RCO_ORIGENS, PASSAGENS_SERVICO, PRISOES, MILITARES, VIATURAS, OPERACOES, POD_EXECUCAO, CIRVC e Checklist/Motomecanização foram comparados com os contratos do backend e estão compatíveis.
+- Individualização das operações reconfirmada: cada nova operação recebe `reportId` próprio, gravado como `REGISTRO_ID`; retificações reaproveitam o mesmo identificador e o RCO atualiza a mesma operação ao consolidar, evitando duplicação estatística.
+- `p3-config-set` foi revisado: aceita somente `POWERBI_URL`. A URL do Power BI permanece configurável pela Gestão P3 e não é fixada no código.
+- Pesquisa no repositório não encontrou valores versionados de `CENTRAL_TOKEN` ou `P3_TOKEN`; as chaves devem permanecer exclusivamente nas Propriedades do Script.
+- `CONFIG.BACKEND_V10_STATUS` continua `AGUARDANDO_PUBLICACAO`, portanto a v10 não foi ativada inadvertidamente.
+- Desktop Commander autorizado foi verificado, porém o computador `BOOK-S440LMLLJM` estava offline nesta retomada; por isso a publicação do novo Apps Script não pôde ser executada remotamente.
+
+## Ponto exato para continuar
+A revisão de código, contratos e bases está concluída. O próximo passo efetivo permanece a publicação de `apps_script_v10.gs` como NOVO Google Apps Script Web App, configuração de `CENTRAL_TOKEN` e `P3_TOKEN`, teste de `?action=version` esperando `10.3.0` e, somente após sucesso, atualização do endpoint v10 em `central_cloud.js` e execução da matriz de homologação.
