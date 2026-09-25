@@ -69,7 +69,7 @@
  }
  function renderOpStats(items){
   const types=new Set(items.map(x=>x.OPERACAO).filter(Boolean)),actual=items.filter(x=>x.LOCAL||x.LATITUDE).length,zero=items.filter(x=>/zero.?álcool/i.test(x.OPERACAO||'')).length,rand=items.filter(x=>/randandan/i.test(x.OPERACAO||'')).length;
-  $('stats').innerHTML=cards([['Operações',items.length],['Tipos',types.size],['Com local executado',actual],['Zero Álcool',zero],['Randandan',rand]]);
+  $('stats').innerHTML=cards([['Operações executadas',items.length],['Tipos',types.size],['Com local executado',actual],['Zero Álcool',zero],['Randandan',rand]]);
  }
  function renderPrisonStats(items){const total=items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),fl=items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),mp=items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),ad=items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0);$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',total],['Flagrantes',fl],['Mandados',mp],['Adolescentes',ad]])}
  function renderProductivity(items){
