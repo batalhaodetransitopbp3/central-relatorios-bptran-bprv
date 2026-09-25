@@ -210,4 +210,33 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
   window.centralInstallCompactMenus=run;
 })();
 </script>
+
+<script src="central_cloud.js"></script>
+<script id="operation-cloud-v10">
+(function(){
+  function install(){
+    if(!window.CentralCloud||typeof window.payload!=='function'||typeof window.validar!=='function')return;
+    const old=window.registrarOperacaoDoDia;
+    window.registrarOperacaoDoDiaCloud=async function(){
+      if(!window.validar())return;
+      const p=window.payload();
+      try{ if(typeof old==='function') old(); }catch(_){}
+      const enabled=await CentralCloud.probe();
+      if(!enabled){ alert('Operação salva neste aparelho. A sincronização individual com a Gestão P3 ficará disponível quando o backend v10 estiver publicado.'); return; }
+      const token=CentralCloud.askToken('central');
+      if(!token){ alert('Operação salva localmente. A chave operacional é necessária apenas para sincronizar com a Central.'); return; }
+      const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
+      alert(r.queued ? 'Operação salva. Sincronização pendente preservada neste aparelho.' : 'Operação salva e registrada individualmente para Gestão P3/Power BI.');
+    };
+    document.querySelectorAll('button').forEach(btn=>{
+      if((btn.getAttribute('onclick')||'').trim()==='registrarOperacaoDoDia()'){
+        btn.setAttribute('onclick','registrarOperacaoDoDiaCloud()');
+        btn.textContent='Salvar operação do dia';
+        btn.title='Salva no aparelho e, com a Central v10 ativa, registra esta operação individualmente no banco estatístico.';
+      }
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+})();
+</script>
 </body></html>
