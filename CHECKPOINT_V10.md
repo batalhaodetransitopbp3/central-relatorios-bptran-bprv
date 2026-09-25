@@ -67,3 +67,12 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Nomenclaturas das viaturas já cadastradas da 3ª CPTran foram normalizadas nas duas bases oficiais, sem alterar prefixo, placa, tipo ou unidade.
 - Padrões aplicados: `Fiat Cronos Drive 1.3`, `Fiat Argo Trekking 1.3`, `Honda XRE 300`, `Honda XRE 300 ABS`, `Honda CRF1100L Africa Twin` e `Agrale A8700`.
 - Regra adotada: usar fabricante + modelo + versão/motorização quando comprovável; não acrescentar versão presumida. O mesmo critério deverá ser usado nas viaturas das demais companhias que forem recebidas posteriormente.
+
+## Publicação do backend v10 — 25/09/2026
+- Novo Web App publicado e validado externamente pelo usuário.
+- Resposta confirmada em `?action=version`: `{"ok":true,"version":"10.3.0","schema":"central-v10"}`.
+- Endpoint v10 publicado: `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`.
+- `central_cloud.js` atualizado em `main` para apontar ao novo endpoint v10.
+- Commit da troca de endpoint: `44473fb49dd8412c4dd368e317ea0ee4a1afaeec`.
+- `CONFIG.BACKEND_V10_STATUS` deve permanecer `AGUARDANDO_PUBLICACAO` até conclusão da matriz de homologação.
+- Backend legado não foi removido nem sobrescrito.
