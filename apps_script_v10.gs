@@ -40,6 +40,12 @@ function doGet(e) {
     } else if (action === 'cirvc-pending') {
       assertToken_(p.token, 'central');
       out = {ok:true, items:cirvcPendentes_(p)};
+    } else if (action === 'cirvc-transport-list') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, items:cirvcTransportList_(p)};
+    } else if (action === 'cirvc-transport-get') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, transporte:cirvcTransportGet_(p.transporteId)};
     } else if (action === 'p3-query') {
       assertToken_(p.token, 'p3');
       out = p3Query_(p);
@@ -483,6 +489,24 @@ function cirvcPendentes_(p) {
     return true;
   });
 }
+
+function cirvcTransportList_(p) {
+  var batt=p.batalhao?normBattalion_(p.batalhao):'', comp=p.companhia||'', status=String(p.status||'');
+  return objects_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTES')).filter(function(x){
+    if(batt&&String(x.BATALHAO)!==batt)return false;
+    if(comp&&String(x.COMPANHIA)!==String(comp))return false;
+    if(status&&String(x.STATUS)!==status)return false;
+    return true;
+  }).slice(-500).reverse();
+}
+function cirvcTransportGet_(id) {
+  var tr=findOne_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTES'),'TRANSPORTE_ID',String(id||''));
+  if(!tr) throw new Error('Transporte não localizado.');
+  var items=objects_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTE_ITENS')).filter(function(x){return String(x.TRANSPORTE_ID)===String(id);});
+  tr.ITENS=items;
+  return tr;
+}
+
 function cirvcTransportCreate_(payload) {
   var t=payload.transporte||payload||{}, ids=t.cirvcIds||[];
   if(!Array.isArray(ids)||!ids.length) throw new Error('Selecione ao menos um veículo.');
@@ -495,6 +519,7 @@ function cirvcTransportCreate_(payload) {
   ids.forEach(function(id){
     var c=findOne_(cust,'CIRVC_ID',id); if(!c) throw new Error('CIRVC não localizado: '+id);
     if(String(c.STATUS_CUSTODIA)==='BAIXADO_DETRAN') throw new Error('Veículo já baixado: '+(c.PLACA||id));
+    if(String(c.STATUS_CUSTODIA)==='EM_TRANSPORTE' && String(c.TRANSPORTE_ID||'')!==tid) throw new Error('Veículo já vinculado a outro transporte: '+(c.PLACA||id));
     c.STATUS_CUSTODIA='EM_TRANSPORTE';c.TRANSPORTE_ID=tid;c.ATUALIZADO_EM=now;upsert_(cust,'CIRVC_ID',id,c);
     upsert_(items,'ITEM_ID',tid+'-'+id,{ITEM_ID:tid+'-'+id,TRANSPORTE_ID:tid,CIRVC_ID:id,PLACA:c.PLACA||'',STATUS_ITEM:'CARREGADO',SELECIONADO_EM:now,CARREGADO_EM:now});
   });
