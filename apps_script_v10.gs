@@ -52,6 +52,9 @@ function doGet(e) {
     } else if (action === 'p3-query') {
       assertToken_(p.token, 'p3');
       out = p3Query_(p);
+    } else if (action === 'p3-analysis') {
+      assertToken_(p.token, 'p3');
+      out = p3Analysis_(p);
     } else if (action === 'motomecanizacao-list') {
       assertToken_(p.token, 'p3');
       out = motomecanizacaoList_(p);
@@ -679,6 +682,20 @@ function filterCommon_(list,p) {
     return true;
   });
 }
+function p3Analysis_(p) {
+  var list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRODUCAO')),p), indicator=String(p.indicador||'');
+  var indicators={},byCompany={},byDate={},total=0;
+  list.forEach(function(x){
+    var name=String(x.INDICADOR_NOME||x.INDICADOR_CHAVE||'');if(name)indicators[name]=1;
+    if(indicator && name!==indicator && String(x.INDICADOR_CHAVE||'')!==indicator)return;
+    var q=Number(x.QUANTIDADE||0),co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||x.DATA||'');
+    total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
+  });
+  return {ok:true,indicadores:Object.keys(indicators).sort(),indicador:indicator,total:total,
+    porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
+    porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
+}
+
 function p3Query_(p) {
   var view=String(p.view||'controle-diario'), list;
   if(view==='controle-diario'){
