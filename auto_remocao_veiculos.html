@@ -1513,5 +1513,18 @@ function prepareAndPrint() {
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
+
+<script>window.CENTRAL_V10_ENABLED=false;</script>
+<script src="central_cloud.js"></script>
+<script id="cirvc-cloud-v10-script">
+(function(){
+ const baseConsolidar=window.consolidarArvc;
+ function unit(){const i=window.getInstitution?getInstitution():{};return {batalhao:i.batalhao||document.getElementById('globalBatalhao')?.value||'BPTran',companhiaNumero:Number(i.numero||document.getElementById('globalCompanhia')?.value||1),companhia:i.companhia||document.getElementById('globalCompanhia')?.selectedOptions?.[0]?.text||''}}
+ function cloudRecords(){const p=arvcPayloadCpu(),raw=coletarTodos();return (p.registros||[]).map((r,i)=>{const a=raw[i]||{};return {...r,unidade:unit(),tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),vtr:a.guarnicaoVtr||'',prefixo:a.guarnicaoVtr||'',matriculaResponsavel:a.matriculaResponsavel||'',responsavelCirvc:a.militarResponsavel||'',local:a.localDestino||r.local||'',localApreensao:a.localApreensao||'',motivo:a.motivo||''}})}
+ async function publicarEImprimir(){salvarRascunho(true);salvarCirvcsParaConsolidacao();const regs=cloudRecords();if(!regs.length){prepareAndPrint();return}let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;try{const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});setStatus(r.message||'CIRVCs disponibilizados para continuidade da custódia.');setTimeout(()=>prepareAndPrint(),180)}catch(e){alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.')}} 
+ function install(){const tb=document.querySelector('.toolbar');if(tb&&!tb.querySelector('[data-cirvc-transporte]')){const a=document.createElement('a');a.href='cirvc_transporte.html';a.textContent='Transporte / Reboqueiros';a.dataset.cirvcTransporte='1';a.className='button secondary no-print';a.style.cssText='text-decoration:none;display:inline-flex;align-items:center;justify-content:center';tb.appendChild(a)}if(window.CentralCloud?.isEnabled())window.consolidarArvc=publicarEImprimir}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,60));else setTimeout(install,60);
+})();
+</script>
 </body>
 </html>
