@@ -920,6 +920,11 @@
       const section = document.createElement('article');
       section.className = 'auto-card';
       section.dataset.autoId = id;
+      const svcCtx=activeServiceContextCirvc();
+      section.dataset.rsdReportId=data.rsdReportId||svcCtx.rsdReportId||'';
+      section.dataset.serviceId=data.serviceId||svcCtx.serviceId||'';
+      section.dataset.segmento=String(data.segmento||svcCtx.segmento||1);
+      section.dataset.guarnicao=data.guarnicao||svcCtx.guarnicao||'';
       section.innerHTML = `
         <div class="auto-form-half">
         <header class="doc-head">
@@ -1278,8 +1283,8 @@ function arvcPayloadCpu(){
   const registros=autos.map((a,i)=>{
     const core=[cirvcReportId,a.dataEntrega||'',a.horaEntrega||'',String(a.placa||'').toUpperCase(),a.guarnicaoVtr||'',a.numeroTermo||'',i+1].join('|');
     return {id:'cirvc-'+stableArvcToken(core),sourceReportId:cirvcReportId,numeroTermo:a.numeroTermo||'',data:a.dataEntrega||'',hora:a.horaEntrega||'',
-      placa:a.placa||'',guarnicao:ctx.guarnicao||a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||ctx.comandante||'',local:a.localDestino||'',
-      rsdReportId:ctx.rsdReportId||'',serviceId:ctx.serviceId||'',segmento:Number(ctx.segmento||1)||1,
+      placa:a.placa||'',guarnicao:a.guarnicao||ctx.guarnicao||a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||ctx.comandante||'',local:a.localDestino||'',
+      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
       matriculaResponsavel:a.matriculaResponsavel||ctx.comandanteMatricula||'',vtr:a.guarnicaoVtr||(Array.isArray(ctx.vtrs)?ctx.vtrs[0]||'':''),
       localApreensao:a.localApreensao||'',motivo:a.motivo||'',tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),
       unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null}};
@@ -1313,6 +1318,10 @@ function prepareAndPrint() {
       dados.assinaturaResponsavel = assinaturaResponsavel ? (assinaturaResponsavel.dataset.signatureData || '') : '';
       dados.assinaturaRecebedor = assinaturaRecebedor ? (assinaturaRecebedor.dataset.signatureData || '') : '';
       dados.fotos = getFotos(section);
+      dados.rsdReportId=section.dataset.rsdReportId||'';
+      dados.serviceId=section.dataset.serviceId||'';
+      dados.segmento=Number(section.dataset.segmento||1)||1;
+      dados.guarnicao=section.dataset.guarnicao||'';
       return dados;
     }
 
