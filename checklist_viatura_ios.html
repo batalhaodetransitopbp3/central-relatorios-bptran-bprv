@@ -2543,7 +2543,7 @@
     if(!confirm('Você tem certeza que deseja apagar todos os dados registrados e dar início a um novo serviço?'))return;
     centralSuppressExit=true;
     try{
-      const prefixes=['central-autosave::','pmpb-transito-','pmpb-operacao-','pmpb-central-','bo_bptrans_','checklist_','arvc_','acoes_educativas_','fisco_'];
+      const prefixes=['central-autosave::','pmpb-transito-','pmpb-operacao-','bo_bptrans_','checklist_','arvc_','acoes_educativas_','fisco_'];
       Object.keys(localStorage).forEach(k=>{if(prefixes.some(p=>k.startsWith(p)))localStorage.removeItem(k)});
       Object.keys(sessionStorage).forEach(k=>{if(prefixes.some(p=>k.startsWith(p)))sessionStorage.removeItem(k)});
     }catch(_){}
@@ -2618,7 +2618,7 @@
 </script>
 
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.4.1-20260925g"></script>
+<script src="central_cloud.js?v=10.5.0-20260925h"></script>
 <script src="checklist_cloud.js"></script>
 </body>
 </html>
