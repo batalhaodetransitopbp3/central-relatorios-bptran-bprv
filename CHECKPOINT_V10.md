@@ -103,3 +103,20 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Gestão P3 deixou de exibir a mensagem enganosa “Backend v10 ainda não publicado” e passa a informar falha de conexão quando o probe não responder.
 - Telas cloud foram atualizadas para carregar `central_cloud.js?v=10.3.1-20260925e`.
 - Próximo passo obrigatório: substituir o `Code.gs` do projeto Apps Script pelo conteúdo atual de `apps_script_v10.gs` e atualizar a implantação existente para uma nova versão, mantendo a mesma URL `/exec`. Depois confirmar `?action=version` retornando `10.3.1`.
+
+## Solução 50 — Registro da Guarnição em Serviço — 25/09/2026
+- Criado registro em nuvem da guarnição já no início do serviço, sem depender da finalização do RSD.
+- Nova rota backend: `rsd-start` (CENTRAL_TOKEN).
+- Novo estado do RSD: `EM_SERVICO`; fluxo previsto: `EM_SERVICO → FINALIZADO → INCLUIDO_RCO`.
+- O mesmo `REPORT_ID` acompanha todo o ciclo. Atualizações em serviço e a finalização incrementam a versão do mesmo RSD, sem duplicação.
+- Criada a aba estruturada `RSD_COMPONENTES` na Base Estatística P3 para registrar individualmente os componentes da guarnição.
+- Cada componente registra matrícula, posto/graduação, nome, função, indicação de responsável pelo RSD, ordem e lotação administrativa de origem.
+- A busca de militar é global no Cadastro Mestre por matrícula, nome ou QRA; lotação não restringe o emprego em outra companhia.
+- RSD desktop e iOS passaram a possuir: turno do serviço, composição individual, funções (Comandante/Motorista/Patrulheiro/Apoio/Outra), definição do responsável e botão `Registrar guarnição no serviço`.
+- O momento real de `Início do serviço` é preservado localmente e enviado ao backend como `INICIADO_EM`.
+- O RCO desktop e iOS passa a listar guarnições/RSDs da nuvem com status `EM SERVIÇO`, permitindo adicionar a identificação antes do fechamento.
+- Quando a guarnição finalizar o RSD, o RCO sinaliza `NOVA VERSÃO` e atualiza a mesma origem sem dupla contagem, inclusive após fechar/reabrir o RCO.
+- O RCO bloqueia a consolidação para o P3 se houver origem adicionada ainda em `EM_SERVICO`.
+- O backend não permite marcar RSD `EM_SERVICO` como `INCLUIDO_RCO`.
+- O botão antigo de arquivo permanece apenas como `Importar JSON (contingência)`.
+- Backend preparado na versão `10.4.0`; é necessária atualização da implantação do Apps Script antes da homologação desta solução.
