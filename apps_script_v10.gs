@@ -590,7 +590,14 @@ function cancelLinkedRsdRecords_(reportId,motivo,ator){
   var cir=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA');ensureHeaders_(cir,['STATUS_REGISTRO','CANCELADO_RSD_EM','CANCELADO_RSD_MOTIVO']);
   objects_(cir).forEach(function(x){if(String(x.RSD_REPORT_ID||'')===String(reportId)){x.STATUS_REGISTRO='CANCELADO';x.CANCELADO_RSD_EM=now;x.CANCELADO_RSD_MOTIVO=motivo;upsert_(cir,'CIRVC_ID',x.CIRVC_ID,x);}});
   var pass=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO');
-  objects_(pass).forEach(function(x){if(String(x.RSD_ORIGEM_ID||'')===String(reportId)&&String(x.STATUS||'')==='AGUARDANDO_RECEBIMENTO'){x.STATUS='CANCELADA';x.ATUALIZADO_EM=now;x.OBSERVACOES=[x.OBSERVACOES,'RSD de origem cancelado: '+motivo].filter(Boolean).join(' | ');upsert_(pass,'PASSAGEM_ID',x.PASSAGEM_ID,x);}});
+  objects_(pass).forEach(function(x){
+    if(String(x.RSD_ORIGEM_ID||'')===String(reportId)&&String(x.STATUS||'')==='AGUARDANDO_RECEBIMENTO'){
+      x.STATUS='CANCELADA';x.ATUALIZADO_EM=now;x.OBSERVACOES=[x.OBSERVACOES,'RSD de origem cancelado: '+motivo].filter(Boolean).join(' | ');upsert_(pass,'PASSAGEM_ID',x.PASSAGEM_ID,x);
+    } else if(String(x.RSD_DESTINO_ID||'')===String(reportId)&&String(x.STATUS||'')==='RECEBIDA'){
+      x.STATUS='AGUARDANDO_RECEBIMENTO';x.RSD_DESTINO_ID='';x.SEGMENTO_DESTINO='';x.RECEBIDA_POR_MATRICULA='';x.RECEBIDA_POR_NOME='';x.RECEBIDA_EM='';x.ATUALIZADO_EM=now;
+      x.OBSERVACOES=[x.OBSERVACOES,'Recebimento anterior cancelado com o RSD de destino: '+motivo].filter(Boolean).join(' | ');upsert_(pass,'PASSAGEM_ID',x.PASSAGEM_ID,x);
+    }
+  });
   return {operacoes:opIds.length};
 }
 function rsdCancel_(payload){
@@ -618,6 +625,9 @@ function rsdCancel_(payload){
   }
   var children=objects_(s).filter(function(x){return String(x.RSD_ANTERIOR_ID||'')===reportId&&String(x.STATUS||'')!=='CANCELADO';});
   if(children.length)throw new Error('Este RSD possui segmento posterior vinculado. Cancele/corrija primeiro a continuidade subsequente para preservar a cadeia do serviço.');
+  var linkedCirvcs=objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){return String(x.RSD_REPORT_ID||'')===reportId&&String(x.STATUS_REGISTRO||'')!=='CANCELADO';});
+  var custodyLocked=linkedCirvcs.filter(function(x){return ['EM_TRANSPORTE','BAIXADO_DETRAN'].indexOf(String(x.STATUS_CUSTODIA||''))>=0||String(x.TRANSPORTE_ID||'').trim();});
+  if(custodyLocked.length)throw new Error('Este RSD possui CIRVC já vinculado a transporte/entrega. O cancelamento foi bloqueado para preservar a cadeia de custódia; a correção deve ser tratada pelo P3.');
   var before=status,now=nowIso_();
   row.STATUS='CANCELADO';row.CANCELADO_EM=now;row.CANCELADO_POR_MATRICULA=mat;row.CANCELADO_POR_NOME=nome;row.CANCELADO_MOTIVO=motivo;row.CANCELADO_PERFIL=perfil;
   row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=now;upsert_(s,'REPORT_ID',reportId,row);
