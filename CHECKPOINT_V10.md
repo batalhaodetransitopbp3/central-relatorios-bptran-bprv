@@ -76,3 +76,10 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Commit da troca de endpoint: `44473fb49dd8412c4dd368e317ea0ee4a1afaeec`.
 - `CONFIG.BACKEND_V10_STATUS` deve permanecer `AGUARDANDO_PUBLICACAO` até conclusão da matriz de homologação.
 - Backend legado não foi removido nem sobrescrito.
+
+## Regra de Cadastro Mestre de Militares — 25/09/2026
+- A matrícula identifica o militar globalmente no Cadastro Mestre.
+- Batalhão e companhia permanecem como dados de lotação/origem, não como restrição operacional de consulta.
+- RSD e demais telas operacionais devem localizar o militar independentemente da companhia em que ele esteja tirando serviço no dia (ex.: extra, reforço ou apoio).
+- A unidade/companhia registrada no relatório representa o local do serviço, não necessariamente a lotação administrativa do militar.
+- Viaturas podem continuar sendo filtradas por unidade/companhia quando isso fizer sentido operacional.
