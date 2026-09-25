@@ -543,7 +543,7 @@ function rsdUpsert_(payload) {
     SERVICE_ID:serviceId,SEGMENTO:seg,RSD_ANTERIOR_ID:r.rsdAnteriorId||(r.servico||{}).rsdAnteriorId||(old&&old.RSD_ANTERIOR_ID)||'',
     PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||(old&&old.PASSAGEM_ORIGEM_ID)||'',ULTIMO_RASCUNHO_EM:nowIso_(),
     EDIT_DEVICE_ID:deviceId||old&&old.EDIT_DEVICE_ID||'',EDIT_LEASE_UNTIL:'',DRAFT_REVISION:old?Number(old.DRAFT_REVISION||0):0};
-  upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);syncRsdOperations_(r,reportId,batt,comp,version);syncRsdOccurrences_(r,reportId,batt,comp);
+  upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);syncRsdOperations_(r,reportId,batt,comp,version);syncRsdOccurrences_(r,reportId,batt,comp);syncRsdCirvcs_(r,reportId,batt,comp,serviceId,seg);
   audit_('RSD',reportId,version,wasFinal?'RETIFICADO':'FINALIZADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,batt,comp,r);
   return {ok:true,message:wasFinal?'RSD retificado e disponibilizado para consolidação.':'RSD finalizado e disponibilizado para consolidação.',reportId:reportId,serviceId:serviceId,segmento:seg,version:version,status:'FINALIZADO'};
 }
@@ -612,6 +612,18 @@ function syncRsdOperations_(r, reportId, batt, comp, version) {
       MOTIVO_ALTERACAO:o.motivoAlteracao||po.MOTIVO_ALTERACAO||'',ORIGEM_RELATORIO:'RSD',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_()
     }));
   });
+}
+function syncRsdCirvcs_(r,reportId,batt,comp,serviceId,seg){
+  var list=r.cirvc||r.arvc||[];if(!Array.isArray(list)||!list.length)return;
+  var u=r.unidade||{},g=r.guarnicao||{};
+  var cirvcs=list.map(function(c){
+    return Object.assign({},c,{rsdReportId:reportId,serviceId:serviceId,segmento:seg,
+      guarnicao:c.guarnicao||g.nome||'',matriculaResponsavel:c.matriculaResponsavel||g.matricula||'',
+      responsavelCirvc:c.responsavelCirvc||c.militarResponsavelAit||g.responsavel||'',
+      vtr:c.vtr||c.prefixo||g.viatura||'',prefixo:c.prefixo||c.vtr||g.viatura||'',
+      unidade:{batalhao:batt,companhia:comp,companhiaNumero:u.companhiaNumero||Number(String(comp||'').match(/\d+/)&&String(comp||'').match(/\d+/)[0]||1)}});
+  });
+  cirvcRegister_({unidade:{batalhao:batt,companhia:comp,companhiaNumero:u.companhiaNumero},cirvcs:cirvcs});
 }
 function syncRsdOccurrences_(r,reportId,batt,comp){
   var list=r.ocorrencias||[];if(!Array.isArray(list))return;
