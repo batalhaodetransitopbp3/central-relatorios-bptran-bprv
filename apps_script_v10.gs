@@ -683,12 +683,15 @@ function motomecanizacaoUpdate_(payload) {
    ========================= */
 
 function filterCommon_(list,p) {
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||'');
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),turno=String(p.turno||'').toLowerCase(),gu=String(p.guarnicao||'').toLowerCase();
   return list.filter(function(x){
     if(batt&&String(x.BATALHAO)!==batt)return false;
     if(comp&&String(x.COMPANHIA)!==String(comp))return false;
     var d=dateText_(x.DATA_SERVICO||x.DATA||x.DATA_HORA||x.ABERTA_EM||'');
     if(di&&d&&d<di)return false;if(df&&d&&d>df)return false;
+    var xt=String(x.TURNO||x.HORARIO_SERVICO||'').toLowerCase(),xg=String(x.GUARNICAO||x.GUARNICAO_RESPONSAVEL||'').toLowerCase();
+    if(turno&&xt&&xt!==turno)return false;if(turno&&!xt)return false;
+    if(gu&&xg.indexOf(gu)<0)return false;
     return true;
   });
 }
