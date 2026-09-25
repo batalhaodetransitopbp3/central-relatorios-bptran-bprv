@@ -30,7 +30,7 @@ function buildPayload(){
     checklistId:id,batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,companhia:u.companhia,
     dataHora:[val('data_inicio'),val('hora_inicio')].filter(Boolean).join('T')||new Date().toISOString(),
     viatura:{prefixo:val('prefixo'),placa:val('placa'),marcaModelo:val('marca_modelo'),tipo:''},
-    km:val('km_inicial'),condutorMatricula:global.CentralCloud?.formatMatricula(val('matricula'))||val('matricula'),
+    km:val('km_inicial'),turno:val('turno'),local:val('local'),condutorMatricula:global.CentralCloud?.formatMatricula(val('matricula'))||val('matricula'),
     condutorNome:val('condutor'),condutorPostoGrad:'',itens:collectItems(),fotos:collectPhotos(),observacoes:val('observacoes')
   }};
 }
@@ -41,6 +41,10 @@ async function finalizar(){
   const token=global.CentralCloud.askToken('central');if(!token)return;
   if(!val('prefixo')){alert('Informe o prefixo da viatura.');el('prefixo')?.focus();return}
   if(!val('matricula')){alert('Informe a matrícula do condutor.');el('matricula')?.focus();return}
+  if(!val('condutor')){alert('Informe o nome do condutor.');el('condutor')?.focus();return}
+  const missing=[...document.querySelectorAll('.checklist-section .check-item')].filter(item=>!item.querySelector('input[type="radio"]:checked');
+  if(missing.length){alert('Ainda existem '+missing.length+' item(ns) do checklist sem resposta.');missing[0].scrollIntoView({behavior:'smooth',block:'center'});return}
+  if(el('signatureData')&&!el('signatureData').value){alert('A assinatura do condutor é obrigatória antes da finalização no banco.');el('signatureBox')?.scrollIntoView({behavior:'smooth',block:'center'});return}
   const p=buildPayload();
   const btn=el('cloudChecklistBtn');if(btn)btn.disabled=true;
   try{
