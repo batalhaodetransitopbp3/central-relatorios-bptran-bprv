@@ -74,7 +74,7 @@
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');view=b.dataset.view;load()});
  $('apply').onclick=load;$('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach((o,i)=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false});};
- $('biBtn').onclick=()=>{let url=localStorage.getItem('pmpb-powerbi-url')||'';if(!url){url=prompt('Cole a URL do painel Power BI publicado para a Gestão P3. Ela ficará salva apenas neste aparelho:')||'';if(url)localStorage.setItem('pmpb-powerbi-url',url)}if(url)window.open(url,'_blank','noopener')};
+ $('biBtn').onclick=async()=>{try{const token=await ensure(),r=await CentralCloud.jsonp('p3-config',{token}),cfg=r.config||{};let url=cfg.POWERBI_URL||'';if(!url){url=prompt('O Power BI ainda não foi vinculado. Cole a URL institucional do painel:')||'';if(url)await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url},token,{popup:false})}if(url)window.open(url,'_blank','noopener')}catch(e){alert(e.message)}};
  setTimeout(load,450);
 })();
 </script></body></html>
