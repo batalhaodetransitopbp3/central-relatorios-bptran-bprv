@@ -417,7 +417,11 @@ function operationList_(p) {
       resultados:{abordagens:{pessoas:Number(x.PESSOAS_ABORDADAS||0),motocicletas:Number(x.MOTOCICLETAS_ABORDADAS||0),ciclomotores:Number(x.CICLOMOTORES_ABORDADOS||0),automoveis:Number(x.AUTOMOVEIS_ABORDADOS||0),checkpoints:Number(x.CHECKPOINTS||0)},
         notificacoes:{testesEtilometro:Number(x.TESTES_ETILOMETRO||0),art165:Number(x.ART_165||0),art165a:Number(x.ART_165_A||0),art230xi:Number(x.ART_230_XI||0),aitsComAbordagem:Number(x.OUTROS_AITS_COM_ABORDAGEM||0),aitsSemAbordagem:Number(x.AITS_SEM_ABORDAGEM||0)},
         remocoes:{motocicletas:Number(x.REMOCOES_MOTOCICLETAS||0),ciclomotores:Number(x.REMOCOES_CICLOMOTORES||0),automoveis:Number(x.REMOCOES_AUTOMOVEIS||0)},
-        criminal:{armas:Number(x.ARMAS_APREENDIDAS||0),prisoes:Number(x.PRISOES||0),drogas:Number(x.DROGAS||0),mandados:Number(x.MANDADOS_PRISAO||0),veiculosRecuperados:Number(x.VEICULOS_RECUPERADOS||0),veiculosAdulterados:Number(x.VEICULOS_ADULTERADOS||0),tcos:Number(x.TCOS||0)}}};
+        criminal:{armas:Number(x.ARMAS_APREENDIDAS||0),prisoes:Number(x.PRISOES||0),drogas:Number(x.DROGAS||0),mandados:Number(x.MANDADOS_PRISAO||0),veiculosRecuperados:Number(x.VEICULOS_RECUPERADOS||0),veiculosAdulterados:Number(x.VEICULOS_ADULTERADOS||0),tcos:Number(x.TCOS||0)}},
+      resumoCpu:{nome:x.OPERACAO||'',local:d.LOCAL_EXECUTADO||x.LOCAL||'',turno:x.TURNO||'',
+        apreensoesVeiculos:Number(x.REMOCOES_MOTOCICLETAS||0)+Number(x.REMOCOES_CICLOMOTORES||0)+Number(x.REMOCOES_AUTOMOVEIS||0),
+        totalAits:Number(x.ART_165||0)+Number(x.ART_165_A||0)+Number(x.ART_230_XI||0)+Number(x.OUTROS_AITS_COM_ABORDAGEM||0)+Number(x.AITS_SEM_ABORDAGEM||0),
+        prisoes:Number(x.PRISOES||0),statusCumprimento:d.STATUS_CUMPRIMENTO||'Não informado',localPrevisto:d.LOCAL_PREVISTO||'',coordenadasPrevistas:d.COORDENADAS_PREVISTAS||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''}};
   });
 }
 
