@@ -1,7 +1,7 @@
 # Implantação e Homologação — Central v10.5.3
 
 ## Estado atual
-A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.3 e homologar as novas rotinas de continuidade em nuvem.
+A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o backend para a versão 10.5.3 e homologar o cancelamento auditável de RSD sem apagar histórico.
 
 Endpoint atual:
 `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
@@ -9,7 +9,7 @@ Endpoint atual:
 ## Atualização do Apps Script
 1. Abra o projeto Apps Script v10 existente.
 2. Abra `Code.gs`.
-3. No GitHub, abra `apps_script_v10.gs` da branch `main`.
+3. No GitHub, abra `apps_script_v10.gs` da branch `rsd-cancelamento-auditavel-v10-5-3`.
 4. Confirme no início:
    `var CENTRAL_V10_VERSION = '10.5.3';`
 5. Substitua todo o conteúdo de `Code.gs` pelo arquivo atual.
