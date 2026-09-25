@@ -480,6 +480,7 @@ function rsdMarkIncluded_(payload) {
   ids.forEach(function(reportId){
     var row=findOne_(s,'REPORT_ID',String(reportId));
     if(!row)return;
+    if(String(row.STATUS)!=='FINALIZADO' && String(row.STATUS)!=='INCLUIDO_RCO')return;
     row.STATUS='INCLUIDO_RCO';row.RCO_REPORT_ID=rcoId;row.INCLUIDO_RCO_EM=nowIso_();row.SINCRONIZADO_EM=nowIso_();
     upsert_(s,'REPORT_ID',String(reportId),row);count++;
   });
