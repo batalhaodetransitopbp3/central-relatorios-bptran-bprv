@@ -1,15 +1,8 @@
 (function(global){
 'use strict';
-const ENDPOINT='https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';
+const ENDPOINT=global.CENTRAL_CLOUD_ENDPOINT||'https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';
 let v10Enabled=global.CENTRAL_V10_ENABLED===true;
 const TOKEN_KEY='pmpb-central-token-v1',P3_TOKEN_KEY='pmpb-p3-token-v1',QUEUE_KEY='pmpb-central-sync-queue-v1';
-const LOCAL_DB_KEY='pmpb-central-localdb-v1';
-function readLocalDb(){try{const x=JSON.parse(localStorage.getItem(LOCAL_DB_KEY)||'{}');return x&&typeof x==='object'?x:{}}catch(_){return {}}}
-function writeLocalDb(db){try{localStorage.setItem(LOCAL_DB_KEY,JSON.stringify(db||{}));return true}catch(_){return false}}
-function upsertLocal(entity,record,idField='id'){if(!entity||!record)return null;const db=readLocalDb();const list=Array.isArray(db[entity])?db[entity]:[];const rec={...record};const id=rec[idField]||rec.id||uid(entity);rec[idField]=id;rec.id=rec.id||id;rec.updatedAt=new Date().toISOString();const i=list.findIndex(x=>String(x?.[idField]||x?.id)===String(id));if(i>=0)list[i]={...list[i],...rec};else list.push(rec);db[entity]=list.slice(-5000);writeLocalDb(db);return rec}
-function listLocal(entity,predicate){const db=readLocalDb(),list=Array.isArray(db[entity])?db[entity]:[];return typeof predicate==='function'?list.filter(predicate):list.slice()}
-function removeLocal(entity,id,idField='id'){const db=readLocalDb(),list=Array.isArray(db[entity])?db[entity]:[];db[entity]=list.filter(x=>String(x?.[idField]||x?.id)!==String(id));writeLocalDb(db);return true}
-function clearLocal(entity){const db=readLocalDb();if(entity)delete db[entity];else Object.keys(db).forEach(k=>delete db[k]);writeLocalDb(db)}
 function uid(p='id'){try{return p+'-'+crypto.randomUUID()}catch(_){return p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)}}
 function formatMatricula(v){const d=String(v||'').replace(/\D/g,'').slice(0,7);return d.length<=3?d:d.length<=6?d.slice(0,3)+'.'+d.slice(3):d.slice(0,3)+'.'+d.slice(3,6)+'-'+d.slice(6)}
 function getToken(kind='central'){try{return localStorage.getItem(kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY)||''}catch(_){return ''}}
@@ -29,6 +22,6 @@ async function compressImage(file,{maxSide=1600,quality=.78,type='image/jpeg'}={
 async function searchCadastro(tipo,q,u,token){const up=unitParams(u);return jsonp('cadastros',{...up,tipo,q,token:token||getToken('central')})}
 function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('button');b.type='button';b.id='centralSyncBadge';b.className='no-print';Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:9998,border:'1px solid #b7c5d1',borderRadius:'18px',padding:'7px 11px',background:'#fff',color:'#24425f',font:'700 11px Arial',boxShadow:'0 4px 16px #0002'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}b.onclick=async()=>{b.disabled=true;const r=await retryQueue();b.disabled=false;refresh();if(r.sent)alert(r.sent+' envio(s) sincronizado(s).')};document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{await retryQueue();refresh()},800))} 
 async function probe(){if(v10Enabled)return true;try{const r=await jsonp('version',{}, {timeout:3500});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}}
-global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getToken,setToken,askToken,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,readLocalDb,writeLocalDb,upsertLocal,listLocal,removeLocal,clearLocal};
+global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getToken,setToken,askToken,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();setTimeout(probe,150)});else{installStatusBadge();setTimeout(probe,150)}
 })(window);
