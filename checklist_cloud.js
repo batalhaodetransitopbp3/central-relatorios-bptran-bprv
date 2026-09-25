@@ -35,6 +35,13 @@ function buildPayload(){
   }};
 }
 async function finalizar(){
+  const issues=typeof global.getBlockingIssues==='function'?global.getBlockingIssues():[];
+  if(issues.length){
+    if(typeof global.updatePendingCount==='function')global.updatePendingCount();
+    if(typeof global.focusPending==='function')global.focusPending(issues[0]);
+    alert('Conclua as pendências do checklist antes de enviar à Motomecanização.');
+    return;
+  }
   if(!global.CentralCloud){alert('Módulo de nuvem indisponível. O checklist continua podendo ser gerado localmente.');return}
   const enabled=await global.CentralCloud.probe();
   if(!enabled){alert('Checklist preservado localmente. O banco da Motomecanização ficará disponível após a publicação do backend v10.');return}
@@ -50,13 +57,13 @@ async function finalizar(){
   try{
     const r=await global.CentralCloud.postOrQueue('checklist-upsert',p,{token,unit:unit(),popup:false});
     if(r.queued) alert('Checklist finalizado. O envio ao banco da Motomecanização ficou pendente e será reenviado automaticamente.');
-    else {alert('Checklist registrado no banco da Motomecanização.');try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}}
+    else {alert((r.message||'Checklist registrado no banco da Motomecanização.')+' As alterações identificadas ficam disponíveis para acompanhamento da Motomecanização.');try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}}
   }catch(err){alert('Não foi possível sincronizar agora: '+err.message)}
   finally{if(btn)btn.disabled=false}
 }
 function install(){
   const toolbar=document.querySelector('.toolbar-inner');if(!toolbar||el('cloudChecklistBtn'))return;
-  const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='cloudChecklistBtn';b.textContent='Finalizar no banco';b.title='Registra este checklist no banco exclusivo da Motomecanização.';
+  const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='cloudChecklistBtn';b.textContent='Finalizar e enviar à Motomecanização';b.title='Finaliza o checklist e registra as alterações no banco da Motomecanização.';
   b.addEventListener('click',finalizar);
   const share=el('shareBtn');toolbar.insertBefore(b,share||toolbar.firstChild);
   const m=el('matricula');if(m){m.addEventListener('blur',()=>{m.value=global.CentralCloud?.formatMatricula(m.value)||m.value})}

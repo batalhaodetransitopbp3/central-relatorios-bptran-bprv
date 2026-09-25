@@ -835,12 +835,14 @@
     <div class="toolbar">
       <span id="status" class="status">Pronto para preenchimento.</span>
       <button type="button" onclick="adicionarAuto()">+ Novo CIRVC</button>
+<button type="button" class="secondary" onclick="carregarRascunho()">Carregar rascunho</button>
       <button type="button" class="primary" onclick="consolidarArvc()">Gerar PDF dos CIRVCs do serviço</button>
       <button type="button" class="danger" onclick="limparTudo()">Limpar todos os CIRVCs</button>
+<button type="button" class="secondary" onclick="location.href='index.html'">Voltar à Central de Relatórios</button>
     </div>
 
     <div class="screen-help no-print">
-      <strong>Uso:</strong> preencha um CIRVC para cada veículo removido. Clique em <strong>+ Novo CIRVC</strong> para inserir outro. A guarnição informada é reaproveitada automaticamente nos CIRVCs seguintes e os registros ficam disponíveis para “Carregar remoções do dia” no RSD/RCO.
+      <strong>Uso:</strong> preencha um CIRVC para cada veículo removido. Clique em <strong>+ Novo CIRVC</strong> para inserir outro. Se fechar a página e precisar recuperar o preenchimento deste aparelho, use <strong>Carregar rascunho</strong>. A guarnição informada é reaproveitada automaticamente nos CIRVCs seguintes e os registros ficam disponíveis para “Carregar remoções do dia” no RSD/RCO.
       Na impressão, cada veículo ocupa uma página A4. O auto permanece na metade superior e a metade inferior é reservada ao anexo fotográfico, com até 4 fotos retangulares (uma por quadrante).
     </div>
 
@@ -933,6 +935,11 @@
       const section = document.createElement('article');
       section.className = 'auto-card';
       section.dataset.autoId = id;
+      const svcCtx=activeServiceContextCirvc();
+      section.dataset.rsdReportId=data.rsdReportId||svcCtx.rsdReportId||'';
+      section.dataset.serviceId=data.serviceId||svcCtx.serviceId||'';
+      section.dataset.segmento=String(data.segmento||svcCtx.segmento||1);
+      section.dataset.guarnicao=data.guarnicao||svcCtx.guarnicao||'';
       section.innerHTML = `
         <div class="auto-form-half">
         <header class="doc-head">
@@ -1285,10 +1292,21 @@
     function arvcDataFile(v){if(!v)return 'SEM DATA';const p=v.split('-');return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:v.replaceAll('/','.')}
 function safeArvcName(v,f='CIRVC'){return String(v||f).trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').slice(0,80)}
 function stableArvcToken(v){let h=2166136261;const s=String(v||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
+function activeServiceContextCirvc(){try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
 function arvcPayloadCpu(){
-  const autos=coletarTodos(),inst=window.getInstitution?getInstitution():{};
-  const registros=autos.map((a,i)=>{const core=[cirvcReportId,a.dataEntrega||'',a.horaEntrega||'',String(a.placa||'').toUpperCase(),a.guarnicaoVtr||'',a.numeroTermo||'',i+1].join('|');return {id:'cirvc-'+stableArvcToken(core),sourceReportId:cirvcReportId,numeroTermo:a.numeroTermo||'',data:a.dataEntrega||'',hora:a.horaEntrega||'',placa:a.placa||'',guarnicao:a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||'',local:a.localDestino||'',unidade:{batalhao:inst.batalhao||'',companhia:inst.companhia||'',companhiaNumero:Number(inst.numero||0)||null}}}).filter(r=>r.placa||r.militarResponsavelAit||r.local);
-  return {schema:'pmpb-transito-cirvc-v1',schemaVersion:1,reportId:cirvcReportId,generatedAt:new Date().toISOString(),unidade:{batalhao:inst.batalhao||'',companhia:inst.companhia||'',companhiaNumero:Number(inst.numero||0)||null},registros};
+  const autos=coletarTodos(),inst=window.getInstitution?getInstitution():{},ctx=activeServiceContextCirvc(),ctxUnit=ctx.unidade||{};
+  const registros=autos.map((a,i)=>{
+    const core=[cirvcReportId,a.dataEntrega||'',a.horaEntrega||'',String(a.placa||'').toUpperCase(),a.guarnicaoVtr||'',a.numeroTermo||'',i+1].join('|');
+    return {id:'cirvc-'+stableArvcToken(core),sourceReportId:cirvcReportId,numeroTermo:a.numeroTermo||'',data:a.dataEntrega||'',hora:a.horaEntrega||'',
+      placa:a.placa||'',guarnicao:a.guarnicao||ctx.guarnicao||a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||ctx.comandante||'',local:a.localDestino||'',
+      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
+      matriculaResponsavel:a.matriculaResponsavel||ctx.comandanteMatricula||'',vtr:a.guarnicaoVtr||(Array.isArray(ctx.vtrs)?ctx.vtrs[0]||'':''),
+      localApreensao:a.localApreensao||'',motivo:a.motivo||'',tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),
+      unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null}};
+  }).filter(r=>r.placa||r.militarResponsavelAit||r.local);
+  return {schema:'pmpb-transito-cirvc-v1',schemaVersion:2,reportId:cirvcReportId,generatedAt:new Date().toISOString(),
+    serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',segmento:Number(ctx.segmento||1)||1,
+    unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null},registros};
 }
 function downloadArvcJson(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
 function exportarArvcJson(silent=false){salvarCirvcsParaConsolidacao();if(!silent)setStatus('Os CIRVCs foram salvos neste aparelho e estão disponíveis para o RSD/RCO.');return arvcPayloadCpu()}
@@ -1315,6 +1333,10 @@ function prepareAndPrint() {
       dados.assinaturaResponsavel = assinaturaResponsavel ? (assinaturaResponsavel.dataset.signatureData || '') : '';
       dados.assinaturaRecebedor = assinaturaRecebedor ? (assinaturaRecebedor.dataset.signatureData || '') : '';
       dados.fotos = getFotos(section);
+      dados.rsdReportId=section.dataset.rsdReportId||'';
+      dados.serviceId=section.dataset.serviceId||'';
+      dados.segmento=Number(section.dataset.segmento||1)||1;
+      dados.guarnicao=section.dataset.guarnicao||'';
       return dados;
     }
 
@@ -1513,7 +1535,7 @@ function prepareAndPrint() {
   };
   function install(){
     const ref=document.querySelector('.toolbar');
-    if(ref && !document.querySelector('.service-state-bar')){
+    if(ref && !/auto_remocao_veiculos/i.test(path) && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html">Voltar à Central de Relatórios</a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
@@ -1532,11 +1554,44 @@ function prepareAndPrint() {
 <script id="cirvc-cloud-v10-script">
 (function(){
  const baseConsolidar=window.consolidarArvc;
- function unit(){const i=window.getInstitution?getInstitution():{};return {batalhao:i.batalhao||document.getElementById('globalBatalhao')?.value||'BPTran',companhiaNumero:Number(i.numero||document.getElementById('globalCompanhia')?.value||1),companhia:i.companhia||document.getElementById('globalCompanhia')?.selectedOptions?.[0]?.text||''}}
- function cloudRecords(){const p=arvcPayloadCpu(),raw=coletarTodos();return (p.registros||[]).map((r,i)=>{const a=raw[i]||{};return {...r,unidade:unit(),tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),vtr:a.guarnicaoVtr||'',prefixo:a.guarnicaoVtr||'',matriculaResponsavel:a.matriculaResponsavel||'',responsavelCirvc:a.militarResponsavel||'',local:a.localDestino||r.local||'',localApreensao:a.localApreensao||'',motivo:a.motivo||''}})}
- async function publicarEImprimir(){salvarRascunho(true);salvarCirvcsParaConsolidacao();const regs=cloudRecords();if(!regs.length){prepareAndPrint();return}let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;try{const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});setStatus(r.message||'CIRVCs disponibilizados para continuidade da custódia.');setTimeout(()=>prepareAndPrint(),180)}catch(e){alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.')}} 
- function install(){const tb=document.querySelector('.toolbar');if(tb&&!tb.querySelector('[data-cirvc-transporte]')){const a=document.createElement('a');a.href='cirvc_transporte.html';a.textContent='Transporte / Reboqueiros';a.dataset.cirvcTransporte='1';a.className='button secondary no-print';a.style.cssText='text-decoration:none;display:inline-flex;align-items:center;justify-content:center';tb.appendChild(a)}if(window.CentralCloud?.isEnabled())window.consolidarArvc=publicarEImprimir}
- window.addEventListener('central-v10-ready',()=>setTimeout(install,20));
+ function unit(){const i=window.getInstitution?getInstitution():{},ctx=window.activeServiceContextCirvc?activeServiceContextCirvc():{},u=ctx.unidade||{};const b=u.batalhao||i.batalhao||document.getElementById('globalBatalhao')?.value||'BPTran',n=Number(u.companhiaNumero||i.numero||document.getElementById('globalCompanhia')?.value||1);return {batalhao:b,companhiaNumero:n,companhia:u.companhia||i.companhia||(n+'ª '+(String(b).toUpperCase()==='BPRV'?'CPRv':'CPTran'))}}
+ function cloudRecords(){const p=arvcPayloadCpu(),raw=coletarTodos();return (p.registros||[]).map((r,i)=>{const a=raw[i]||{};return {...r,unidade:r.unidade||unit(),tipo:a.tipo||r.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/')||r.marcaModelo||'',vtr:a.guarnicaoVtr||r.vtr||'',prefixo:a.guarnicaoVtr||r.vtr||'',matriculaResponsavel:a.matriculaResponsavel||r.matriculaResponsavel||'',responsavelCirvc:a.militarResponsavel||r.militarResponsavelAit||'',local:a.localDestino||r.local||'',localApreensao:a.localApreensao||r.localApreensao||'',motivo:a.motivo||r.motivo||''}})}
+ async function publicarCirvcs(imprimir){
+    salvarRascunho(true);salvarCirvcsParaConsolidacao();
+    const regs=cloudRecords();
+    if(!regs.length){if(imprimir)prepareAndPrint();return}
+    let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+    try{
+      const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});
+      setStatus(r.message||'CIRVCs registrados na Central.');
+      if(imprimir)setTimeout(()=>prepareAndPrint(),180);
+      else alert(r.message||'CIRVCs registrados na Central e disponíveis para o RSD e para a continuidade da custódia.');
+    }catch(e){
+      alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.');
+    }
+  }
+  function publicarEImprimir(){return publicarCirvcs(true)}
+  function salvarCirvcsNaCentral(){return publicarCirvcs(false)}
+  function applyActiveServiceUnit(){
+    const ctx=window.activeServiceContextCirvc?activeServiceContextCirvc():{},u=ctx.unidade||{};
+    if(!u.batalhao&&!u.companhiaNumero)return;
+    const b=document.getElementById('globalBatalhao'),c=document.getElementById('globalCompanhia');
+    if(b&&u.batalhao){b.value=u.batalhao;b.dispatchEvent(new Event('change',{bubbles:true}))}
+    if(c&&u.companhiaNumero){c.value=String(u.companhiaNumero);c.dispatchEvent(new Event('change',{bubbles:true}))}
+  }
+  function install(){
+    applyActiveServiceUnit();
+    const tb=document.querySelector('.toolbar');
+    if(tb&&!tb.querySelector('[data-cirvc-cloud-save]')){
+      const b=document.createElement('button');b.type='button';b.textContent='Salvar CIRVCs na Central';b.dataset.cirvcCloudSave='1';b.className='secondary no-print';b.onclick=salvarCirvcsNaCentral;
+      const danger=tb.querySelector('.danger');danger?tb.insertBefore(b,danger):tb.appendChild(b);
+    }
+    if(tb&&!tb.querySelector('[data-cirvc-transporte]')){
+      const a=document.createElement('a');a.href='cirvc_transporte.html';a.textContent='Transporte / Reboqueiros';a.dataset.cirvcTransporte='1';a.className='button secondary no-print';a.style.cssText='text-decoration:none;display:inline-flex;align-items:center;justify-content:center';tb.appendChild(a)
+    }
+    if(window.CentralCloud?.isEnabled())window.consolidarArvc=publicarEImprimir
+  }
+  window.addEventListener('central-v10-ready',()=>setTimeout(install,20));
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,60));else setTimeout(install,60);
 })();
 </script>

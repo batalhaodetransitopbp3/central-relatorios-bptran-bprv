@@ -296,6 +296,7 @@ html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavio
 <button class="secondary" onclick="salvarRascunhoGuarnicao()">Salvar rascunho</button>
 <button class="secondary" onclick="carregarRascunhoGuarnicao()">Carregar rascunho</button>
 <button class="secondary" onclick="importarOperacoesDoDia()">Importar operações</button>
+<button class="secondary" onclick="carregarRemocoesDoDia()">Carregar remoções do dia</button>
 <button class="secondary" onclick="gerarPassagemServico()">Realizar passagem de serviço</button>
 <button class="secondary" onclick="document.getElementById('importPassagem').click()">Receber Serviço</button>
 <input id="importPassagem" type="file" hidden accept=".json,application/json" onchange="importarPassagemServico(this.files);this.value=''">
@@ -777,7 +778,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
 @media print{.rsd-vtr-main button,.rsd-vtr-extras,.rsd-register-row{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.5.1-20260925i"></script>
+<script src="central_cloud.js?v=10.5.2-20260925j"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -829,15 +830,72 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
       return false;
     }
   }
-  async function claimCloudItem(item,force=false){const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force},token,{popup:false});serviceRegistered=true;cloudConflictNotified=false;window.applyPayload(r.rsd);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);alert('Serviço carregado da nuvem neste aparelho.');return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este serviço está aberto em outro aparelho. Deseja assumir a edição neste dispositivo? O aparelho anterior deixará de sincronizar.'))return claimCloudItem(item,true)}alert('Não foi possível continuar o serviço: '+e.message);return false}}
+  async function claimCloudItem(item,force=false){const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force},token,{popup:false});serviceRegistered=true;cloudConflictNotified=false;window.applyPayload(r.rsd);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);alert('Serviço carregado da nuvem neste aparelho.');return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este serviço está aberto em outro aparelho. Deseja assumir a edição neste dispositivo? O aparelho anterior deixará de sincronizar.'))return claimCloudItem(item,true)}alert('Não foi possível continuar o serviço: '+e.message);return false}}
   async function continueFromCloud(){const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;let mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));if(!/^\d{3}\.\d{3}-\d$/.test(mat))mat=CentralCloud.formatMatricula(prompt('Informe a matrícula do comandante para localizar serviços em andamento:')||'');if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Matrícula inválida.');return false}try{const r=await CentralCloud.jsonp('rsd-active',{matricula:mat,token},{timeout:15000}),items=r.items||[];if(!items.length){alert('Não há RSD em andamento para esta matrícula.');return false}let item=items[0];if(items.length>1){const opts=items.slice(0,10).map((x,i)=>(i+1)+' - '+x.guarnicao+' — '+x.companhia+' — '+x.data+' — segmento '+x.segmento).join('\n');const pick=Number(prompt('Selecione o serviço a continuar:\n\n'+opts)||0);if(!(pick>=1&&pick<=Math.min(items.length,10)))return false;item=items[pick-1]}return claimCloudItem(item,false)}catch(e){alert('Não foi possível localizar o serviço em andamento: '+e.message);return false}}
   function zeroLike(x){if(Array.isArray(x))return[];if(x&&typeof x==='object'){const o={};Object.keys(x).forEach(k=>o[k]=zeroLike(x[k]));return o}return typeof x==='number'?0:''}
   async function receivePass(){let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;const u=currentUnit(),gu=val('guarnicao'),mat=CentralCloud.formatMatricula(val('matriculaResponsavel')),nome=val('responsavel');if(!gu){alert('Informe a guarnição para procurar a passagem anterior.');return}if(!nome||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o novo comandante antes de receber a passagem.');return}try{let r=await CentralCloud.jsonp('passagens-pendentes',{...CentralCloud.unitParams(u),guarnicao:gu,data:val('data'),token}),list=r.items||[];if(!list.length)r=await CentralCloud.jsonp('passagens-pendentes',{...CentralCloud.unitParams(u),guarnicao:gu,token}),list=r.items||[];if(!list.length){alert('Não há passagem de serviço pendente para esta guarnição.');return}let x=list[list.length-1];if(list.length>1){const opts=list.map((a,i)=>(i+1)+' - '+(a.ENTREGUE_POR_NOME||a.ENTREGUE_POR_MATRICULA||'Serviço anterior')+' — '+(a.DISPONIBILIZADA_EM||'')).join('\n');const pick=Number(prompt('Selecione a passagem a receber:\n\n'+opts)||0);if(!(pick>=1&&pick<=list.length))return;x=list[pick-1]}const srcResp=await CentralCloud.jsonp('rsd-get',{reportId:x.RSD_ORIGEM_ID,token}),src=srcResp.rsd;if(!src)throw new Error('RSD de origem indisponível.');const novoId=CentralCloud.uid('sd'),novoService=x.SERVICE_ID||src.serviceId||CentralCloud.uid('svc'),novoSeg=Number(x.SEGMENTO_ORIGEM||src.segmento||1)+1,p=JSON.parse(JSON.stringify(src));p.reportId=novoId;p.generatedAt=new Date().toISOString();p.serviceId=novoService;p.segmento=novoSeg;p.rsdAnteriorId=src.reportId;p.passagemOrigemId=x.PASSAGEM_ID;p.cloudRegistered=false;p.servico={...(src.servico||{}),data:val('data')||src.servico?.data||'',iniciadoEm:new Date().toISOString(),serviceId:novoService,segmento:novoSeg,rsdAnteriorId:src.reportId,passagemOrigemId:x.PASSAGEM_ID};p.guarnicao={...(src.guarnicao||{}),nome:gu,responsavel:nome,matricula:mat,postoGrad:commanderPostoGrad};p.producao=zeroLike(src.producao||{});p.ocorrencias=[];p.operacoes=[];p.operacoesAcumuladas=[];p.veiculosRecuperados=[];p.tcos=[];p.arvc=[];p.cirvc=[];p.fisco={...(src.fisco||{}),quantidadeOcorrencias:0,alteracoesEfetivo:''};delete p.auditoria;const pend=x.PENDENCIAS||[];p.observacoes=[src.observacoes&&('Situação recebida do serviço anterior: '+src.observacoes),pend.length&&('Pendências recebidas: '+pend.map(y=>y.descricao||y.tipo).join(' | '))].filter(Boolean).join('\n');reportId=novoId;serviceId=novoService;segmento=novoSeg;rsdAnteriorId=src.reportId;passagemOrigemId=x.PASSAGEM_ID;serviceStartedAt=p.servico.iniciadoEm;serviceRegistered=false;localStorage.setItem(REPORT_ID_KEY,reportId);window.applyPayload(p);const started=await CentralCloud.submitForm('rsd-start',{rsd:window.payloadV2(),deviceId},token,{popup:false});serviceRegistered=true;saveIdentity();saveActiveContext();await CentralCloud.submitForm('passagem-receber',{passagemId:x.PASSAGEM_ID,rsdDestinoId:reportId,segmentoDestino:segmento,recebidoPor:{matricula:mat,nome}},token,{popup:false});try{salvarRascunhoGuarnicao(true)}catch(_){}alert('Passagem recebida. Um novo segmento do mesmo serviço foi aberto para o novo comandante, com produtividade zerada.')}catch(e){alert('Não foi possível receber a passagem: '+e.message)}}
-  async function publishPass(){
+  const CIRVC_SERVICE_STORE='pmpb-transito-cirvc-dia-v1';
+function readStoredCirvcsForRsd(){try{const a=JSON.parse(localStorage.getItem(CIRVC_SERVICE_STORE)||'[]');return Array.isArray(a)?a:[]}catch(_){return []}}
+function cirvcUnitMatches(r){
+  const u=currentUnit(),ru=r?.unidade||{};
+  if(ru.batalhao&&String(ru.batalhao)!==String(u.batalhao))return false;
+  if(ru.companhiaNumero&&Number(ru.companhiaNumero)!==Number(u.companhiaNumero))return false;
+  return true;
+}
+function cirvcBelongsToThisRsd(r){
+  if(!r||!r.id)return false;
+  if(r.rsdReportId)return String(r.rsdReportId)===String(reportId);
+  if(r.serviceId){
+    if(String(r.serviceId)!==String(serviceId))return false;
+    if(r.segmento&&Number(r.segmento)!==Number(segmento))return false;
+    return true;
+  }
+  if(Number(segmento||1)>1)return false;
+  if(r.data&&val('data')&&String(r.data)!==String(val('data')))return false;
+  if(!cirvcUnitMatches(r))return false;
+  const gu=String(r.guarnicao||'').trim().toLowerCase(),atual=String(val('guarnicao')||'').trim().toLowerCase();
+  return !gu||!atual||gu===atual;
+}
+function cirvcToRsd(r){
+  return {id:r.id||CentralCloud.uid('cirvc'),data:r.data||val('data'),hora:r.hora||'',numeroTermo:r.numeroTermo||'',
+    placa:String(r.placa||'').toUpperCase(),militarResponsavelAit:r.militarResponsavelAit||r.responsavelCirvc||'',
+    local:r.local||r.localDestino||''};
+}
+function importCirvcItems(items){
+  const existing=new Set([...document.querySelectorAll('#arvcs .entry')].map(e=>String(e.dataset.id||''))),map=new Map();
+  (items||[]).filter(cirvcBelongsToThisRsd).forEach(r=>map.set(String(r.id),r));
+  let added=0;
+  map.forEach(r=>{const id=String(r.id||'');if(!id||existing.has(id))return;addArvc(cirvcToRsd(r));existing.add(id);added++});
+  if(added){try{salvarRascunhoGuarnicao(true)}catch(_){}window.centralAutosave?.()}
+  return added;
+}
+async function fetchCloudCirvcs(silent=true){
+  if(!serviceRegistered||!navigator.onLine)return [];
+  const token=CentralCloud.getToken('central');if(!token)return [];
+  try{
+    const r=await CentralCloud.jsonp('cirvc-list',{rsdReportId:reportId,serviceId,segmento,token},{timeout:15000});
+    return Array.isArray(r.items)?r.items:[];
+  }catch(e){
+    if(!silent)alert('Não foi possível buscar os CIRVCs na Central: '+e.message);
+    return [];
+  }
+}
+async function carregarRemocoesDoDia(silent=false){
+  const local=readStoredCirvcsForRsd(),cloud=await fetchCloudCirvcs(true),map=new Map();
+  [...local,...cloud].forEach(r=>{if(r?.id)map.set(String(r.id),r)});
+  const found=[...map.values()].filter(cirvcBelongsToThisRsd),added=importCirvcItems(found);
+  if(!silent){
+    if(added)alert(added+' CIRVC(s) incorporado(s) ao RSD.');
+    else if(found.length)alert('Os CIRVCs encontrados já estão incluídos neste RSD.');
+    else alert('Nenhum CIRVC vinculado a este serviço foi localizado.');
+  }
+  return added;
+}
+window.carregarRemocoesDoDia=carregarRemocoesDoDia;
+async function publishPass(){
     if(!validarFinalizacao())return false;
     let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
-    await fetchCloudOperations(true);
-    const p=window.payloadV2(),mat=CentralCloud.formatMatricula(p.guarnicao?.matricula||'');
+    await fetchCloudOperations(true); await carregarRemocoesDoDia(true); const p=window.payloadV2(),mat=CentralCloud.formatMatricula(p.guarnicao?.matricula||'');
     if(!p.guarnicao?.responsavel||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição antes de realizar a passagem.');return false}
     if(!serviceStartedAt)serviceStartedAt=p.servico?.iniciadoEm||new Date().toISOString();
     p.guarnicao.matricula=mat;
@@ -863,8 +921,8 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
   }
   async function fetchCloudOperations(silent=false){if(!serviceRegistered)return 0;const token=CentralCloud.getToken('central');if(!token)return 0;try{const r=await CentralCloud.jsonp('operation-list',{rsdReportId:reportId,token},{timeout:15000}),items=r.items||[],arr=readStoredOperations(),map=new Map(arr.map(x=>[x.reportId,x]));items.forEach(x=>map.set(x.reportId,x));localStorage.setItem(OPERATIONS_STORE,JSON.stringify(Array.from(map.values())));return items.length}catch(e){if(!silent)alert('Não foi possível buscar as operações na nuvem: '+e.message);return 0}}
   const baseImportOperations=window.importarOperacoesDoDia;window.importarOperacoesDoDia=async function(){await fetchCloudOperations(true);return baseImportOperations?.()}
-  async function finalizeCloud(){if(!validarFinalizacao())return;const mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));if(!val('responsavel')||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição antes de finalizar o RSD.');return}await fetchCloudOperations(true);if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();const p=window.payloadV2();p.guarnicao.matricula=mat;p.servico.iniciadoEm=serviceStartedAt;p.servico.finalizadoEm=new Date().toISOString();if(!confirm(summaryText(p)+'\n\nFinalizar e disponibilizar este RSD para consolidação?'))return;let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;try{const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){};setTimeout(()=>prepareAndPrint(),180)}catch(e){alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.')}}
-  function install(){document.getElementById('viatura')?.addEventListener('input',syncVtrPrint);const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const rb=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Receber Serviço'||(b.textContent||'').trim()==='Receber passagem de serviço');if(rb){rb.removeAttribute('onclick');rb.onclick=receivePass;rb.textContent='Receber passagem de serviço'}const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok&&serviceRegistered&&navigator.onLine){const item={reportId};await claimCloudItem(item,false)}return ok}return continueFromCloud()};if(serviceRegistered){saveActiveContext();scheduleCloudSync()}}
+  async function finalizeCloud(){if(!validarFinalizacao())return;const mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));if(!val('responsavel')||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição antes de finalizar o RSD.');return}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();const p=window.payloadV2();p.guarnicao.matricula=mat;p.servico.iniciadoEm=serviceStartedAt;p.servico.finalizadoEm=new Date().toISOString();if(!confirm(summaryText(p)+'\n\nFinalizar e disponibilizar este RSD para consolidação?'))return;let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;try{const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){};setTimeout(()=>prepareAndPrint(),180)}catch(e){alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.')}}
+  function install(){document.getElementById('viatura')?.addEventListener('input',syncVtrPrint);const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';const cirvcBtn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Carregar remoções do dia');if(cirvcBtn)cirvcBtn.onclick=()=>carregarRemocoesDoDia(false);window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const rb=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Receber Serviço'||(b.textContent||'').trim()==='Receber passagem de serviço');if(rb){rb.removeAttribute('onclick');rb.onclick=receivePass;rb.textContent='Receber passagem de serviço'}const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok&&serviceRegistered&&navigator.onLine){const item={reportId};await claimCloudItem(item,false)}return ok}return continueFromCloud()};if(serviceRegistered){saveActiveContext();scheduleCloudSync()}}
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
