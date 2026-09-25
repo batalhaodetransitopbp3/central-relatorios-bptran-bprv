@@ -491,16 +491,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     const ops=p3ReadArray(P3_OPERATIONS_STORE).filter(p=>p3DataRegistro(p)===data && p3SameUnit(p,u));
     const cirvcs=p3ReadArray(P3_CIRVC_STORE).filter(c=>p3DataRegistro(c)===data && p3SameUnit(c,u));
     const estatisticaP3=p3BuildStatistics(rco,ops,cirvcs,data,u);
-    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v10-P3-operacoes-individuais',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,operacoesIndividuais:estatisticaP3.podExecucao,estatisticaP3};
-  }
-  function p3PublishIndividualOps(pkg,token){
-    const rows=pkg?.estatisticaP3?.podExecucao||[],rcoId=pkg?.rco?.state?.reportId||pkg?.rco?.reportId||'';
-    for(const x of rows){
-      const id=x.registroId||x.origemRegistroId||('op-'+rcoId+'-'+Math.random().toString(36).slice(2));
-      const rec={...x,operacaoId:id,id,parentRcoId:rcoId,unidade:pkg.unidade||{},source:'RCO',registroIndividual:true,updatedAt:new Date().toISOString()};
-      try{window.CentralCloud?.upsertLocal('operacoes',rec,'operacaoId')}catch(_){}
-      if(window.CentralCloud?.isEnabled()&&token)CentralCloud.postOrQueue('operacao-upsert',{operacao:rec},{token,unit:pkg.unidade,popup:false}).catch(()=>{});
-    }
+    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,estatisticaP3};
   }
   function p3GetSavedToken(){try{return localStorage.getItem(P3_TOKEN_KEY)||''}catch(_){return ''}}
   function p3SetSavedToken(v){try{if(v)localStorage.setItem(P3_TOKEN_KEY,v);else localStorage.removeItem(P3_TOKEN_KEY)}catch(_){}}
@@ -520,7 +511,6 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     if(!token){alert('Informe a Chave P3.');input.focus();return}
     let pkg;try{pkg=p3BuildPackage()}catch(err){alert(err.message||String(err));return}
     if(remember.checked)p3SetSavedToken(token);else p3SetSavedToken('');
-    p3PublishIndividualOps(pkg,token);
     try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){}
     const winName='p3Consolidacao_'+Date.now();
     const w=window.open('about:blank',winName);
@@ -623,6 +613,31 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   async function markIncluded(){if(!CentralCloud?.isEnabled()||!origins.length)return;const token=CentralCloud.getToken('central');if(!token)return;const p=baseCollect(),rcoId=p?.state?.reportId||p?.reportId||'';if(!rcoId)return;await CentralCloud.postOrQueue('rsd-mark-included',{unidade:currentUnit(),rcoReportId:rcoId,rsdReportIds:origins.map(x=>x.rsdReportId)},{token,unit:currentUnit(),popup:false})}
   function install(){installCloudBox();document.getElementById('rcoConsolidadorMatricula')?.addEventListener('blur',lookupConsolidator);document.getElementById('rcoConsolidadorMatricula')?.addEventListener('input',e=>{e.target.value=CentralCloud.formatMatricula(e.target.value)});centralRcoToggleSemCpu();window.addEventListener('message',e=>{if(e.data?.source==='central-p3-v10'&&e.data?.action==='rco'&&e.data?.ok)markIncluded()});const note=document.querySelector('.matrix-note');if(note)note.textContent='Os totais são calculados por guarnição. RSDs em nuvem preservam a origem e versões mais recentes substituem a versão anterior sem dupla contagem.'}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
+})();
+</script>
+
+<script id="rco-v10-finalize-bridge">
+(function(){
+  let busy=false;
+  async function supplemental(){
+    if(busy||!window.CentralCloud||!await CentralCloud.probe())return;
+    const p3Token=CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3 para registrar a consolidação no banco estatístico:');
+    if(!p3Token)return;
+    const centralToken=CentralCloud.getToken('central')||CentralCloud.askToken('central','Informe a chave operacional da Central para atualizar o status dos RSDs:');
+    let rco;try{rco=window.collectState()}catch(_){return}
+    const reportId=rco?.state?.reportId||rco?.reportId||'';
+    if(!reportId)return;
+    busy=true;
+    try{
+      await CentralCloud.postOrQueue('rco-upsert',{rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]},{token:p3Token,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+      const ids=(rco.rcoOrigens||[]).map(x=>x.rsdReportId).filter(Boolean);
+      if(ids.length&&centralToken)await CentralCloud.postOrQueue('rsd-mark-included',{rcoReportId:reportId,rsdReportIds:ids},{token:centralToken,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+    }finally{busy=false}
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#p3Send');if(!b)return;
+    setTimeout(supplemental,350);
+  },true);
 })();
 </script>
 </body></html>
