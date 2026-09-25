@@ -15,7 +15,10 @@
 
 var CENTRAL_V10_VERSION = '10.3.0';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
-var CHECKLIST_SHEET_ID = '1h8VWGcg9ZMSDZmoXI3_Pvf6HjSEXNu9UbwLVJY0xE0s';
+var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
+var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
+var RSD_PAYLOAD_FOLDER_ID = '13eMc58sdk2uD_6Np-8fvoUq9Dw3Sk3jn';
+var CIRVC_SIGNATURE_FOLDER_ID = '1IonmgIFfbeSvkBtDLOnrWJBnbzJ6AMfa';
 
 function doGet(e) {
   try {
@@ -221,7 +224,7 @@ function postMessagePage_(action, obj) {
 function escapeHtml_(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
 function folderFor_(propertyName, defaultName) {
-  var props=PropertiesService.getScriptProperties(), id=props.getProperty(propertyName);
+  var props=PropertiesService.getScriptProperties(), defaults={CHECKLIST_PHOTO_FOLDER_ID:CHECKLIST_PHOTO_FOLDER_ID,RSD_PAYLOAD_FOLDER_ID:RSD_PAYLOAD_FOLDER_ID,CIRVC_SIGNATURE_FOLDER_ID:CIRVC_SIGNATURE_FOLDER_ID}, id=props.getProperty(propertyName)||defaults[propertyName]||'';
   if (id) { try { return DriveApp.getFolderById(id); } catch(_) {} }
   var f=DriveApp.createFolder(defaultName);
   props.setProperty(propertyName, f.getId());
@@ -558,56 +561,68 @@ function checklistUpsert_(payload) {
   var c=payload.checklist||payload||{}, id=c.checklistId||uid_('chk'), now=nowIso_();
   var batt=normBattalion_(c.batalhao),comp=c.companhia||normCompany_(batt,c.companhiaNumero),v=c.viatura||{};
   var items=c.itens||[];if(!Array.isArray(items))items=[];
-  var alter=items.filter(function(x){return String(x.situacao||'').toUpperCase()!=='OK' && String(x.situacao||'').toUpperCase()!=='REGULAR';});
-  var obj={CHECKLIST_ID:id,DATA_HORA:c.dataHora||now,BATALHAO:batt,COMPANHIA:comp,VIATURA_ID:v.viaturaId||c.viaturaId||'',PREFIXO:v.prefixo||c.prefixo||'',
-    PLACA:v.placa||c.placa||'',MARCA_MODELO:v.marcaModelo||c.marcaModelo||'',TIPO:v.tipo||c.tipo||'',KM:c.km||'',
-    CONDUTOR_MATRICULA:normMat_(c.condutorMatricula||''),CONDUTOR_POSTO_GRAD:c.condutorPostoGrad||'',CONDUTOR_NOME:c.condutorNome||'',
-    STATUS_GERAL:alter.length?'COM_ALTERACAO':'SEM_ALTERACAO',ALTERACOES_QTD:alter.length,OBSERVACOES:c.observacoes||'',FINALIZADO_EM:now,VERSAO:c.versao||1,ATUALIZADO_EM:now};
+  var negatives=['NAO','DEFEITO','AVARIA','BAIXO','BAIXA','AUSENTE'];
+  var alter=items.filter(function(x){return negatives.indexOf(String(x.situacao||'').toUpperCase())>=0;});
+  var dt=String(c.dataHora||now),parts=dt.split('T');
+  var obj={CHECKLIST_ID:id,DATA_SERVICO:dateText_(parts[0]),HORA_INICIO:(parts[1]||'').slice(0,5),BATALHAO:batt,COMPANHIA:comp,
+    VIATURA_ID:v.viaturaId||c.viaturaId||'',PREFIXO:v.prefixo||c.prefixo||'',PLACA:v.placa||c.placa||'',MARCA_MODELO:v.marcaModelo||c.marcaModelo||'',
+    CONDUTOR_MATRICULA:normMat_(c.condutorMatricula||''),CONDUTOR_NOME:c.condutorNome||'',TURNO:c.turno||'',LOCAL_INSPECAO:c.local||'',
+    KM_INICIAL:c.km||'',STATUS_GERAL:alter.length?'COM_ALTERACAO':'SEM_ALTERACAO',QTD_ALTERACOES:alter.length,CRIADO_EM:c.criadoEm||now,
+    FINALIZADO_EM:now,VERSAO:c.versao||1,ORIGEM:'CENTRAL_RELATORIOS',ASSINATURA_URL:'',OBSERVACOES:c.observacoes||''};
   upsert_(sheet_(CHECKLIST_SHEET_ID,'CHECKLISTS'),'CHECKLIST_ID',id,obj);
   deleteWhere_(sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_ITENS'),'CHECKLIST_ID',id);
-  var si=sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_ITENS'), sp=sheet_(CHECKLIST_SHEET_ID,'PENDENCIAS_MOTOMECANIZACAO');
+  var si=sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_ITENS'), sa=sheet_(CHECKLIST_SHEET_ID,'ALTERACOES');
   items.forEach(function(it){
-    var iid=it.itemId||uid_('item'), pend='';
-    var irregular=String(it.situacao||'').toUpperCase()!=='OK'&&String(it.situacao||'').toUpperCase()!=='REGULAR';
+    var iid=it.itemId||uid_('item'), irregular=negatives.indexOf(String(it.situacao||'').toUpperCase())>=0, altId='';
     if(irregular){
-      pend=it.pendenciaId||uid_('pend');
-      upsert_(sp,'PENDENCIA_ID',pend,{PENDENCIA_ID:pend,CHECKLIST_ID_ORIGEM:id,VIATURA_ID:obj.VIATURA_ID,PREFIXO:obj.PREFIXO,BATALHAO:batt,COMPANHIA:comp,
-        GRUPO:it.grupo||'',ITEM:it.item||'',DESCRICAO:it.descricao||'',STATUS:'ABERTA',PRIORIDADE:it.prioridade||'NORMAL',ABERTA_EM:now,ABERTA_POR_MATRICULA:obj.CONDUTOR_MATRICULA,ATUALIZADO_EM:now});
+      altId=it.pendenciaId||('alt-'+id+'-'+String(iid).replace(/[^A-Za-z0-9_-]/g,'-'));
+      var old=findOne_(sa,'ALTERACAO_ID',altId);
+      upsert_(sa,'ALTERACAO_ID',altId,{ALTERACAO_ID:altId,CHECKLIST_ID:id,VIATURA_ID:obj.VIATURA_ID,PREFIXO:obj.PREFIXO,DATA_CONSTACAO:obj.DATA_SERVICO,
+        BATALHAO:batt,COMPANHIA:comp,ITEM_CODIGO:iid,ITEM_NOME:it.item||'',DESCRICAO:it.descricao||'',STATUS:old&&old.STATUS||'ABERTA',
+        PRIORIDADE:it.prioridade||old&&old.PRIORIDADE||'NORMAL',RESPONSAVEL_MATRICULA:old&&old.RESPONSAVEL_MATRICULA||'',RESPONSAVEL_NOME:old&&old.RESPONSAVEL_NOME||'',
+        ABERTO_EM:old&&old.ABERTO_EM||now,EM_ANALISE_EM:old&&old.EM_ANALISE_EM||'',EM_MANUTENCAO_EM:old&&old.EM_MANUTENCAO_EM||'',RESOLVIDO_EM:old&&old.RESOLVIDO_EM||'',
+        SOLUCAO:old&&old.SOLUCAO||'',FOTO_INICIAL_URL:old&&old.FOTO_INICIAL_URL||'',FOTO_FINAL_URL:old&&old.FOTO_FINAL_URL||'',ATUALIZADO_EM:now});
     }
-    append_(si,{ITEM_ID:iid,CHECKLIST_ID:id,GRUPO:it.grupo||'',ITEM:it.item||'',SITUACAO:it.situacao||'',DESCRICAO:it.descricao||'',GERA_PENDENCIA:irregular?'SIM':'NÃO',PENDENCIA_ID:pend,REGISTRADO_EM:now});
-    (it.fotos||[]).forEach(function(f){saveChecklistPhoto_(id,iid,pend,f,'ALTERACAO');});
+    append_(si,{ITEM_ID:iid+'-'+id,CHECKLIST_ID:id,SECAO:it.grupo||'',ITEM_CODIGO:iid,ITEM_NOME:it.item||'',RESPOSTA:it.situacao||'',DETALHE:it.descricao||'',ALTERACAO_GERADA:irregular?'SIM':'NÃO',REGISTRADO_EM:now});
+    (it.fotos||[]).forEach(function(f){var ph=saveChecklistPhoto_(id,altId,obj.VIATURA_ID,obj.PREFIXO,f,'ALTERACAO');if(ph.fileUrl&&altId){var ar=findOne_(sa,'ALTERACAO_ID',altId);if(ar&&!ar.FOTO_INICIAL_URL){ar.FOTO_INICIAL_URL=ph.fileUrl;ar.ATUALIZADO_EM=nowIso_();upsert_(sa,'ALTERACAO_ID',altId,ar);}}});
   });
-  (c.fotos||[]).forEach(function(f){saveChecklistPhoto_(id,'','',f,'CHECKLIST_GERAL');});
+  (c.fotos||[]).forEach(function(f){saveChecklistPhoto_(id,'',obj.VIATURA_ID,obj.PREFIXO,f,'CHECKLIST_GERAL');});
   return {ok:true,message:'Checklist registrado no banco exclusivo da Motomecanização.',checklistId:id,alteracoes:alter.length};
 }
-function saveChecklistPhoto_(checklistId,itemId,pendId,f,tipo) {
+function saveChecklistPhoto_(checklistId,alteracaoId,viaturaId,prefixo,f,tipo) {
   var data=typeof f==='string'?f:(f.dataUrl||''),name='checklist-'+checklistId+'-'+uid_('foto')+'.jpg';
   var x=saveDataUrl_(data,name,'CHECKLIST_PHOTO_FOLDER_ID','Central Checklist - Fotos');
-  append_(sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_FOTOS'),{FOTO_ID:uid_('foto'),CHECKLIST_ID:checklistId,ITEM_ID:itemId,PENDENCIA_ID:pendId,TIPO_FOTO:tipo||'ALTERACAO',
-    FILE_ID:x.fileId,FILE_URL:x.fileUrl,MIME_TYPE:x.mimeType||'',LARGURA:(f||{}).largura||'',ALTURA:(f||{}).altura||'',TAMANHO_BYTES:x.size||(f||{}).tamanhoBytes||'',CAPTURADA_EM:(f||{}).capturadaEm||'',ENVIADA_EM:nowIso_()});
+  append_(sheet_(CHECKLIST_SHEET_ID,'FOTOS'),{FOTO_ID:uid_('foto'),CHECKLIST_ID:checklistId,ALTERACAO_ID:alteracaoId||'',VIATURA_ID:viaturaId||'',PREFIXO:prefixo||'',
+    TIPO:tipo||'ALTERACAO',URL:x.fileUrl,DRIVE_FILE_ID:x.fileId,MIME_TYPE:x.mimeType||'',TAMANHO_BYTES:x.size||(f||{}).tamanhoBytes||'',
+    LARGURA:(f||{}).largura||'',ALTURA:(f||{}).altura||'',CRIADO_EM:nowIso_()});
+  return x;
 }
 function checklistList_(p) {
   var list=objects_(sheet_(CHECKLIST_SHEET_ID,'CHECKLISTS'));
   return {ok:true,items:filterCommon_(list,p).slice(-500).reverse()};
 }
 function motomecanizacaoList_(p) {
-  var pend=filterCommon_(objects_(sheet_(CHECKLIST_SHEET_ID,'PENDENCIAS_MOTOMECANIZACAO')),p);
+  var pend=filterCommon_(objects_(sheet_(CHECKLIST_SHEET_ID,'ALTERACOES')),p);
   if(p.status) pend=pend.filter(function(x){return String(x.STATUS)===String(p.status);});
   return {ok:true,pendencias:pend.slice(-1000).reverse(),viaturas:objects_(sheet_(CHECKLIST_SHEET_ID,'VIATURAS')).slice(0,3000)};
 }
 function motomecanizacaoUpdate_(payload) {
-  var id=String(payload.pendenciaId||''), s=sheet_(CHECKLIST_SHEET_ID,'PENDENCIAS_MOTOMECANIZACAO'), row=findOne_(s,'PENDENCIA_ID',id);
-  if(!row) throw new Error('Pendência não localizada.');
+  var id=String(payload.pendenciaId||payload.alteracaoId||''), s=sheet_(CHECKLIST_SHEET_ID,'ALTERACOES'), row=findOne_(s,'ALTERACAO_ID',id);
+  if(!row) throw new Error('Alteração não localizada.');
   var old=String(row.STATUS||''), novo=String(payload.status||old), now=nowIso_();
-  row.STATUS=novo;row.RESPONSAVEL_SETOR=payload.responsavelSetor||row.RESPONSAVEL_SETOR||'';
+  row.STATUS=novo;row.RESPONSAVEL_MATRICULA=normMat_(payload.responsavelMatricula||row.RESPONSAVEL_MATRICULA||'');row.RESPONSAVEL_NOME=payload.responsavelNome||row.RESPONSAVEL_NOME||'';
   if(novo==='EM_ANALISE'&&!row.EM_ANALISE_EM)row.EM_ANALISE_EM=now;
   if(novo==='EM_MANUTENCAO'&&!row.EM_MANUTENCAO_EM)row.EM_MANUTENCAO_EM=now;
-  if(novo==='SOLUCIONADA'){row.SOLUCIONADA_EM=now;row.SOLUCIONADA_POR=payload.responsavelNome||'';row.OBSERVACAO_SOLUCAO=payload.observacao||'';}
-  row.ATUALIZADO_EM=now;upsert_(s,'PENDENCIA_ID',id,row);
-  append_(sheet_(CHECKLIST_SHEET_ID,'HISTORICO_PENDENCIAS'),{HISTORICO_ID:uid_('hist'),PENDENCIA_ID:id,DATA_HORA:now,STATUS_ANTERIOR:old,STATUS_NOVO:novo,
-    RESPONSAVEL_MATRICULA:normMat_(payload.responsavelMatricula||''),RESPONSAVEL_NOME:payload.responsavelNome||'',OBSERVACAO:payload.observacao||''});
-  if(payload.fotoSolucao) saveChecklistPhoto_(row.CHECKLIST_ID_ORIGEM,'',id,payload.fotoSolucao,'SOLUCAO');
-  return {ok:true,message:'Pendência atualizada.',pendencia:row};
+  if(novo==='SOLUCIONADA'){row.RESOLVIDO_EM=now;row.SOLUCAO=payload.observacao||'';}
+  row.ATUALIZADO_EM=now;
+  if(payload.fotoSolucao){
+    var ph=saveChecklistPhoto_(row.CHECKLIST_ID,id,row.VIATURA_ID,row.PREFIXO,payload.fotoSolucao,'SOLUCAO');
+    if(ph.fileUrl)row.FOTO_FINAL_URL=ph.fileUrl;
+  }
+  upsert_(s,'ALTERACAO_ID',id,row);
+  append_(sheet_(CHECKLIST_SHEET_ID,'MOTOMECANIZACAO'),{MOVIMENTO_ID:uid_('mov'),ALTERACAO_ID:id,VIATURA_ID:row.VIATURA_ID,PREFIXO:row.PREFIXO,DATA_HORA:now,
+    STATUS_ANTERIOR:old,STATUS_NOVO:novo,RESPONSAVEL_MATRICULA:row.RESPONSAVEL_MATRICULA,RESPONSAVEL_NOME:row.RESPONSAVEL_NOME,OBSERVACAO:payload.observacao||'',FOTO_URL:row.FOTO_FINAL_URL||''});
+  return {ok:true,message:'Alteração atualizada.',pendencia:row};
 }
 
 /* =========================
