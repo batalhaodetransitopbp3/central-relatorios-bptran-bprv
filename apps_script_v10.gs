@@ -82,7 +82,10 @@ function doPost(e) {
     var payload = parseJson_(p.payload, {});
 
     var out;
-    if (action === 'rsd-upsert') {
+    if (action === 'operation-upsert') {
+      assertToken_(token, 'central');
+      out = operationUpsert_(payload);
+    } else if (action === 'rsd-upsert') {
       assertToken_(token, 'central');
       out = rsdUpsert_(payload);
     } else if (action === 'rsd-mark-included') {
