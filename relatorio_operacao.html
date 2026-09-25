@@ -211,23 +211,26 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
 })();
 </script>
 
-<script src="central_cloud.js?v=10.4.1-20260925g"></script>
+<script src="central_cloud.js?v=10.5.0-20260925h"></script>
 <script id="operation-cloud-v10">
 (function(){
   function install(){
     if(!window.CentralCloud||typeof window.payload!=='function'||typeof window.validar!=='function')return;
     const old=window.registrarOperacaoDoDia;
+    function serviceContext(){try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
+    function enrichOperation(p){const ctx=serviceContext();if(ctx?.rsdReportId){p.serviceId=ctx.serviceId||'';p.rsdReportId=ctx.rsdReportId;p.segmento=ctx.segmento||'';p.comandanteMatricula=ctx.comandanteMatricula||'';p.contextoServico=ctx}return p}
+    function applyServiceContext(){const ctx=serviceContext();if(!ctx?.rsdReportId)return;try{if(ctx.unidade?.batalhao)document.getElementById('batalhao').value=ctx.unidade.batalhao;if(ctx.unidade?.companhiaNumero)document.getElementById('companhiaNumero').value=String(ctx.unidade.companhiaNumero);if(ctx.data&&!val('data'))document.getElementById('data').value=ctx.data;if(ctx.guarnicao&&!val('guarnicoes'))document.getElementById('guarnicoes').value=ctx.guarnicao;if(Array.isArray(ctx.vtrs)&&ctx.vtrs.length&&!val('vtrs'))document.getElementById('vtrs').value=ctx.vtrs.join(', ');if(ctx.comandante&&!val('responsavel'))document.getElementById('responsavel').value=ctx.comandante;syncUnitHeader()}catch(_){}}
     window.registrarOperacaoDoDiaCloud=async function(){
       if(!window.validar())return;
-      const p=window.payload();
-      try{ if(typeof old==='function') old(); }catch(_){}
-      const enabled=await CentralCloud.probe();
-      if(!enabled){ alert('Operação salva neste aparelho. A sincronização individual com a Gestão P3 ficará disponível quando o backend v10 estiver publicado.'); return; }
+      const p=enrichOperation(window.payload());
+      try{ if(typeof old==='function') old(); registrarOperacaoPayload(p,true); }catch(_){}
       const token=CentralCloud.askToken('central');
-      if(!token){ alert('Operação salva localmente. A chave operacional é necessária apenas para sincronizar com a Central.'); return; }
-      const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
-      alert(r.queued ? 'Operação salva. Sincronização pendente preservada neste aparelho.' : 'Operação salva e registrada individualmente para Gestão P3/Power BI.');
+      if(!token){ alert('Operação salva localmente. A chave operacional é necessária para sincronizar com a Central.'); return; }
+      try{const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
+      alert(r.queued ? 'Operação salva. Sincronização pendente preservada neste aparelho.' : 'Operação salva e registrada individualmente na Central.');}
+      catch(e){alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+e.message)}
     };
+    applyServiceContext();
     document.querySelectorAll('button').forEach(btn=>{
       if((btn.getAttribute('onclick')||'').trim()==='registrarOperacaoDoDia()'){
         btn.setAttribute('onclick','registrarOperacaoDoDiaCloud()');
