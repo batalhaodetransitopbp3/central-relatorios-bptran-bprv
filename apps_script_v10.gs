@@ -13,7 +13,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.5.1';
+var CENTRAL_V10_VERSION = '10.5.2';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -52,6 +52,9 @@ function doGet(e) {
     } else if (action === 'rco-draft-get') {
       assertToken_(p.token, 'central');
       out = {ok:true, rco:rcoDraftGet_(p.reportId)};
+    } else if (action === 'cirvc-list') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, items:cirvcList_(p)};
     } else if (action === 'cirvc-pending') {
       assertToken_(p.token, 'central');
       out = {ok:true, items:cirvcPendentes_(p)};
@@ -184,6 +187,14 @@ function sheet_(id, name) {
 function headers_(s) {
   var last = Math.max(1, s.getLastColumn());
   return s.getRange(1,1,1,last).getValues()[0].map(function(x){return String(x||'').trim();});
+}
+function ensureHeaders_(s, names) {
+  var h=headers_(s), missing=(names||[]).filter(function(n){return h.indexOf(String(n))<0;});
+  if(missing.length){
+    s.getRange(1,h.length+1,1,missing.length).setValues([missing]);
+    h=h.concat(missing);
+  }
+  return h;
 }
 function objects_(s) {
   var lastRow = s.getLastRow(), lastCol = s.getLastColumn();
@@ -676,18 +687,42 @@ function cirvcRegister_(payload) {
   var list=payload.cirvcs||[], u=payload.unidade||{};
   if(!Array.isArray(list)) list=[];
   var s=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA'), count=0;
+  ensureHeaders_(s,['NUMERO_TERMO','HORA_CADASTRO','SERVICE_ID','SEGMENTO','SOURCE_REPORT_ID','LOCAL_APREENSAO','MOTIVO']);
   list.forEach(function(c){
     var id=String(c.id||c.cirvcId||c.registroId||uid_('cirvc')), old=findOne_(s,'CIRVC_ID',id);
     var batt=normBattalion_((c.unidade||u).batalhao), comp=(c.unidade||u).companhia||normCompany_(batt,(c.unidade||u).companhiaNumero);
-    var obj={CIRVC_ID:id,RSD_REPORT_ID:c.rsdReportId||'',RCO_REPORT_ID:c.rcoReportId||'',DATA_CADASTRO:dateText_(c.data||new Date()),
-      BATALHAO:batt,COMPANHIA:comp,GUARNICAO:c.guarnicao||'',PLACA:String(c.placaUf||c.placa||'').toUpperCase(),TIPO:c.tipo||'',MARCA_MODELO:c.marcaModelo||'',
-      PREFIXO_ORIGEM:c.prefixo||c.vtr||'',CADASTRADO_POR_MATRICULA:normMat_(c.matriculaResponsavel||''),CADASTRADO_POR_NOME:c.responsavelCirvc||'',
-      LOCAL_CUSTODIA:c.local||c.localDestino||'',STATUS_CUSTODIA:old&&old.STATUS_CUSTODIA||'AGUARDANDO_TRANSPORTE',TRANSPORTE_ID:old&&old.TRANSPORTE_ID||'',
+    var obj={CIRVC_ID:id,RSD_REPORT_ID:c.rsdReportId||old&&old.RSD_REPORT_ID||'',RCO_REPORT_ID:c.rcoReportId||old&&old.RCO_REPORT_ID||'',DATA_CADASTRO:dateText_(c.data||old&&old.DATA_CADASTRO||new Date()),
+      BATALHAO:batt,COMPANHIA:comp,GUARNICAO:c.guarnicao||old&&old.GUARNICAO||'',PLACA:String(c.placaUf||c.placa||old&&old.PLACA||'').toUpperCase(),TIPO:c.tipo||old&&old.TIPO||'',MARCA_MODELO:c.marcaModelo||old&&old.MARCA_MODELO||'',
+      PREFIXO_ORIGEM:c.prefixo||c.vtr||old&&old.PREFIXO_ORIGEM||'',CADASTRADO_POR_MATRICULA:normMat_(c.matriculaResponsavel||old&&old.CADASTRADO_POR_MATRICULA||''),CADASTRADO_POR_NOME:c.responsavelCirvc||old&&old.CADASTRADO_POR_NOME||'',
+      LOCAL_CUSTODIA:c.local||c.localDestino||old&&old.LOCAL_CUSTODIA||'',STATUS_CUSTODIA:old&&old.STATUS_CUSTODIA||'AGUARDANDO_TRANSPORTE',TRANSPORTE_ID:old&&old.TRANSPORTE_ID||'',
       ATUALIZADO_EM:nowIso_(),BAIXADO_EM:old&&old.BAIXADO_EM||'',DESTINO_FINAL:old&&old.DESTINO_FINAL||'',RECEBEDOR_NOME:old&&old.RECEBEDOR_NOME||'',
-      RECEBEDOR_IDENTIFICACAO:old&&old.RECEBEDOR_IDENTIFICACAO||''};
+      RECEBEDOR_IDENTIFICACAO:old&&old.RECEBEDOR_IDENTIFICACAO||'',NUMERO_TERMO:c.numeroTermo||old&&old.NUMERO_TERMO||'',HORA_CADASTRO:c.hora||old&&old.HORA_CADASTRO||'',
+      SERVICE_ID:c.serviceId||old&&old.SERVICE_ID||'',SEGMENTO:Number(c.segmento||old&&old.SEGMENTO||0)||'',SOURCE_REPORT_ID:c.sourceReportId||old&&old.SOURCE_REPORT_ID||'',
+      LOCAL_APREENSAO:c.localApreensao||old&&old.LOCAL_APREENSAO||'',MOTIVO:c.motivo||old&&old.MOTIVO||''};
     upsert_(s,'CIRVC_ID',id,obj);count++;
   });
   return {ok:true,message:count+' CIRVC(s) disponibilizado(s) para continuidade da custódia.',quantidade:count};
+}
+function cirvcList_(p) {
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',rid=String(p.rsdReportId||p.reportId||''),sid=String(p.serviceId||''),seg=Number(p.segmento||0)||0;
+  var data=dateText_(p.data||''),gu=String(p.guarnicao||'').toLowerCase().trim();
+  return objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){
+    if(rid && String(x.RSD_REPORT_ID||'')!==rid)return false;
+    if(!rid && sid && String(x.SERVICE_ID||'')!==sid)return false;
+    if(!rid && sid && seg && Number(x.SEGMENTO||0)!==seg)return false;
+    if(batt&&String(x.BATALHAO)!==batt)return false;
+    if(comp&&String(x.COMPANHIA)!==String(comp))return false;
+    if(data&&dateText_(x.DATA_CADASTRO)!==data)return false;
+    if(gu&&String(x.GUARNICAO||'').toLowerCase().trim()!==gu)return false;
+    if(String(x.STATUS_CUSTODIA||'')==='CANCELADO')return false;
+    return true;
+  }).map(function(x){
+    return {id:x.CIRVC_ID||'',sourceReportId:x.SOURCE_REPORT_ID||'',rsdReportId:x.RSD_REPORT_ID||'',rcoReportId:x.RCO_REPORT_ID||'',
+      serviceId:x.SERVICE_ID||'',segmento:Number(x.SEGMENTO||0)||'',data:dateText_(x.DATA_CADASTRO),hora:x.HORA_CADASTRO||'',numeroTermo:x.NUMERO_TERMO||'',
+      placa:x.PLACA||'',tipo:x.TIPO||'',marcaModelo:x.MARCA_MODELO||'',guarnicao:x.GUARNICAO||'',vtr:x.PREFIXO_ORIGEM||'',
+      militarResponsavelAit:x.CADASTRADO_POR_NOME||'',matriculaResponsavel:x.CADASTRADO_POR_MATRICULA||'',local:x.LOCAL_CUSTODIA||'',
+      localApreensao:x.LOCAL_APREENSAO||'',motivo:x.MOTIVO||'',statusCustodia:x.STATUS_CUSTODIA||'',transporteId:x.TRANSPORTE_ID||''};
+  }).slice(-1000).reverse();
 }
 function cirvcPendentes_(p) {
   var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'';
