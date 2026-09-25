@@ -13,7 +13,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.5.0';
+var CENTRAL_V10_VERSION = '10.5.1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -463,7 +463,34 @@ function rsdStart_(payload) {
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
   if(old&&['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0)throw new Error('Este RSD já foi finalizado.');
-  var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');
+
+  var u0=r.unidade||{},g0=r.guarnicao||{},batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran'),
+      comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero),data0=dateText_((r.servico||{}).data),
+      mat0=normMat_(g0.matricula||r.matriculaResponsavel||''),gu0=String(g0.nome||'').trim().toUpperCase();
+
+  // Proteção contra duplicidade: se o mesmo comandante/equipe/data já estiver em serviço,
+  // não abre um segundo RSD. O cliente deverá assumir/continuar o registro existente.
+  if(!old&&mat0&&gu0&&data0){
+    var existing=objects_(s).filter(function(x){
+      return String(x.STATUS)==='EM_SERVICO' &&
+        normMat_(x.RESPONSAVEL_MATRICULA)===mat0 &&
+        String(x.GUARNICAO||'').trim().toUpperCase()===gu0 &&
+        dateText_(x.DATA_SERVICO)===data0 &&
+        String(x.BATALHAO||'')===String(batt0) &&
+        String(x.COMPANHIA||'')===String(comp0) &&
+        String(x.REPORT_ID||'')!==reportId;
+    }).sort(function(a,b){
+      return String(b.ULTIMO_RASCUNHO_EM||b.INICIADO_EM||'').localeCompare(String(a.ULTIMO_RASCUNHO_EM||a.INICIADO_EM||''));
+    })[0]||null;
+    if(existing){
+      return {ok:true,existing:true,message:'Já existe serviço em andamento para este comandante e guarnição. O registro existente deve ser continuado.',
+        reportId:String(existing.REPORT_ID||''),serviceId:String(existing.SERVICE_ID||''),segmento:Number(existing.SEGMENTO||1),
+        draftRevision:Number(existing.DRAFT_REVISION||0),status:'EM_SERVICO'};
+    }
+  }
+
+  var newMat=mat0;
+  if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');
   assertLease_(old,deviceId,!!payload.forceTakeover);
   var obj=rsdDraftObject_(r,old,deviceId);upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   audit_('RSD',reportId,obj.DRAFT_REVISION,old?'RASCUNHO_ATUALIZADO':'INICIADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,obj.BATALHAO,obj.COMPANHIA,r);
@@ -867,10 +894,26 @@ function p3Query_(p) {
    ========================= */
 function rcoDraftUpsert_(payload){
   var r=payload.rco||payload||{},reportId=String((r.state||{}).reportId||r.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId)throw new Error('RCO sem REPORT_ID.');
-  var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId);assertLease_(old,deviceId,!!payload.forceTakeover);
+  var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId);
+  var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero),data=dateText_((r.periodo||{}).inicio||r.data||'');
+
+  // Um único RCO em andamento por unidade/data. Impede que "Início do serviço"
+  // em outro aparelho crie um documento concorrente em vez de continuar o existente.
+  if(!old&&data){
+    var existing=objects_(s).filter(function(x){
+      return String(x.STATUS)==='EM_ANDAMENTO' &&
+        dateText_(x.DATA_SERVICO)===data &&
+        String(x.BATALHAO||'')===String(batt) &&
+        String(x.COMPANHIA||'')===String(comp) &&
+        String(x.RCO_REPORT_ID||'')!==reportId;
+    }).sort(function(a,b){return String(b.ULTIMO_SYNC_EM||b.ATUALIZADO_EM||'').localeCompare(String(a.ULTIMO_SYNC_EM||a.ATUALIZADO_EM||''));})[0]||null;
+    if(existing)throw new Error('Já existe RCO em andamento para esta unidade e data. Use Continuar serviço para carregar o relatório existente.');
+  }
+
+  assertLease_(old,deviceId,!!payload.forceTakeover);
   var rev=old?Number(old.REVISAO||0)+1:1,json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',old&&old.PAYLOAD_FILE_ID||'');
-  var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero),cons=r.consolidacaoResponsavel||{},cpus=r.cpu||[],slot=Number((r.auditoria||{}).activeSlot||1)||1,cpu=cpus[Math.max(0,slot-1)]||cpus[0]||{};
-  var obj={RCO_REPORT_ID:reportId,DATA_SERVICO:dateText_((r.periodo||{}).inicio||r.data||''),BATALHAO:batt,COMPANHIA:comp,STATUS:'EM_ANDAMENTO',
+  var cons=r.consolidacaoResponsavel||{},cpus=r.cpu||[],slot=Number((r.auditoria||{}).activeSlot||1)||1,cpu=cpus[Math.max(0,slot-1)]||cpus[0]||{};
+  var obj={RCO_REPORT_ID:reportId,DATA_SERVICO:data,BATALHAO:batt,COMPANHIA:comp,STATUS:'EM_ANDAMENTO',
     RESPONSAVEL_MATRICULA:normMat_(cons.matricula||cpu.matricula||''),RESPONSAVEL_NOME:cons.nome||cpu.nome||'',REVISAO:rev,ULTIMO_SYNC_EM:nowIso_(),
     EDIT_DEVICE_ID:deviceId||old&&old.EDIT_DEVICE_ID||'',EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),
     PAYLOAD_JSON:saved.json,PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),ATUALIZADO_EM:nowIso_(),ORIGEM:'RCO_WEB'};
