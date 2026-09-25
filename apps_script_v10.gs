@@ -459,6 +459,7 @@ function rsdStart_(payload) {
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
   if(old&&['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0)throw new Error('Este RSD já foi finalizado.');
+  var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');
   assertLease_(old,deviceId,!!payload.forceTakeover);
   var obj=rsdDraftObject_(r,old,deviceId);upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   audit_('RSD',reportId,obj.DRAFT_REVISION,old?'RASCUNHO_ATUALIZADO':'INICIADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,obj.BATALHAO,obj.COMPANHIA,r);
@@ -476,7 +477,7 @@ function rsdClaim_(payload){
 function rsdUpsert_(payload) {
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
-  var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);assertLease_(old,deviceId,!!payload.forceTakeover);
+  var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');assertLease_(old,deviceId,!!payload.forceTakeover);
   var wasFinal=!!(old&&['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0),version=Math.max(Number(r.versao||r.version||0),old?Number(old.VERSAO||0)+1:1);
   var u=r.unidade||{},g=r.guarnicao||{},json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var serviceId=String(r.serviceId||(r.servico||{}).serviceId||(old&&old.SERVICE_ID)||uid_('svc')),seg=Number(r.segmento||(r.servico||{}).segmento||(old&&old.SEGMENTO)||1)||1;
@@ -603,9 +604,10 @@ function passagemPublicar_(payload) {
   return {ok:true,message:'Passagem de serviço disponibilizada.',passagemId:id};
 }
 function passagensPendentes_(p) {
-  var batt=p.batalhao?normBattalion_(p.batalhao):'', comp=p.companhia||'', gu=String(p.guarnicao||'').toLowerCase();
+  var batt=p.batalhao?normBattalion_(p.batalhao):'', comp=p.companhia||'', gu=String(p.guarnicao||'').toLowerCase(), data=dateText_(p.data||'');
   return objects_(sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO')).filter(function(x){
     if(String(x.STATUS)!=='AGUARDANDO_RECEBIMENTO') return false;
+    if(data && dateText_(x.DATA_SERVICO)!==data) return false;
     if(batt && String(x.BATALHAO)!==batt) return false;
     if(comp && String(x.COMPANHIA)!==String(comp)) return false;
     if(gu && String(x.GUARNICAO||'').toLowerCase()!==gu) return false;
@@ -615,6 +617,8 @@ function passagensPendentes_(p) {
 function passagemReceber_(payload) {
   var id=String(payload.passagemId||''), s=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'), row=findOne_(s,'PASSAGEM_ID',id);
   if(!row) throw new Error('Passagem não localizada.');
+  if(String(row.STATUS)!=='AGUARDANDO_RECEBIMENTO')throw new Error('Esta passagem já foi recebida ou encerrada.');
+  if(!payload.rsdDestinoId)throw new Error('RSD de destino não informado para a passagem.');
   row.STATUS='RECEBIDA';row.RSD_DESTINO_ID=payload.rsdDestinoId||'';row.SEGMENTO_DESTINO=Number(payload.segmentoDestino||0)||'';row.RSD_ANTERIOR_ID=row.RSD_ORIGEM_ID||row.RSD_ANTERIOR_ID||'';var ator=payload.recebidoPor||{};row.RECEBIDA_POR_MATRICULA=normMat_(payload.matricula||payload.recebidaPorMatricula||ator.matricula||'');
   row.RECEBIDA_POR_NOME=payload.nome||payload.recebidaPorNome||ator.nome||'';row.RECEBIDA_EM=nowIso_();row.ATUALIZADO_EM=nowIso_();
   upsert_(s,'PASSAGEM_ID',id,row);
