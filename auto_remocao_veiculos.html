@@ -1559,7 +1559,15 @@ function prepareAndPrint() {
   }
   function publicarEImprimir(){return publicarCirvcs(true)}
   function salvarCirvcsNaCentral(){return publicarCirvcs(false)}
+  function applyActiveServiceUnit(){
+    const ctx=window.activeServiceContextCirvc?activeServiceContextCirvc():{},u=ctx.unidade||{};
+    if(!u.batalhao&&!u.companhiaNumero)return;
+    const b=document.getElementById('globalBatalhao'),c=document.getElementById('globalCompanhia');
+    if(b&&u.batalhao){b.value=u.batalhao;b.dispatchEvent(new Event('change',{bubbles:true}))}
+    if(c&&u.companhiaNumero){c.value=String(u.companhiaNumero);c.dispatchEvent(new Event('change',{bubbles:true}))}
+  }
   function install(){
+    applyActiveServiceUnit();
     const tb=document.querySelector('.toolbar');
     if(tb&&!tb.querySelector('[data-cirvc-cloud-save]')){
       const b=document.createElement('button');b.type='button';b.textContent='Salvar CIRVCs na Central';b.dataset.cirvcCloudSave='1';b.className='secondary no-print';b.onclick=salvarCirvcsNaCentral;
