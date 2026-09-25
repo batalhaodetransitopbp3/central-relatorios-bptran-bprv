@@ -590,7 +590,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
 
 <style id="rco-cloud-v10-style">
 .rco-mode-pill{display:flex!important;gap:7px;align-items:center;font-weight:800;color:#173a57}.rco-mode-pill input{width:18px;height:18px}
-.rco-cloud-box{border:1px solid #c6d6e2;background:#f7fbfe;border-radius:10px;padding:8px;margin:7px 0}.rco-cloud-actions{display:flex;gap:6px;flex-wrap:wrap}.rco-cloud-list{display:grid;gap:5px;margin-top:7px}.rco-cloud-item{display:grid;grid-template-columns:1.4fr .8fr .7fr auto;gap:6px;align-items:center;border:1px solid #d7e1e8;border-radius:8px;background:#fff;padding:6px;font-size:11px}.rco-cloud-item strong{color:#183f62}.rco-cloud-status{font-weight:800}.rco-cloud-status.finalizado{color:#18713c}.rco-cloud-status.retificado{color:#a45b00}.rco-cloud-status.em_servico{color:#a45b00}.rco-cloud-status.incluido_rco{color:#365c7c}.rco-origin-note{font-size:10px;color:#607286}
+.rco-cloud-box{border:1px solid #c6d6e2;background:#f7fbfe;border-radius:10px;padding:8px;margin:7px 0}.rco-cloud-actions{display:flex;gap:6px;flex-wrap:wrap}.rco-cloud-list{display:grid;gap:5px;margin-top:7px}.rco-cloud-item{display:grid;grid-template-columns:1.4fr .8fr .7fr auto auto;gap:6px;align-items:center;border:1px solid #d7e1e8;border-radius:8px;background:#fff;padding:6px;font-size:11px}.rco-cloud-item strong{color:#183f62}.rco-cloud-status{font-weight:800}.rco-cloud-status.finalizado{color:#18713c}.rco-cloud-status.retificado{color:#a45b00}.rco-cloud-status.em_servico{color:#a45b00}.rco-cloud-status.incluido_rco{color:#365c7c}.rco-origin-note{font-size:10px;color:#607286}
 body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media(max-width:700px){.rco-cloud-item{grid-template-columns:1fr 1fr}.rco-cloud-item button{grid-column:1/-1}.rco-cloud-actions button{flex:1 1 46%}}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
@@ -666,6 +666,7 @@ async function cancelCloudRsd(item){
   if(!confirm('CONFIRMA O CANCELAMENTO DESTE REGISTRO?\n\nGuarnição: '+(item.guarnicao||'—')+'\nResponsável: '+(item.responsavel||'—')+'\n\nO registro não será apagado: ficará preservado para auditoria.'))return;
   const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
   try{
+    if(!await syncRcoDraft(false))return;
     const r=await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,perfil:'COORDENADOR',motivo,ator,unidade:currentUnit(),rcoReportId:(window.collectState()?.state?.reportId||''),deviceId:rcoDeviceId},token,{popup:false});
     removeCancelledOrigin(item);cloudItems=cloudItems.filter(x=>x.reportId!==item.reportId);
     try{salvarRascunho(true)}catch(_){}scheduleRcoSync();renderCloud();
