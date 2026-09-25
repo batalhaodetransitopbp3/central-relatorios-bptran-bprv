@@ -343,9 +343,10 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     if(toolbar&&!document.getElementById('rcoPassagemFile')){
       const b1=document.createElement('button');b1.type='button';b1.className='secondary';b1.textContent='Realizar passagem de serviço';b1.onclick=()=>window.gerarPassagemServicoRco();
       const b2=document.createElement('button');b2.type='button';b2.className='secondary';b2.textContent='Receber passagem JSON (contingência)';b2.onclick=()=>document.getElementById('rcoPassagemFile').click();
+      const b3=document.createElement('button');b3.type='button';b3.className='secondary';b3.textContent='Exportar passagem JSON (contingência)';b3.onclick=()=>window.exportarPassagemRcoContingencia?.();
       const fi=document.createElement('input');fi.id='rcoPassagemFile';fi.type='file';fi.hidden=true;fi.accept='.json,application/json';fi.onchange=function(){window.receberPassagemServicoRco(this.files);this.value=''};
       const ba=document.createElement('button');ba.id='rcoAuditToggle';ba.type='button';ba.className='secondary';ba.textContent='Auditoria';ba.hidden=!auditState.activated;ba.onclick=()=>{const c=document.getElementById('rcoAuditCard');if(c){c.hidden=!c.hidden;if(!c.hidden){render();c.scrollIntoView({behavior:'smooth',block:'start'})}}};
-      const danger=toolbar.querySelector('.danger');[b1,b2,ba,fi].forEach(el=>danger?toolbar.insertBefore(el,danger):toolbar.appendChild(el));
+      const danger=toolbar.querySelector('.danger');[b1,b2,b3,ba,fi].forEach(el=>danger?toolbar.insertBefore(el,danger):toolbar.appendChild(el));
     }
     if(!document.getElementById('rcoAuditCard')){
       const card=document.createElement('section');card.id='rcoAuditCard';card.className='card audit-card no-print';card.hidden=true;
@@ -360,6 +361,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
   function dlJSON(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},300)}
   function safeName(s,f='CPU'){return text(s).replace(/[\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||f}
   function fmtDateFile(s){if(!s)return new Date().toLocaleDateString('pt-BR').replaceAll('/','.');const [y,m,d]=String(s).split('-');return d&&m&&y?`${d}.${m}.${y}`:s}
+  window.exportarPassagemRcoContingencia=function(){const p=window.collectState?window.collectState():(baseCollect?baseCollect():{}),a=actor(1),data=p?.periodo?.inicio||'';dlJSON('PASSAGEM RCO - '+safeName(a.nome||'CPU')+' - '+fmtDateFile(data)+'.json',{schema:PASS_SCHEMA,schemaVersion:2,generatedAt:new Date().toISOString(),relatorio:p})};
   window.gerarPassagemServicoRco=function(){
     syncActors();const a=actor(1);if(!a.nome&&!a.matricula){alert('Identifique o CPU 1 no Campo 1 antes de realizar a passagem de serviço.');return}
     const base=baseCollect?baseCollect():{};auditState.activated=true;auditState.activeSlot=1;auditState.actors['1']={...auditState.actors['1'],nome:a.nome,matricula:a.matricula,graduacao:a.graduacao,turno:a.turno};auditState.snapshots.cpu1AtPassage=clone({...base,auditoria:undefined});auditState.passagens.push({em:new Date().toISOString(),de:actorLabel(a),reportId:base?.state?.reportId||base?.reportId||''});
