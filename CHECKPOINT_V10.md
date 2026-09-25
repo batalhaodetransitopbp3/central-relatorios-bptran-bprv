@@ -6,10 +6,10 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Repositório: `batalhaodetransitopbp3/central-relatorios-bptran-bprv`
 - Branch de homologação desta rodada: `cirvc-rsd-checklist-motomec-v10-5-2`
 - Backend complementar atual: `apps_script_v10.gs`
-- Versão atual do código em homologação: **10.5.2**
+- Versão atual do código em homologação: **10.5.3**
 - Endpoint v10 existente:
   `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
-- O endpoint já está publicado em 10.5.1. A versão 10.5.2 desta rodada ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
+- O endpoint já está publicado em 10.5.2. A versão 10.5.3 desta rodada ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
 
 ## Estado de homologação
 - `CONFIG.BACKEND_V10_STATUS = EM_HOMOLOGACAO`
@@ -86,6 +86,18 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Confirmado que a integração Checklist → Motomecanização já existe por `checklist_cloud.js` + `checklist-upsert`.
 - O Checklist agora usa o rótulo **Finalizar e enviar à Motomecanização**, valida pendências antes do envio e mantém `Pendências: 0` como indicador de preenchimento, não de ausência de avarias.
 - Checklist, Operações e CIRVC deixaram de exibir o botão genérico de início/continuidade que poderia apagar o contexto do RSD; cada módulo mantém suas próprias ações de rascunho/novo registro.
+
+## Ajustes da versão 10.5.3 — cancelamento auditável de RSD
+- Novo fluxo lógico de **Cancelar registro de serviço**; nenhum RSD é apagado fisicamente.
+- O próprio comandante pode cancelar apenas o seu RSD `EM_SERVICO`, com motivo obrigatório.
+- O Coordenador pode cancelar RSD `EM_SERVICO` da própria unidade/companhia, com identificação do responsável e motivo obrigatório.
+- O P3 pode cancelar RSD `EM_SERVICO` ou `FINALIZADO` ainda não incorporado ao RCO.
+- RSD `INCLUIDO_RCO` não pode ser cancelado isoladamente: a operação é bloqueada para preservar a consolidação.
+- Registros cancelados deixam de aparecer nos fluxos normais, não podem ser continuados/finalizados e ficam disponíveis em **Gestão P3 > Registros cancelados**.
+- Operações, POD, ocorrências, prisões/conduções e CIRVCs vinculados ao RSD cancelado recebem invalidação lógica para não contaminar consultas normais.
+- Se houver CIRVC já em transporte ou baixado no DETRAN, o cancelamento do RSD é bloqueado para preservar a cadeia de custódia.
+- Se o RSD cancelado era destino de uma passagem recebida, a passagem volta a `AGUARDANDO_RECEBIMENTO`; se era origem de passagem ainda pendente, a passagem é cancelada.
+- O RCO consulta cancelados apenas para reconciliar/remover uma origem que tenha sido cancelada e não exibe esses registros na lista operacional.
 
 ## Estruturas adicionadas na Base P3
 - RSD: `SERVICE_ID`, `SEGMENTO`, `RSD_ANTERIOR_ID`, `PASSAGEM_ORIGEM_ID`, `ULTIMO_RASCUNHO_EM`, `EDIT_DEVICE_ID`, `EDIT_LEASE_UNTIL`, `DRAFT_REVISION`.
