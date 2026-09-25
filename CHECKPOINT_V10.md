@@ -56,3 +56,9 @@ Não substituir nem excluir o backend legado durante a homologação.
 
 ## Ponto exato para continuar
 A revisão de código, contratos e bases está concluída. O próximo passo efetivo permanece a publicação de `apps_script_v10.gs` como NOVO Google Apps Script Web App, configuração de `CENTRAL_TOKEN` e `P3_TOKEN`, teste de `?action=version` esperando `10.3.0` e, somente após sucesso, atualização do endpoint v10 em `central_cloud.js` e execução da matriz de homologação.
+
+## Numeração das soluções
+- Solução 46: existente.
+- Solução 47: não foi criada; a numeração salta diretamente da 46 para a 48.
+- Solução 48: Cadastro Mestre do efetivo do BPRv, com matrícula canônica no padrão PMPB `000.000-0`.
+- Solução 49: cadastro das viaturas da 3ª CPTran no Cadastro Mestre de Viaturas. Validação realizada diretamente na base oficial em 25/09/2026: 18 registros ativos encontrados para a 3ª CPTran, incluindo Agrale/A8700, prefixo 1697, placa TOZ-8D86, tipo Reboque. O cadastro é compartilhado com os fluxos que usam viaturas, inclusive o Transporte CIRVC.
