@@ -12,12 +12,12 @@
 <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
 <div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div><div><label>Turno</label><select id="turno"><option value="">Todos</option><option>Manhã</option><option>Tarde</option><option>Noite</option><option>Madrugada</option><option>24h</option></select></div><div><label>Guarnição</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button></div>
 <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a><button class="secondary" id="customBtn">Personalizar indicadores</button><button class="secondary" id="biBtn">Power BI</button></div></section>
-<section class="card"><div class="tabs"><button data-view="controle-diario" class="active">Controle diário</button><button data-view="produtividade">Produtividade</button><button data-view="analise">Análise estatística</button><button data-view="operacoes">Operações</button><button data-view="prisoes">Prisões/Conduções</button><button data-view="cirvc">CIRVC</button><button data-view="auditoria">Auditoria</button></div></section>
+<section class="card"><div class="tabs"><button data-view="controle-diario" class="active">Controle diário</button><button data-view="produtividade">Produtividade</button><button data-view="analise">Análise estatística</button><button data-view="operacoes">Operações</button><button data-view="prisoes">Prisões/Conduções</button><button data-view="cirvc">CIRVC</button><button data-view="auditoria">Auditoria</button><button data-view="cancelados">Registros cancelados</button></div></section>
 <div id="stats" class="stats"></div>
 <section id="customPanel" class="card hidden"><div class="matrix-title"><h3>Indicadores visíveis</h3><button type="button" class="secondary" id="customClose">Fechar</button></div><div id="customOptions" class="custom-grid"></div><div class="note">A preferência fica salva apenas neste navegador e pode ser alterada a qualquer momento.</div></section>
 <section class="card view" id="mainView"><div id="title"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
 </main>
-<script src="central_cloud.js?v=10.5.1-20260925i"></script><script>
+<script src="central_cloud.js?v=10.5.3-20260925k"></script><script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];let view='controle-diario',last=null,analysisIndicator='';
  $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
@@ -39,13 +39,14 @@
   if(v==='prisoes')return [['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']];
   if(v==='cirvc')return [['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']];
   if(v==='auditoria')return [['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']];
+  if(v==='cancelados')return [['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['RESPONSAVEL_NOME','Responsável original'],['RESPONSAVEL_MATRICULA','Matrícula'],['CANCELADO_EM','Cancelado em'],['CANCELADO_POR_NOME','Cancelado por'],['CANCELADO_POR_MATRICULA','Matrícula cancelamento'],['CANCELADO_PERFIL','Perfil'],['CANCELADO_MOTIVO','Motivo'],['REPORT_ID','REPORT_ID']];
   return [];
  }
  function render(r){
   if(view==='controle-diario') return renderControl(r);
   const items=r.items||[];
   if(view==='produtividade') return renderProductivity(items);
-  const cols=columnsFor(view);$('title').innerHTML='<h2>'+({operacoes:'Operações individualizadas',prisoes:'Prisões e conduções por tipificação',cirvc:'CIRVC — custódia',auditoria:'Auditoria e versões'}[view]||view)+'</h2>';
+  const cols=columnsFor(view);$('title').innerHTML='<h2>'+({operacoes:'Operações individualizadas',prisoes:'Prisões e conduções por tipificação',cirvc:'CIRVC — custódia',auditoria:'Auditoria e versões',cancelados:'Registros de serviço cancelados'}[view]||view)+'</h2>';
   $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr>';
   $('tbody').innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros.</td></tr>';
   if(view==='operacoes')renderOpStats(items);else if(view==='prisoes')renderPrisonStats(items);else $('stats').innerHTML='';
@@ -59,11 +60,30 @@
   $('analysisChart').innerHTML=(r.porCompanhia||[]).length?(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">Sem dados para este indicador/período.</div>';
   document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
  }
+ function getP3CancelActor(){
+  let a={};try{a=JSON.parse(localStorage.getItem('pmpb-p3-cancel-actor-v1')||'{}')||{}}catch(_){}
+  const mat=CentralCloud.formatMatricula(prompt('Confirme a matrícula do responsável pelo cancelamento (000.000-0):',a.matricula||'')||'');
+  if(!/^\d{3}\.\d{3}-\d$/.test(mat))return null;
+  const nome=String(prompt('Confirme o Nome/QRA do responsável pelo cancelamento:',a.nome||'')||'').trim();
+  if(!nome)return null;
+  try{localStorage.setItem('pmpb-p3-cancel-actor-v1',JSON.stringify({matricula:mat,nome}))}catch(_){}
+  return {matricula:mat,nome};
+ }
+ async function cancelRsdP3(reportId,status){
+  if(!['EM_SERVICO','FINALIZADO'].includes(String(status||''))){alert('Este RSD não pode ser cancelado diretamente. Se já foi incluído em RCO, a correção deve preservar a consolidação.');return}
+  const ator=getP3CancelActor();if(!ator){alert('Identifique o responsável pelo cancelamento.');return}
+  const motivo=String(prompt('Informe o motivo do cancelamento deste registro de serviço:')||'').trim();if(!motivo)return;
+  if(motivo.length<5){alert('Descreva o motivo com pelo menos 5 caracteres.');return}
+  if(!confirm('CONFIRMA O CANCELAMENTO?\n\nO registro deixará de participar dos fluxos operacionais e estatísticos, mas permanecerá preservado para auditoria.'))return;
+  try{const token=await ensure(),r=await CentralCloud.submitForm('rsd-cancel',{reportId,perfil:'P3',motivo,ator},token,{popup:false});alert(r.message||'RSD cancelado.');await load()}catch(e){alert('Não foi possível cancelar o RSD: '+e.message)}
+ }
+ window.cancelRsdP3=cancelRsdP3;
  function renderControl(r){
-  const rsd=r.rsd||[],rco=r.rco||[];$('title').innerHTML='<h2>Controle diário</h2><div class="note">RSDs finalizados ficam disponíveis ao RCO sem troca de arquivos.</div>';
+  const rsd=r.rsd||[],rco=r.rco||[];$('title').innerHTML='<h2>Controle diário</h2><div class="note">RSDs finalizados ficam disponíveis ao RCO sem troca de arquivos. Registros em serviço ou finalizados ainda não incorporados podem ser cancelados pelo P3 com auditoria.</div>';
   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','RCO']];
-  $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr>';
-  $('tbody').innerHTML=rsd.length?rsd.map(x=>'<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="8" class="empty">Nenhum RSD localizado.</td></tr>';
+  $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'<th>Ação</th></tr>';
+  $('tbody').innerHTML=rsd.length?rsd.map(x=>{const can=['EM_SERVICO','FINALIZADO'].includes(String(x.STATUS||'')),action=can?'<button type="button" class="secondary" data-p3-cancel="'+esc(x.REPORT_ID||'')+'" data-p3-status="'+esc(x.STATUS||'')+'">Cancelar registro</button>':(x.STATUS==='INCLUIDO_RCO'?'<span class="note">Correção via RCO/P3</span>':'');return '<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'<td>'+action+'</td></tr>'}).join(''):'<tr><td colspan="9" class="empty">Nenhum RSD localizado.</td></tr>';
+  document.querySelectorAll('button[data-p3-cancel]').forEach(b=>b.onclick=()=>cancelRsdP3(b.dataset.p3Cancel,b.dataset.p3Status));
   const fin=rsd.filter(x=>x.STATUS==='FINALIZADO').length,inc=rsd.filter(x=>x.STATUS==='INCLUIDO_RCO').length,ret=rsd.filter(x=>Number(x.VERSAO||1)>1).length;
   $('stats').innerHTML=cards([['RSDs',rsd.length],['Finalizados',fin],['Incluídos no RCO',inc],['Retificados',ret],['RCOs',rco.length]]);
  }

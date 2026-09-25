@@ -13,7 +13,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.5.2';
+var CENTRAL_V10_VERSION = '10.5.3';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -119,6 +119,10 @@ function doPost(e) {
     } else if (action === 'rsd-mark-included') {
       assertToken_(token, 'central');
       out = rsdMarkIncluded_(payload);
+    } else if (action === 'rsd-cancel') {
+      var cancelProfile=String(payload.perfil||payload.profile||'RESPONSAVEL').toUpperCase();
+      assertToken_(token, cancelProfile==='P3'?'p3':'central');
+      out = rsdCancel_(payload);
     } else if (action === 'passagem-publicar') {
       assertToken_(token, 'central');
       out = passagemPublicar_(payload);
@@ -379,6 +383,8 @@ function operationUpsert_(payload) {
   var u=p.unidade||{}, op=p.operacao||{}, pod=p.pod||{}, loc=p.local||{}, res=p.resultados||{}, ab=res.abordagens||{}, nt=res.notificacoes||{}, rem=res.remocoes||{}, cr=res.criminal||{};
   var batt=normBattalion_(u.batalhao||u.batalhaoSigla), comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var coord=splitCoords_(loc.coordenadas), prev=splitCoords_(pod.coordenadasPrevistas);
+  var rsdLink=String(p.rsdReportId||(p.contextoServico||{}).rsdReportId||'');
+  if(rsdLink){var rsdRow=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',rsdLink);if(rsdRow&&String(rsdRow.STATUS)==='CANCELADO')throw new Error('O serviço vinculado a esta operação foi cancelado.');}
   var old=findOne_(sheet_(P3_SHEET_ID,'OPERACOES'),'REGISTRO_ID',id), version=old?Number(old.VERSAO_ORIGEM||1)+1:1;
   var row={
     REGISTRO_ID:id,REPORT_ID:id,DATA:dateText_(op.data),TURNO:op.turno||'',BATALHAO:batt,COMPANHIA:comp,GUARNICAO_RESPONSAVEL:op.guarnicoes||'',
@@ -398,12 +404,13 @@ function operationUpsert_(payload) {
     COMANDANTE_MATRICULA:normMat_(p.comandanteMatricula||(p.contextoServico||{}).comandanteMatricula||'')
   };
   upsert_(sheet_(P3_SHEET_ID,'OPERACOES'),'REGISTRO_ID',id,row);
+  var podSheet=sheet_(P3_SHEET_ID,'POD_EXECUCAO');ensureHeaders_(podSheet,['STATUS_REGISTRO']);
   var changed=['Executado em local diverso','Executado parcialmente','Não executado'].indexOf(String(pod.statusCumprimento||''))>=0;
-  upsert_(sheet_(P3_SHEET_ID,'POD_EXECUCAO'),'REGISTRO_ID',id,{
+  upsert_(podSheet,'REGISTRO_ID',id,{
     REGISTRO_ID:id,REPORT_ID:id,DATA:dateText_(op.data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:op.guarnicoes||'',OPERACAO:op.nome||'',TURNO:op.turno||'',
     STATUS_CUMPRIMENTO:pod.statusCumprimento||'',LOCAL_PREVISTO:pod.localPrevisto||'',COORDENADAS_PREVISTAS:pod.coordenadasPrevistas||'',
     LOCAL_EXECUTADO:loc.descricao||'',COORDENADAS_EXECUTADAS:loc.coordenadas||'',HORA_INICIO:op.horaInicio||'',HORA_FIM:op.horaFim||'',
-    HOUVE_ALTERACAO:changed?'SIM':'NÃO',MOTIVO_ALTERACAO:pod.motivoAlteracao||'',ORIGEM_RELATORIO:'OPERACAO',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_()
+    HOUVE_ALTERACAO:changed?'SIM':'NÃO',MOTIVO_ALTERACAO:pod.motivoAlteracao||'',ORIGEM_RELATORIO:'OPERACAO',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_(),STATUS_REGISTRO:'ATIVO'
   });
   audit_('OPERACAO',id,version,old?'RETIFICADA':'FINALIZADA','',op.responsavel||'',batt,comp,p);
   return {ok:true,message:old?'Operação atualizada no banco estatístico.':'Operação registrada individualmente no banco estatístico.',registroId:id,version:version};
@@ -416,7 +423,7 @@ function operationList_(p) {
     if(p.rsdReportId && String(x.RSD_REPORT_ID)!==String(p.rsdReportId))return false;
     if(p.serviceId && String(x.SERVICE_ID)!==String(p.serviceId))return false;
     if(p.data && dateText_(x.DATA)!==dateText_(p.data))return false;
-    return String(x.STATUS_REGISTRO||'')!=='INATIVO';
+    return ['INATIVO','CANCELADO'].indexOf(String(x.STATUS_REGISTRO||'').toUpperCase())<0;
   }).map(function(x){
     var d=pm[String(x.REGISTRO_ID||'')]||{};
     return {schema:'pmpb-transito-operacao-v2',schemaVersion:2,reportId:x.REGISTRO_ID,
@@ -473,6 +480,7 @@ function rsdStart_(payload) {
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
+  if(old&&String(old.STATUS)==='CANCELADO')throw new Error('Este registro de serviço foi cancelado e não pode ser reutilizado.');
   if(old&&['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0)throw new Error('Este RSD já foi finalizado.');
 
   var u0=r.unidade||{},g0=r.guarnicao||{},batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran'),
@@ -512,6 +520,7 @@ function rsdDraftSync_(payload){
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
   if(!old)return rsdStart_(payload);
+  if(String(old.STATUS)==='CANCELADO')throw new Error('Este registro de serviço foi cancelado e não pode ser sincronizado.');
   if(['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0)throw new Error('Este RSD já foi finalizado.');
   var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');
   if(old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');
@@ -531,7 +540,7 @@ function rsdClaim_(payload){
 function rsdUpsert_(payload) {
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
-  var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');assertLease_(old,deviceId,!!payload.forceTakeover);
+  var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);if(old&&String(old.STATUS)==='CANCELADO')throw new Error('Este registro de serviço foi cancelado e não pode ser finalizado.');var newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||'');if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');assertLease_(old,deviceId,!!payload.forceTakeover);
   var wasFinal=!!(old&&['FINALIZADO','INCLUIDO_RCO'].indexOf(String(old.STATUS))>=0),version=Math.max(Number(r.versao||r.version||0),old?Number(old.VERSAO||0)+1:1);
   var u=r.unidade||{},g=r.guarnicao||{},json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var serviceId=String(r.serviceId||(r.servico||{}).serviceId||(old&&old.SERVICE_ID)||uid_('svc')),seg=Number(r.segmento||(r.servico||{}).segmento||(old&&old.SEGMENTO)||1)||1;
@@ -548,12 +557,13 @@ function rsdUpsert_(payload) {
   return {ok:true,message:wasFinal?'RSD retificado e disponibilizado para consolidação.':'RSD finalizado e disponibilizado para consolidação.',reportId:reportId,serviceId:serviceId,segmento:seg,version:version,status:'FINALIZADO'};
 }
 function rsdList_(p) {
-  var list=objects_(sheet_(P3_SHEET_ID,'RSD')),batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',data=dateText_(p.data||''),vtrs=objects_(sheet_(P3_SHEET_ID,'RSD_VIATURAS'));
-  return list.filter(function(x){if(['EM_SERVICO','FINALIZADO','INCLUIDO_RCO'].indexOf(String(x.STATUS))<0)return false;if(batt&&String(x.BATALHAO)!==batt)return false;if(comp&&String(x.COMPANHIA)!==String(comp))return false;if(data&&dateText_(x.DATA_SERVICO)!==data)return false;return true;}).map(function(x){
+  var list=objects_(sheet_(P3_SHEET_ID,'RSD')),batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',data=dateText_(p.data||''),vtrs=objects_(sheet_(P3_SHEET_ID,'RSD_VIATURAS')),includeCancelled=String(p.includeCancelled||'')==='1';
+  return list.filter(function(x){var allowed=['EM_SERVICO','FINALIZADO','INCLUIDO_RCO'];if(includeCancelled)allowed.push('CANCELADO');if(allowed.indexOf(String(x.STATUS))<0)return false;if(batt&&String(x.BATALHAO)!==batt)return false;if(comp&&String(x.COMPANHIA)!==String(comp))return false;if(data&&dateText_(x.DATA_SERVICO)!==data)return false;return true;}).map(function(x){
     var rv=vtrs.filter(function(v){return String(v.RSD_REPORT_ID)===String(x.REPORT_ID);}).sort(function(a,b){return Number(a.ORDEM||0)-Number(b.ORDEM||0);});
     return {reportId:x.REPORT_ID,serviceId:x.SERVICE_ID||'',segmento:Number(x.SEGMENTO||1),rsdAnteriorId:x.RSD_ANTERIOR_ID||'',passagemOrigemId:x.PASSAGEM_ORIGEM_ID||'',version:Number(x.VERSAO||1),draftRevision:Number(x.DRAFT_REVISION||0),
       data:x.DATA_SERVICO,batalhao:x.BATALHAO,companhia:x.COMPANHIA,guarnicao:x.GUARNICAO,status:x.STATUS,responsavel:x.RESPONSAVEL_NOME,matricula:x.RESPONSAVEL_MATRICULA,
       iniciadoEm:x.INICIADO_EM,finalizadoEm:x.FINALIZADO_EM,ultimoRascunhoEm:x.ULTIMO_RASCUNHO_EM,rcoReportId:x.RCO_REPORT_ID,editDeviceId:x.EDIT_DEVICE_ID||'',editLeaseUntil:x.EDIT_LEASE_UNTIL||'',
+      canceladoEm:x.CANCELADO_EM||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPerfil:x.CANCELADO_PERFIL||'',
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
   });
 }
@@ -563,10 +573,76 @@ function rsdActive_(p) {
 }
 function rsdGet_(reportId) {
   var row=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
+  if(String(row.STATUS)==='CANCELADO')throw new Error('Este registro de serviço foi cancelado.');
   var p=loadJsonPayload_(row);if(!p||!Object.keys(p).length)throw new Error('Conteúdo do RSD indisponível.');
   p.versao=Number(row.VERSAO||1);p.serviceId=row.SERVICE_ID||p.serviceId||'';p.segmento=Number(row.SEGMENTO||p.segmento||1);p.rsdAnteriorId=row.RSD_ANTERIOR_ID||p.rsdAnteriorId||'';p.passagemOrigemId=row.PASSAGEM_ORIGEM_ID||p.passagemOrigemId||'';
   return p;
 }
+function cancelLinkedRsdRecords_(reportId,motivo,ator){
+  var now=nowIso_(),ops=sheet_(P3_SHEET_ID,'OPERACOES'),opRows=objects_(ops),opIds=[];
+  opRows.forEach(function(x){if(String(x.RSD_REPORT_ID||'')===String(reportId)){x.STATUS_REGISTRO='CANCELADO';x.ENVIADO_EM=now;upsert_(ops,'REGISTRO_ID',x.REGISTRO_ID,x);opIds.push(String(x.REGISTRO_ID||''));}});
+  var pod=sheet_(P3_SHEET_ID,'POD_EXECUCAO');ensureHeaders_(pod,['STATUS_REGISTRO']);
+  objects_(pod).forEach(function(x){if(opIds.indexOf(String(x.REGISTRO_ID||''))>=0){x.STATUS_REGISTRO='CANCELADO';x.ENVIADO_EM=now;upsert_(pod,'REGISTRO_ID',x.REGISTRO_ID,x);}});
+  var occ=sheet_(P3_SHEET_ID,'OCORRENCIAS');ensureHeaders_(occ,['STATUS_REGISTRO']);
+  objects_(occ).forEach(function(x){if(String(x.REPORT_ID||'')===String(reportId)){x.STATUS_REGISTRO='CANCELADO';upsert_(occ,'REGISTRO_ID',x.REGISTRO_ID,x);}});
+  var pri=sheet_(P3_SHEET_ID,'PRISOES');ensureHeaders_(pri,['STATUS_REGISTRO']);
+  objects_(pri).forEach(function(x){if(String(x.RSD_REPORT_ID||'')===String(reportId)){x.STATUS_REGISTRO='CANCELADO';upsert_(pri,'PRISAO_ID',x.PRISAO_ID,x);}});
+  var cir=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA');ensureHeaders_(cir,['STATUS_REGISTRO','CANCELADO_RSD_EM','CANCELADO_RSD_MOTIVO']);
+  objects_(cir).forEach(function(x){if(String(x.RSD_REPORT_ID||'')===String(reportId)){x.STATUS_REGISTRO='CANCELADO';x.CANCELADO_RSD_EM=now;x.CANCELADO_RSD_MOTIVO=motivo;upsert_(cir,'CIRVC_ID',x.CIRVC_ID,x);}});
+  var pass=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO');
+  objects_(pass).forEach(function(x){
+    if(String(x.RSD_ORIGEM_ID||'')===String(reportId)&&String(x.STATUS||'')==='AGUARDANDO_RECEBIMENTO'){
+      x.STATUS='CANCELADA';x.ATUALIZADO_EM=now;x.OBSERVACOES=[x.OBSERVACOES,'RSD de origem cancelado: '+motivo].filter(Boolean).join(' | ');upsert_(pass,'PASSAGEM_ID',x.PASSAGEM_ID,x);
+    } else if(String(x.RSD_DESTINO_ID||'')===String(reportId)&&String(x.STATUS||'')==='RECEBIDA'){
+      x.STATUS='AGUARDANDO_RECEBIMENTO';x.RSD_DESTINO_ID='';x.SEGMENTO_DESTINO='';x.RECEBIDA_POR_MATRICULA='';x.RECEBIDA_POR_NOME='';x.RECEBIDA_EM='';x.ATUALIZADO_EM=now;
+      x.OBSERVACOES=[x.OBSERVACOES,'Recebimento anterior cancelado com o RSD de destino: '+motivo].filter(Boolean).join(' | ');upsert_(pass,'PASSAGEM_ID',x.PASSAGEM_ID,x);
+    }
+  });
+  return {operacoes:opIds.length};
+}
+function rsdCancel_(payload){
+  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),perfil=String(payload.perfil||payload.profile||'RESPONSAVEL').toUpperCase(),ator=payload.ator||{};
+  if(!reportId)throw new Error('RSD não informado para cancelamento.');
+  if(motivo.length<5)throw new Error('Informe o motivo do cancelamento com pelo menos 5 caracteres.');
+  if(['RESPONSAVEL','COORDENADOR','P3'].indexOf(perfil)<0)throw new Error('Perfil de cancelamento inválido.');
+  var s=sheet_(P3_SHEET_ID,'RSD');ensureHeaders_(s,['CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_MOTIVO','CANCELADO_PERFIL']);
+  var row=findOne_(s,'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
+  var status=String(row.STATUS||''),mat=normMat_(ator.matricula||payload.matricula||''),nome=String(ator.nome||payload.nome||'').trim();
+  if(status==='CANCELADO')return {ok:true,already:true,message:'Este registro já estava cancelado.',reportId:reportId,status:'CANCELADO'};
+  if(status==='INCLUIDO_RCO')throw new Error('Este RSD já foi incluído em um RCO. O cancelamento isolado foi bloqueado para preservar a consolidação; realize a correção pela Gestão P3.');
+  if(perfil==='RESPONSAVEL'){
+    if(status!=='EM_SERVICO')throw new Error('O próprio comandante só pode cancelar um RSD que ainda esteja EM SERVIÇO.');
+    if(!mat||mat!==normMat_(row.RESPONSAVEL_MATRICULA||''))throw new Error('Somente o comandante responsável por este segmento pode cancelá-lo.');
+    var cancelDevice=String(payload.deviceId||'');
+    if(row.EDIT_DEVICE_ID&&(!cancelDevice||String(row.EDIT_DEVICE_ID)!==cancelDevice))throw new Error('Este RSD está assumido em outro aparelho. Use Continuar serviço neste dispositivo antes de cancelar.');
+  } else if(perfil==='COORDENADOR'){
+    if(status!=='EM_SERVICO')throw new Error('O Coordenador só pode cancelar RSD que ainda esteja EM SERVIÇO. Relatórios finalizados exigem ação do P3.');
+    var u=payload.unidade||{},b=normBattalion_(u.batalhao||''),c=u.companhia||normCompany_(b,u.companhiaNumero);
+    if(b&&String(row.BATALHAO||'')!==String(b))throw new Error('O RSD pertence a outra unidade.');
+    if(c&&String(row.COMPANHIA||'')!==String(c))throw new Error('O RSD pertence a outra companhia.');
+    if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Identifique o Coordenador responsável pelo cancelamento.');
+    var rcoId=String(payload.rcoReportId||''),rcoDevice=String(payload.deviceId||''),rcoDraft=findOne_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),'RCO_REPORT_ID',rcoId);
+    if(!rcoDraft||String(rcoDraft.STATUS)!=='EM_ANDAMENTO')throw new Error('RCO em andamento não localizado para autorizar o cancelamento.');
+    if(String(rcoDraft.BATALHAO||'')!==String(row.BATALHAO||'')||String(rcoDraft.COMPANHIA||'')!==String(row.COMPANHIA||''))throw new Error('O RCO atual não corresponde à unidade deste RSD.');
+    if(rcoDraft.EDIT_DEVICE_ID&&(!rcoDevice||String(rcoDraft.EDIT_DEVICE_ID)!==rcoDevice))throw new Error('Este RCO está assumido em outro aparelho. Use Continuar serviço no RCO antes de cancelar.');
+    if(rcoDraft.RESPONSAVEL_MATRICULA&&normMat_(rcoDraft.RESPONSAVEL_MATRICULA)!==mat)throw new Error('A matrícula informada não corresponde ao responsável atual do RCO.');
+  } else if(perfil==='P3'){
+    if(['EM_SERVICO','FINALIZADO'].indexOf(status)<0)throw new Error('Este status não permite cancelamento direto pelo P3.');
+    if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Identifique o responsável do P3 pelo cancelamento.');
+  }
+  var children=objects_(s).filter(function(x){return String(x.RSD_ANTERIOR_ID||'')===reportId&&String(x.STATUS||'')!=='CANCELADO';});
+  if(children.length)throw new Error('Este RSD possui segmento posterior vinculado. Cancele/corrija primeiro a continuidade subsequente para preservar a cadeia do serviço.');
+  var linkedCirvcs=objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){return String(x.RSD_REPORT_ID||'')===reportId&&String(x.STATUS_REGISTRO||'')!=='CANCELADO';});
+  var custodyLocked=linkedCirvcs.filter(function(x){return ['EM_TRANSPORTE','BAIXADO_DETRAN'].indexOf(String(x.STATUS_CUSTODIA||''))>=0||String(x.TRANSPORTE_ID||'').trim();});
+  if(custodyLocked.length)throw new Error('Este RSD possui CIRVC já vinculado a transporte/entrega. O cancelamento foi bloqueado para preservar a cadeia de custódia; a correção deve ser tratada pelo P3.');
+  var before=status,now=nowIso_();
+  row.STATUS='CANCELADO';row.CANCELADO_EM=now;row.CANCELADO_POR_MATRICULA=mat;row.CANCELADO_POR_NOME=nome;row.CANCELADO_MOTIVO=motivo;row.CANCELADO_PERFIL=perfil;
+  row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=now;upsert_(s,'REPORT_ID',reportId,row);
+  var linked=cancelLinkedRsdRecords_(reportId,motivo,ator);
+  audit_('RSD',reportId,Number(row.VERSAO||1),'CANCELADO',mat,nome,row.BATALHAO,row.COMPANHIA,{reportId:reportId,statusAnterior:before,status:'CANCELADO',motivo:motivo,perfil:perfil,ator:{matricula:mat,nome:nome},registrosVinculados:linked});
+  return {ok:true,message:'Registro de serviço cancelado. O histórico foi preservado para auditoria e o RSD deixou de participar dos fluxos operacionais.',reportId:reportId,status:'CANCELADO',canceladoEm:now};
+}
+
 function rsdMarkIncluded_(payload) {
   var ids=payload.rsdReportIds||payload.reportIds||[];
   if(!Array.isArray(ids))ids=[];
@@ -699,8 +775,9 @@ function cirvcRegister_(payload) {
   var list=payload.cirvcs||[], u=payload.unidade||{};
   if(!Array.isArray(list)) list=[];
   var s=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA'), count=0;
-  ensureHeaders_(s,['NUMERO_TERMO','HORA_CADASTRO','SERVICE_ID','SEGMENTO','SOURCE_REPORT_ID','LOCAL_APREENSAO','MOTIVO']);
+  ensureHeaders_(s,['NUMERO_TERMO','HORA_CADASTRO','SERVICE_ID','SEGMENTO','SOURCE_REPORT_ID','LOCAL_APREENSAO','MOTIVO','STATUS_REGISTRO','CANCELADO_RSD_EM','CANCELADO_RSD_MOTIVO']);
   list.forEach(function(c){
+    var linkedRsd=String(c.rsdReportId||'');if(linkedRsd){var rr=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',linkedRsd);if(rr&&String(rr.STATUS)==='CANCELADO')throw new Error('O serviço vinculado a este CIRVC foi cancelado.');}
     var id=String(c.id||c.cirvcId||c.registroId||uid_('cirvc')), old=findOne_(s,'CIRVC_ID',id);
     var batt=normBattalion_((c.unidade||u).batalhao), comp=(c.unidade||u).companhia||normCompany_(batt,(c.unidade||u).companhiaNumero);
     var obj={CIRVC_ID:id,RSD_REPORT_ID:c.rsdReportId||old&&old.RSD_REPORT_ID||'',RCO_REPORT_ID:c.rcoReportId||old&&old.RCO_REPORT_ID||'',DATA_CADASTRO:dateText_(c.data||old&&old.DATA_CADASTRO||new Date()),
@@ -710,7 +787,8 @@ function cirvcRegister_(payload) {
       ATUALIZADO_EM:nowIso_(),BAIXADO_EM:old&&old.BAIXADO_EM||'',DESTINO_FINAL:old&&old.DESTINO_FINAL||'',RECEBEDOR_NOME:old&&old.RECEBEDOR_NOME||'',
       RECEBEDOR_IDENTIFICACAO:old&&old.RECEBEDOR_IDENTIFICACAO||'',NUMERO_TERMO:c.numeroTermo||old&&old.NUMERO_TERMO||'',HORA_CADASTRO:c.hora||old&&old.HORA_CADASTRO||'',
       SERVICE_ID:c.serviceId||old&&old.SERVICE_ID||'',SEGMENTO:Number(c.segmento||old&&old.SEGMENTO||0)||'',SOURCE_REPORT_ID:c.sourceReportId||old&&old.SOURCE_REPORT_ID||'',
-      LOCAL_APREENSAO:c.localApreensao||old&&old.LOCAL_APREENSAO||'',MOTIVO:c.motivo||old&&old.MOTIVO||''};
+      LOCAL_APREENSAO:c.localApreensao||old&&old.LOCAL_APREENSAO||'',MOTIVO:c.motivo||old&&old.MOTIVO||'',STATUS_REGISTRO:old&&old.STATUS_REGISTRO&&String(old.STATUS_REGISTRO)!=='CANCELADO'?old.STATUS_REGISTRO:'ATIVO',
+      CANCELADO_RSD_EM:'',CANCELADO_RSD_MOTIVO:''};
     upsert_(s,'CIRVC_ID',id,obj);count++;
   });
   return {ok:true,message:count+' CIRVC(s) disponibilizado(s) para continuidade da custódia.',quantidade:count};
@@ -726,7 +804,7 @@ function cirvcList_(p) {
     if(comp&&String(x.COMPANHIA)!==String(comp))return false;
     if(data&&dateText_(x.DATA_CADASTRO)!==data)return false;
     if(gu&&String(x.GUARNICAO||'').toLowerCase().trim()!==gu)return false;
-    if(String(x.STATUS_CUSTODIA||'')==='CANCELADO')return false;
+    if(String(x.STATUS_CUSTODIA||'')==='CANCELADO'||String(x.STATUS_REGISTRO||'')==='CANCELADO')return false;
     return true;
   }).map(function(x){
     return {id:x.CIRVC_ID||'',sourceReportId:x.SOURCE_REPORT_ID||'',rsdReportId:x.RSD_REPORT_ID||'',rcoReportId:x.RCO_REPORT_ID||'',
@@ -740,7 +818,7 @@ function cirvcPendentes_(p) {
   var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'';
   return objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){
     var st=String(x.STATUS_CUSTODIA||'');
-    if(st==='BAIXADO_DETRAN'||st==='CANCELADO')return false;
+    if(st==='BAIXADO_DETRAN'||st==='CANCELADO'||String(x.STATUS_REGISTRO||'')==='CANCELADO')return false;
     if(batt&&String(x.BATALHAO)!==batt)return false;
     if(comp&&String(x.COMPANHIA)!==String(comp))return false;
     return true;
@@ -918,17 +996,18 @@ function p3Analysis_(p) {
 }
 
 function p3Query_(p) {
-  var view=String(p.view||'controle-diario'), list;
+  var view=String(p.view||'controle-diario'), list,notCancelled=function(x){return String(x.STATUS_REGISTRO||'').toUpperCase()!=='CANCELADO';};
   if(view==='controle-diario'){
-    var rsd=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RSD')),p),rco=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RCO')),p);
+    var rsd=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RSD')),p).filter(function(x){return String(x.STATUS)!=='CANCELADO';}),rco=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RCO')),p);
     return {ok:true,rsd:rsd.slice(-1000).reverse(),rco:rco.slice(-500).reverse()};
   }
-  if(view==='produtividade'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRODUCAO')),p);}
-  else if(view==='operacoes'){var pods=objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OPERACOES')),p).map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.COORDENADAS_PREVISTAS=d.COORDENADAS_PREVISTAS||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});}
-  else if(view==='pod'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')),p);}
-  else if(view==='ocorrencias'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OCORRENCIAS')),p);}
-  else if(view==='prisoes'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRISOES')),p);}
-  else if(view==='cirvc'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')),p);}
+  if(view==='cancelados'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RSD')),p).filter(function(x){return String(x.STATUS)==='CANCELADO';});}
+  else if(view==='produtividade'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRODUCAO')),p);}
+  else if(view==='operacoes'){var pods=objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')).filter(notCancelled),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OPERACOES')).filter(notCancelled),p).map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.COORDENADAS_PREVISTAS=d.COORDENADAS_PREVISTAS||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});}
+  else if(view==='pod'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')).filter(notCancelled),p);}
+  else if(view==='ocorrencias'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OCORRENCIAS')).filter(notCancelled),p);}
+  else if(view==='prisoes'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRISOES')).filter(notCancelled),p);}
+  else if(view==='cirvc'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(notCancelled),p);}
   else if(view==='auditoria'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES')),p);}
   else if(view==='viaturas'){list=objects_(sheet_(P3_SHEET_ID,'VIATURAS'));}
   else if(view==='militares'){list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));}
@@ -988,6 +1067,8 @@ function rcoSupplementalUpsert_(payload) {
   var pkg=payload.rco||payload||{}, rco=pkg.rco||pkg, reportId=String((rco||{}).reportId||pkg.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
   var old=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
+  var sourceIds=(rco.rcoOrigens||[]).map(function(o){return String(o.rsdReportId||'')}).filter(Boolean),rsdSheet=sheet_(P3_SHEET_ID,'RSD');
+  sourceIds.forEach(function(id){var src=findOne_(rsdSheet,'REPORT_ID',id);if(!src)throw new Error('RSD de origem não localizado: '+id);if(String(src.STATUS)==='CANCELADO')throw new Error('O RCO contém RSD cancelado. Atualize as guarnições antes de consolidar.');if(['FINALIZADO','INCLUIDO_RCO'].indexOf(String(src.STATUS))<0)throw new Error('O RCO contém RSD ainda não finalizado. Atualize as guarnições antes de consolidar.');});
   var u=pkg.unidade||rco.unidade||{}, batt=normBattalion_(u.batalhao||pkg.batalhao),comp=u.companhia||pkg.companhia||normCompany_(batt,u.companhiaNumero);
   var cons=rco.consolidacaoResponsavel||{};
   var obj={REPORT_ID:reportId,DATA_SERVICO:dateText_((rco.periodo||{}).inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
