@@ -19,7 +19,7 @@ Ativar os módulos em nuvem preparados nesta branch sem substituir o backend leg
 4. Implantar como **Aplicativo da Web**, executando como o proprietário. Definir o nível de acesso conforme a política institucional. Como a interface está no GitHub Pages, validar que a política escolhida permite chamadas do navegador; nunca retirar a validação por token do código.
 5. Copiar a URL `/exec` da nova implantação.
 6. Em `central_cloud.js`, substituir apenas o endpoint padrão pelo novo `/exec`. Não alterar o endpoint legado existente nos fluxos antigos do RCO.
-7. Abrir `<NOVO_ENDPOINT>?action=version`. A resposta esperada contém `"version":"10.3.0"`.
+7. Abrir `<NOVO_ENDPOINT>?action=version`. A resposta esperada contém `"version":"10.4.0"`.
 8. Testar a matriz abaixo antes de promover a branch para `main`.
 
 ## Matriz mínima de homologação
@@ -45,3 +45,18 @@ Somente após homologação:
 
 ## Observações
 O arquivo JSON deixa de ser fluxo principal, mas continua disponível como contingência. O Power BI é camada de visualização e não substitui os bancos operacionais.
+
+
+## Homologação adicional — Solução 50
+1. No RSD, usar `Início do serviço`.
+2. Informar guarnição, turno e VTR(s).
+3. Buscar militares no Cadastro Mestre por matrícula, nome ou QRA e montar a composição da guarnição.
+4. Definir a função de cada componente e o responsável pelo RSD.
+5. Clicar `Registrar guarnição no serviço`.
+6. No RCO da mesma unidade/data, clicar `Buscar guarnições / RSDs` e confirmar que a origem aparece como `EM_SERVICO`.
+7. Adicionar a identificação ao RCO.
+8. Finalizar o RSD da guarnição.
+9. Atualizar a lista no RCO e confirmar `NOVA VERSÃO`.
+10. Clicar `Atualizar` e confirmar que a mesma guarnição foi substituída sem duplicação.
+11. Confirmar que o RCO bloqueia `Consolidar P3` enquanto houver origem adicionada ainda `EM_SERVICO`.
+12. Confirmar que, após todos os RSDs finalizados/atualizados, a consolidação é liberada.
