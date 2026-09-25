@@ -282,8 +282,9 @@ function saveDataUrl_(dataUrl, fileName, folderProp, folderName) {
   var file=folderFor_(folderProp,folderName).createFile(blob);
   return {fileId:file.getId(),fileUrl:file.getUrl(),mimeType:m[1],size:file.getSize()};
 }
-function saveJsonPayload_(reportId, version, json, folderProp, folderName) {
+function saveJsonPayload_(reportId, version, json, folderProp, folderName, existingFileId) {
   if (String(json||'').length <= 45000) return {json:json,fileId:'',fileUrl:''};
+  if(existingFileId){try{var oldFile=DriveApp.getFileById(String(existingFileId));oldFile.setContent(String(json));return {json:'',fileId:oldFile.getId(),fileUrl:oldFile.getUrl()};}catch(_){}}
   var prop=folderProp||'RSD_PAYLOAD_FOLDER_ID', name=folderName||'Central RSD - Payloads';
   var file=folderFor_(prop,name).createFile(
     Utilities.newBlob(json,'application/json',String(reportId)+'-v'+version+'.json')
@@ -443,7 +444,7 @@ function rsdDraftObject_(r,old,deviceId) {
   var version=old?Number(old.VERSAO||1):1, rev=old?Number(old.DRAFT_REVISION||0)+1:1;
   var serviceId=String(r.serviceId||(r.servico||{}).serviceId||(old&&old.SERVICE_ID)||uid_('svc')),seg=Number(r.segmento||(r.servico||{}).segmento||(old&&old.SEGMENTO)||1)||1;
   r.serviceId=serviceId;r.segmento=seg;r.servico=r.servico||{};r.servico.serviceId=serviceId;r.servico.segmento=seg;
-  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
+  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||''),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   return {REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dateText_((r.servico||{}).data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||'',TURNO:'',
     STATUS:'EM_SERVICO',RESPONSAVEL_MATRICULA:normMat_(g.matricula||r.matriculaResponsavel||''),RESPONSAVEL_POSTO_GRAD:g.postoGrad||'',RESPONSAVEL_NOME:g.responsavel||'',
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||nowIso_(),FINALIZADO_EM:'',RETIFICADO_EM:'',CANCELADO_EM:'',
@@ -847,7 +848,7 @@ function p3Query_(p) {
 function rcoDraftUpsert_(payload){
   var r=payload.rco||payload||{},reportId=String((r.state||{}).reportId||r.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId)throw new Error('RCO sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId);assertLease_(old,deviceId,!!payload.forceTakeover);
-  var rev=old?Number(old.REVISAO||0)+1:1,json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos');
+  var rev=old?Number(old.REVISAO||0)+1:1,json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',old&&old.PAYLOAD_FILE_ID||'');
   var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero),cons=r.consolidacaoResponsavel||{},cpu=(r.cpu||[])[0]||{};
   var obj={RCO_REPORT_ID:reportId,DATA_SERVICO:dateText_((r.periodo||{}).inicio||r.data||''),BATALHAO:batt,COMPANHIA:comp,STATUS:'EM_ANDAMENTO',
     RESPONSAVEL_MATRICULA:normMat_(cons.matricula||cpu.matricula||''),RESPONSAVEL_NOME:cons.nome||cpu.nome||'',REVISAO:rev,ULTIMO_SYNC_EM:nowIso_(),
