@@ -155,9 +155,10 @@ function doPost(e) {
     } else {
       throw new Error('Ação POST não reconhecida: ' + action);
     }
-    return postMessagePage_(action, out);
+    return postMessagePage_(action, out, String(p.requestId||''));
   } catch (err) {
-    return postMessagePage_(action, {ok:false, message:String(err && err.message || err)});
+    var ep=(e&&e.parameter)||{};
+    return postMessagePage_(action, {ok:false, message:String(err && err.message || err)}, String(ep.requestId||''));
   }
 }
 
@@ -589,6 +590,7 @@ function syncRsdOccurrences_(r,reportId,batt,comp){
 
 function passagemPublicar_(payload) {
   var p=payload.passagem||payload||{}, id=p.passagemId||uid_('passagem');
+  if(p.rsdOrigemId){var src=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',String(p.rsdOrigemId));if(!src||['FINALIZADO','INCLUIDO_RCO'].indexOf(String(src.STATUS))<0)throw new Error('Finalize o RSD do comandante que está saindo antes de disponibilizar a passagem de serviço.');if(!p.serviceId)p.serviceId=src.SERVICE_ID||'';if(!p.segmentoOrigem)p.segmentoOrigem=Number(src.SEGMENTO||1);}
   var u=p.unidade||{}, batt=normBattalion_(u.batalhao), comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var obj={PASSAGEM_ID:id,RSD_ORIGEM_ID:p.rsdOrigemId||'',RSD_DESTINO_ID:'',DATA_SERVICO:dateText_(p.dataServico),BATALHAO:batt,COMPANHIA:comp,
     GUARNICAO:(p.guarnicao||{}).nome||p.guarnicao||'',TURNO_ORIGEM:p.turnoOrigem||'',ENTREGUE_POR_MATRICULA:normMat_(p.entreguePorMatricula||(p.entreguePor||{}).matricula||''),
