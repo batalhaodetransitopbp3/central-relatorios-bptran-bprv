@@ -1,7 +1,7 @@
-# Implantação e Homologação — Central v10.5.1
+# Implantação e Homologação — Central v10.5.2
 
 ## Estado atual
-A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.1 e homologar as novas rotinas de continuidade em nuvem.
+A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.2 e homologar as novas rotinas de continuidade em nuvem.
 
 Endpoint atual:
 `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
@@ -11,7 +11,7 @@ Endpoint atual:
 2. Abra `Code.gs`.
 3. No GitHub, abra `apps_script_v10.gs` da branch `main`.
 4. Confirme no início:
-   `var CENTRAL_V10_VERSION = '10.5.1';`
+   `var CENTRAL_V10_VERSION = '10.5.2';`
 5. Substitua todo o conteúdo de `Code.gs` pelo arquivo atual.
 6. Salve.
 7. Não altere `CENTRAL_TOKEN` nem `P3_TOKEN`.
@@ -19,7 +19,7 @@ Endpoint atual:
 9. Selecione a implantação atual e clique em editar.
 10. Em versão, selecione **Nova versão**.
 11. Descrição sugerida:
-    `Backend V10.5.1 — continuidade em nuvem e passagem encadeada`
+    `Backend V10.5.2 — CIRVC integrado ao RSD e checklist/motomecanização`
 12. Mantenha execução como proprietário e o mesmo nível de acesso já homologado.
 13. Clique em `Implantar`.
 14. Confirme que a URL `/exec` permaneceu a mesma.
@@ -29,7 +29,7 @@ Abra:
 `<ENDPOINT>?action=version`
 
 Resultado esperado:
-`{"ok":true,"version":"10.5.1","schema":"central-v10"}`
+`{"ok":true,"version":"10.5.2","schema":"central-v10"}`
 
 Depois feche a Central, abra novamente e use `Ctrl + Shift + R`.
 
@@ -109,6 +109,25 @@ Depois feche a Central, abra novamente e use `Ctrl + Shift + R`.
 8. JSON deve aparecer apenas como:
    - `Exportar passagem JSON (contingência)`;
    - `Receber passagem JSON (contingência)`.
+
+## Homologação — CIRVC integrado ao RSD
+1. Inicie e registre um RSD.
+2. Abra o CIRVC sem iniciar um segundo serviço.
+3. Preencha um CIRVC e clique **Salvar CIRVCs na Central**.
+4. Volte ao mesmo RSD e clique **Carregar remoções do dia**.
+5. Confirme que o CIRVC aparece uma única vez.
+6. Em outro aparelho, use **Continuar serviço** no RSD e depois **Carregar remoções do dia**; confirme a recuperação pela nuvem.
+7. Finalize o RSD.
+8. No RCO, incorpore esse RSD e confirme que o mesmo CIRVC acompanha a consolidação sem novo cadastro.
+9. Faça uma passagem de comandante e confirme que os CIRVCs do segmento anterior não são copiados como produção do novo segmento.
+
+## Homologação — Checklist e Motomecanização
+1. Abra o Checklist e confirme que não existe botão genérico **Início do serviço/Continuar serviço**.
+2. Preencha os campos obrigatórios e registre uma alteração real em um item.
+3. Confirme que **Pendências: 0** significa ausência de campos pendentes, mesmo havendo alteração registrada.
+4. Clique **Finalizar e enviar à Motomecanização**.
+5. Na Motomecanização, clique **Atualizar** e confirme a alteração com status **ABERTA**.
+6. Atualize sucessivamente para **EM_ANALISE**, **EM_MANUTENCAO** e **SOLUCIONADA**, registrando a providência.
 
 ## Homologação complementar
 - RSD Android/Chrome e iOS/Safari.
