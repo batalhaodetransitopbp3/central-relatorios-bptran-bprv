@@ -551,7 +551,8 @@ function cirvcTransportList_(p) {
 function cirvcTransportGet_(id) {
   var tr=findOne_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTES'),'TRANSPORTE_ID',String(id||''));
   if(!tr) throw new Error('Transporte não localizado.');
-  var items=objects_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTE_ITENS')).filter(function(x){return String(x.TRANSPORTE_ID)===String(id);});
+  var cust=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA');
+  var items=objects_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTE_ITENS')).filter(function(x){return String(x.TRANSPORTE_ID)===String(id);}).map(function(x){var v=findOne_(cust,'CIRVC_ID',x.CIRVC_ID)||{};x.TIPO=v.TIPO||'';x.MARCA_MODELO=v.MARCA_MODELO||'';x.LOCAL_CUSTODIA=v.LOCAL_CUSTODIA||'';return x;});
   tr.ITENS=items;
   return tr;
 }
