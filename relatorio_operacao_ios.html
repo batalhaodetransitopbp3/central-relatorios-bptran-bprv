@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
   };
   function install(){
     const ref=document.querySelector('.toolbar');
-    if(ref && !document.querySelector('.service-state-bar')){
+    if(ref && !/relatorio_operacao/i.test(path) && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html">Voltar à Central de Relatórios</a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
