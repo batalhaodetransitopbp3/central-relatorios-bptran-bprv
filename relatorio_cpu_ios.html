@@ -666,7 +666,7 @@ async function cancelCloudRsd(item){
   if(!confirm('CONFIRMA O CANCELAMENTO DESTE REGISTRO?\n\nGuarnição: '+(item.guarnicao||'—')+'\nResponsável: '+(item.responsavel||'—')+'\n\nO registro não será apagado: ficará preservado para auditoria.'))return;
   const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
   try{
-    const r=await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,perfil:'COORDENADOR',motivo,ator,unidade:currentUnit()},token,{popup:false});
+    const r=await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,perfil:'COORDENADOR',motivo,ator,unidade:currentUnit(),rcoReportId:(window.collectState()?.state?.reportId||''),deviceId:rcoDeviceId},token,{popup:false});
     removeCancelledOrigin(item);cloudItems=cloudItems.filter(x=>x.reportId!==item.reportId);
     try{salvarRascunho(true)}catch(_){}scheduleRcoSync();renderCloud();
     alert(r.message||'RSD cancelado.');
