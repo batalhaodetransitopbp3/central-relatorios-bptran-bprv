@@ -4,7 +4,7 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 
 ## Repositório ativo
 - Repositório: `batalhaodetransitopbp3/central-relatorios-bptran-bprv`
-- Branch de homologação desta rodada: `cirvc-rsd-checklist-motomec-v10-5-2`
+- Branch de homologação desta rodada: `rsd-cancelamento-auditavel-v10-5-3`
 - Backend complementar atual: `apps_script_v10.gs`
 - Versão atual do código em homologação: **10.5.3**
 - Endpoint v10 existente:
@@ -18,7 +18,7 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Não alterar para `ATIVO` antes da homologação funcional completa.
 
 ## Rotas v10 atuais
-- RSD: `rsd-start`, `rsd-draft-sync`, `rsd-active`, `rsd-claim`, `rsd-upsert`, `rsd-list`, `rsd-get`, `rsd-mark-included`.
+- RSD: `rsd-start`, `rsd-draft-sync`, `rsd-active`, `rsd-claim`, `rsd-upsert`, `rsd-list`, `rsd-get`, `rsd-mark-included`, `rsd-cancel`.
 - Passagem RSD: `passagem-publicar`, `passagem-receber`, `passagens-pendentes`.
 - Operações: `operation-upsert`, `operation-list`.
 - RCO: `rco-draft-upsert`, `rco-draft-list`, `rco-draft-get`, `rco-draft-claim`, `rco-upsert`.
