@@ -571,7 +571,7 @@
       <button type="button" class="btn primary" id="shareBtn">Compartilhar checklist, PDF e fotos</button>
       <button type="button" class="btn" id="saveBtn">Salvar rascunho</button>
       <button type="button" class="btn" id="loadBtn">Carregar rascunho</button>
-      <button type="button" class="btn danger" id="clearBtn">Limpar</button>
+      <button type="button" class="btn danger" id="clearBtn">Apagar para zerar página</button>
       <span class="toolbar-spacer"></span>
       <button type="button" class="pending-badge" id="pendingBadge" title="Clique para ir à próxima pendência">Pendências: 0</button>
     </div>
@@ -2558,7 +2558,7 @@
   };
   function install(){
     const ref=document.querySelector('.toolbar');
-    if(ref && !document.querySelector('.service-state-bar')){
+    if(ref && !/checklist_viatura/i.test(path) && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html">Central</a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
@@ -2618,7 +2618,7 @@
 </script>
 
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.5.0-20260925h"></script>
-<script src="checklist_cloud.js"></script>
+<script src="central_cloud.js?v=10.5.2-20260925j"></script>
+<script src="checklist_cloud.js?v=10.5.2-20260925j"></script>
 </body>
 </html>
