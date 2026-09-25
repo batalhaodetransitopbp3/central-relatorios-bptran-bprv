@@ -55,6 +55,9 @@ function doGet(e) {
     } else if (action === 'p3-analysis') {
       assertToken_(p.token, 'p3');
       out = p3Analysis_(p);
+    } else if (action === 'p3-config') {
+      assertToken_(p.token, 'p3');
+      out = p3Config_();
     } else if (action === 'motomecanizacao-list') {
       assertToken_(p.token, 'p3');
       out = motomecanizacaoList_(p);
@@ -109,6 +112,9 @@ function doPost(e) {
     } else if (action === 'cadastro-upsert') {
       assertToken_(token, 'p3');
       out = cadastroUpsert_(payload);
+    } else if (action === 'p3-config-set') {
+      assertToken_(token, 'p3');
+      out = p3ConfigSet_(payload);
     } else if (action === 'rco-upsert') {
       assertToken_(token, 'p3');
       out = rcoSupplementalUpsert_(payload);
@@ -682,6 +688,18 @@ function filterCommon_(list,p) {
     return true;
   });
 }
+function p3Config_(){
+  var rows=objects_(sheet_(P3_SHEET_ID,'CONFIG')),out={};
+  rows.forEach(function(x){if(['POWERBI_URL','AMBIENTE','BACKEND_V10_STATUS'].indexOf(String(x.CHAVE))>=0)out[String(x.CHAVE)]=x.VALOR||'';});
+  return {ok:true,config:out};
+}
+function p3ConfigSet_(payload){
+  var key=String(payload.chave||payload.key||'');if(['POWERBI_URL'].indexOf(key)<0)throw new Error('Configuração não autorizada.');
+  var s=sheet_(P3_SHEET_ID,'CONFIG'),row=findOne_(s,'CHAVE',key)||{CHAVE:key,DESCRICAO:'Configuração da Gestão P3',EDITAVEL_P3:'SIM'};
+  row.VALOR=String(payload.valor||payload.value||'').trim();upsert_(s,'CHAVE',key,row);
+  return {ok:true,message:'Configuração atualizada.',chave:key,valor:row.VALOR};
+}
+
 function p3Analysis_(p) {
   var list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRODUCAO')),p), indicator=String(p.indicador||'');
   var indicators={},byCompany={},byDate={},total=0;
