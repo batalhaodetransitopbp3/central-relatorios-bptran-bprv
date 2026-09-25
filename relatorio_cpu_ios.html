@@ -615,4 +615,28 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
 })();
 </script>
+
+<script id="rco-v10-finalize-bridge">
+(function(){
+  let busy=false;
+  async function supplemental(){
+    if(busy||!window.CentralCloud||!await CentralCloud.probe())return;
+    const token=CentralCloud.getToken('central')||CentralCloud.askToken('central','Informe a chave operacional da Central para registrar as origens do RCO:');
+    if(!token)return;
+    let rco;try{rco=window.collectState()}catch(_){return}
+    const reportId=rco?.state?.reportId||rco?.reportId||'';
+    if(!reportId)return;
+    busy=true;
+    try{
+      await CentralCloud.postOrQueue('rco-upsert',{rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]},{token,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+      const ids=(rco.rcoOrigens||[]).map(x=>x.rsdReportId).filter(Boolean);
+      if(ids.length)await CentralCloud.postOrQueue('rsd-mark-included',{rcoReportId:reportId,rsdReportIds:ids},{token,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+    }finally{busy=false}
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#p3Send');if(!b)return;
+    setTimeout(supplemental,350);
+  },true);
+})();
+</script>
 </body></html>
