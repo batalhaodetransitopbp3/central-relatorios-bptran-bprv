@@ -11,7 +11,7 @@
 <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
 <div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div><button id="apply">Aplicar filtros</button></div>
 <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a><button class="secondary" id="biBtn">Power BI</button></div></section>
-<section class="card"><div class="tabs"><button data-view="controle-diario" class="active">Controle diário</button><button data-view="produtividade">Produtividade</button><button data-view="operacoes">Operações</button><button data-view="cirvc">CIRVC</button><button data-view="auditoria">Auditoria</button></div></section>
+<section class="card"><div class="tabs"><button data-view="controle-diario" class="active">Controle diário</button><button data-view="produtividade">Produtividade</button><button data-view="operacoes">Operações</button><button data-view="prisoes">Prisões/Conduções</button><button data-view="cirvc">CIRVC</button><button data-view="auditoria">Auditoria</button></div></section>
 <div id="stats" class="stats"></div>
 <section class="card view" id="mainView"><div id="title"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
 </main>
@@ -27,16 +27,17 @@
  function columnsFor(v){
   if(v==='produtividade')return [['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['GRUPO_NOME','Grupo'],['INDICADOR_NOME','Indicador'],['QUANTIDADE','Qtd.'],['ORIGEM_RELATORIO','Origem']];
   if(v==='operacoes')return [['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['LOCAL','Local executado'],['LATITUDE','Lat.'],['LONGITUDE','Long.'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motos'],['ART_165','165'],['ART_165_A','165-A'],['AITS_SEM_ABORDAGEM','AIT s/abord.'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']];
+  if(v==='prisoes')return [['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']];
   if(v==='cirvc')return [['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']];
   if(v==='auditoria')return [['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']];
   return [];
  }
  function render(r){
   if(view==='controle-diario') return renderControl(r);
-  const items=r.items||[],cols=columnsFor(view);$('title').innerHTML='<h2>'+({produtividade:'Produtividade operacional',operacoes:'Operações individualizadas',cirvc:'CIRVC — custódia',auditoria:'Auditoria e versões'}[view]||view)+'</h2>';
+  const items=r.items||[],cols=columnsFor(view);$('title').innerHTML='<h2>'+({produtividade:'Produtividade operacional',operacoes:'Operações individualizadas',prisoes:'Prisões e conduções por tipificação',cirvc:'CIRVC — custódia',auditoria:'Auditoria e versões'}[view]||view)+'</h2>';
   $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr>';
   $('tbody').innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros.</td></tr>';
-  if(view==='operacoes')renderOpStats(items);else if(view==='produtividade')renderProdStats(items);else $('stats').innerHTML='';
+  if(view==='operacoes')renderOpStats(items);else if(view==='produtividade')renderProdStats(items);else if(view==='prisoes')renderPrisonStats(items);else $('stats').innerHTML='';
  }
  function renderControl(r){
   const rsd=r.rsd||[],rco=r.rco||[];$('title').innerHTML='<h2>Controle diário</h2><div class="note">RSDs finalizados ficam disponíveis ao RCO sem troca de arquivos.</div>';
@@ -50,6 +51,7 @@
   const types=new Set(items.map(x=>x.OPERACAO).filter(Boolean)),actual=items.filter(x=>x.LOCAL||x.LATITUDE).length,zero=items.filter(x=>/zero.?álcool/i.test(x.OPERACAO||'')).length,rand=items.filter(x=>/randandan/i.test(x.OPERACAO||'')).length;
   $('stats').innerHTML=cards([['Operações',items.length],['Tipos',types.size],['Com local executado',actual],['Zero Álcool',zero],['Randandan',rand]]);
  }
+ function renderPrisonStats(items){const total=items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),fl=items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),mp=items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),ad=items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0);$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',total],['Flagrantes',fl],['Mandados',mp],['Adolescentes',ad]])}
  function renderProdStats(items){const total=items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0);$('stats').innerHTML=cards([['Registros',items.length],['Somatório exibido',total],['Companhias',new Set(items.map(x=>x.COMPANHIA)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME)).size]])}
  function cards(a){return a.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
  function formatCell(k,v,x){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return '<span class="pill '+(/FINAL|INCLUID|CONSOLID|BAIXADO/.test(v||'')?'ok':'warn')+'">'+esc(v||'—')+'</span>';if(k==='LOCAL'&&v)return '<span class="oploc">'+esc(v)+'</span>';if(k==='LATITUDE'||k==='LONGITUDE')return '<span class="coords">'+esc(v||'')+'</span>';return esc(v??'')}
