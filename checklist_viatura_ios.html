@@ -2211,7 +2211,7 @@
     const vehiclePhotosInput=document.getElementById('vehiclePhotosInput');
     const vehiclePhotoGrid=document.getElementById('vehiclePhotoGrid');
     const vehiclePhotoCount=document.getElementById('vehiclePhotoCount');
-    function compressVehiclePhoto(file,maxSize=1600,quality=.84){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const scale=Math.min(1,maxSize/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',quality));};img.src=reader.result;};reader.readAsDataURL(file);});}
+    function compressVehiclePhoto(file,maxSize=1600,quality=.78){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const scale=Math.min(1,maxSize/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',quality));};img.src=reader.result;};reader.readAsDataURL(file);});}
     async function handleVehiclePhotos(files){const incoming=Array.from(files||[]).filter(f=>f.type.startsWith('image/'));const room=Math.max(0,4-vehiclePhotos.length);if(!room){showToast('Limite de 4 fotos atingido.');return;}for(const file of incoming.slice(0,room)){try{const src=await compressVehiclePhoto(file);vehiclePhotos.push(src);vehiclePhotoOriginals.push(src);}catch(e){showToast('Não foi possível processar uma das fotos.');}}renderVehiclePhotos();vehiclePhotosInput.value='';}
     function renderVehiclePhotos(){vehiclePhotoCount.textContent=`${vehiclePhotos.length}/4 foto(s)`;vehiclePhotoGrid.innerHTML=Array.from({length:4},(_,i)=>{const src=vehiclePhotos[i];return `<div class="vehicle-photo-card">${src?`<img src="${src}" alt="Foto ${i+1} da viatura"><button type="button" class="photo-adjust-btn no-print" onclick="adjustVehiclePhoto(${i})">Ajustar</button><button type="button" class="vehicle-photo-remove no-print" onclick="removeVehiclePhoto(${i})" aria-label="Remover foto ${i+1}">×</button>`:`<div class="vehicle-photo-empty">Foto ${String(i+1).padStart(2,'0')}</div>`}</div>`;}).join('');}
     async function adjustVehiclePhoto(index){const src=vehiclePhotoOriginals[index]||vehiclePhotos[index];if(!src)return;try{const novo=await PhotoFramer.open(src,{aspect:5/3,maxWidth:1600,quality:.88,title:`Ajustar Foto ${index+1} da viatura`});if(novo){vehiclePhotos[index]=novo;renderVehiclePhotos();}}catch(e){console.warn(e);showToast('Não foi possível abrir o ajuste de enquadramento.');}}
@@ -2598,5 +2598,7 @@
   window.centralInstallCompactMenus=run;
 })();
 </script>
+<script src="central_cloud.js"></script>
+<script src="checklist_cloud.js"></script>
 </body>
 </html>

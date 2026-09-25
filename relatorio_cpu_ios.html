@@ -615,4 +615,29 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
 })();
 </script>
+
+<script id="rco-v10-finalize-bridge">
+(function(){
+  let busy=false;
+  async function supplemental(){
+    if(busy||!window.CentralCloud||!await CentralCloud.probe())return;
+    const p3Token=CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3 para registrar a consolidação no banco estatístico:');
+    if(!p3Token)return;
+    const centralToken=CentralCloud.getToken('central')||CentralCloud.askToken('central','Informe a chave operacional da Central para atualizar o status dos RSDs:');
+    let rco;try{rco=window.collectState()}catch(_){return}
+    const reportId=rco?.state?.reportId||rco?.reportId||'';
+    if(!reportId)return;
+    busy=true;
+    try{
+      await CentralCloud.postOrQueue('rco-upsert',{rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]},{token:p3Token,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+      const ids=(rco.rcoOrigens||[]).map(x=>x.rsdReportId).filter(Boolean);
+      if(ids.length&&centralToken)await CentralCloud.postOrQueue('rsd-mark-included',{rcoReportId:reportId,rsdReportIds:ids},{token:centralToken,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+    }finally{busy=false}
+  }
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#p3Send');if(!b)return;
+    setTimeout(supplemental,350);
+  },true);
+})();
+</script>
 </body></html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CIRVC — Transporte ao DETRAN</title>
+<style>
+:root{--b:#17375e;--b2:#285f92;--bg:#edf3f7;--card:#fff;--line:#c9d6e0;--ok:#176b3a;--warn:#956100;--danger:#a51e3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,sans-serif;color:#18324b}.top{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:16px}.top h1{font-size:20px;margin:0 0 4px}.top p{margin:0;opacity:.9}.wrap{max-width:1100px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px;box-shadow:0 2px 8px #1231}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px}.f{grid-column:span 3}.f.w6{grid-column:span 6}.f.w12{grid-column:1/-1}.f label{display:block;font-size:11px;font-weight:800;margin:0 0 4px;color:#415b72}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;min-height:40px;border:1px solid #bfcdd8;border-radius:8px;padding:8px;background:#fff}button,.btn{border:0;border-radius:9px;padding:9px 12px;background:var(--b2);color:#fff;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#e7eef4;color:#17375e;border:1px solid #becdd9}.danger{background:var(--danger)}.ok{background:var(--ok)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.list{display:grid;gap:7px}.item{border:1px solid #d3dee7;border-radius:10px;padding:9px;display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start}.item input[type=checkbox]{width:20px;height:20px;min-height:auto}.meta{font-size:12px;color:#5d7183;margin-top:4px}.badge{display:inline-block;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800;background:#eef3f7;color:#284964}.badge.ok{background:#e8f4eb;color:#176b3a}.badge.warn{background:#fff4db;color:#7a5400}.signs{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sig{border:1px solid #cad6df;border-radius:10px;padding:8px}.sig canvas{width:100%;height:160px;border:1px dashed #9eb0bd;border-radius:8px;touch-action:none;background:#fff}.small{font-size:11px;color:#617487}.hidden{display:none!important}.print-only{display:none}
+@media(max-width:700px){.f,.f.w6{grid-column:1/-1}.signs{grid-template-columns:1fr}.toolbar button,.toolbar .btn{flex:1 1 45%}}
+@media print{body{background:#fff}.no-print,.top p{display:none!important}.wrap{max-width:none;padding:0}.card{box-shadow:none;border:0;padding:5px;margin:0}.print-only{display:block}.screen-only{display:none!important}.top{background:#fff;color:#000;padding:5px;border-bottom:1px solid #000}.top h1{font-size:16px}.signs{grid-template-columns:1fr 1fr}.sig canvas{display:none}.sig img{display:block!important;width:100%;height:90px;object-fit:contain;border-bottom:1px solid #000}.item{break-inside:avoid}}
+</style>
+</head><body>
+<header class="top"><h1>CIRVC — Transporte e Entrega ao DETRAN</h1><p>Continuidade da custódia: selecione apenas veículos já cadastrados no CIRVC e registre a entrega final.</p></header>
+<div class="wrap">
+<section class="card no-print">
+ <div class="grid">
+  <div class="f"><label>Batalhão</label><select id="bat"><option>BPTran</option><option>BPRv</option></select></div>
+  <div class="f"><label>Companhia</label><select id="cia"></select></div>
+  <div class="f"><label>Matrícula do transportador</label><input id="mat" inputmode="numeric" placeholder="000.000-0"></div>
+  <div class="f"><label>Posto/graduação</label><input id="pg"></div>
+  <div class="f w6"><label>Nome do transportador</label><input id="nome"></div>
+  <div class="f"><label>Prefixo da VTR/reboque</label><input id="prefixo"></div>
+  <div class="f"><label>Destino</label><input id="destino" value="DETRAN-PB"></div>
+ </div>
+ <div class="toolbar"><button id="loadBtn">Atualizar veículos disponíveis</button><button class="secondary" id="activeBtn">Transportes em andamento</button><a class="btn secondary" href="index.html">Voltar à Central</a></div>
+</section>
+
+<section class="card screen-only" id="pendingCard">
+ <h2>Veículos sob custódia aguardando encaminhamento</h2>
+ <div class="small">Os itens entregues ao DETRAN deixam de aparecer nesta relação, mas permanecem no histórico de auditoria.</div>
+ <div id="pending" class="list" style="margin-top:10px"></div>
+ <div class="toolbar no-print"><button class="ok" id="startBtn">Iniciar transporte com selecionados</button></div>
+</section>
+
+<section class="card hidden" id="transportCard">
+ <div class="screen-only"><h2>Transporte em andamento</h2><div id="transportMeta" class="meta"></div></div>
+ <div class="print-only"><h2>RELATÓRIO DE ENTREGA DE VEÍCULOS — CIRVC</h2><div id="printMeta"></div></div>
+ <div id="transportItems" class="list" style="margin-top:10px"></div>
+ <div class="grid no-print" style="margin-top:12px">
+  <div class="f w6"><label>Nome de quem recebeu no DETRAN</label><input id="recvName"></div>
+  <div class="f w6"><label>Identificação/matrícula de quem recebeu</label><input id="recvId"></div>
+  <div class="f w12"><label>Observações da entrega</label><textarea id="obs"></textarea></div>
+ </div>
+ <div class="signs" style="margin-top:12px">
+  <div class="sig"><strong>Transportador</strong><canvas id="sigT"></canvas><img id="sigTImg" class="hidden"><div class="toolbar no-print"><button class="secondary" onclick="clearSig('T')">Limpar</button></div></div>
+  <div class="sig"><strong>Recebedor — DETRAN</strong><canvas id="sigR"></canvas><img id="sigRImg" class="hidden"><div class="toolbar no-print"><button class="secondary" onclick="clearSig('R')">Limpar</button></div></div>
+ </div>
+ <div class="toolbar no-print"><button class="ok" id="finishBtn">Registrar entrega final e baixar veículos</button><button class="secondary" onclick="window.print()">Gerar relatório / PDF</button></div>
+</section>
+</div>
+<script src="central_cloud.js"></script>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);let current=null,selectedTransportIds=[],sigDrawn={T:false,R:false};
+ function ciaOptions(){const b=$('bat').value; $('cia').innerHTML=[1,2,3,4,5].map(n=>'<option>'+n+'ª '+(b==='BPRv'?'CPRv':'CPTran')+'</option>').join('')}
+ $('bat').addEventListener('change',ciaOptions);ciaOptions();
+ $('mat').addEventListener('blur',()=>{$('mat').value=CentralCloud.formatMatricula($('mat').value)});
+ function token(){return CentralCloud.askToken('central')}
+ async function ensure(){if(!await CentralCloud.probe())throw new Error('Backend v10 ainda não publicado.');const t=token();if(!t)throw new Error('Informe a chave operacional.');return t}
+ async function loadPending(){
+  try{const t=await ensure(),r=await CentralCloud.jsonp('cirvc-pending',{token:t,batalhao:$('bat').value,companhia:$('cia').value});renderPending(r.items||[])}
+  catch(e){alert(e.message)}
+ }
+ function renderPending(items){
+  const free=items.filter(x=>String(x.STATUS_CUSTODIA||'')!=='EM_TRANSPORTE');
+  $('pending').innerHTML=free.length?free.map(x=>'<label class="item"><input type="checkbox" value="'+esc(x.CIRVC_ID)+'"><div><strong>'+esc(x.PLACA||'SEM PLACA')+' — '+esc(x.MARCA_MODELO||x.TIPO||'')+'</strong><div class="meta">'+esc(x.COMPANHIA||'')+' • '+esc(x.GUARNICAO||'')+' • custódia: '+esc(x.LOCAL_CUSTODIA||'não informada')+'</div><span class="badge warn">'+esc(x.STATUS_CUSTODIA||'AGUARDANDO_TRANSPORTE')+'</span></div></label>').join(''):'<div class="meta">Nenhum veículo disponível para novo transporte.</div>';
+ }
+ async function start(){
+  const ids=[...$('pending').querySelectorAll('input:checked')].map(x=>x.value);if(!ids.length)return alert('Selecione ao menos um veículo.');
+  if(!$('mat').value||!$('nome').value)return alert('Informe matrícula e nome do transportador.');
+  try{
+   const t=await ensure(),tid=CentralCloud.uid('transporte');
+   const p={transporte:{transporteId:tid,data:new Date().toISOString().slice(0,10),batalhao:$('bat').value,companhia:$('cia').value,
+    transportadorMatricula:$('mat').value,transportadorPostoGrad:$('pg').value,transportadorNome:$('nome').value,prefixo:$('prefixo').value,destinoFinal:$('destino').value,cirvcIds:ids}};
+   const r=await CentralCloud.postOrQueue('cirvc-transport-create',p,{token:t,unit:{batalhao:$('bat').value,companhia:$('cia').value},popup:false});
+   if(r.queued){localStorage.setItem('cirvc-current-transport',tid);alert('Transporte preservado para sincronização. Quando houver conexão, atualize os transportes em andamento.');return}
+   localStorage.setItem('cirvc-current-transport',tid);await openTransport(tid);
+  }catch(e){alert(e.message)}
+ }
+ async function listActive(){
+  try{const t=await ensure(),r=await CentralCloud.jsonp('cirvc-transport-list',{token:t,batalhao:$('bat').value,companhia:$('cia').value,status:'EM_TRANSPORTE'});
+   if(!(r.items||[]).length)return alert('Não há transportes em andamento nesta unidade.');
+   const msg=(r.items||[]).map((x,i)=>(i+1)+'. '+x.TRANSPORTE_ID+' — '+x.TRANSPORTADOR_NOME+' — '+x.VEICULOS_QTD+' veículo(s)').join('\n');
+   const n=prompt('Escolha o número do transporte:\n\n'+msg,'1');if(!n)return;const x=r.items[Number(n)-1];if(x)openTransport(x.TRANSPORTE_ID);
+  }catch(e){alert(e.message)}
+ }
+ async function openTransport(id){
+  try{const t=await ensure(),r=await CentralCloud.jsonp('cirvc-transport-get',{token:t,transporteId:id});current=r.transporte;selectedTransportIds=(current.ITENS||[]).map(x=>x.CIRVC_ID);
+   $('transportCard').classList.remove('hidden');$('pendingCard').classList.add('hidden');renderTransport();window.scrollTo({top:$('transportCard').offsetTop-10,behavior:'smooth'});
+  }catch(e){alert(e.message)}
+ }
+ function renderTransport(){
+  const x=current||{};$('transportMeta').textContent=(x.TRANSPORTADOR_NOME||'')+' • '+(x.PREFIXO||'VTR não informada')+' • '+(x.DESTINO_FINAL||'DETRAN-PB');
+  $('printMeta').textContent='Transportador: '+(x.TRANSPORTADOR_POSTO_GRAD||'')+' '+(x.TRANSPORTADOR_NOME||'')+' — Matrícula '+(x.TRANSPORTADOR_MATRICULA||'')+' • VTR '+(x.PREFIXO||'—')+' • Destino '+(x.DESTINO_FINAL||'DETRAN-PB');
+  $('transportItems').innerHTML=(x.ITENS||[]).map(it=>'<div class="item"><div></div><div><strong>'+esc(it.PLACA||'SEM PLACA')+'</strong><div class="meta">CIRVC '+esc(it.CIRVC_ID||'')+'</div></div></div>').join('');
+ }
+ function setupCanvas(id,key){
+  const c=$(id),ctx=c.getContext('2d');function size(){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);ctx.setTransform(d,0,0,d,0,0);ctx.lineWidth=2;ctx.lineCap='round'}size();window.addEventListener('resize',size);let down=false,last=null;
+  const pt=e=>{const r=c.getBoundingClientRect(),q=e.touches?e.touches[0]:e;return{x:q.clientX-r.left,y:q.clientY-r.top}};
+  const start=e=>{e.preventDefault();down=true;last=pt(e)};const move=e=>{if(!down)return;e.preventDefault();const p=pt(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p};const end=e=>{if(!down)return;down=false;const k=key==='sigT'?'T':'R';sigDrawn[k]=true;$(key+'Img').src=c.toDataURL('image/png')};
+  c.addEventListener('pointerdown',start);c.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
+ }
+ setupCanvas('sigT','sigT');setupCanvas('sigR','sigR');
+ window.clearSig=k=>{const c=$('sig'+k),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);sigDrawn[k]=false;$('sig'+k+'Img').removeAttribute('src')};
+ async function finish(){
+  if(!current)return alert('Nenhum transporte aberto.');if(!$('recvName').value||!$('recvId').value)return alert('Informe quem recebeu no DETRAN.');if(!sigDrawn.T||!sigDrawn.R)return alert('As assinaturas do transportador e do recebedor são obrigatórias.');
+  const sT=$('sigT').toDataURL('image/png'),sR=$('sigR').toDataURL('image/png');
+  try{const t=await ensure(),p={transporte:{transporteId:current.TRANSPORTE_ID,destinoFinal:$('destino').value||current.DESTINO_FINAL,recebedorNome:$('recvName').value,recebedorIdentificacao:$('recvId').value,observacoes:$('obs').value,assinaturaTransportadorDataUrl:sT,assinaturaRecebedorDataUrl:sR}};
+   const r=await CentralCloud.submitForm('cirvc-transport-finalize',p,t,{popup:false,timeout:20000});
+   alert(r.message||'Entrega registrada.');localStorage.removeItem('cirvc-current-transport');current.STATUS='ENTREGUE_DETRAN';current.RECEBEDOR_NOME=$('recvName').value;current.RECEBEDOR_IDENTIFICACAO=$('recvId').value;$('sigTImg').src=sT;$('sigRImg').src=sR;$('sigTImg').classList.remove('hidden');$('sigRImg').classList.remove('hidden');$('printMeta').textContent+=' • Recebido por '+$('recvName').value+' ('+$('recvId').value+')';$('finishBtn').disabled=true;setTimeout(()=>window.print(),250);
+  }catch(e){alert(e.message)}
+ }
+ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+ $('loadBtn').onclick=loadPending;$('startBtn').onclick=start;$('activeBtn').onclick=listActive;$('finishBtn').onclick=finish;
+ window.addEventListener('central-v10-ready',()=>{const id=localStorage.getItem('cirvc-current-transport');if(id)openTransport(id);else loadPending()});
+ setTimeout(()=>CentralCloud.probe().then(ok=>{if(ok){const id=localStorage.getItem('cirvc-current-transport');id?openTransport(id):loadPending()}}),300);
+})();
+</script></body></html>

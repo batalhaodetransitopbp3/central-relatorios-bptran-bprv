@@ -1,0 +1,57 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motomecanização — Gestão de Viaturas</title>
+<style>
+:root{--b:#17375e;--b2:#2e6696;--bg:#edf3f7;--line:#c9d6e0;--ok:#176b3a;--warn:#8a5b00;--red:#a31d39}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial;color:#19334b}.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:16px}.head h1{margin:0;font-size:21px}.wrap{max-width:1250px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px}.filters{display:grid;grid-template-columns:1fr 1.2fr 1fr 1.8fr auto;gap:8px;align-items:end}label{display:block;font-size:11px;font-weight:800;margin-bottom:4px;color:#50687c}select,input,textarea{width:100%;min-height:39px;border:1px solid #bdcbd7;border-radius:8px;padding:7px;background:#fff}button,.btn{border:0;border-radius:8px;background:var(--b2);color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center}.secondary{background:#e6eef4;color:#17375e;border:1px solid #c3d0da}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{border:1px solid #d0dce5;border-radius:11px;padding:10px}.stat b{display:block;font-size:24px;color:var(--b)}.tablewrap{overflow:auto}.tbl{width:100%;border-collapse:collapse;min-width:900px}.tbl th,.tbl td{border-bottom:1px solid #d9e2e9;padding:8px;text-align:left;vertical-align:top}.tbl th{font-size:10px;color:#536c80;background:#f4f7f9;position:sticky;top:0}.badge{display:inline-block;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800}.ABERTA{background:#fff0d6;color:#805600}.EM_ANALISE{background:#e8f0fb;color:#22558b}.EM_MANUTENCAO{background:#f9e9d9;color:#8a4e11}.SOLUCIONADA{background:#e6f4ea;color:#176b3a}.modal{position:fixed;inset:0;background:#071523aa;display:flex;align-items:center;justify-content:center;padding:14px;z-index:50}.modal.hidden{display:none}.modalbox{width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:14px;padding:16px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.empty{padding:22px;text-align:center;color:#687e91}
+@media(max-width:760px){.filters{grid-template-columns:1fr 1fr}.filters>div:nth-child(4){grid-column:1/-1}.filters>button{grid-column:1/-1}.stats{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr}}
+</style></head><body>
+<header class="head"><h1>Motomecanização — Gestão de Viaturas</h1><div>Checklist, alterações, manutenção e solução por viatura e companhia</div></header>
+<main class="wrap">
+<section class="card"><div class="filters">
+<div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+<div><label>Companhia</label><select id="cia"><option value="">Todas as 10 companhias</option></select></div>
+<div><label>Status</label><select id="status"><option value="">Todos</option><option>ABERTA</option><option>EM_ANALISE</option><option>EM_MANUTENCAO</option><option>SOLUCIONADA</option></select></div>
+<div><label>Pesquisar prefixo/item/descrição</label><input id="q" type="search" placeholder="Ex.: 8563, giroflex, pneu..."></div>
+<button id="refresh">Atualizar</button></div>
+<div class="actions"><a href="index.html" class="btn secondary">Voltar à Central</a></div></section>
+<section class="stats" id="stats"></section>
+<section class="card"><h2>Pendências da frota</h2><div class="tablewrap"><table class="tbl"><thead><tr><th>VTR</th><th>Unidade</th><th>Item</th><th>Descrição</th><th>Status</th><th>Aberta em</th><th>Ação</th></tr></thead><tbody id="body"></tbody></table></div></section>
+</main>
+<div id="modal" class="modal hidden"><div class="modalbox">
+<h2 id="mTitle">Atualizar pendência</h2>
+<div class="row"><div><label>Novo status</label><select id="mStatus"><option>ABERTA</option><option>EM_ANALISE</option><option>EM_MANUTENCAO</option><option>SOLUCIONADA</option></select></div>
+<div><label>Matrícula do responsável</label><input id="mMat" placeholder="000.000-0"></div></div>
+<div class="row"><div><label>Nome do responsável</label><input id="mNome"></div><div><label>Setor/responsável</label><input id="mSetor" value="Motomecanização"></div></div>
+<div><label>Observação/providência</label><textarea id="mObs" rows="4"></textarea></div>
+<div><label>Foto da solução (opcional)</label><input id="mFoto" type="file" accept="image/*"></div>
+<div class="actions"><button id="mSave">Salvar atualização</button><button class="secondary" id="mCancel">Cancelar</button></div>
+</div></div>
+<script src="central_cloud.js"></script><script>
+(function(){
+ const $=id=>document.getElementById(id), allCias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];let data=[],current=null;
+ $('cia').innerHTML='<option value="">Todas as 10 companhias</option>'+allCias.map(x=>'<option>'+x+'</option>').join('');
+ function tok(){return CentralCloud.askToken('p3')}
+ async function ensure(){if(!await CentralCloud.probe())throw new Error('Backend v10 ainda não publicado.');const t=tok();if(!t)throw new Error('Informe a Chave P3.');return t}
+ async function load(){
+  try{const t=await ensure(),r=await CentralCloud.jsonp('motomecanizacao-list',{token:t,batalhao:$('bat').value,companhia:$('cia').value,status:$('status').value});data=r.pendencias||[];render()}catch(e){alert(e.message)}
+ }
+ function filtered(){const q=$('q').value.toLowerCase().trim();return data.filter(x=>!q||[x.PREFIXO,x.ITEM,x.DESCRICAO,x.COMPANHIA].join(' ').toLowerCase().includes(q))}
+ function render(){
+  const x=filtered(),counts={ABERTA:0,EM_ANALISE:0,EM_MANUTENCAO:0,SOLUCIONADA:0};x.forEach(r=>counts[r.STATUS]=(counts[r.STATUS]||0)+1);
+  $('stats').innerHTML=[['Abertas',counts.ABERTA],['Em análise',counts.EM_ANALISE],['Em manutenção',counts.EM_MANUTENCAO],['Solucionadas',counts.SOLUCIONADA]].map(a=>'<div class="stat"><span>'+a[0]+'</span><b>'+a[1]+'</b></div>').join('');
+  $('body').innerHTML=x.length?x.map((r,i)=>'<tr><td><strong>'+esc(r.PREFIXO||'—')+'</strong></td><td>'+esc(r.COMPANHIA||'')+'</td><td>'+esc(r.GRUPO||'')+'<br><strong>'+esc(r.ITEM||'')+'</strong></td><td>'+esc(r.DESCRICAO||'—')+'</td><td><span class="badge '+esc(r.STATUS)+'">'+esc(r.STATUS||'')+'</span></td><td>'+esc(r.ABERTO_EM||r.ABERTA_EM||'')+'</td><td><button onclick="openP('+i+')">Atualizar</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhuma pendência encontrada.</td></tr>';
+  window.__view=x;
+ }
+ window.openP=i=>{current=window.__view[i];if(!current)return;$('mTitle').textContent='VTR '+(current.PREFIXO||'')+' — '+(current.ITEM||'');$('mStatus').value=current.STATUS||'ABERTA';$('mObs').value='';$('modal').classList.remove('hidden')};
+ $('mCancel').onclick=()=>{$('modal').classList.add('hidden');current=null};$('mMat').addEventListener('blur',()=>{$('mMat').value=CentralCloud.formatMatricula($('mMat').value)});
+ $('mSave').onclick=async()=>{
+   if(!current)return;try{const t=await ensure();let foto=null;const file=$('mFoto').files[0];if(file)foto=await CentralCloud.compressImage(file,{maxSide:1600,quality:.78});
+    const p={pendenciaId:current.ALTERACAO_ID||current.PENDENCIA_ID,status:$('mStatus').value,responsavelMatricula:$('mMat').value,responsavelNome:$('mNome').value,responsavelSetor:$('mSetor').value,observacao:$('mObs').value,fotoSolucao:foto};
+    const r=await CentralCloud.submitForm('motomecanizacao-update',p,t,{popup:false,timeout:20000});alert(r.message||'Atualizado.');$('modal').classList.add('hidden');current=null;await load();
+   }catch(e){alert(e.message)}
+ };
+ ['bat','cia','status'].forEach(id=>$(id).addEventListener('change',load));$('q').addEventListener('input',render);$('refresh').onclick=load;
+ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+ setTimeout(load,400);
+})();
+</script></body></html>

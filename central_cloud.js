@@ -1,6 +1,7 @@
 (function(global){
 'use strict';
-const ENDPOINT='https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';\nlet v10Enabled=global.CENTRAL_V10_ENABLED===true;
+const ENDPOINT=global.CENTRAL_CLOUD_ENDPOINT||'https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';
+let v10Enabled=global.CENTRAL_V10_ENABLED===true;
 const TOKEN_KEY='pmpb-central-token-v1',P3_TOKEN_KEY='pmpb-p3-token-v1',QUEUE_KEY='pmpb-central-sync-queue-v1';
 function uid(p='id'){try{return p+'-'+crypto.randomUUID()}catch(_){return p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)}}
 function formatMatricula(v){const d=String(v||'').replace(/\D/g,'').slice(0,7);return d.length<=3?d:d.length<=6?d.slice(0,3)+'.'+d.slice(3):d.slice(0,3)+'.'+d.slice(3,6)+'-'+d.slice(6)}
