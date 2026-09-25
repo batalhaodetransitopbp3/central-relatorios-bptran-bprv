@@ -902,7 +902,7 @@ async function cancelCurrentRsdService(){
   if(!confirm('CONFIRMA O CANCELAMENTO?\n\nEste RSD deixará de aparecer no fluxo operacional e não poderá ser continuado. O registro não será apagado: ficará preservado para auditoria.'))return false;
   const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
   try{
-    const r=await CentralCloud.submitForm('rsd-cancel',{reportId,perfil:'RESPONSAVEL',motivo,ator:{matricula:mat,nome}},token,{popup:false});
+    const r=await CentralCloud.submitForm('rsd-cancel',{reportId,perfil:'RESPONSAVEL',motivo,ator:{matricula:mat,nome},deviceId},token,{popup:false});
     serviceRegistered=false;
     try{
       [DRAFT_KEY,REPORT_ID_KEY,SERVICE_ID_KEY,SEGMENT_KEY,PREV_RSD_KEY,PASS_ID_KEY,REGISTERED_KEY,ACTIVE_CONTEXT_KEY,'pmpb-transito-servico-diario-v2-started-at','central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase()].forEach(k=>localStorage.removeItem(k));
