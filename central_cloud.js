@@ -16,7 +16,21 @@ function authError(action,message,token){const e=new Error(message||'Chave invá
 function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
-function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{const requestId=uid('get'),iframe=document.createElement('iframe');let done=false;iframe.style.display='none';iframe.setAttribute('aria-hidden','true');function cleanup(){clearTimeout(timer);global.removeEventListener('message',onMsg);iframe.remove()}function finish(err,data){if(done)return;done=true;cleanup();err?reject(err):resolve(data)}function onMsg(e){const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;d.ok===false?finish(authError(action,d.message||'Consulta rejeitada.',params.token)):finish(null,d)}global.addEventListener('message',onMsg);iframe.onerror=()=>finish(new Error('Falha de comunicação com a Central.'));iframe.src=ENDPOINT+'?'+qs({...params,action,transport:'message',requestId,_:Date.now()});document.body.appendChild(iframe);const timer=setTimeout(()=>finish(new Error('Tempo esgotado ao consultar a Central.')),opts.timeout||20000)})}
+function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
+  const callback='__central_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
+  let done=false,timer;
+  function cleanup(){clearTimeout(timer);try{delete global[callback]}catch(_){global[callback]=undefined}script.remove()}
+  function finish(err,data){if(done)return;done=true;cleanup();err?reject(err):resolve(data)}
+  global[callback]=function(data){
+    if(data&&data.ok===false)finish(authError(action,data.message||'Consulta rejeitada.',params.token));
+    else finish(null,data||{ok:false,message:'Resposta vazia da Central.'});
+  };
+  script.async=true;
+  script.onerror=()=>finish(new Error('Falha de comunicação com a Central.'));
+  script.src=ENDPOINT+'?'+qs({...params,action,callback,_:Date.now()});
+  (document.head||document.documentElement).appendChild(script);
+  timer=setTimeout(()=>finish(new Error('Tempo esgotado ao consultar a Central.')),opts.timeout||20000);
+})}
 function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);let win=null,iframe=null,target=name;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;cleanup();d.ok?resolve(d):reject(authError(action,d.message||'Operação rejeitada.',token))};function cleanup(){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400)}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();timer=setTimeout(()=>{cleanup();reject(new Error('Tempo esgotado ao comunicar com a Central.'))},opts.timeout||20000)})}
 function readQueue(){try{const x=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
 function writeQueue(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-100)))}catch(_){}}
