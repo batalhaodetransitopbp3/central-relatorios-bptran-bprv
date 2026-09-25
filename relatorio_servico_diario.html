@@ -351,6 +351,7 @@ const OPERATIONS_STORE='pmpb-transito-operacoes-dia-v1';
 function operationToSummary(p){const sm=p.resumoCpu||p.resumo||{},pod=p.pod||{};return {id:p.reportId||uid('op'),nome:p.operacao?.nome||sm.nome||'',local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',turno:p.operacao?.turno||sm.turno||'',apreensoesVeiculos:sm.apreensoesVeiculos??0,totalAits:sm.totalAits??0,prisoes:sm.prisoes??0,statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',coordenadasPrevistas:pod.coordenadasPrevistas||sm.coordenadasPrevistas||'',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',incluirNoCpu:'true'}}
 function storedOperationIsValid(p){return !!(p?.reportId&&p?.operacao?.nome&&(p?.operacao?.modalidade==='Checkpoint / Blitz'||p?.local?.descricao||p?.local?.coordenadas))}
 function readStoredOperations(){try{const raw=JSON.parse(localStorage.getItem(OPERATIONS_STORE)||'[]');return Array.isArray(raw)?raw.filter(storedOperationIsValid):[]}catch(_){return []}}
+function operationBelongsToActiveSegment(p){let ctx={};try{ctx=JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){}if(!ctx.rsdReportId)return true;const rid=p?.rsdReportId||p?.contextoServico?.rsdReportId||'';if(rid)return String(rid)===String(ctx.rsdReportId);return Number(ctx.segmento||1)<=1}
 
 // ===== PASSAGEM RSD v2 — interoperabilidade Android/iOS e operações cumulativas =====
 function rsdArrayCompat(v){if(Array.isArray(v))return v;if(!v)return [];if(typeof v==='object')return Object.values(v).filter(Boolean);return []}
@@ -388,7 +389,7 @@ function normalizarOperacaoResumoRsd(o={}){
 }
 function operacoesLocaisDoServicoRsd(){
   const data=val('data'),u=currentUnit();
-  return readStoredOperations().filter(p=>p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));
+  return readStoredOperations().filter(p=>operationBelongsToActiveSegment(p)&&p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));
 }
 function mesclarResumosOperacoesRsd(resumos=[],detalhadas=[]){
   const mapa=new Map();
@@ -436,7 +437,7 @@ function montarPassagemServicoRsd(){
   return {schema:'pmpb-transito-passagem-rsd-v1',schemaVersion:2,formatoPassagem:'v2-interoperavel',generatedAt:new Date().toISOString(),origemPlataforma:/iphone|ipad|ipod/i.test(navigator.userAgent)?'iOS':'Android/Web',integridade,relatorio};
 }
 
-function importarOperacoesDoDia(){const data=val('data'),u=currentUnit();if(!data){alert('Informe a data do serviço.');return}const currentIds=new Set(Array.from(document.querySelectorAll('#operations .entry')).map(e=>e.dataset.id));const found=readStoredOperations().filter(p=>p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));let n=0;found.forEach(p=>{const x=operationToSummary(p);if(!currentIds.has(x.id)){addOperationSummary(x);currentIds.add(x.id);n++}});alert(n?`${n} operação(ões) do dia incorporada(s) ao relatório.`:'Não há novas operações registradas neste aparelho para a data e unidade selecionadas.')}
+function importarOperacoesDoDia(){const data=val('data'),u=currentUnit();if(!data){alert('Informe a data do serviço.');return}const currentIds=new Set(Array.from(document.querySelectorAll('#operations .entry')).map(e=>e.dataset.id));const found=readStoredOperations().filter(p=>operationBelongsToActiveSegment(p)&&p?.operacao?.data===data&&(!p.unidade?.batalhao||p.unidade.batalhao===u.batalhao)&&(!p.unidade?.companhiaNumero||Number(p.unidade.companhiaNumero)===Number(u.companhiaNumero)));let n=0;found.forEach(p=>{const x=operationToSummary(p);if(!currentIds.has(x.id)){addOperationSummary(x);currentIds.add(x.id);n++}});alert(n?`${n} operação(ões) do dia incorporada(s) ao relatório.`:'Não há novas operações registradas neste aparelho para a data e unidade selecionadas.')}
 function gerarPassagemServico(){
  if(!val('guarnicao')){alert('Informe a guarnição antes de gerar a passagem de serviço.');return}
  const wrap=montarPassagemServicoRsd();
