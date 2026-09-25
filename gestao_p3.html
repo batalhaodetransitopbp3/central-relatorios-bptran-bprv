@@ -62,10 +62,9 @@
  }
  function getP3CancelActor(){
   let a={};try{a=JSON.parse(localStorage.getItem('pmpb-p3-cancel-actor-v1')||'{}')||{}}catch(_){}
-  let mat=CentralCloud.formatMatricula(a.matricula||'');
-  if(!/^\d{3}\.\d{3}-\d$/.test(mat))mat=CentralCloud.formatMatricula(prompt('Matrícula do responsável pelo cancelamento (000.000-0):')||'');
+  const mat=CentralCloud.formatMatricula(prompt('Confirme a matrícula do responsável pelo cancelamento (000.000-0):',a.matricula||'')||'');
   if(!/^\d{3}\.\d{3}-\d$/.test(mat))return null;
-  let nome=String(a.nome||'').trim();if(!nome)nome=String(prompt('Nome/QRA do responsável pelo cancelamento:')||'').trim();
+  const nome=String(prompt('Confirme o Nome/QRA do responsável pelo cancelamento:',a.nome||'')||'').trim();
   if(!nome)return null;
   try{localStorage.setItem('pmpb-p3-cancel-actor-v1',JSON.stringify({matricula:mat,nome}))}catch(_){}
   return {matricula:mat,nome};
