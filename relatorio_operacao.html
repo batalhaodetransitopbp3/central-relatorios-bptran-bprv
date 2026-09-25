@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
     const old=window.registrarOperacaoDoDia;
     function serviceContext(){try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
     function enrichOperation(p){const ctx=serviceContext();if(ctx?.rsdReportId){p.serviceId=ctx.serviceId||'';p.rsdReportId=ctx.rsdReportId;p.segmento=ctx.segmento||'';p.comandanteMatricula=ctx.comandanteMatricula||'';p.contextoServico=ctx}return p}
-    function applyServiceContext(){const ctx=serviceContext();if(!ctx?.rsdReportId)return;try{if(ctx.unidade?.batalhao)document.getElementById('batalhao').value=ctx.unidade.batalhao;if(ctx.unidade?.companhiaNumero)document.getElementById('companhiaNumero').value=String(ctx.unidade.companhiaNumero);if(ctx.data&&!val('data'))document.getElementById('data').value=ctx.data;if(ctx.guarnicao&&!val('guarnicoes'))document.getElementById('guarnicoes').value=ctx.guarnicao;if(Array.isArray(ctx.vtrs)&&ctx.vtrs.length&&!val('vtrs'))document.getElementById('vtrs').value=ctx.vtrs.join(', ');if(ctx.comandante&&!val('responsavel'))document.getElementById('responsavel').value=ctx.comandante;syncUnitHeader()}catch(_){}}
+    function applyServiceContext(){const ctx=serviceContext();if(!ctx?.rsdReportId)return;try{if(ctx.unidade?.batalhao)document.getElementById('batalhao').value=ctx.unidade.batalhao;if(ctx.unidade?.companhiaNumero)document.getElementById('companhiaNumero').value=String(ctx.unidade.companhiaNumero);if(ctx.data)document.getElementById('data').value=ctx.data;if(ctx.guarnicao&&!val('guarnicoes'))document.getElementById('guarnicoes').value=ctx.guarnicao;if(Array.isArray(ctx.vtrs)&&ctx.vtrs.length&&!val('vtrs'))document.getElementById('vtrs').value=ctx.vtrs.join(', ');if(ctx.comandante&&!val('responsavel'))document.getElementById('responsavel').value=ctx.comandante;syncUnitHeader()}catch(_){}}
     window.registrarOperacaoDoDiaCloud=async function(){
       if(!window.validar())return;
       const p=enrichOperation(window.payload());
@@ -231,6 +231,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
       catch(e){alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+e.message)}
     };
     applyServiceContext();
+    const oldNova=window.novaOperacao;if(typeof oldNova==='function'&&!oldNova.__serviceWrapped){const wrapped=function(){const r=oldNova.apply(this,arguments);setTimeout(applyServiceContext,20);return r};wrapped.__serviceWrapped=true;window.novaOperacao=wrapped}
     document.querySelectorAll('button').forEach(btn=>{
       if((btn.getAttribute('onclick')||'').trim()==='registrarOperacaoDoDia()'){
         btn.setAttribute('onclick','registrarOperacaoDoDiaCloud()');
