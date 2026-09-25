@@ -62,3 +62,8 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Solução 47: não foi criada; a numeração salta diretamente da 46 para a 48.
 - Solução 48: Cadastro Mestre do efetivo do BPRv, com matrícula canônica no padrão PMPB `000.000-0`.
 - Solução 49: cadastro das viaturas da 3ª CPTran no Cadastro Mestre de Viaturas. Validação realizada diretamente nas duas bases oficiais em 25/09/2026: 18 registros ativos encontrados para a 3ª CPTran tanto na Base Estatística P3 quanto na Base Checklist/Motomecanização, incluindo Agrale/A8700, prefixo 1697, placa TOZ-8D86, tipo Reboque. O cadastro está propagado para os fluxos que usam viaturas, inclusive Checklist, Motomecanização e Transporte CIRVC.
+
+## Padronização de marca/modelo — 25/09/2026
+- Nomenclaturas das viaturas já cadastradas da 3ª CPTran foram normalizadas nas duas bases oficiais, sem alterar prefixo, placa, tipo ou unidade.
+- Padrões aplicados: `Fiat Cronos Drive 1.3`, `Fiat Argo Trekking 1.3`, `Honda XRE 300`, `Honda XRE 300 ABS`, `Honda CRF1100L Africa Twin` e `Agrale A8700`.
+- Regra adotada: usar fabricante + modelo + versão/motorização quando comprovável; não acrescentar versão presumida. O mesmo critério deverá ser usado nas viaturas das demais companhias que forem recebidas posteriormente.
