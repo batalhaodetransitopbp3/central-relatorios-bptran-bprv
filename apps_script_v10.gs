@@ -545,6 +545,7 @@ function checklistUpsert_(payload) {
     append_(si,{ITEM_ID:iid,CHECKLIST_ID:id,GRUPO:it.grupo||'',ITEM:it.item||'',SITUACAO:it.situacao||'',DESCRICAO:it.descricao||'',GERA_PENDENCIA:irregular?'SIM':'NÃO',PENDENCIA_ID:pend,REGISTRADO_EM:now});
     (it.fotos||[]).forEach(function(f){saveChecklistPhoto_(id,iid,pend,f,'ALTERACAO');});
   });
+  (c.fotos||[]).forEach(function(f){saveChecklistPhoto_(id,'','',f,'CHECKLIST_GERAL');});
   return {ok:true,message:'Checklist registrado no banco exclusivo da Motomecanização.',checklistId:id,alteracoes:alter.length};
 }
 function saveChecklistPhoto_(checklistId,itemId,pendId,f,tipo) {
