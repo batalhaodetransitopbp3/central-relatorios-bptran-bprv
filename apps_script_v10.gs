@@ -613,12 +613,19 @@ function rsdCancel_(payload){
   if(perfil==='RESPONSAVEL'){
     if(status!=='EM_SERVICO')throw new Error('O próprio comandante só pode cancelar um RSD que ainda esteja EM SERVIÇO.');
     if(!mat||mat!==normMat_(row.RESPONSAVEL_MATRICULA||''))throw new Error('Somente o comandante responsável por este segmento pode cancelá-lo.');
+    var cancelDevice=String(payload.deviceId||'');
+    if(row.EDIT_DEVICE_ID&&(!cancelDevice||String(row.EDIT_DEVICE_ID)!==cancelDevice))throw new Error('Este RSD está assumido em outro aparelho. Use Continuar serviço neste dispositivo antes de cancelar.');
   } else if(perfil==='COORDENADOR'){
     if(status!=='EM_SERVICO')throw new Error('O Coordenador só pode cancelar RSD que ainda esteja EM SERVIÇO. Relatórios finalizados exigem ação do P3.');
     var u=payload.unidade||{},b=normBattalion_(u.batalhao||''),c=u.companhia||normCompany_(b,u.companhiaNumero);
     if(b&&String(row.BATALHAO||'')!==String(b))throw new Error('O RSD pertence a outra unidade.');
     if(c&&String(row.COMPANHIA||'')!==String(c))throw new Error('O RSD pertence a outra companhia.');
     if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Identifique o Coordenador responsável pelo cancelamento.');
+    var rcoId=String(payload.rcoReportId||''),rcoDevice=String(payload.deviceId||''),rcoDraft=findOne_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),'RCO_REPORT_ID',rcoId);
+    if(!rcoDraft||String(rcoDraft.STATUS)!=='EM_ANDAMENTO')throw new Error('RCO em andamento não localizado para autorizar o cancelamento.');
+    if(String(rcoDraft.BATALHAO||'')!==String(row.BATALHAO||'')||String(rcoDraft.COMPANHIA||'')!==String(row.COMPANHIA||''))throw new Error('O RCO atual não corresponde à unidade deste RSD.');
+    if(rcoDraft.EDIT_DEVICE_ID&&(!rcoDevice||String(rcoDraft.EDIT_DEVICE_ID)!==rcoDevice))throw new Error('Este RCO está assumido em outro aparelho. Use Continuar serviço no RCO antes de cancelar.');
+    if(rcoDraft.RESPONSAVEL_MATRICULA&&normMat_(rcoDraft.RESPONSAVEL_MATRICULA)!==mat)throw new Error('A matrícula informada não corresponde ao responsável atual do RCO.');
   } else if(perfil==='P3'){
     if(['EM_SERVICO','FINALIZADO'].indexOf(status)<0)throw new Error('Este status não permite cancelamento direto pelo P3.');
     if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Identifique o responsável do P3 pelo cancelamento.');
