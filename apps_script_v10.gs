@@ -1060,6 +1060,8 @@ function rcoSupplementalUpsert_(payload) {
   var pkg=payload.rco||payload||{}, rco=pkg.rco||pkg, reportId=String((rco||{}).reportId||pkg.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
   var old=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
+  var sourceIds=(rco.rcoOrigens||[]).map(function(o){return String(o.rsdReportId||'')}).filter(Boolean),rsdSheet=sheet_(P3_SHEET_ID,'RSD');
+  sourceIds.forEach(function(id){var src=findOne_(rsdSheet,'REPORT_ID',id);if(!src)throw new Error('RSD de origem não localizado: '+id);if(String(src.STATUS)==='CANCELADO')throw new Error('O RCO contém RSD cancelado. Atualize as guarnições antes de consolidar.');if(['FINALIZADO','INCLUIDO_RCO'].indexOf(String(src.STATUS))<0)throw new Error('O RCO contém RSD ainda não finalizado. Atualize as guarnições antes de consolidar.');});
   var u=pkg.unidade||rco.unidade||{}, batt=normBattalion_(u.batalhao||pkg.batalhao),comp=u.companhia||pkg.companhia||normCompany_(batt,u.companhiaNumero);
   var cons=rco.consolidacaoResponsavel||{};
   var obj={REPORT_ID:reportId,DATA_SERVICO:dateText_((rco.periodo||{}).inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
