@@ -703,7 +703,7 @@ function p3Query_(p) {
     return {ok:true,rsd:rsd.slice(-1000).reverse(),rco:rco.slice(-500).reverse()};
   }
   if(view==='produtividade'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRODUCAO')),p);}
-  else if(view==='operacoes'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OPERACOES')),p);}
+  else if(view==='operacoes'){var pods=objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OPERACOES')),p).map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.COORDENADAS_PREVISTAS=d.COORDENADAS_PREVISTAS||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});}
   else if(view==='pod'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'POD_EXECUCAO')),p);}
   else if(view==='ocorrencias'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'OCORRENCIAS')),p);}
   else if(view==='prisoes'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRISOES')),p);}
