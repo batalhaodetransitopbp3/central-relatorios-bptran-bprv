@@ -491,7 +491,16 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     const ops=p3ReadArray(P3_OPERATIONS_STORE).filter(p=>p3DataRegistro(p)===data && p3SameUnit(p,u));
     const cirvcs=p3ReadArray(P3_CIRVC_STORE).filter(c=>p3DataRegistro(c)===data && p3SameUnit(c,u));
     const estatisticaP3=p3BuildStatistics(rco,ops,cirvcs,data,u);
-    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,estatisticaP3};
+    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v10-P3-operacoes-individuais',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,operacoesIndividuais:estatisticaP3.podExecucao,estatisticaP3};
+  }
+  function p3PublishIndividualOps(pkg,token){
+    const rows=pkg?.estatisticaP3?.podExecucao||[],rcoId=pkg?.rco?.state?.reportId||pkg?.rco?.reportId||'';
+    for(const x of rows){
+      const id=x.registroId||x.origemRegistroId||('op-'+rcoId+'-'+Math.random().toString(36).slice(2));
+      const rec={...x,operacaoId:id,id,parentRcoId:rcoId,unidade:pkg.unidade||{},source:'RCO',registroIndividual:true,updatedAt:new Date().toISOString()};
+      try{window.CentralCloud?.upsertLocal('operacoes',rec,'operacaoId')}catch(_){}
+      if(window.CentralCloud?.isEnabled()&&token)CentralCloud.postOrQueue('operacao-upsert',{operacao:rec},{token,unit:pkg.unidade,popup:false}).catch(()=>{});
+    }
   }
   function p3GetSavedToken(){try{return localStorage.getItem(P3_TOKEN_KEY)||''}catch(_){return ''}}
   function p3SetSavedToken(v){try{if(v)localStorage.setItem(P3_TOKEN_KEY,v);else localStorage.removeItem(P3_TOKEN_KEY)}catch(_){}}
@@ -511,6 +520,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     if(!token){alert('Informe a Chave P3.');input.focus();return}
     let pkg;try{pkg=p3BuildPackage()}catch(err){alert(err.message||String(err));return}
     if(remember.checked)p3SetSavedToken(token);else p3SetSavedToken('');
+    p3PublishIndividualOps(pkg,token);
     try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){}
     const winName='p3Consolidacao_'+Date.now();
     const w=window.open('about:blank',winName);
