@@ -211,37 +211,32 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
 })();
 </script>
 
-<script>window.CENTRAL_V10_ENABLED=false;</script>
 <script src="central_cloud.js"></script>
-<script id="operacao-individual-cloud-v1">
+<script id="operation-cloud-v10">
 (function(){
-  const basePayload=window.payload;
-  if(typeof basePayload==='function')window.payload=function(){
-    const p=basePayload();
-    const id=p.operacaoId||p.reportId||window.reportId||CentralCloud.uid('op');
-    p.operacaoId=id;p.reportId=id;
-    p.registroIndividual=true;
-    p.localEfetivo={descricao:p.local?.descricao||'',coordenadas:p.local?.coordenadas||''};
-    p.localPrevisto={descricao:p.pod?.localPrevisto||'',coordenadas:p.pod?.coordenadasPrevistas||''};
-    p.updatedAt=new Date().toISOString();
-    return p;
-  };
-  function unitFromPayload(p){return {batalhao:p?.unidade?.batalhao||document.getElementById('batalhao')?.value||'BPTran',companhiaNumero:Number(p?.unidade?.companhiaNumero||document.getElementById('companhiaNumero')?.value||1),companhia:p?.unidade?.companhia||''}}
-  function localRecord(p){const prod=p?.resultados||{};return {id:p.operacaoId||p.reportId,operacaoId:p.operacaoId||p.reportId,reportId:p.reportId,data:p.operacao?.data||'',turno:p.operacao?.turno||'',tipo:p.operacao?.nome||'',modalidade:p.operacao?.modalidade||'',statusCumprimento:p.pod?.statusCumprimento||'',localPrevisto:p.pod?.localPrevisto||'',coordenadasPrevistas:p.pod?.coordenadasPrevistas||'',localEfetivo:p.local?.descricao||'',coordenadasEfetivas:p.local?.coordenadas||'',motivoAlteracao:p.pod?.motivoAlteracao||'',guarnicoes:p.operacao?.guarnicoes||'',vtrs:p.operacao?.vtrs||'',qtdPms:Number(p.operacao?.qtdPms||0),responsavel:p.operacao?.responsavel||'',unidade:p.unidade||{},resultados:prod,source:'MODULO_OPERACOES',updatedAt:new Date().toISOString()}}
-  async function publish(p){
-    const rec=localRecord(p);CentralCloud?.upsertLocal('operacoes',rec,'operacaoId');
-    if(!CentralCloud?.isEnabled())return {local:true};
-    const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return {local:true};
-    try{return await CentralCloud.postOrQueue('operacao-upsert',{operacao:p},{token,unit:unitFromPayload(p),popup:false})}
-    catch(e){return {local:true,error:e.message}}
-  }
   function install(){
-    const base=window.registrarOperacaoDoDia;if(typeof base!=='function'||base.__individualCloud)return;
-    const wrapped=async function(){if(typeof validar==='function'&&!validar())return;const p=window.payload();if(typeof registrarOperacaoPayload==='function'&&!registrarOperacaoPayload(p,true))return;try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){};const r=await publish(p);if(typeof atualizarStatusOperacoes==='function')atualizarStatusOperacoes();if(typeof window.centralMarkSaved==='function')window.centralMarkSaved();alert(r?.queued?'Operação salva e mantida na fila de sincronização.':'Operação registrada individualmente para consulta estatística.');};
-    wrapped.__individualCloud=true;window.registrarOperacaoDoDia=wrapped;
+    if(!window.CentralCloud||typeof window.payload!=='function'||typeof window.validar!=='function')return;
+    const old=window.registrarOperacaoDoDia;
+    window.registrarOperacaoDoDiaCloud=async function(){
+      if(!window.validar())return;
+      const p=window.payload();
+      try{ if(typeof old==='function') old(); }catch(_){}
+      const enabled=await CentralCloud.probe();
+      if(!enabled){ alert('Operação salva neste aparelho. A sincronização individual com a Gestão P3 ficará disponível quando o backend v10 estiver publicado.'); return; }
+      const token=CentralCloud.askToken('central');
+      if(!token){ alert('Operação salva localmente. A chave operacional é necessária apenas para sincronizar com a Central.'); return; }
+      const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
+      alert(r.queued ? 'Operação salva. Sincronização pendente preservada neste aparelho.' : 'Operação salva e registrada individualmente para Gestão P3/Power BI.');
+    };
+    document.querySelectorAll('button').forEach(btn=>{
+      if((btn.getAttribute('onclick')||'').trim()==='registrarOperacaoDoDia()'){
+        btn.setAttribute('onclick','registrarOperacaoDoDiaCloud()');
+        btn.textContent='Salvar operação do dia';
+        btn.title='Salva no aparelho e, com a Central v10 ativa, registra esta operação individualmente no banco estatístico.';
+      }
+    });
   }
-  window.addEventListener('central-v10-ready',()=>setTimeout(install,10));
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,60));else setTimeout(install,60);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
 </body></html>
