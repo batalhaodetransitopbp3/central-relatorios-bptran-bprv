@@ -93,3 +93,13 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - Itens antigos da fila que contenham chave inválida têm a credencial descartada para que uma chave válida possa ser usada na tentativa seguinte.
 - A recuperação vale tanto para a chave operacional (`CENTRAL_TOKEN`) quanto para a chave administrativa (`P3_TOKEN`), conforme a ação executada.
 - O módulo corrigido foi versionado com cache-busting `central_cloud.js?v=10.3.0-20260925d` nas telas cloud.
+
+## Comunicação cloud v10.3.1 — 25/09/2026
+- O Web App v10.3.0 já estava publicado e validado manualmente; `BACKEND_V10_STATUS=AGUARDANDO_PUBLICACAO` era apenas um estado de homologação desatualizado e não bloqueava as rotas.
+- A aba CONFIG foi corrigida para `BACKEND_V10_STATUS=EM_HOMOLOGACAO`.
+- Identificada falha no transporte JSONP carregado como script externo pelo GitHub Pages, apesar de a resposta JSONP funcionar quando aberta diretamente no navegador.
+- Backend atualizado para `10.3.1` com ponte GET via iframe + `postMessage`, usando `HtmlService.XFrameOptionsMode.ALLOWALL`.
+- `central_cloud.js` mantém a API `jsonp()`, porém internamente passou a usar iframe + `postMessage`, com `requestId` para correlação segura das respostas.
+- Gestão P3 deixou de exibir a mensagem enganosa “Backend v10 ainda não publicado” e passa a informar falha de conexão quando o probe não responder.
+- Telas cloud foram atualizadas para carregar `central_cloud.js?v=10.3.1-20260925e`.
+- Próximo passo obrigatório: substituir o `Code.gs` do projeto Apps Script pelo conteúdo atual de `apps_script_v10.gs` e atualizar a implantação existente para uma nova versão, mantendo a mesma URL `/exec`. Depois confirmar `?action=version` retornando `10.3.1`.
