@@ -49,7 +49,7 @@
 <script src="central_cloud.js"></script>
 <script>
 (function(){
- const $=id=>document.getElementById(id);let current=null,selectedTransportIds=[];
+ const $=id=>document.getElementById(id);let current=null,selectedTransportIds=[],sigDrawn={T:false,R:false};
  function ciaOptions(){const b=$('bat').value; $('cia').innerHTML=[1,2,3,4,5].map(n=>'<option>'+n+'ª '+(b==='BPRv'?'CPRv':'CPTran')+'</option>').join('')}
  $('bat').addEventListener('change',ciaOptions);ciaOptions();
  $('mat').addEventListener('blur',()=>{$('mat').value=CentralCloud.formatMatricula($('mat').value)});
@@ -95,17 +95,17 @@
  function setupCanvas(id,key){
   const c=$(id),ctx=c.getContext('2d');function size(){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);ctx.setTransform(d,0,0,d,0,0);ctx.lineWidth=2;ctx.lineCap='round'}size();window.addEventListener('resize',size);let down=false,last=null;
   const pt=e=>{const r=c.getBoundingClientRect(),q=e.touches?e.touches[0]:e;return{x:q.clientX-r.left,y:q.clientY-r.top}};
-  const start=e=>{e.preventDefault();down=true;last=pt(e)};const move=e=>{if(!down)return;e.preventDefault();const p=pt(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p};const end=e=>{if(!down)return;down=false;$(key+'Img').src=c.toDataURL('image/png')};
+  const start=e=>{e.preventDefault();down=true;last=pt(e)};const move=e=>{if(!down)return;e.preventDefault();const p=pt(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p};const end=e=>{if(!down)return;down=false;const k=key==='sigT'?'T':'R';sigDrawn[k]=true;$(key+'Img').src=c.toDataURL('image/png')};
   c.addEventListener('pointerdown',start);c.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
  }
  setupCanvas('sigT','sigT');setupCanvas('sigR','sigR');
- window.clearSig=k=>{const c=$('sig'+k),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);$('sig'+k+'Img').removeAttribute('src')};
+ window.clearSig=k=>{const c=$('sig'+k),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);sigDrawn[k]=false;$('sig'+k+'Img').removeAttribute('src')};
  async function finish(){
-  if(!current)return alert('Nenhum transporte aberto.');if(!$('recvName').value||!$('recvId').value)return alert('Informe quem recebeu no DETRAN.');
+  if(!current)return alert('Nenhum transporte aberto.');if(!$('recvName').value||!$('recvId').value)return alert('Informe quem recebeu no DETRAN.');if(!sigDrawn.T||!sigDrawn.R)return alert('As assinaturas do transportador e do recebedor são obrigatórias.');
   const sT=$('sigT').toDataURL('image/png'),sR=$('sigR').toDataURL('image/png');
   try{const t=await ensure(),p={transporte:{transporteId:current.TRANSPORTE_ID,destinoFinal:$('destino').value||current.DESTINO_FINAL,recebedorNome:$('recvName').value,recebedorIdentificacao:$('recvId').value,observacoes:$('obs').value,assinaturaTransportadorDataUrl:sT,assinaturaRecebedorDataUrl:sR}};
    const r=await CentralCloud.submitForm('cirvc-transport-finalize',p,t,{popup:false,timeout:20000});
-   alert(r.message||'Entrega registrada.');localStorage.removeItem('cirvc-current-transport');current=null;$('transportCard').classList.add('hidden');$('pendingCard').classList.remove('hidden');await loadPending();
+   alert(r.message||'Entrega registrada.');localStorage.removeItem('cirvc-current-transport');current.STATUS='ENTREGUE_DETRAN';current.RECEBEDOR_NOME=$('recvName').value;current.RECEBEDOR_IDENTIFICACAO=$('recvId').value;$('sigTImg').src=sT;$('sigRImg').src=sR;$('sigTImg').classList.remove('hidden');$('sigRImg').classList.remove('hidden');$('printMeta').textContent+=' • Recebido por '+$('recvName').value+' ('+$('recvId').value+')';$('finishBtn').disabled=true;setTimeout(()=>window.print(),250);
   }catch(e){alert(e.message)}
  }
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
