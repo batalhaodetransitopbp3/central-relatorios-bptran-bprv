@@ -557,12 +557,13 @@ function rsdUpsert_(payload) {
   return {ok:true,message:wasFinal?'RSD retificado e disponibilizado para consolidação.':'RSD finalizado e disponibilizado para consolidação.',reportId:reportId,serviceId:serviceId,segmento:seg,version:version,status:'FINALIZADO'};
 }
 function rsdList_(p) {
-  var list=objects_(sheet_(P3_SHEET_ID,'RSD')),batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',data=dateText_(p.data||''),vtrs=objects_(sheet_(P3_SHEET_ID,'RSD_VIATURAS'));
-  return list.filter(function(x){if(['EM_SERVICO','FINALIZADO','INCLUIDO_RCO'].indexOf(String(x.STATUS))<0)return false;if(batt&&String(x.BATALHAO)!==batt)return false;if(comp&&String(x.COMPANHIA)!==String(comp))return false;if(data&&dateText_(x.DATA_SERVICO)!==data)return false;return true;}).map(function(x){
+  var list=objects_(sheet_(P3_SHEET_ID,'RSD')),batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',data=dateText_(p.data||''),vtrs=objects_(sheet_(P3_SHEET_ID,'RSD_VIATURAS')),includeCancelled=String(p.includeCancelled||'')==='1';
+  return list.filter(function(x){var allowed=['EM_SERVICO','FINALIZADO','INCLUIDO_RCO'];if(includeCancelled)allowed.push('CANCELADO');if(allowed.indexOf(String(x.STATUS))<0)return false;if(batt&&String(x.BATALHAO)!==batt)return false;if(comp&&String(x.COMPANHIA)!==String(comp))return false;if(data&&dateText_(x.DATA_SERVICO)!==data)return false;return true;}).map(function(x){
     var rv=vtrs.filter(function(v){return String(v.RSD_REPORT_ID)===String(x.REPORT_ID);}).sort(function(a,b){return Number(a.ORDEM||0)-Number(b.ORDEM||0);});
     return {reportId:x.REPORT_ID,serviceId:x.SERVICE_ID||'',segmento:Number(x.SEGMENTO||1),rsdAnteriorId:x.RSD_ANTERIOR_ID||'',passagemOrigemId:x.PASSAGEM_ORIGEM_ID||'',version:Number(x.VERSAO||1),draftRevision:Number(x.DRAFT_REVISION||0),
       data:x.DATA_SERVICO,batalhao:x.BATALHAO,companhia:x.COMPANHIA,guarnicao:x.GUARNICAO,status:x.STATUS,responsavel:x.RESPONSAVEL_NOME,matricula:x.RESPONSAVEL_MATRICULA,
       iniciadoEm:x.INICIADO_EM,finalizadoEm:x.FINALIZADO_EM,ultimoRascunhoEm:x.ULTIMO_RASCUNHO_EM,rcoReportId:x.RCO_REPORT_ID,editDeviceId:x.EDIT_DEVICE_ID||'',editLeaseUntil:x.EDIT_LEASE_UNTIL||'',
+      canceladoEm:x.CANCELADO_EM||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPerfil:x.CANCELADO_PERFIL||'',
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
   });
 }
