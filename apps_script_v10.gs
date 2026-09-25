@@ -13,7 +13,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.3.0';
+var CENTRAL_V10_VERSION = '10.3.1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -67,9 +67,13 @@ function doGet(e) {
     } else {
       throw new Error('Ação GET não reconhecida: ' + action);
     }
+    if (String(p.transport||'') === 'message') return postMessagePage_(action, out, p.requestId||'');
     return jsonp_(out, p.callback);
   } catch (err) {
-    return jsonp_({ok:false, message:String(err && err.message || err)}, ((e||{}).parameter||{}).callback);
+    var ep=((e||{}).parameter||{}), ea=String(ep.action||'version');
+    var eo={ok:false, message:String(err && err.message || err)};
+    if (String(ep.transport||'') === 'message') return postMessagePage_(ea, eo, ep.requestId||'');
+    return jsonp_(eo, ep.callback);
   }
 }
 
@@ -226,12 +230,12 @@ function jsonp_(obj, callback) {
   if (callback) return ContentService.createTextOutput(String(callback)+'('+raw+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
   return ContentService.createTextOutput(raw).setMimeType(ContentService.MimeType.JSON);
 }
-function postMessagePage_(action, obj) {
-  var data=JSON.stringify(Object.assign({source:'central-p3-v10',action:action},obj||{})).replace(/</g,'\\u003c');
+function postMessagePage_(action, obj, requestId) {
+  var data=JSON.stringify(Object.assign({source:'central-p3-v10',action:action,requestId:String(requestId||'')},obj||{})).replace(/</g,'\\u003c');
   var html='<!doctype html><meta charset="utf-8"><title>Central</title><style>body{font:14px Arial;padding:24px;color:#17375e}.ok{color:#176b3a}.err{color:#9d1d36}</style>'+
     '<p class="'+((obj||{}).ok===false?'err':'ok')+'">'+escapeHtml_((obj||{}).message||((obj||{}).ok===false?'Falha.':'Operação concluída.'))+'</p>'+
     '<script>(function(){var d='+data+';try{if(window.opener)window.opener.postMessage(d,"*");if(window.parent&&window.parent!==window)window.parent.postMessage(d,"*");}catch(e){}setTimeout(function(){try{window.close()}catch(e){}},700)})();<\/script>';
-  return HtmlService.createHtmlOutput(html);
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 function escapeHtml_(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
