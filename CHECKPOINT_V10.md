@@ -83,3 +83,13 @@ A revisão de código, contratos e bases está concluída. O próximo passo efet
 - RSD e demais telas operacionais devem localizar o militar independentemente da companhia em que ele esteja tirando serviço no dia (ex.: extra, reforço ou apoio).
 - A unidade/companhia registrada no relatório representa o local do serviço, não necessariamente a lotação administrativa do militar.
 - Viaturas podem continuar sendo filtradas por unidade/companhia quando isso fizer sentido operacional.
+
+## Correção crítica de credenciais — 25/09/2026
+- Identificada falha: uma `CENTRAL_TOKEN` ou `P3_TOKEN` digitada incorretamente podia permanecer salva no `localStorage` e ser reutilizada indefinidamente, impedindo nova tentativa de autenticação.
+- `central_cloud.js` passou a reconhecer explicitamente a resposta `Chave inválida.` do backend.
+- Ao detectar chave inválida, a credencial correspondente é removida automaticamente do navegador.
+- A consulta ao Cadastro Mestre solicita imediatamente uma nova chave e repete a consulta uma única vez.
+- Envios rejeitados por chave inválida não são mais adicionados à fila offline.
+- Itens antigos da fila que contenham chave inválida têm a credencial descartada para que uma chave válida possa ser usada na tentativa seguinte.
+- A recuperação vale tanto para a chave operacional (`CENTRAL_TOKEN`) quanto para a chave administrativa (`P3_TOKEN`), conforme a ação executada.
+- O módulo corrigido foi versionado com cache-busting `central_cloud.js?v=10.3.0-20260925d` nas telas cloud.
