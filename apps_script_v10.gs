@@ -438,10 +438,10 @@ function passagemPublicar_(payload) {
   var p=payload.passagem||payload||{}, id=p.passagemId||uid_('passagem');
   var u=p.unidade||{}, batt=normBattalion_(u.batalhao), comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var obj={PASSAGEM_ID:id,RSD_ORIGEM_ID:p.rsdOrigemId||'',RSD_DESTINO_ID:'',DATA_SERVICO:dateText_(p.dataServico),BATALHAO:batt,COMPANHIA:comp,
-    GUARNICAO:(p.guarnicao||{}).nome||p.guarnicao||'',TURNO_ORIGEM:p.turnoOrigem||'',ENTREGUE_POR_MATRICULA:normMat_(p.entreguePorMatricula||''),
-    ENTREGUE_POR_NOME:p.entreguePorNome||'',DISPONIBILIZADA_EM:nowIso_(),STATUS:'AGUARDANDO_RECEBIMENTO',
+    GUARNICAO:(p.guarnicao||{}).nome||p.guarnicao||'',TURNO_ORIGEM:p.turnoOrigem||'',ENTREGUE_POR_MATRICULA:normMat_(p.entreguePorMatricula||(p.entreguePor||{}).matricula||''),
+    ENTREGUE_POR_NOME:p.entreguePorNome||(p.entreguePor||{}).nome||'',DISPONIBILIZADA_EM:nowIso_(),STATUS:'AGUARDANDO_RECEBIMENTO',
     RECEBIDA_POR_MATRICULA:'',RECEBIDA_POR_NOME:'',RECEBIDA_EM:'',VTRS_JSON:JSON.stringify(p.viaturas||[]),
-    ALTERACOES_VTR_JSON:JSON.stringify(p.alteracoesVtr||[]),MATERIAIS_JSON:JSON.stringify(p.materiais||[]),PENDENCIAS_JSON:JSON.stringify(p.pendencias||[]),
+    ALTERACOES_VTR_JSON:JSON.stringify(p.alteracoesVtr||p.alteracoesViatura||[]),MATERIAIS_JSON:JSON.stringify(p.materiais||[]),PENDENCIAS_JSON:JSON.stringify(p.pendencias||[]),
     OBSERVACOES:p.observacoes||'',ATUALIZADO_EM:nowIso_()};
   upsert_(sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'),'PASSAGEM_ID',id,obj);
   return {ok:true,message:'Passagem de serviço disponibilizada.',passagemId:id};
@@ -459,8 +459,8 @@ function passagensPendentes_(p) {
 function passagemReceber_(payload) {
   var id=String(payload.passagemId||''), s=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'), row=findOne_(s,'PASSAGEM_ID',id);
   if(!row) throw new Error('Passagem não localizada.');
-  row.STATUS='RECEBIDA';row.RSD_DESTINO_ID=payload.rsdDestinoId||'';row.RECEBIDA_POR_MATRICULA=normMat_(payload.matricula||payload.recebidaPorMatricula||'');
-  row.RECEBIDA_POR_NOME=payload.nome||payload.recebidaPorNome||'';row.RECEBIDA_EM=nowIso_();row.ATUALIZADO_EM=nowIso_();
+  row.STATUS='RECEBIDA';row.RSD_DESTINO_ID=payload.rsdDestinoId||'';var ator=payload.recebidoPor||{};row.RECEBIDA_POR_MATRICULA=normMat_(payload.matricula||payload.recebidaPorMatricula||ator.matricula||'');
+  row.RECEBIDA_POR_NOME=payload.nome||payload.recebidaPorNome||ator.nome||'';row.RECEBIDA_EM=nowIso_();row.ATUALIZADO_EM=nowIso_();
   upsert_(s,'PASSAGEM_ID',id,row);
   return {ok:true,message:'Recebimento do serviço registrado.'};
 }
