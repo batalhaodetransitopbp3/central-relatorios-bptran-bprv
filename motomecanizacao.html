@@ -39,14 +39,14 @@
  function render(){
   const x=filtered(),counts={ABERTA:0,EM_ANALISE:0,EM_MANUTENCAO:0,SOLUCIONADA:0};x.forEach(r=>counts[r.STATUS]=(counts[r.STATUS]||0)+1);
   $('stats').innerHTML=[['Abertas',counts.ABERTA],['Em análise',counts.EM_ANALISE],['Em manutenção',counts.EM_MANUTENCAO],['Solucionadas',counts.SOLUCIONADA]].map(a=>'<div class="stat"><span>'+a[0]+'</span><b>'+a[1]+'</b></div>').join('');
-  $('body').innerHTML=x.length?x.map((r,i)=>'<tr><td><strong>'+esc(r.PREFIXO||'—')+'</strong></td><td>'+esc(r.COMPANHIA||'')+'</td><td>'+esc(r.GRUPO||'')+'<br><strong>'+esc(r.ITEM||'')+'</strong></td><td>'+esc(r.DESCRICAO||'—')+'</td><td><span class="badge '+esc(r.STATUS)+'">'+esc(r.STATUS||'')+'</span></td><td>'+esc(r.ABERTA_EM||'')+'</td><td><button onclick="openP('+i+')">Atualizar</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhuma pendência encontrada.</td></tr>';
+  $('body').innerHTML=x.length?x.map((r,i)=>'<tr><td><strong>'+esc(r.PREFIXO||'—')+'</strong></td><td>'+esc(r.COMPANHIA||'')+'</td><td>'+esc(r.GRUPO||'')+'<br><strong>'+esc(r.ITEM||'')+'</strong></td><td>'+esc(r.DESCRICAO||'—')+'</td><td><span class="badge '+esc(r.STATUS)+'">'+esc(r.STATUS||'')+'</span></td><td>'+esc(r.ABERTO_EM||r.ABERTA_EM||'')+'</td><td><button onclick="openP('+i+')">Atualizar</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhuma pendência encontrada.</td></tr>';
   window.__view=x;
  }
  window.openP=i=>{current=window.__view[i];if(!current)return;$('mTitle').textContent='VTR '+(current.PREFIXO||'')+' — '+(current.ITEM||'');$('mStatus').value=current.STATUS||'ABERTA';$('mObs').value='';$('modal').classList.remove('hidden')};
  $('mCancel').onclick=()=>{$('modal').classList.add('hidden');current=null};$('mMat').addEventListener('blur',()=>{$('mMat').value=CentralCloud.formatMatricula($('mMat').value)});
  $('mSave').onclick=async()=>{
    if(!current)return;try{const t=await ensure();let foto=null;const file=$('mFoto').files[0];if(file)foto=await CentralCloud.compressImage(file,{maxSide:1600,quality:.78});
-    const p={pendenciaId:current.PENDENCIA_ID,status:$('mStatus').value,responsavelMatricula:$('mMat').value,responsavelNome:$('mNome').value,responsavelSetor:$('mSetor').value,observacao:$('mObs').value,fotoSolucao:foto};
+    const p={pendenciaId:current.ALTERACAO_ID||current.PENDENCIA_ID,status:$('mStatus').value,responsavelMatricula:$('mMat').value,responsavelNome:$('mNome').value,responsavelSetor:$('mSetor').value,observacao:$('mObs').value,fotoSolucao:foto};
     const r=await CentralCloud.submitForm('motomecanizacao-update',p,t,{popup:false,timeout:20000});alert(r.message||'Atualizado.');$('modal').classList.add('hidden');current=null;await load();
    }catch(e){alert(e.message)}
  };
