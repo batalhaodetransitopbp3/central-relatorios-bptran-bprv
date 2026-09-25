@@ -1,87 +1,134 @@
-# Implantação da Central v10
+# Implantação e Homologação — Central v10.5.0
 
-## Objetivo
-Ativar os módulos em nuvem preparados nesta branch sem substituir o backend legado que continua recebendo os RCOs atuais.
+## Estado atual
+A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.0 e homologar as novas rotinas de continuidade em nuvem.
 
-## Arquitetura
-- Backend legado: permanece ativo e não deve ser sobrescrito.
-- Backend v10 complementar: `apps_script_v10.gs`.
-- Base estatística P3: `BASE ESTATÍSTICA P3 - BPTran-BPRv`.
-- Base separada de Checklist/Motomecanização: `BASE CHECKLIST E MOTOMECANIZAÇÃO - BPTran-BPRv`.
-- Fotos e assinaturas: arquivos no Google Drive; planilhas armazenam URLs/metadados.
+Endpoint atual:
+`https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
 
-## Publicação segura
-1. Abrir o projeto Google Apps Script v10 já existente.
-2. Substituir integralmente o conteúdo de `Code.gs` pelo `apps_script_v10.gs` atual.
-3. Em **Configurações do projeto > Propriedades do script**, criar:
-   - `CENTRAL_TOKEN`: chave longa e aleatória para RSD, Operações, CIRVC e Checklist.
-   - `P3_TOKEN`: chave longa e aleatória, distinta, para Gestão P3, cadastros e consolidação.
-4. Implantar como **Aplicativo da Web**, executando como o proprietário. Definir o nível de acesso conforme a política institucional. Como a interface está no GitHub Pages, validar que a política escolhida permite chamadas do navegador; nunca retirar a validação por token do código.
-5. Copiar a URL `/exec` da nova implantação.
-6. Em `central_cloud.js`, substituir apenas o endpoint padrão pelo novo `/exec`. Não alterar o endpoint legado existente nos fluxos antigos do RCO.
-7. Abrir `<NOVO_ENDPOINT>?action=version`. A resposta esperada contém `"version":"10.4.1"`.
-8. Testar a matriz abaixo antes de promover a branch para `main`.
+## Atualização do Apps Script
+1. Abra o projeto Apps Script v10 existente.
+2. Abra `Code.gs`.
+3. No GitHub, abra `apps_script_v10.gs` da branch `main`.
+4. Confirme no início:
+   `var CENTRAL_V10_VERSION = '10.5.0';`
+5. Substitua todo o conteúdo de `Code.gs` pelo arquivo atual.
+6. Salve.
+7. Não altere `CENTRAL_TOKEN` nem `P3_TOKEN`.
+8. Vá em `Implantar → Gerenciar implantações`.
+9. Selecione a implantação atual e clique em editar.
+10. Em versão, selecione **Nova versão**.
+11. Descrição sugerida:
+    `Backend V10.5.0 — continuidade em nuvem e passagem encadeada`
+12. Mantenha execução como proprietário e o mesmo nível de acesso já homologado.
+13. Clique em `Implantar`.
+14. Confirme que a URL `/exec` permaneceu a mesma.
 
-## Matriz mínima de homologação
-- RSD Android/Chrome e iOS/Safari: operação responsiva; múltiplas VTRs; finalizar; aparecer no RCO.
-- RSD: retificar e confirmar aviso de versão mais recente no RCO.
-- Passagem de serviço: disponibilizar e receber na mesma guarnição.
-- Operação: salvar duas operações distintas no mesmo dia e confirmar dois registros independentes em Gestão P3.
-- Operação: conferir local previsto, local executado e coordenadas reais.
-- RCO: adicionar todos os RSDs finalizados; testar consolidação normal e "sem guarnição CPU".
-- Checklist: uma VTR por checklist; assinatura; foto comprimida; criação de alteração.
-- Motomecanização: alterar ABERTA > EM_ANALISE > EM_MANUTENCAO > SOLUCIONADA.
-- CIRVC: cadastrar veículo; visualizar no módulo Transporte; iniciar carga; impedir dupla carga; entregar ao DETRAN com duas assinaturas; confirmar BAIXADO_DETRAN.
+## Verificação de versão
+Abra:
+`<ENDPOINT>?action=version`
+
+Resultado esperado:
+`{"ok":true,"version":"10.5.0","schema":"central-v10"}`
+
+Depois feche a Central, abra novamente e use `Ctrl + Shift + R`.
+
+## Homologação — Cadastro Mestre e Registro da Guarnição
+1. Abra o RSD.
+2. Use `Início do serviço`.
+3. Informe nome da guarnição.
+4. Busque o comandante por matrícula ou nome/QRA.
+5. Clique `Registrar guarnição no serviço`.
+6. No RCO da mesma unidade/data, clique `Buscar guarnições / RSDs`.
+7. Confirme status `EM_SERVICO` com guarnição e comandante.
+8. Adicione a identificação ao RCO.
+9. Finalize o RSD.
+10. Atualize a lista do RCO e confirme `NOVA VERSÃO`.
+11. Atualize a origem e confirme ausência de duplicidade.
+
+## Homologação — Continuidade do mesmo comandante
+1. Inicie e registre um RSD em aparelho A.
+2. Digite alguns dados e aguarde alguns segundos para sincronização.
+3. Em aparelho B, abra o RSD e clique `Continuar serviço`.
+4. Informe a matrícula do mesmo comandante.
+5. Selecione o RSD `EM_SERVICO`.
+6. Se o aparelho A ainda possuir lease ativo, confirme `Assumir neste dispositivo`.
+7. Verifique que o aparelho B recebe o **mesmo REPORT_ID**.
+8. Edite um campo no aparelho B e aguarde sincronização.
+9. No aparelho A, tente editar/sincronizar e confirme que ele não consegue sobrescrever a nuvem sem nova assunção.
+
+## Homologação — Passagem de comandante da guarnição
+1. Finalize o RSD do comandante 1.
+2. Clique `Realizar passagem de serviço`.
+3. Em aparelho B, abra RSD e use `Início do serviço`.
+4. Informe a mesma guarnição e identifique o comandante 2.
+5. Clique `Receber passagem de serviço`.
+6. Confirme:
+   - mesmo `SERVICE_ID`;
+   - novo `REPORT_ID`;
+   - `SEGMENTO = segmento anterior + 1`;
+   - RSD anterior vinculado;
+   - VTR/contexto e pendências preservados;
+   - produtividade zerada.
+7. Adicione produção própria do comandante 2.
+8. Finalize o novo RSD.
+
+## Homologação — Operações por segmento
+1. No segmento 1, abra Relatório de Operação.
+2. Confirme preenchimento automático de unidade, data, guarnição, VTR(s) e responsável.
+3. Salve uma operação.
+4. Após a passagem, no segmento 2, salve outra operação.
+5. No RSD do segmento 2, clique `Carregar operações do dia`.
+6. Confirme que a operação do segmento 1 **não** é importada para o segmento 2.
+7. Confirme que a operação do segmento 2 é importada.
+8. No RCO, adicione os dois RSDs e confirme soma cumulativa da mesma guarnição sem apagar o segmento anterior.
+9. Na Gestão P3, confirme duas operações independentes, cada uma com seu `RSD_REPORT_ID` e segmento.
+
+## Homologação — Continuidade do Coordenador
+1. Abra o RCO.
+2. Preencha dados e clique `Salvar RCO na nuvem` pelo menos uma vez.
+3. Faça alterações e aguarde autosave.
+4. Em outro aparelho, abra o RCO e clique `Continuar serviço`.
+5. Se necessário, selecione o RCO correto.
+6. Confirme o mesmo `REPORT_ID`.
+7. Se o outro aparelho ainda estiver ativo, aceite a assunção.
+8. Confirme que o aparelho anterior não sobrescreve o novo.
+
+## Homologação — Passagem do Coordenador
+1. No RCO, identifique o coordenador atual.
+2. Clique `Realizar passagem de serviço`.
+3. Confirme que a passagem é sincronizada na nuvem.
+4. No aparelho do substituto, abra o RCO e clique `Continuar serviço`.
+5. Carregue o mesmo RCO.
+6. Confirme a assunção como novo Coordenador.
+7. Verifique que:
+   - o mesmo RCO continua;
+   - o coordenador anterior permanece bloqueado na auditoria;
+   - é criado novo slot de autoria (CPU 2, CPU 3...);
+   - novas alterações pertencem ao coordenador atual.
+8. JSON deve aparecer apenas como:
+   - `Exportar passagem JSON (contingência)`;
+   - `Receber passagem JSON (contingência)`.
+
+## Homologação complementar
+- RSD Android/Chrome e iOS/Safari.
+- RCO desktop e iOS/Safari.
+- Múltiplas VTRs no RSD.
+- Retificação de RSD.
+- Duas operações distintas no mesmo dia.
+- Local previsto x local executado.
+- RCO normal e modo sem CPU.
+- Checklist 1 VTR por checklist, assinatura, fotos e alteração.
+- Motomecanização: ABERTA → EM_ANALISE → EM_MANUTENCAO → SOLUCIONADA.
+- CIRVC: cadastro, custódia, transporte, dupla carga bloqueada, entrega ao DETRAN.
 - Gestão P3: Controle Diário, Produtividade, Análise, Operações, Prisões/Conduções, CIRVC e Auditoria.
-- Power BI: informar URL institucional em Gestão P3 e confirmar persistência central.
-- Contingência: interromper internet e confirmar preservação local/fila; reconectar e sincronizar.
-- Continuidade RSD: iniciar e registrar em um aparelho, preencher parcialmente, abrir outro aparelho, usar `Continuar serviço`, assumir a edição e confirmar o mesmo `REPORT_ID`.
-- Conflito RSD: depois da assunção pelo segundo aparelho, confirmar que o primeiro não consegue sobrescrever a nuvem.
-- Passagem RSD: finalizar segmento 1, publicar passagem, receber em outro aparelho com novo comandante e confirmar mesmo `SERVICE_ID`, novo `REPORT_ID`, `SEGMENTO=2` e produtividade zerada.
-- Operações por segmento: salvar operação no segmento 1 e outra no segmento 2; confirmar que cada RSD importa somente sua própria operação e que o RCO soma ambos.
-- Continuidade RCO: salvar RCO na nuvem, retomá-lo em outro aparelho e confirmar mesmo `REPORT_ID`.
-- Passagem RCO: registrar passagem do Coordenador, retomar pela nuvem em outro aparelho, assumir novo slot de auditoria e preservar os coordenadores anteriores bloqueados.
-- Credenciais: usar `Início do serviço` e confirmar que CENTRAL_TOKEN/P3_TOKEN continuam disponíveis.
+- Power BI: persistência do `POWERBI_URL`.
+- Offline: preservar dados/fila e sincronizar após reconexão.
+- `Início do serviço`: confirmar que dados do serviço anterior são zerados e que `CENTRAL_TOKEN`, `P3_TOKEN`, fila de sincronização e ID do dispositivo permanecem.
 
-## Promoção
-Somente após homologação:
-1. Atualizar `CONFIG.BACKEND_V10_STATUS` para `ATIVO`.
-2. Registrar a nova URL como configuração do backend v10.
-3. Registrar o commit/checkpoint homologado no `main`.
-4. Validar GitHub Pages em desktop, Android/Chrome e iOS/Safari.
-
-## Observações
-O arquivo JSON deixa de ser fluxo principal, mas continua disponível como contingência. O Power BI é camada de visualização e não substitui os bancos operacionais.
-
-
-## Homologação adicional — Solução 50
-1. No RSD, usar `Início do serviço`.
-2. Informar o **nome da guarnição**.
-3. Identificar o **comandante** pelo Cadastro Mestre usando matrícula ou nome/QRA; a lotação não restringe a busca.
-4. Clicar `Registrar guarnição no serviço`.
-5. No RCO da mesma unidade/data, clicar `Buscar guarnições / RSDs` e confirmar que a origem aparece como `EM_SERVICO`, identificada pela guarnição e comandante.
-6. Adicionar a identificação ao RCO.
-7. Finalizar o RSD da guarnição.
-8. Atualizar a lista no RCO e confirmar `NOVA VERSÃO`.
-9. Clicar `Atualizar` e confirmar que a mesma guarnição foi substituída sem duplicação.
-10. Confirmar que o RCO bloqueia `Consolidar P3` enquanto houver origem adicionada ainda `EM_SERVICO`.
-11. Confirmar que, após todos os RSDs finalizados/atualizados, a consolidação é liberada.
-12. JSON deve permanecer apenas como contingência.
-
-
-## Homologação adicional — Solução 51
-1. **Mesmo comandante / mesmo aparelho:** iniciar RSD, registrar guarnição, digitar dados, fechar e usar `Continuar serviço`; conferir preservação do `REPORT_ID`.
-2. **Mesmo comandante / outro aparelho:** abrir RSD em aparelho diferente, clicar `Continuar serviço`, informar matrícula e selecionar o RSD `EM_SERVICO`.
-3. Se o primeiro aparelho ainda tiver lease ativo, confirmar a mensagem de assunção; aceitar e conferir que o segundo aparelho passa a editar.
-4. Alterar um campo no segundo aparelho, aguardar sincronização e confirmar que o primeiro aparelho recebe bloqueio ao tentar sincronizar depois.
-5. Finalizar o RSD do primeiro comandante e publicar a passagem.
-6. No aparelho do substituto, informar guarnição + novo comandante e clicar `Receber passagem de serviço`.
-7. Conferir: mesmo `SERVICE_ID`, novo `REPORT_ID`, segmento incrementado, VTR/contexto preservados e produtividade zerada.
-8. Abrir Relatório de Operação no novo segmento e confirmar preenchimento automático de unidade, data, guarnição, VTR(s) e responsável.
-9. Salvar operações distintas nos dois segmentos e confirmar que cada RSD carrega apenas as operações vinculadas ao seu próprio `RSD_REPORT_ID`.
-10. No RCO, adicionar/atualizar os dois segmentos da mesma guarnição e confirmar soma cumulativa sem exclusão do segmento anterior.
-11. No RCO, salvar na nuvem; abrir em outro aparelho e usar `Continuar serviço`.
-12. Registrar passagem do Coordenador e, no aparelho seguinte, retomar o mesmo RCO e assumir o novo slot de autoria.
-13. Confirmar que os registros anteriores ficam bloqueados para auditoria e as novas alterações são atribuídas ao Coordenador atual.
-14. Confirmar que JSON de passagem aparece somente como opção de contingência.
-15. Somente depois dessa matriz promover `BACKEND_V10_STATUS` de `EM_HOMOLOGACAO` para `ATIVO`.
+## Promoção para ativo
+Somente depois de toda a matriz:
+1. Alterar `CONFIG.BACKEND_V10_STATUS` de `EM_HOMOLOGACAO` para `ATIVO`.
+2. Registrar a versão homologada no checkpoint.
+3. Validar novamente GitHub Pages em desktop, Android/Chrome e iOS/Safari.
+4. Manter o backend legado preservado enquanto houver necessidade de compatibilidade.
