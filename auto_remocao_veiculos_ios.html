@@ -835,12 +835,13 @@
     <div class="toolbar">
       <span id="status" class="status">Pronto para preenchimento.</span>
       <button type="button" onclick="adicionarAuto()">+ Novo CIRVC</button>
+<button type="button" class="secondary" onclick="carregarRascunho()">Carregar rascunho</button>
       <button type="button" class="primary" onclick="consolidarArvc()">Gerar PDF dos CIRVCs do serviço</button>
       <button type="button" class="danger" onclick="limparTudo()">Limpar todos os CIRVCs</button>
     </div>
 
     <div class="screen-help no-print">
-      <strong>Uso:</strong> preencha um CIRVC para cada veículo removido. Clique em <strong>+ Novo CIRVC</strong> para inserir outro. A guarnição informada é reaproveitada automaticamente nos CIRVCs seguintes e os registros ficam disponíveis para “Carregar remoções do dia” no RSD/RCO.
+      <strong>Uso:</strong> preencha um CIRVC para cada veículo removido. Clique em <strong>+ Novo CIRVC</strong> para inserir outro. Se fechar a página e precisar recuperar o preenchimento deste aparelho, use <strong>Carregar rascunho</strong>. A guarnição informada é reaproveitada automaticamente nos CIRVCs seguintes e os registros ficam disponíveis para “Carregar remoções do dia” no RSD/RCO.
       Na impressão, cada veículo ocupa uma página A4. O auto permanece na metade superior e a metade inferior é reservada ao anexo fotográfico, com até 4 fotos retangulares (uma por quadrante).
     </div>
 
@@ -1533,7 +1534,7 @@ function prepareAndPrint() {
   };
   function install(){
     const ref=document.querySelector('.toolbar');
-    if(ref && !document.querySelector('.service-state-bar')){
+    if(ref && !/auto_remocao_veiculos/i.test(path) && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html">Voltar à Central de Relatórios</a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
