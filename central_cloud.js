@@ -1,6 +1,6 @@
 (function(global){
 'use strict';
-const ENDPOINT=global.CENTRAL_CLOUD_ENDPOINT||'https://script.google.com/macros/s/AKfycbz5uKHUQe0_C-96r1vcme0LtiiAXbKxSz9TMfIQ3OC3m_0Uoj3hfHHJjZNGLrx9Gy0Q/exec';
+const ENDPOINT=global.CENTRAL_CLOUD_ENDPOINT||'https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec';
 let v10Enabled=global.CENTRAL_V10_ENABLED===true;
 const TOKEN_KEY='pmpb-central-token-v1',P3_TOKEN_KEY='pmpb-p3-token-v1',QUEUE_KEY='pmpb-central-sync-queue-v1';
 function uid(p='id'){try{return p+'-'+crypto.randomUUID()}catch(_){return p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)}}
