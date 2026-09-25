@@ -4,12 +4,12 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 
 ## Repositório ativo
 - Repositório: `batalhaodetransitopbp3/central-relatorios-bptran-bprv`
-- Branch ativa: `main`
+- Branch de homologação desta rodada: `cirvc-rsd-checklist-motomec-v10-5-2`
 - Backend complementar atual: `apps_script_v10.gs`
-- Versão atual do código: **10.5.1**
+- Versão atual do código em homologação: **10.5.2**
 - Endpoint v10 existente:
   `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
-- O endpoint já foi criado anteriormente; a versão 10.5.1 ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
+- O endpoint já está publicado em 10.5.1. A versão 10.5.2 desta rodada ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
 
 ## Estado de homologação
 - `CONFIG.BACKEND_V10_STATUS = EM_HOMOLOGACAO`
@@ -23,7 +23,7 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Operações: `operation-upsert`, `operation-list`.
 - RCO: `rco-draft-upsert`, `rco-draft-list`, `rco-draft-get`, `rco-draft-claim`, `rco-upsert`.
 - Cadastros: `cadastros`, `cadastro-upsert`.
-- CIRVC: `cirvc-register`, `cirvc-pending`, `cirvc-transport-create`, `cirvc-transport-finalize`, `cirvc-transport-list`, `cirvc-transport-get`.
+- CIRVC: `cirvc-register`, `cirvc-list`, `cirvc-pending`, `cirvc-transport-create`, `cirvc-transport-finalize`, `cirvc-transport-list`, `cirvc-transport-get`.
 - Checklist/Motomecanização: `checklist-upsert`, `checklist-list`, `motomecanizacao-list`, `motomecanizacao-update`.
 - Gestão P3: `p3-query`, `p3-analysis`, `p3-config`, `p3-config-set`.
 
@@ -76,6 +76,17 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - JSON de passagem do RCO é apenas contingência.
 - `Início do serviço` foi corrigido para não apagar `CENTRAL_TOKEN`, `P3_TOKEN`, fila de sincronização nem ID do dispositivo.
 
+## Ajustes da versão 10.5.2 — CIRVC e Checklist/Motomecanização
+- Cada CIRVC produzido durante um RSD ativo passa a guardar `RSD_REPORT_ID`, `SERVICE_ID` e `SEGMENTO`.
+- O CIRVC possui ação explícita **Salvar CIRVCs na Central**; a geração do PDF também tenta registrar os CIRVCs na Central.
+- O RSD recebeu **Carregar remoções do dia**, com deduplicação por ID e filtro pelo segmento atual.
+- Finalização/passagem do RSD tenta incorporar os CIRVCs já vinculados antes de encerrar o segmento.
+- O backend também sincroniza os CIRVCs presentes no RSD final com `CIRVC_CUSTODIA`, preservando eventual estado de transporte/baixa existente.
+- O RCO continua recebendo os CIRVCs pela cadeia normal `CIRVC → RSD → RCO`, sem redigitação.
+- Confirmado que a integração Checklist → Motomecanização já existe por `checklist_cloud.js` + `checklist-upsert`.
+- O Checklist agora usa o rótulo **Finalizar e enviar à Motomecanização**, valida pendências antes do envio e mantém `Pendências: 0` como indicador de preenchimento, não de ausência de avarias.
+- Checklist, Operações e CIRVC deixaram de exibir o botão genérico de início/continuidade que poderia apagar o contexto do RSD; cada módulo mantém suas próprias ações de rascunho/novo registro.
+
 ## Estruturas adicionadas na Base P3
 - RSD: `SERVICE_ID`, `SEGMENTO`, `RSD_ANTERIOR_ID`, `PASSAGEM_ORIGEM_ID`, `ULTIMO_RASCUNHO_EM`, `EDIT_DEVICE_ID`, `EDIT_LEASE_UNTIL`, `DRAFT_REVISION`.
 - PASSAGENS_SERVICO: `SERVICE_ID`, `SEGMENTO_ORIGEM`, `SEGMENTO_DESTINO`, `RSD_ANTERIOR_ID`.
@@ -95,12 +106,12 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Credenciais não estão versionadas no GitHub.
 
 ## Próximo passo obrigatório
-1. Substituir o `Code.gs` do projeto Apps Script pelo `apps_script_v10.gs` atual.
+1. Substituir o `Code.gs` do projeto Apps Script pelo `apps_script_v10.gs` da branch de homologação 10.5.2.
 2. Salvar.
 3. `Implantar → Gerenciar implantações → Editar → Nova versão`.
 4. Manter a mesma URL `/exec`.
 5. Confirmar:
-   `?action=version` → `{"ok":true,"version":"10.5.1","schema":"central-v10"}`.
+   `?action=version` → `{"ok":true,"version":"10.5.2","schema":"central-v10"}`.
 6. Executar a matriz de homologação descrita em `IMPLANTACAO_V10.md`.
 7. Somente depois alterar `BACKEND_V10_STATUS` para `ATIVO`.
 
