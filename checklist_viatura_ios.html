@@ -2206,7 +2206,7 @@
     window.addEventListener('afterprint', restoreDocumentTitle);
 
 
-    let vehiclePhotos = [];
+    let vehiclePhotos = []; window.centralVehiclePhotos=vehiclePhotos;
     let vehiclePhotoOriginals = [];
     const vehiclePhotosInput=document.getElementById('vehiclePhotosInput');
     const vehiclePhotoGrid=document.getElementById('vehiclePhotoGrid');
@@ -2596,6 +2596,22 @@
   }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(run,30));
   window.centralInstallCompactMenus=run;
+})();
+</script>
+
+<script>window.CENTRAL_V10_ENABLED=false;</script>
+<script src="central_cloud.js"></script>
+<script id="checklist-cloud-registry-v1">
+(function(){
+ const NEG=new Set(['nao','defeito','baixo','baixa','avaria']);
+ function unit(){const b=document.getElementById('globalBatalhao')?.value||'BPTran',n=Number(document.getElementById('globalCompanhia')?.value||1);return {batalhao:b,companhiaNumero:n,companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
+ function v(id){return (document.getElementById(id)?.value||'').trim()}
+ function checklistId(){const parts=[unit().batalhao,unit().companhiaNumero,v('prefixo'),v('data_inicio'),v('hora_inicio'),CentralCloud.formatMatricula(v('matricula'))].join('|').toUpperCase();let h=2166136261;for(let i=0;i<parts.length;i++){h^=parts.charCodeAt(i);h=Math.imul(h,16777619)}return 'chk-'+(h>>>0).toString(36)}
+ function alterations(){const out=[];document.querySelectorAll('select').forEach(s=>{if(!s.id||!NEG.has(String(s.value||'').toLowerCase()))return;const field=s.closest('.check-item,.field,.form-field')||s.parentElement;const label=field?.querySelector('label,.item-label,strong')?.textContent?.trim()||s.id;let detalhe='';const root=field||document;const det=root.querySelector('input[type=text],textarea');if(det&&det!==s)detalhe=det.value.trim();out.push({item:s.id,label,status:s.value,detalhe})});return out}
+ function collect(includePhotos=false){const id=checklistId(),alts=alterations(),photos=Array.isArray(window.centralVehiclePhotos)?window.centralVehiclePhotos:[];return {checklistId:id,id,unidade:unit(),prefixo:v('prefixo').toUpperCase(),placa:v('placa').toUpperCase(),marcaModelo:v('marca_modelo'),condutor:v('condutor'),matricula:CentralCloud.formatMatricula(v('matricula')),data:v('data_inicio'),hora:v('hora_inicio'),turno:v('turno'),kmInicial:v('km_inicial'),local:v('local'),observacoes:v('observacoes'),semObservacoes:!!document.getElementById('sem_observacoes')?.checked,alteracoes:alts,status:alts.length?'COM_ALTERACAO':'SEM_ALTERACAO',fotoCount:photos.length,fotos:includePhotos?photos.slice(0,4):[],updatedAt:new Date().toISOString()}}
+ async function register(){if(!v('prefixo')||!v('data_inicio')||!v('condutor'))return;const local=collect(false);CentralCloud.upsertLocal('checklists',local,'checklistId');if(!CentralCloud.isEnabled())return;const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;const full=collect(true);try{await CentralCloud.postOrQueue('checklist-register',{checklist:full},{token,unit:unit(),popup:false})}catch(_){}}
+ function install(){document.getElementById('matricula')?.addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));window.addEventListener('beforeprint',register);document.getElementById('shareBtn')?.addEventListener('click',()=>setTimeout(register,500));}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
 })();
 </script>
 </body>
