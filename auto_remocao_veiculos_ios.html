@@ -1539,5 +1539,20 @@ function prepareAndPrint() {
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,60));else setTimeout(install,60);
 })();
 </script>
+
+<script id="cirvc-local-registry-v1">
+(function(){
+ function unit(){const i=window.getInstitution?getInstitution():{};return {batalhao:i.batalhao||document.getElementById('globalBatalhao')?.value||'BPTran',companhiaNumero:Number(i.numero||document.getElementById('globalCompanhia')?.value||1),companhia:i.companhia||document.getElementById('globalCompanhia')?.selectedOptions?.[0]?.text||''}}
+ function registerLocal(){
+   if(!window.CentralCloud||typeof window.arvcPayloadCpu!=='function')return [];
+   const p=arvcPayloadCpu(),raw=typeof coletarTodos==='function'?coletarTodos():[];
+   const regs=(p.registros||[]).map((r,i)=>{const a=raw[i]||{},id=r.id||r.cirvcId||('cirvc-'+(r.numero||i)+'-'+(r.data||''));return {...r,...{id,cirvcId:id,unidade:unit(),tipo:a.tipo||r.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/')||r.marcaModelo||'',prefixo:a.guarnicaoVtr||r.vtr||'',matriculaResponsavel:a.matriculaResponsavel||'',responsavelCirvc:a.militarResponsavel||'',localCustodia:a.localDestino||r.local||'',localApreensao:a.localApreensao||'',statusCustodia:'AGUARDANDO_TRANSPORTE',updatedAt:new Date().toISOString()}}});
+   regs.forEach(x=>CentralCloud.upsertLocal('cirvc',x,'cirvcId'));return regs;
+ }
+ function install(){const base=window.consolidarArvc;if(typeof base!=='function'||base.__localRegistry)return;const w=function(){registerLocal();return base.apply(this,arguments)};w.__localRegistry=true;window.consolidarArvc=w}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,120));else setTimeout(install,120);
+ window.addEventListener('central-v10-ready',()=>setTimeout(install,80));
+})();
+</script>
 </body>
 </html>
