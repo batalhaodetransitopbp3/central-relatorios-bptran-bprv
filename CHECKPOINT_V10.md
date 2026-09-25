@@ -6,10 +6,10 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - Repositório: `batalhaodetransitopbp3/central-relatorios-bptran-bprv`
 - Branch ativa: `main`
 - Backend complementar atual: `apps_script_v10.gs`
-- Versão atual do código: **10.5.0**
+- Versão atual do código: **10.5.1**
 - Endpoint v10 existente:
   `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
-- O endpoint já foi criado anteriormente; a versão 10.5.0 ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
+- O endpoint já foi criado anteriormente; a versão 10.5.1 ainda precisa ser promovida na implantação existente e confirmada por `?action=version`.
 
 ## Estado de homologação
 - `CONFIG.BACKEND_V10_STATUS = EM_HOMOLOGACAO`
@@ -54,11 +54,11 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 ## Solução 51 — Continuidade em Nuvem e Passagem Encadeada
 - Cada serviço contínuo recebe um `SERVICE_ID`.
 - Cada comandante da guarnição trabalha em um `SEGMENTO` próprio, com `REPORT_ID` próprio.
-- Mesmo comandante em outro aparelho: `Continuar serviço` recupera o mesmo RSD pela matrícula e mantém o mesmo `REPORT_ID`.
+- Mesmo comandante em outro aparelho: `Continuar serviço` recupera o mesmo RSD pela matrícula e mantém o mesmo `REPORT_ID`. Se tentar registrar/iniciar novamente a mesma guarnição, o backend detecta o RSD ativo e direciona para o registro existente, impedindo duplicidade.
 - O RSD sincroniza rascunho em nuvem por `rsd-draft-sync` após período de inatividade.
 - Controle de edição: `EDIT_DEVICE_ID` + `EDIT_LEASE_UNTIL`. Um novo aparelho pode assumir a edição; o anterior deixa de sincronizar.
 - Troca de comandante dentro do mesmo segmento é bloqueada. Para mudar comandante é obrigatória a passagem de serviço.
-- A passagem só pode ser publicada depois que o RSD de origem estiver finalizado.
+- Ao realizar a passagem pela nuvem, o sistema finaliza/sincroniza automaticamente o RSD de origem antes de publicar a passagem; o trecho anterior fica imutável.
 - Novo comandante recebe a passagem com:
   - mesmo `SERVICE_ID`;
   - novo `REPORT_ID`;
@@ -72,7 +72,7 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 - O RCO soma múltiplos segmentos da mesma guarnição sem apagar segmentos anteriores.
 - Criada a aba `RCO_RASCUNHOS` para continuidade do Coordenador.
 - O RCO pode ser retomado em outro aparelho mantendo o mesmo `REPORT_ID`.
-- Passagem do Coordenador mantém o mesmo RCO e abre novo slot de autoria (CPU 2, CPU 3...), preservando a auditoria dos anteriores.
+- Passagem do Coordenador mantém o mesmo RCO e abre novo slot de autoria (CPU 2, CPU 3...), preservando a auditoria dos anteriores. O backend também bloqueia a abertura de um segundo RCO concorrente para a mesma unidade/data.
 - JSON de passagem do RCO é apenas contingência.
 - `Início do serviço` foi corrigido para não apagar `CENTRAL_TOKEN`, `P3_TOKEN`, fila de sincronização nem ID do dispositivo.
 
@@ -100,7 +100,7 @@ Este arquivo é a fotografia atual para retomada segura do projeto.
 3. `Implantar → Gerenciar implantações → Editar → Nova versão`.
 4. Manter a mesma URL `/exec`.
 5. Confirmar:
-   `?action=version` → `{"ok":true,"version":"10.5.0","schema":"central-v10"}`.
+   `?action=version` → `{"ok":true,"version":"10.5.1","schema":"central-v10"}`.
 6. Executar a matriz de homologação descrita em `IMPLANTACAO_V10.md`.
 7. Somente depois alterar `BACKEND_V10_STATUS` para `ATIVO`.
 

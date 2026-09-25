@@ -1,7 +1,7 @@
-# Implantação e Homologação — Central v10.5.0
+# Implantação e Homologação — Central v10.5.1
 
 ## Estado atual
-A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.0 e homologar as novas rotinas de continuidade em nuvem.
+A Central v10 já possui Web App publicado. Esta etapa **não cria outro projeto** e **não troca a URL**. O objetivo é promover o código atual para a versão 10.5.1 e homologar as novas rotinas de continuidade em nuvem.
 
 Endpoint atual:
 `https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec`
@@ -11,7 +11,7 @@ Endpoint atual:
 2. Abra `Code.gs`.
 3. No GitHub, abra `apps_script_v10.gs` da branch `main`.
 4. Confirme no início:
-   `var CENTRAL_V10_VERSION = '10.5.0';`
+   `var CENTRAL_V10_VERSION = '10.5.1';`
 5. Substitua todo o conteúdo de `Code.gs` pelo arquivo atual.
 6. Salve.
 7. Não altere `CENTRAL_TOKEN` nem `P3_TOKEN`.
@@ -19,7 +19,7 @@ Endpoint atual:
 9. Selecione a implantação atual e clique em editar.
 10. Em versão, selecione **Nova versão**.
 11. Descrição sugerida:
-    `Backend V10.5.0 — continuidade em nuvem e passagem encadeada`
+    `Backend V10.5.1 — continuidade em nuvem e passagem encadeada`
 12. Mantenha execução como proprietário e o mesmo nível de acesso já homologado.
 13. Clique em `Implantar`.
 14. Confirme que a URL `/exec` permaneceu a mesma.
@@ -29,7 +29,7 @@ Abra:
 `<ENDPOINT>?action=version`
 
 Resultado esperado:
-`{"ok":true,"version":"10.5.0","schema":"central-v10"}`
+`{"ok":true,"version":"10.5.1","schema":"central-v10"}`
 
 Depois feche a Central, abra novamente e use `Ctrl + Shift + R`.
 
@@ -58,8 +58,8 @@ Depois feche a Central, abra novamente e use `Ctrl + Shift + R`.
 9. No aparelho A, tente editar/sincronizar e confirme que ele não consegue sobrescrever a nuvem sem nova assunção.
 
 ## Homologação — Passagem de comandante da guarnição
-1. Finalize o RSD do comandante 1.
-2. Clique `Realizar passagem de serviço`.
+1. Com o RSD do comandante 1 em andamento, clique `Realizar passagem de serviço`.
+2. Confirme que o sistema finaliza/sincroniza automaticamente o segmento do comandante 1 antes de disponibilizar a passagem.
 3. Em aparelho B, abra RSD e use `Início do serviço`.
 4. Informe a mesma guarnição e identifique o comandante 2.
 5. Clique `Receber passagem de serviço`.
