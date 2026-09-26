@@ -1151,13 +1151,13 @@ function rcoDraftUpsert_(payload){
   // em outro aparelho crie um documento concorrente em vez de continuar o existente.
   if(!old&&data){
     var existing=objects_(s).filter(function(x){
-      return String(x.STATUS)==='EM_ANDAMENTO' &&
+      return ['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(x.STATUS||''))>=0 &&
         dateText_(x.DATA_SERVICO)===data &&
         String(x.BATALHAO||'')===String(batt) &&
         String(x.COMPANHIA||'')===String(comp) &&
         String(x.RCO_REPORT_ID||'')!==reportId;
     }).sort(function(a,b){return String(b.ULTIMO_SYNC_EM||b.ATUALIZADO_EM||'').localeCompare(String(a.ULTIMO_SYNC_EM||a.ATUALIZADO_EM||''));})[0]||null;
-    if(existing)throw new Error('Já existe RCO em andamento para esta unidade e data. Use Continuar serviço para carregar o relatório existente.');
+    if(existing)throw new Error(String(existing.STATUS)==='EM_RETIFICACAO'?'Já existe um RCO desta unidade/data aberto para retificação. Use Continuar serviço para carregar o mesmo relatório.':'Já existe RCO em andamento para esta unidade e data. Use Continuar serviço para carregar o relatório existente.');
   }
 
   if(old&&['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(old.STATUS||''))<0)throw new Error('Este RCO já foi finalizado. Para alterar dados consolidados, o P3 deve reabrir formalmente o RCO para retificação.');
