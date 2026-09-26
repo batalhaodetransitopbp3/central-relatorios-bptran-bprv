@@ -217,6 +217,12 @@ function sheet_(id, name) {
   if (!s) throw new Error('Aba ausente no banco: ' + name);
   return s;
 }
+function sheetOrCreate_(id,name,headers){
+  var ss=ss_(id),s=ss.getSheetByName(name);
+  if(!s){s=ss.insertSheet(name);if(headers&&headers.length)s.getRange(1,1,1,headers.length).setValues([headers]);}
+  else if(headers&&headers.length)ensureHeaders_(s,headers);
+  return s;
+}
 function headers_(s) {
   var last = Math.max(1, s.getLastColumn());
   return s.getRange(1,1,1,last).getValues()[0].map(function(x){return String(x||'').trim();});
@@ -1099,6 +1105,10 @@ function p3Query_(p) {
   else if(view==='prisoes'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'PRISOES')),p);}
   else if(view==='cirvc'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')),p);}
   else if(view==='auditoria'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES')),p);}
+  else if(view==='veiculos-operacionais'){
+    var vs=sheetOrCreate_(P3_SHEET_ID,'VEICULOS_OPERACIONAIS',['REGISTRO_ID','REPORT_ID','DATA','BATALHAO','COMPANHIA','GUARNICAO','PLACA_UF','TIPO','MARCA_MODELO','MARCA','MODELO','ANO','SITUACAO','CLASSIFICACAO_P3','TIPO_RECUPERACAO_DETALHADA','CONTA_COMO_RECUPERADO','PLACA_ORIGINAL_IDENTIFICADA','PLACA_ORIGINAL_UF','RESTRICAO_ORIGINAL','LOCAL','HOUVE_CONDUZIDOS','QUANTIDADE_CONDUZIDOS','VALOR_FIPE','ORIGEM_RELATORIO','ORIGEM_REGISTRO_ID','ENVIADO_EM']);
+    list=filterCommon_(objects_(vs),p);
+  }
   else if(view==='viaturas'){list=objects_(sheet_(P3_SHEET_ID,'VIATURAS'));}
   else if(view==='militares'){list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));}
   else throw new Error('Visão P3 desconhecida.');
@@ -1217,6 +1227,23 @@ function rcoSupplementalUpsert_(payload) {
         QUANTIDADE:Number(x.quantidade!=null?x.quantidade:(x.QUANTIDADE||0)),
         ORIGEM_RELATORIO:x.origemRelatorio||x.ORIGEM_RELATORIO||'RCO',
         ORIGEM_REGISTRO_ID:x.origemRegistroId||x.ORIGEM_REGISTRO_ID||'',ENVIADO_EM:nowIso_()
+      });
+    });
+  }
+
+  var vehHeaders=['REGISTRO_ID','REPORT_ID','DATA','BATALHAO','COMPANHIA','GUARNICAO','PLACA_UF','TIPO','MARCA_MODELO','MARCA','MODELO','ANO','SITUACAO','CLASSIFICACAO_P3','TIPO_RECUPERACAO_DETALHADA','CONTA_COMO_RECUPERADO','PLACA_ORIGINAL_IDENTIFICADA','PLACA_ORIGINAL_UF','RESTRICAO_ORIGINAL','LOCAL','HOUVE_CONDUZIDOS','QUANTIDADE_CONDUZIDOS','VALOR_FIPE','ORIGEM_RELATORIO','ORIGEM_REGISTRO_ID','ENVIADO_EM'];
+  var vehSheet=sheetOrCreate_(P3_SHEET_ID,'VEICULOS_OPERACIONAIS',vehHeaders),vehRows=stat.veiculos||pkg.veiculos||[];
+  if(Array.isArray(vehRows)){
+    deleteWhere_(vehSheet,'REPORT_ID',reportId);
+    vehRows.forEach(function(x){
+      append_(vehSheet,{
+        REGISTRO_ID:String(x.registroId||x.REGISTRO_ID||uid_('veic')),REPORT_ID:reportId,DATA:dateText_(x.data||x.DATA||obj.DATA_SERVICO),BATALHAO:batt,COMPANHIA:comp,
+        GUARNICAO:x.guarnicao||x.GUARNICAO||'',PLACA_UF:String(x.placaUf||x.PLACA_UF||'').toUpperCase(),TIPO:x.tipo||x.TIPO||'',MARCA_MODELO:x.marcaModelo||x.MARCA_MODELO||'',
+        MARCA:x.marca||x.MARCA||'',MODELO:x.modelo||x.MODELO||'',ANO:x.ano||x.ANO||'',SITUACAO:x.situacao||x.SITUACAO||'',CLASSIFICACAO_P3:x.classificacaoP3||x.CLASSIFICACAO_P3||'',
+        TIPO_RECUPERACAO_DETALHADA:x.tipoRecuperacaoDetalhada||x.TIPO_RECUPERACAO_DETALHADA||'',CONTA_COMO_RECUPERADO:x.contaComoRecuperado===true?'SIM':(x.contaComoRecuperado===false?'NÃO':(x.CONTA_COMO_RECUPERADO||'')),
+        PLACA_ORIGINAL_IDENTIFICADA:x.placaOriginalIdentificada||x.PLACA_ORIGINAL_IDENTIFICADA||'',PLACA_ORIGINAL_UF:x.placaOriginalUf||x.PLACA_ORIGINAL_UF||'',RESTRICAO_ORIGINAL:x.restricaoOriginal||x.RESTRICAO_ORIGINAL||'',
+        LOCAL:x.local||x.LOCAL||'',HOUVE_CONDUZIDOS:x.houveConduzidos||x.HOUVE_CONDUZIDOS||'',QUANTIDADE_CONDUZIDOS:Number(x.quantidadeConduzidos!=null?x.quantidadeConduzidos:(x.QUANTIDADE_CONDUZIDOS||0)),
+        VALOR_FIPE:Number(x.valorFipe!=null?x.valorFipe:(x.VALOR_FIPE||0)),ORIGEM_RELATORIO:x.origemRelatorio||x.ORIGEM_RELATORIO||'RCO',ORIGEM_REGISTRO_ID:x.origemRegistroId||x.ORIGEM_REGISTRO_ID||'',ENVIADO_EM:nowIso_()
       });
     });
   }
