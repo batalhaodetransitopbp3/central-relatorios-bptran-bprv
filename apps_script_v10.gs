@@ -14,7 +14,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.3-rc1';
+var CENTRAL_V10_VERSION = '10.6.4-rc1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -1248,6 +1248,17 @@ function p3FirstField_(h,names){
   for(var i=0;i<(names||[]).length;i++){var x=h.indexOf(names[i]);if(x>=0)return x;}
   return -1;
 }
+function p3Companies_(p){
+  p=p||{};var raw=p.companhias!=null?p.companhias:p.companhia,a=[];
+  if(Array.isArray(raw))a=raw;
+  else a=String(raw||'').split(/[|;,]+/);
+  var seen={},out=[];
+  a.forEach(function(v){v=String(v||'').trim();if(v&&!seen[v]){seen[v]=1;out.push(v)}});
+  return out;
+}
+function p3IndicatorLeaf_(v){
+  var s=String(v||'').trim(),a=s.split('.');return a[a.length-1]||s;
+}
 function p3RowChunks_(rows){
   rows=(rows||[]).slice().sort(function(a,b){return a-b});var out=[],cur=null;
   rows.forEach(function(r){
@@ -1283,13 +1294,13 @@ function p3IndexedRows_(s,p,dateCandidates){
       indexes=[dateIdx,battIdx,compIdx,turnoIdx,guIdx].filter(function(x){return x>=0}),blockStart=indexes.length?Math.min.apply(null,indexes):0,
       blockEnd=indexes.length?Math.max.apply(null,indexes):0,iv=s.getRange(2,blockStart+1,n,blockEnd-blockStart+1).getValues();
   function valueAt(row,idx){return idx>=0?row[idx-blockStart]:''}
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
       turno=String(p.turno||'').toLowerCase(),gu=String(p.guarnicao||'').toLowerCase(),rows=[];
   for(var i=0;i<n;i++){
-    var row=iv[i],d=dateIdx>=0?dateText_(valueAt(row,dateIdx)):'';
+    var row=iv[i],d=dateIdx>=0?dateText_(valueAt(row,dateIdx)):'',co=compIdx>=0?String(valueAt(row,compIdx)||''):'';
     if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;
     if(batt&&(battIdx<0||String(valueAt(row,battIdx)||'')!==batt))continue;
-    if(comp&&(compIdx<0||String(valueAt(row,compIdx)||'')!==comp))continue;
+    if(comps.length&&(compIdx<0||comps.indexOf(co)<0))continue;
     if(turno&&(turnoIdx<0||String(valueAt(row,turnoIdx)||'').toLowerCase()!==turno))continue;
     if(gu&&(guIdx<0||String(valueAt(row,guIdx)||'').toLowerCase().indexOf(gu)<0))continue;
     rows.push(i+2);
@@ -1308,12 +1319,12 @@ function p3ProductionScan_(p){
   var indexCols=[dateIdx,battIdx,compIdx,guIdx],indexStart=Math.min.apply(null,indexCols),indexEnd=Math.max.apply(null,indexCols),
       iv=s.getRange(2,indexStart+1,n,indexEnd-indexStart+1).getValues(),ov=s.getRange(2,origIdx+1,n,1).getDisplayValues();
   function ix(row,col){return row[col-indexStart];}
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
       gu=String(p.guarnicao||'').toLowerCase(),matched=[],digitalKeys={};
   if(p.turno)return {sheet:s,headers:h,matched:[],effective:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
   for(var i=0;i<n;i++){
     var row=iv[i],d=dateText_(ix(row,dateIdx)),b=String(ix(row,battIdx)||''),co=String(ix(row,compIdx)||''),g=String(ix(row,guIdx)||''),o=String(ov[i][0]||'');
-    if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;if(batt&&b!==batt)continue;if(comp&&co!==comp)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
+    if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;if(batt&&b!==batt)continue;if(comps.length&&comps.indexOf(co)<0)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
     var hist=p3HistoricalOrigin_(o),key=[d,b,co].join('|'),m={row:i+2,data:d,batalhao:b,companhia:co,guarnicao:g,origem:o,historico:hist,key:key};
     matched.push(m);if(!hist)digitalKeys[key]=1;
   }
@@ -1341,17 +1352,68 @@ function p3ProductionFacts_(p,mode,limit){
   return {items:items,total:total,totalHistorico:histAll,totalDigital:digAll,sourceStats:scan.sourceStats};
 }
 function p3ProductivityMatrix_(p){
-  var facts=p3ProductionFacts_(p,'effective',0),map={};
+  var facts=p3ProductionFacts_(p,'effective',0),map={},companies={};
   facts.items.forEach(function(x){
-    var k=[x.COMPANHIA,x.GUARNICAO,x.GRUPO_CODIGO,x.INDICADOR_CODIGO].join('||');
-    if(!map[k])map[k]={COMPANHIA:x.COMPANHIA,GUARNICAO:x.GUARNICAO,GRUPO_CODIGO:x.GRUPO_CODIGO,GRUPO_NOME:x.GRUPO_NOME,INDICADOR_CODIGO:x.INDICADOR_CODIGO,INDICADOR_NOME:x.INDICADOR_NOME,QUANTIDADE:0};
+    var ic=p3IndicatorLeaf_(x.INDICADOR_CODIGO),co=String(x.COMPANHIA||'Não informada'),gc=String(x.GRUPO_CODIGO||'');
+    companies[co]=1;
+    var k=[co,gc,ic].join('||');
+    if(!map[k])map[k]={COMPANHIA:co,GUARNICAO:'CONSOLIDADO',GRUPO_CODIGO:gc,GRUPO_NOME:x.GRUPO_NOME,INDICADOR_CODIGO:ic,INDICADOR_NOME:x.INDICADOR_NOME,QUANTIDADE:0};
     map[k].QUANTIDADE+=Number(x.QUANTIDADE||0);
   });
   var items=Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){
-    return String(a.COMPANHIA+'|'+a.GUARNICAO+'|'+a.GRUPO_CODIGO+'|'+a.INDICADOR_CODIGO).localeCompare(String(b.COMPANHIA+'|'+b.GUARNICAO+'|'+b.GRUPO_CODIGO+'|'+b.INDICADOR_CODIGO));
+    return String(a.GRUPO_CODIGO+'|'+a.INDICADOR_CODIGO+'|'+a.COMPANHIA).localeCompare(String(b.GRUPO_CODIGO+'|'+b.INDICADOR_CODIGO+'|'+b.COMPANHIA));
   });
-  return {ok:true,items:items,rawRows:facts.items.length,sourceStats:facts.sourceStats};
+  return {ok:true,items:items,companies:Object.keys(companies).sort(),rawRows:facts.items.length,sourceStats:facts.sourceStats};
 }
+function p3IntegratedCatalog_(){
+  return [
+    {codigo:'acionamentos-total',nome:'Total de acionamentos',descricao:'Acionamentos CICC + apoios PMPB.'},
+    {codigo:'ait-165',nome:'AIT art. 165',descricao:'Dirigir sob influência de álcool.'},
+    {codigo:'ait-165-a',nome:'AIT art. 165-A',descricao:'Recusa aos procedimentos de verificação de álcool/outra substância psicoativa.'},
+    {codigo:'ait-230-xi',nome:'AIT art. 230, XI',descricao:'Descarga livre ou silenciador defeituoso, deficiente ou inoperante.'},
+    {codigo:'aits-total',nome:'Total de AITs',descricao:'AITs com abordagem + AITs sem abordagem.'},
+    {codigo:'aits-com-abordagem',nome:'Total de AITs com abordagem',descricao:'Art. 165 + art. 165-A + art. 230, XI + demais AITs com abordagem.'},
+    {codigo:'aits-sem-abordagem',nome:'Total de AITs sem abordagem',descricao:'AITs lavrados sem abordagem.'},
+    {codigo:'veiculos-apreendidos-total',nome:'Veículos apreendidos — total',descricao:'Total geral de motocicletas, ciclomotores, automóveis e outros veículos recolhidos.'},
+    {codigo:'prisoes-total',nome:'Prisões — total',descricao:'Somatório das prisões registradas, excluídos TCO-SASP.'},
+    {codigo:'veiculos-crime-total',nome:'Veículos relacionados a crime',descricao:'Apreensões classificadas como SIVA-R + SINAIS.'},
+    {codigo:'abordagens-pessoas',nome:'Pessoas abordadas',descricao:'Total de pessoas abordadas.'},
+    {codigo:'abordagens-veiculos',nome:'Veículos abordados — total',descricao:'Motocicletas + ciclomotores + automóveis + outros veículos abordados.'},
+    {codigo:'testes-etilometro',nome:'Testes de etilômetro realizados',descricao:'Quantidade de testes de etilômetro realizados.'}
+  ];
+}
+function p3MetricContribution_(x,code){
+  var gc=String(x.GRUPO_CODIGO||''),ic=p3IndicatorLeaf_(x.INDICADOR_CODIGO),q=Number(x.QUANTIDADE||0);
+  if(!q)return 0;
+  if(code==='acionamentos-total')return gc==='acionamentos'&&['bsts','reboque-outras-unidades'].indexOf(ic)>=0?q:0;
+  if(code==='ait-165')return gc==='notificacoes'&&ic==='art-165'?q:0;
+  if(code==='ait-165-a')return gc==='notificacoes'&&ic==='art-165-a'?q:0;
+  if(code==='ait-230-xi')return gc==='notificacoes'&&ic==='art-230-xi'?q:0;
+  if(code==='aits-sem-abordagem')return gc==='notificacoes'&&ic==='aits-sem-abordagem'?q:0;
+  if(code==='aits-com-abordagem')return gc==='notificacoes'&&['art-165','art-165-a','art-230-xi','demais-aits-com-abordagem'].indexOf(ic)>=0?q:0;
+  if(code==='aits-total')return gc==='notificacoes'&&['art-165','art-165-a','art-230-xi','demais-aits-com-abordagem','aits-sem-abordagem'].indexOf(ic)>=0?q:0;
+  if(code==='veiculos-apreendidos-total')return ['apreensoes-veiculos-recolhimentos','remocoes-veiculos-legado'].indexOf(gc)>=0&&['motocicletas','ciclomotores','automoveis','outros'].indexOf(ic)>=0?q:0;
+  if(code==='prisoes-total')return gc==='prisoes'&&ic!=='tco-sasp'?q:0;
+  if(code==='veiculos-crime-total')return gc==='apreensoes'&&['siva-r','sinais'].indexOf(ic)>=0?q:0;
+  if(code==='abordagens-pessoas')return gc==='abordagens'&&ic==='pessoas'?q:0;
+  if(code==='abordagens-veiculos')return gc==='abordagens'&&['motocicletas','ciclomotores','automoveis','outros'].indexOf(ic)>=0?q:0;
+  if(code==='testes-etilometro')return ic==='testes-etilometro'?q:0;
+  return 0;
+}
+function p3Analysis_(p) {
+  var catalog=p3IntegratedCatalog_(),requested=String(p.indicador||catalog[0].codigo),
+      meta=catalog.filter(function(x){return x.codigo===requested||x.nome===requested})[0]||catalog[0],code=meta.codigo;
+  var facts=p3ProductionFacts_(p,'effective',0),list=facts.items,byCompany={},byDate={},total=0;
+  list.forEach(function(x){
+    var q=p3MetricContribution_(x,code);if(!q)return;
+    var co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||'');
+    total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
+  });
+  return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
+    porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
+    porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
+}
+
 function p3Config_(){
   var rows=objects_(sheet_(P3_SHEET_ID,'CONFIG')),out={};
   rows.forEach(function(x){if(['POWERBI_URL','AMBIENTE','BACKEND_V10_STATUS','HISTORICO_2026_STATUS','HISTORICO_2026_PERIODO','HISTORICO_2026_PRODUCAO_LINHAS'].indexOf(String(x.CHAVE))>=0)out[String(x.CHAVE)]=x.VALOR||'';});
@@ -1362,18 +1424,6 @@ function p3ConfigSet_(payload){
   var s=sheet_(P3_SHEET_ID,'CONFIG'),row=findOne_(s,'CHAVE',key)||{CHAVE:key,DESCRICAO:'Configuração da Gestão P3',EDITAVEL_P3:'SIM'};
   row.VALOR=String(payload.valor||payload.value||'').trim();upsert_(s,'CHAVE',key,row);
   return {ok:true,message:'Configuração atualizada.',chave:key,valor:row.VALOR};
-}
-function p3Analysis_(p) {
-  var facts=p3ProductionFacts_(p,'effective',0),list=facts.items,indicator=String(p.indicador||''),indicators={},byCompany={},byDate={},total=0;
-  list.forEach(function(x){
-    var name=String(x.INDICADOR_NOME||x.INDICADOR_CODIGO||'');if(name)indicators[name]=1;
-    if(indicator&&name!==indicator&&String(x.INDICADOR_CODIGO||'')!==indicator)return;
-    var q=Number(x.QUANTIDADE||0),co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||'');
-    total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
-  });
-  return {ok:true,indicadores:Object.keys(indicators).sort(),indicador:indicator,total:total,sourceStats:facts.sourceStats,
-    porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
-    porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
 }
 function p3LegacyCirvcMap_(x){
   return Object.assign({},x,{CIRVC_ID:x.CIRVC_ID||x.REGISTRO_ID||'',DATA_CADASTRO:x.DATA_CADASTRO||x.DATA||'',LOCAL_CUSTODIA:x.LOCAL_CUSTODIA||x.LOCAL_DEIXADO||'',
