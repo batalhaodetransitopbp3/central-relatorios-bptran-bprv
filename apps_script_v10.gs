@@ -797,11 +797,18 @@ function passagemCancelar_(payload){
 
 function passagemRetificar_(payload){
   var id=String(payload.passagemId||''),s=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'),row=findOne_(s,'PASSAGEM_ID',id);if(!row)throw new Error('Passagem não localizada.');
-  if(String(row.STATUS)!=='AGUARDANDO_RECEBIMENTO')throw new Error('Somente passagem ainda não recebida pode ser retificada diretamente.');
-  if(payload.viaturas)row.VTRS_JSON=JSON.stringify(payload.viaturas);if(payload.observacoes!==undefined)row.OBSERVACOES=String(payload.observacoes||'');
-  if(payload.pendencias)row.PENDENCIAS_JSON=JSON.stringify(payload.pendencias);ensureHeaders_(s,['RETIFICADA_EM','RETIFICADA_MOTIVO']);
-  row.RETIFICADA_EM=nowIso_();row.RETIFICADA_MOTIVO=String(payload.motivo||'Retificação de passagem');row.ATUALIZADO_EM=nowIso_();upsert_(s,'PASSAGEM_ID',id,row);
-  return {ok:true,message:'Passagem retificada.',status:row.STATUS};
+  var status=String(row.STATUS||'');
+  if(['AGUARDANDO_RECEBIMENTO','RECEBIDA'].indexOf(status)<0)throw new Error('Esta passagem não pode ser retificada neste estado.');
+  ensureHeaders_(s,['RETIFICADA_EM','RETIFICADA_MOTIVO','RETIFICADA_POR_MATRICULA','RETIFICADA_POR_NOME']);
+  if(status==='AGUARDANDO_RECEBIMENTO'){
+    if(payload.viaturas)row.VTRS_JSON=JSON.stringify(payload.viaturas);
+    if(payload.pendencias)row.PENDENCIAS_JSON=JSON.stringify(payload.pendencias);
+  }
+  if(payload.observacoes!==undefined)row.OBSERVACOES=String(payload.observacoes||'');
+  row.RETIFICADA_EM=nowIso_();row.RETIFICADA_MOTIVO=String(payload.motivo||'Retificação de passagem');
+  row.RETIFICADA_POR_MATRICULA=normMat_(payload.autorMatricula||'');row.RETIFICADA_POR_NOME=String(payload.autorNome||'');
+  row.ATUALIZADO_EM=nowIso_();upsert_(s,'PASSAGEM_ID',id,row);
+  return {ok:true,message:status==='RECEBIDA'?'Registro da passagem retificado. O recebimento permanece válido.':'Passagem retificada.',status:row.STATUS};
 }
 
 function passagemAnular_(payload){
