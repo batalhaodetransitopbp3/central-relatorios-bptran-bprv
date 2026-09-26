@@ -14,10 +14,8 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 - recebimento de passagem pela nuvem com lista de passagens disponíveis;
 - preenchimento automático do serviço recebido e identificação do novo comandante pelo Cadastro Mestre;
 - passagem em estado aguardando recebimento;
-- no RCO, botão próprio `Receber passagem de serviço`, com busca em nuvem e cards somente dos RCOs disponibilizados;
-- RCO recebido preserva o relatório existente, abre novo segmento de CPU e exige novo cadastro/autenticação do responsável;
-- passagem do RCO pode ser retificada ou cancelada antes do recebimento;
 - retificação e cancelamento de passagem antes do recebimento;
+- após o recebimento, o novo segmento pode retificar o registro da passagem ou solicitar a anulação do recebimento enquanto ainda não houver movimentação relevante;
 - proteção de recebimento simultâneo;
 - cancelamento lógico/auditável de RSD;
 - estados de análise do Coordenador e devolutiva ao comandante;
@@ -27,6 +25,9 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 
 ### RCO
 - cadastro formal do CPU/P3/Oficial por matrícula e Cadastro Mestre;
+- botão próprio `Receber passagem de serviço`, com busca em nuvem e cards somente dos RCOs disponibilizados;
+- RCO recebido preserva o relatório existente, abre novo segmento de CPU e exige novo cadastro/autenticação do responsável;
+- passagem do RCO pode ser retificada ou cancelada antes do recebimento;
 - credencial de Coordenação separada da credencial operacional;
 - P3/Oficial usa credencial administrativa;
 - preenchimento automático do responsável pela consolidação no rodapé;
@@ -70,7 +71,7 @@ Tabela:
 - bairro/cidade;
 - nome/matrícula.
 
-O módulo permite acrescentar e retirar veículos, mantém rascunho local do dia e gera PDF em A4 paisagem. O PDF contém somente espaço para assinatura do militar responsável pelo preenchimento, sem vistos do CPU ou do comandante da companhia.
+O módulo permite acrescentar e retirar veículos, mantém rascunho local do dia e gera PDF em A4 paisagem. A assinatura do militar responsável é feita em tela cheia, no mesmo padrão dos demais relatórios, e é inserida no PDF. Não há vistos do CPU ou do comandante da companhia.
 
 Arquivos:
 - `relatorio_traslados_reboque.html`
@@ -163,6 +164,10 @@ A validação estática não substitui homologação funcional com o Apps Script
 28. Confirmar que `Início do serviço (limpar histórico)` não apaga nuvem.
 29. Salvar diferentes operações e conferir o resumo nominal/quantitativo no topo.
 30. Confirmar que TCO registrado em ocorrência acompanha o RSD/RCO sem cadastro independente ou duplicação.
+31. Retificar o registro de uma passagem já recebida sem criar novo segmento.
+32. Anular imediatamente um recebimento de passagem e confirmar retorno ao segmento anterior.
+33. Confirmar bloqueio da anulação quando o novo segmento já possuir movimentação relevante.
+34. Testar a assinatura em tela cheia do Relatório de Traslados do Reboque e sua impressão no PDF.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
