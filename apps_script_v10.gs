@@ -14,7 +14,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.4-rc1';
+var CENTRAL_V10_VERSION = '10.6.5-rc1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -80,6 +80,9 @@ function doGet(e) {
     } else if (action === 'p3-analysis') {
       assertToken_(p.token, 'p3');
       out = p3Analysis_(p);
+    } else if (action === 'p3-analysis-compare') {
+      assertToken_(p.token, 'p3');
+      out = p3AnalysisCompare_(p);
     } else if (action === 'p3-config') {
       assertToken_(p.token, 'p3');
       out = p3Config_();
@@ -1351,20 +1354,66 @@ function p3ProductionFacts_(p,mode,limit){
   var histAll=scan.matched.filter(function(x){return x.historico}).length,digAll=scan.matched.length-histAll;
   return {items:items,total:total,totalHistorico:histAll,totalDigital:digAll,sourceStats:scan.sourceStats};
 }
-function p3ProductivityMatrix_(p){
-  var facts=p3ProductionFacts_(p,'effective',0),map={},companies={};
-  facts.items.forEach(function(x){
+
+function p3ProductionFastEffective_(p,di,df){
+  p=p||{};var s=sheet_(P3_SHEET_ID,'PRODUCAO'),h=headers_(s),last=s.getLastRow(),n=Math.max(0,last-1);
+  if(!n||p.turno)return {items:[],matched:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
+  var idx={
+    d:h.indexOf('DATA_SERVICO'),b:h.indexOf('BATALHAO'),c:h.indexOf('COMPANHIA'),g:h.indexOf('GUARNICAO'),
+    gc:h.indexOf('GRUPO_CODIGO'),gn:h.indexOf('GRUPO_NOME'),ic:h.indexOf('INDICADOR_CODIGO'),inn:h.indexOf('INDICADOR_NOME'),
+    q:h.indexOf('QUANTIDADE'),o:h.indexOf('ORIGEM_RELATORIO')
+  },cols=Object.keys(idx).map(function(k){return idx[k]}).filter(function(x){return x>=0});
+  if(cols.length<10)return {items:[],matched:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
+  var first=Math.min.apply(null,cols),lastCol=Math.max.apply(null,cols),vals=s.getRange(2,first+1,n,lastCol-first+1).getValues();
+  function at(row,i){return row[i-first]}
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),gu=String(p.guarnicao||'').toLowerCase(),
+      start=dateText_(di||p.dataInicio||p.inicio||''),end=dateText_(df||p.dataFim||p.fim||''),matched=[],digitalKeys={};
+  for(var i=0;i<vals.length;i++){
+    var row=vals[i],d=dateText_(at(row,idx.d)),b=String(at(row,idx.b)||''),co=String(at(row,idx.c)||''),g=String(at(row,idx.g)||'');
+    if(start&&(!d||d<start))continue;if(end&&(!d||d>end))continue;if(batt&&b!==batt)continue;if(comps.length&&comps.indexOf(co)<0)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
+    var o=String(at(row,idx.o)||''),hist=p3HistoricalOrigin_(o),key=[d,b,co].join('|');
+    var m={DATA_SERVICO:d,BATALHAO:b,COMPANHIA:co,GUARNICAO:g,GRUPO_CODIGO:at(row,idx.gc),GRUPO_NOME:at(row,idx.gn),
+      INDICADOR_CODIGO:at(row,idx.ic),INDICADOR_NOME:at(row,idx.inn),QUANTIDADE:Number(at(row,idx.q)||0),ORIGEM_RELATORIO:o,
+      historico:hist,key:key,suppressed:false};
+    matched.push(m);if(!hist)digitalKeys[key]=1;
+  }
+  var items=[],digital=0,historico=0,suppressed=0;
+  matched.forEach(function(m){
+    if(m.historico&&digitalKeys[m.key]){m.suppressed=true;suppressed++;return}
+    items.push(m);if(m.historico)historico++;else digital++;
+  });
+  return {items:items,matched:matched,sourceStats:{digital:digital,historico:historico,historicoSuprimido:suppressed}};
+}
+function p3PeriodStatsFast_(scan,start,end){
+  start=dateText_(start||'');end=dateText_(end||'');var digital=0,historico=0,suppressed=0,rows=0;
+  (scan.matched||[]).forEach(function(m){
+    var d=m.DATA_SERVICO;if(start&&d<start)return;if(end&&d>end)return;
+    if(m.suppressed){suppressed++;return}rows++;if(m.historico)historico++;else digital++;
+  });
+  return {digital:digital,historico:historico,historicoSuprimido:suppressed,rows:rows};
+}
+function p3CacheKey_(prefix,obj){
+  try{return prefix+Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,JSON.stringify(obj))).replace(/=+$/,'')}
+  catch(_){return prefix+String(new Date().getTime())}
+}
+function p3ProductivityMatrixFast_(p){
+  var keyObj={di:p.dataInicio||'',df:p.dataFim||'',b:p.batalhao||'',c:p3Companies_(p),g:p.guarnicao||'',t:p.turno||''},
+      ck=p3CacheKey_('p3mx65:',keyObj),cache=CacheService.getScriptCache(),cached=cache.get(ck);
+  if(cached){try{return JSON.parse(cached)}catch(_){}}
+  var scan=p3ProductionFastEffective_(p,p.dataInicio||p.inicio||'',p.dataFim||p.fim||''),map={},companies={};
+  scan.items.forEach(function(x){
     var ic=p3IndicatorLeaf_(x.INDICADOR_CODIGO),co=String(x.COMPANHIA||'Não informada'),gc=String(x.GRUPO_CODIGO||'');
-    companies[co]=1;
-    var k=[co,gc,ic].join('||');
+    companies[co]=1;var k=[co,gc,ic].join('||');
     if(!map[k])map[k]={COMPANHIA:co,GUARNICAO:'CONSOLIDADO',GRUPO_CODIGO:gc,GRUPO_NOME:x.GRUPO_NOME,INDICADOR_CODIGO:ic,INDICADOR_NOME:x.INDICADOR_NOME,QUANTIDADE:0};
     map[k].QUANTIDADE+=Number(x.QUANTIDADE||0);
   });
   var items=Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){
     return String(a.GRUPO_CODIGO+'|'+a.INDICADOR_CODIGO+'|'+a.COMPANHIA).localeCompare(String(b.GRUPO_CODIGO+'|'+b.INDICADOR_CODIGO+'|'+b.COMPANHIA));
-  });
-  return {ok:true,items:items,companies:Object.keys(companies).sort(),rawRows:facts.items.length,sourceStats:facts.sourceStats};
+  }),out={ok:true,items:items,companies:Object.keys(companies).sort(),rawRows:scan.items.length,sourceStats:scan.sourceStats,fast:true};
+  try{cache.put(ck,JSON.stringify(out),60)}catch(_){}
+  return out;
 }
+function p3ProductivityMatrix_(p){return p3ProductivityMatrixFast_(p)}
 function p3IntegratedCatalog_(){
   return [
     {codigo:'acionamentos-total',nome:'Total de acionamentos',descricao:'Acionamentos CICC + apoios PMPB.'},
@@ -1412,6 +1461,38 @@ function p3Analysis_(p) {
   return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
     porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
     porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
+}
+
+
+function p3AnalysisCompare_(p){
+  p=p||{};var curStart=dateText_(p.dataInicio||p.inicio||''),curEnd=dateText_(p.dataFim||p.fim||''),
+      refStart=dateText_(p.refInicio||p.referenciaInicio||''),refEnd=dateText_(p.refFim||p.referenciaFim||'');
+  if(!curStart||!curEnd)throw new Error('Informe o período analisado.');
+  if(!refStart||!refEnd)throw new Error('Informe a janela de referência.');
+  var unionStart=curStart<refStart?curStart:refStart,unionEnd=curEnd>refEnd?curEnd:refEnd,
+      keyObj={cs:curStart,ce:curEnd,rs:refStart,re:refEnd,b:p.batalhao||'',c:p3Companies_(p),g:p.guarnicao||'',t:p.turno||''},
+      ck=p3CacheKey_('p3cmp65:',keyObj),cache=CacheService.getScriptCache(),cached=cache.get(ck);
+  if(cached){try{return JSON.parse(cached)}catch(_){}}
+  var scan=p3ProductionFastEffective_(p,unionStart,unionEnd),catalog=p3IntegratedCatalog_(),metrics={};
+  catalog.forEach(function(m){metrics[m.codigo]={codigo:m.codigo,nome:m.nome,descricao:m.descricao,totalPeriodo:0,totalReferencia:0,periodoComp:{},periodoData:{},referenciaComp:{},referenciaData:{}}});
+  scan.items.forEach(function(x){
+    var d=x.DATA_SERVICO,inCur=d>=curStart&&d<=curEnd,inRef=d>=refStart&&d<=refEnd;if(!inCur&&!inRef)return;
+    catalog.forEach(function(meta){
+      var q=p3MetricContribution_(x,meta.codigo);if(!q)return;var m=metrics[meta.codigo],co=String(x.COMPANHIA||'Não informada');
+      if(inCur){m.totalPeriodo+=q;m.periodoComp[co]=(m.periodoComp[co]||0)+q;m.periodoData[d]=(m.periodoData[d]||0)+q}
+      if(inRef){m.totalReferencia+=q;m.referenciaComp[co]=(m.referenciaComp[co]||0)+q;m.referenciaData[d]=(m.referenciaData[d]||0)+q}
+    });
+  });
+  function pairs(o,nameKey){return Object.keys(o).sort().map(function(k){var z={valor:o[k]};z[nameKey]=k;return z})}
+  var outMetrics=catalog.map(function(meta){var m=metrics[meta.codigo];return {
+    codigo:m.codigo,nome:m.nome,descricao:m.descricao,totalPeriodo:m.totalPeriodo,totalReferencia:m.totalReferencia,
+    periodoPorCompanhia:pairs(m.periodoComp,'nome'),periodoPorData:pairs(m.periodoData,'data'),
+    referenciaPorCompanhia:pairs(m.referenciaComp,'nome'),referenciaPorData:pairs(m.referenciaData,'data')
+  }});
+  var out={ok:true,catalogo:catalog,metricas:outMetrics,periodo:{inicio:curStart,fim:curEnd,sourceStats:p3PeriodStatsFast_(scan,curStart,curEnd)},
+    referencia:{inicio:refStart,fim:refEnd,sourceStats:p3PeriodStatsFast_(scan,refStart,refEnd)},fast:true};
+  try{cache.put(ck,JSON.stringify(out),60)}catch(_){}
+  return out;
 }
 
 function p3Config_(){
