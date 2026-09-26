@@ -1167,18 +1167,37 @@ function closeRcoDraft_(reportId){var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=
    Esta ação complementar preserva origens, auditoria e garante que cada
    operação continue individualizada após a consolidação. */
 function rcoSupplementalUpsert_(payload) {
-  var pkg=payload.rco||payload||{}, rco=pkg.rco||pkg, reportId=String((rco||{}).reportId||pkg.reportId||'');
+  var pkg=payload.rco||payload||{}, rco=pkg.rco||pkg, stat=pkg.estatisticaP3||rco.estatisticaP3||{};
+  var reportId=String((rco||{}).reportId||(rco.state||{}).reportId||pkg.reportId||stat.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
   var old=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
   var u=pkg.unidade||rco.unidade||{}, batt=normBattalion_(u.batalhao||pkg.batalhao),comp=u.companhia||pkg.companhia||normCompany_(batt,u.companhiaNumero);
-  var cons=rco.consolidacaoResponsavel||{};
-  var obj={REPORT_ID:reportId,DATA_SERVICO:dateText_((rco.periodo||{}).inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
-    INICIO:(rco.periodo||{}).inicio||'',TERMINO:(rco.periodo||{}).fim||'',HORARIO_SERVICO:rco.horarioServico||'',SCHEMA_VERSION:pkg.schemaVersion||rco.schemaVersion||2,
+  var cons=rco.consolidacaoResponsavel||{},periodo=rco.periodo||{};
+  var obj={REPORT_ID:reportId,DATA_SERVICO:dateText_(periodo.inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
+    INICIO:periodo.inicio||'',TERMINO:periodo.termino||periodo.fim||'',HORARIO_SERVICO:periodo.horario||rco.horarioServico||'',SCHEMA_VERSION:pkg.schemaVersion||rco.schemaVersion||2,
     GERADO_EM:rco.generatedAt||'',ENVIADO_EM:nowIso_(),RETIFICADO_EM:old?nowIso_():'',STATUS:'ATIVO',
     QUANTIDADE_GUARNICOES:(rco.rcoOrigens||[]).length||'',OBSERVACOES:rco.observacoes||'',ORIGEM:'RCO',
     MODO_CONSOLIDACAO:rco.semGuarnicaoCpu?'SEM_CPU':'CPU',CONSOLIDADOR_MATRICULA:normMat_(cons.matricula||''),CONSOLIDADOR_POSTO_GRAD:cons.postoGrad||'',
     CONSOLIDADOR_NOME:cons.nome||'',CONSOLIDADOR_TURNO:cons.turno||''};
   upsert_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId,obj);
+
+  var prodSheet=sheet_(P3_SHEET_ID,'PRODUCAO'),prodRows=stat.producao||pkg.producao||[];
+  if(Array.isArray(prodRows)&&prodRows.length){
+    deleteWhere_(prodSheet,'REPORT_ID',reportId);
+    prodRows.forEach(function(x){
+      var rid=String(x.registroId||x.REGISTRO_ID||uid_('prod'));
+      append_(prodSheet,{
+        REGISTRO_ID:rid,REPORT_ID:reportId,DATA_SERVICO:dateText_(x.dataServico||x.DATA_SERVICO||obj.DATA_SERVICO),
+        BATALHAO:batt,COMPANHIA:comp,GUARNICAO:x.guarnicao||x.GUARNICAO||'',
+        GRUPO_CODIGO:x.grupoCodigo||x.GRUPO_CODIGO||'',GRUPO_NOME:x.grupoNome||x.GRUPO_NOME||'',
+        INDICADOR_CODIGO:x.indicadorCodigo||x.INDICADOR_CODIGO||'',INDICADOR_NOME:x.indicadorNome||x.INDICADOR_NOME||'',
+        QUANTIDADE:Number(x.quantidade!=null?x.quantidade:(x.QUANTIDADE||0)),
+        ORIGEM_RELATORIO:x.origemRelatorio||x.ORIGEM_RELATORIO||'RCO',
+        ORIGEM_REGISTRO_ID:x.origemRegistroId||x.ORIGEM_REGISTRO_ID||'',ENVIADO_EM:nowIso_()
+      });
+    });
+  }
+
   deleteWhere_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'),'RCO_REPORT_ID',reportId);
   (rco.rcoOrigens||[]).forEach(function(o){append_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'),{REGISTRO_ID:uid_('orig'),RCO_REPORT_ID:reportId,RSD_REPORT_ID:o.rsdReportId||'',
     GUARNICAO:o.guarnicao||'',VERSAO_RSD:o.versao||'',STATUS_ORIGEM:o.status||'INCLUIDO',ADICIONADO_EM:o.adicionadoEm||nowIso_(),ATUALIZADO_EM:nowIso_(),CONSOLIDADOR_MATRICULA:obj.CONSOLIDADOR_MATRICULA});});
