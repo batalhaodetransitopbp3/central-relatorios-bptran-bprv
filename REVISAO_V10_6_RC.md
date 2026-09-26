@@ -44,6 +44,37 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 - após salvar uma operação, o formulário fica pronto para a próxima;
 - resumo superior agrupado por tipo/nome oficial da operação e quantidade.
 
+## Novo módulo — Traslados do Reboque
+
+Foi acrescentado um módulo independente para registrar veículos trasladados pelo reboque durante o serviço, inclusive quando o veículo não passou por CIRVC.
+
+Campos do cabeçalho:
+- data;
+- turno/horário do serviço;
+- prefixo da VTR/Reboque;
+- militar mais antigo responsável.
+
+Tabela:
+- ordem automática (01, 02, 03...);
+- nº do termo;
+- marca;
+- tipo do veículo em seleção;
+- modelo;
+- cor;
+- placa;
+- motivo: Transporte para DETRAN, Transporte para Delegacia, Sinistro de trânsito ou Outro;
+- ao selecionar Outro, abre campo para especificação;
+- bairro/cidade;
+- nome/matrícula.
+
+O módulo permite acrescentar e retirar veículos, mantém rascunho local do dia e gera PDF em A4 paisagem. O PDF contém somente espaço para assinatura do militar responsável pelo preenchimento, sem vistos do CPU ou do comandante da companhia.
+
+Arquivos:
+- `relatorio_traslados_reboque.html`
+- `relatorio_traslados_reboque_ios.html`
+
+O acesso foi incluído na página principal da Central.
+
 ## Backend Apps Script
 
 A versão de código desta branch está identificada como `10.6.0-rc1`.
