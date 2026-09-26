@@ -1279,21 +1279,19 @@ function p3IndexedRows_(s,p,dateCandidates){
   var last=s.getLastRow(),n=Math.max(0,last-1),h=headers_(s);if(!n)return {headers:h,rows:[]};
   var dateIdx=p3FirstField_(h,dateCandidates||['DATA_SERVICO','DATA','DATA_HORA','ABERTA_EM','DATA_CADASTRO']),
       battIdx=p3FirstField_(h,['BATALHAO']),compIdx=p3FirstField_(h,['COMPANHIA']),
-      turnoIdx=p3FirstField_(h,['TURNO','HORARIO_SERVICO']),guIdx=p3FirstField_(h,['GUARNICAO','GUARNICAO_RESPONSAVEL']);
-  var dv=dateIdx>=0?s.getRange(2,dateIdx+1,n,1).getValues():null,
-      bv=battIdx>=0?s.getRange(2,battIdx+1,n,1).getDisplayValues():null,
-      cv=compIdx>=0?s.getRange(2,compIdx+1,n,1).getDisplayValues():null,
-      tv=turnoIdx>=0?s.getRange(2,turnoIdx+1,n,1).getDisplayValues():null,
-      gv=guIdx>=0?s.getRange(2,guIdx+1,n,1).getDisplayValues():null;
+      turnoIdx=p3FirstField_(h,['TURNO','HORARIO_SERVICO']),guIdx=p3FirstField_(h,['GUARNICAO','GUARNICAO_RESPONSAVEL']),
+      indexes=[dateIdx,battIdx,compIdx,turnoIdx,guIdx].filter(function(x){return x>=0}),blockStart=indexes.length?Math.min.apply(null,indexes):0,
+      blockEnd=indexes.length?Math.max.apply(null,indexes):0,iv=s.getRange(2,blockStart+1,n,blockEnd-blockStart+1).getValues();
+  function valueAt(row,idx){return idx>=0?row[idx-blockStart]:''}
   var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
       turno=String(p.turno||'').toLowerCase(),gu=String(p.guarnicao||'').toLowerCase(),rows=[];
   for(var i=0;i<n;i++){
-    var d=dv?dateText_(dv[i][0]):'';
+    var row=iv[i],d=dateIdx>=0?dateText_(valueAt(row,dateIdx)):'';
     if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;
-    if(batt&&(!bv||String(bv[i][0])!==batt))continue;
-    if(comp&&(!cv||String(cv[i][0])!==comp))continue;
-    if(turno&&(!tv||String(tv[i][0]||'').toLowerCase()!==turno))continue;
-    if(gu&&(!gv||String(gv[i][0]||'').toLowerCase().indexOf(gu)<0))continue;
+    if(batt&&(battIdx<0||String(valueAt(row,battIdx)||'')!==batt))continue;
+    if(comp&&(compIdx<0||String(valueAt(row,compIdx)||'')!==comp))continue;
+    if(turno&&(turnoIdx<0||String(valueAt(row,turnoIdx)||'').toLowerCase()!==turno))continue;
+    if(gu&&(guIdx<0||String(valueAt(row,guIdx)||'').toLowerCase().indexOf(gu)<0))continue;
     rows.push(i+2);
   }
   return {headers:h,rows:rows};
