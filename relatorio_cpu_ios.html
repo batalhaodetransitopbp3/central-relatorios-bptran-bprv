@@ -904,7 +904,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   async function supplemental(){
     const accepted=window.__centralP3Accepted||{};
     if(busy||!accepted.pkg||!accepted.token||!accepted.acceptedAt||accepted.acceptedAt===lastAcceptedAt||Date.now()-accepted.acceptedAt>10000)return;
-    if(!window.CentralCloud||!await CentralCloud.probe())return;
+    if(!window.CentralCloud)return;
     const pkg=accepted.pkg,rco=pkg.rco||{};
     const reportId=rco?.state?.reportId||rco?.reportId||pkg?.estatisticaP3?.reportId||'';
     if(!reportId)return;
@@ -912,12 +912,15 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     try{
       const rr=await CentralCloud.postOrQueue('rco-upsert',pkg,{token:accepted.token,unit:pkg.unidade||rco.unidade,popup:false});
       if(rr&&rr.ok!==false){
-        const v=rr.version?' v'+rr.version:'';
-        const el=document.getElementById('p3Status');if(el)el.textContent='RCO sincronizado na Central v10'+v+'.';
+        const el=document.getElementById('p3Status');
+        if(el){
+          if(rr.queued)el.textContent='Envio principal realizado. Sincronização v10 preservada na fila e será enviada quando a Central estiver disponível.';
+          else{const v=rr.version?' v'+rr.version:'';el.textContent='RCO sincronizado na Central v10'+v+'.';}
+        }
       }
     }catch(err){
       console.error('Falha na sincronização complementar v10 do RCO',err);
-      const el=document.getElementById('p3Status');if(el)el.textContent='Envio principal aberto. A sincronização complementar v10 ficará pendente para nova tentativa.';
+      const el=document.getElementById('p3Status');if(el)el.textContent='Envio principal realizado. A sincronização complementar v10 não foi concluída; verifique a Chave P3/configuração da Central.';
     }finally{busy=false}
   }
   document.addEventListener('central-p3-submit-accepted',()=>setTimeout(supplemental,80));
