@@ -658,7 +658,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.6.0-rc1"></script>
+<script src="central_cloud.js?v=10.6.2-rc1"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
@@ -808,15 +808,18 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     window.open(url,'_blank','noopener');
   }
   async function openCloudReboquePdf(item){
-    const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+    const viewer=window.open('about:blank','_blank');if(viewer)try{viewer.opener=null}catch(_){}
+    const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token){try{viewer?.close()}catch(_){}return}
     try{
-      const r=await CentralCloud.jsonp('reboque-list',{rsdReportId:item.reportId,serviceId:item.serviceId||'',token});
+      const params=item.serviceId?{serviceId:item.serviceId,token}:{rsdReportId:item.reportId,token};
+      const r=await CentralCloud.jsonp('reboque-list',params);
       const docs=r.items||[];
-      if(!docs.length){alert('Não há relatório de traslados salvo na Central para esta guarnição.');return}
+      if(!docs.length){try{viewer?.close()}catch(_){}alert('Não há relatório de traslados salvo na Central para esta guarnição.');return}
       const doc=docs.find(x=>String(x.status||'').toUpperCase()==='FINALIZADO')||docs[0];
-      if(String(doc.status||'').toUpperCase()!=='FINALIZADO'&&!confirm('O relatório do reboque ainda está em rascunho. Abrir a versão atual para conferência/PDF?'))return;
-      window.open(cloudDocumentPage('reboque')+'?cloudView='+encodeURIComponent(doc.reportId),'_blank','noopener');
-    }catch(e){alert('Não foi possível recuperar o relatório do reboque: '+e.message)}
+      if(String(doc.status||'').toUpperCase()!=='FINALIZADO'&&!confirm('O relatório do reboque ainda está em rascunho. Abrir a versão atual para conferência/PDF?')){try{viewer?.close()}catch(_){}return}
+      const url=cloudDocumentPage('reboque')+'?cloudView='+encodeURIComponent(doc.reportId);
+      if(viewer)viewer.location.href=url;else window.open(url,'_blank','noopener');
+    }catch(e){try{viewer?.close()}catch(_){}alert('Não foi possível recuperar o relatório do reboque: '+e.message)}
   }
 
   async function viewRsd(item){
