@@ -15,7 +15,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 .filter-di{grid-area:di}.filter-df{grid-area:df}.filter-bat{grid-area:bat}.filters .companies{grid-area:companies}.filter-turno{grid-area:turno}.filter-guarn{grid-area:guarn}.filters button#apply{grid-area:apply}
 .company-picker{border:1px solid #becdd8;border-radius:9px;background:#fff;padding:8px}.company-actions{display:flex;gap:6px;align-items:center;margin-bottom:7px}.company-actions button{padding:4px 7px;font-size:10px}.company-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.company-chip{display:flex;align-items:center;justify-content:flex-start;gap:6px;border:1px solid #d6e0e7;border-radius:7px;background:#f8fbfd;padding:7px 8px;font-size:10px;font-weight:800;white-space:nowrap;min-width:0}.company-chip input{width:auto;min-height:0;margin:0;flex:0 0 auto}
 @media(min-width:1280px){.company-grid{grid-template-columns:repeat(10,minmax(0,1fr))}}
-.progress-box{display:none;margin-top:9px;padding:8px;border:1px solid #c9d6e0;border-radius:9px;background:#f8fbfd}.progress-box.show{display:block}.progress-line{height:8px;background:#e2e9ef;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--b2),var(--b));transition:width .25s ease}.progress-text{font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}.source-note{display:none;margin-top:7px;font-size:9px;color:#7b8d9b;font-style:italic}.source-note.show{display:block}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
+.progress-box{display:none;margin-top:9px;padding:8px;border:1px solid #c9d6e0;border-radius:9px;background:#f8fbfd}.progress-box.show{display:block}.progress-line{height:8px;background:#e2e9ef;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--b2),var(--b));transition:width .25s ease}.progress-text{font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}.source-note{display:none;margin-top:7px;font-size:10px;color:#6f8293;font-style:italic}.source-note.show{display:block}.helpbox{margin-top:10px;border:1px solid #d5e0e8;border-radius:10px;background:#f8fbfd;padding:9px 11px}.helpbox summary{cursor:pointer;font-weight:850;color:var(--b)}.helpbox p{margin:7px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.plain-note{margin-top:7px;font-size:10px;color:var(--muted);line-height:1.4}.analysis-explain{margin:8px 0 2px;padding:9px 10px;border-left:3px solid var(--b2);background:#f7fafc;border-radius:7px;font-size:11px;color:#52697d;line-height:1.45}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
 .toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}.stat small{display:block;margin-top:4px;color:var(--muted);font-size:9px;line-height:1.25;text-transform:none}
 .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:9px}.section-head h2{margin:0;color:var(--b);font-size:19px}.note{font-size:11px;color:var(--muted)}.tablewrap{overflow:auto;max-height:66vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f;text-transform:uppercase}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}.empty{text-align:center;padding:28px;color:#6b7f90}.hidden{display:none!important}
 .chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}
@@ -40,42 +40,43 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 </section>
 <section class="card">
  <nav class="main-menu">
-  <button class="active" data-main="painel"><strong>Painel Geral</strong><small>Resumo e análises</small></button>
-  <a class="btn" href="tabela_operacional_p3.html"><strong>Tabela Operacional</strong><small>Formato do RCO</small></a>
-  <button data-main="rco"><strong>Controle de RCOs</strong><small>Recebidos e retificados</small></button>
-  <button data-main="powerbi"><strong>Painel BI</strong><small>Looker Studio / Power BI</small></button>
+  <button class="active" data-main="painel"><strong>Consulta e acompanhamento</strong><small>Veja a situação dos relatórios e consulte os indicadores</small></button>
+  <a class="btn" href="tabela_operacional_p3.html"><strong>Tabela de produtividade</strong><small>Compare os indicadores por companhia</small></a>
+  <button data-main="rco"><strong>Controle dos RCOs</strong><small>Veja os relatórios recebidos, responsáveis e retificações</small></button>
+  <button data-main="powerbi"><strong>Painel de Indicadores</strong><small>Gráficos para briefing, reunião e apresentação</small></button>
  </nav>
  <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a></div>
+ <details class="helpbox"><summary>Como usar a Gestão P3?</summary><p><strong>1.</strong> Escolha acima o que deseja consultar. <strong>2.</strong> Defina o período e, se quiser, restrinja por batalhão, companhia, turno ou guarnição. <strong>3.</strong> Clique em <strong>Consultar dados</strong>. <strong>4.</strong> Os cartões e tabelas mostrarão apenas o que corresponde aos filtros escolhidos. <strong>5.</strong> Quando precisar apresentar os resultados em reunião ou briefing, use <strong>Painel de Indicadores</strong> para visualizar os mesmos dados em gráficos.</p></details>
 </section>
 
 <div class="subnav card" id="panelSubnav">
- <button class="active" data-sub="controle-diario">Resumo</button><button data-sub="operacoes">Operações</button><button data-sub="prisoes">Prisões/Conduções</button><button data-sub="veiculos-operacionais">Veículos</button><button data-sub="cirvc">CIRVC</button><button data-sub="fisco">Fisco</button><button data-sub="nace-cicc">NACE/CICC</button><button data-sub="auditoria">Auditoria</button><button data-sub="analise">Análise integrada</button>
+ <button class="active" data-sub="controle-diario">Situação do serviço</button><button data-sub="operacoes">Operações</button><button data-sub="prisoes">Prisões e conduções</button><button data-sub="veiculos-operacionais">Veículos recuperados/apreendidos</button><button data-sub="cirvc">CIRVC</button><button data-sub="fisco">Fisco</button><button data-sub="nace-cicc">Sinistros NACE/CICC</button><button data-sub="auditoria">Auditoria</button><button data-sub="analise">Comparar indicadores</button>
 </div>
 
 <section class="card" id="filterCard">
  <div class="filters">
-  <div class="filter-di"><label>Data inicial</label><input id="di" type="date"></div><div class="filter-df"><label>Data final</label><input id="df" type="date"></div>
-  <div class="filter-bat"><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
-  <div class="companies"><label>Companhias</label><div class="company-picker"><div class="company-actions"><button type="button" class="secondary" id="allCompanies">Marcar todas</button><button type="button" class="secondary" id="clearCompanies">Limpar</button><span id="companyCount"></span></div><div id="companyGrid" class="company-grid"></div></div></div>
-  <div class="filter-turno"><label>Turno</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"></div>
-  <div class="filter-guarn"><label>Guarnição (consulta detalhada)</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button>
+  <div class="filter-di"><label>Início do período</label><input id="di" type="date"></div><div class="filter-df"><label>Fim do período</label><input id="df" type="date"></div>
+  <div class="filter-bat"><label>Batalhão (opcional)</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+  <div class="companies"><label>Companhias incluídas na consulta</label><div class="company-picker"><div class="company-actions"><button type="button" class="secondary" id="allCompanies">Marcar todas</button><button type="button" class="secondary" id="clearCompanies">Limpar</button><span id="companyCount"></span></div><div id="companyGrid" class="company-grid"></div></div></div>
+  <div class="filter-turno"><label>Turno específico (opcional)</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"></div>
+  <div class="filter-guarn"><label>Guarnição específica (opcional)</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Consultar dados</button>
  </div>
- <div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
- <div id="sourceNote" class="source-note">ℹ O período consultado inclui dados importados anteriores à implantação digital, integrados automaticamente à série estatística.</div>
+ <div class="plain-note">Deixe os filtros opcionais em branco para considerar todos os registros do período. Marque somente as companhias que deseja incluir na consulta.</div><div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
+ <div id="sourceNote" class="source-note">ℹ Parte dos dados deste período foi registrada antes da implantação da Central atual. Esses registros foram incorporados à consulta para manter a continuidade histórica, sem duplicar informações já substituídas por RCO digital.</div>
 </section>
 
 <section id="painelView">
  <div id="stats" class="stats"></div>
- <section class="card"><div class="section-head"><div><h2 id="title">Painel Geral</h2><div class="note" id="subtitle"></div></div></div><div id="analysisControls"></div><div id="chart" class="chart"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
+ <section class="card"><div class="section-head"><div><h2 id="title">Situação do serviço</h2><div class="note" id="subtitle"></div></div></div><div id="analysisControls"></div><div id="chart" class="chart"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
 </section>
 
 <section id="rcoView" class="hidden">
  <div id="rcoStats" class="stats"></div>
- <section class="card"><div class="section-head"><div><h2>Controle de RCOs</h2><div class="note">Consolidações recebidas pelo P3, responsáveis e eventual retificação do mesmo REPORT_ID.</div></div></div><div class="tablewrap"><table class="tbl"><thead id="rcoHead"></thead><tbody id="rcoBody"></tbody></table></div></section>
+ <section class="card"><div class="section-head"><div><h2>Controle dos RCOs</h2><div class="note">Confira quais RCOs foram recebidos, quem foi o responsável pela consolidação e se houve reabertura para correção. O identificador técnico do relatório aparece apenas para rastreabilidade.</div></div></div><div class="tablewrap"><table class="tbl"><thead id="rcoHead"></thead><tbody id="rcoBody"></tbody></table></div></section>
 </section>
 
 <section id="powerbiView" class="hidden">
- <section class="card"><div class="section-head"><div><h2>Painel BI</h2><div class="note">Vínculo para painel institucional. Compatível com Looker Studio e Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o provedor do painel impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
+ <section class="card"><div class="section-head"><div><h2>Painel de Indicadores</h2><div class="note">Área destinada à apresentação visual dos indicadores operacionais para oficiais, comando, reuniões e briefings. A Gestão P3 é a fonte de consulta e conferência; o painel transforma esses mesmos dados em gráficos de leitura rápida.</div></div></div><div class="analysis-explain"><strong>Para que serve?</strong> Depois de consultar um indicador na Gestão P3, use este painel para apresentá-lo de forma visual: evolução por período, comparação entre companhias, distribuição dos resultados e outros gráficos gerenciais.</div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Verificando se há um painel institucional configurado...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir apresentação dos indicadores</button><button class="secondary" id="biConfigure">Configurar painel</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel de Indicadores"></iframe><div class="powerbi-frame-note">Se o painel não puder ser exibido dentro desta página, utilize “Abrir apresentação dos indicadores”.</div></div></section>
 </section>
 </main>
 <script src="central_cloud.js?v=10.6.5-rc1"></script>
@@ -158,14 +159,14 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  }
  function renderControl(r){
    const rsd=r.rsd||[],rco=r.rco||[],pending=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'];
-   $('title').textContent='Painel Geral';$('subtitle').textContent='Situação dos RSDs e RCOs no período selecionado.';
+   $('title').textContent='Situação do serviço';$('subtitle').textContent='Mostra quantos relatórios existem no período escolhido e em que etapa cada um se encontra.';
    $('stats').innerHTML=cards([['RSDs',rsd.length],['Em serviço',rsd.filter(x=>x.STATUS==='EM_SERVICO'||x.STATUS==='PASSAGEM_DISPONIVEL').length],['Aguardando análise',rsd.filter(x=>x.STATUS==='AGUARDANDO_ANALISE').length],['Deferidos',rsd.filter(x=>/DEFERIDO/.test(x.STATUS||'')).length],['Pendências',rsd.filter(x=>pending.includes(x.STATUS)).length],['RCOs',rco.length]]);
    const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','RCO']];
    table(cols,rsd,$('thead'),$('tbody'));
  }
  function renderList(v,items){
    const defs={
-    operacoes:{title:'Operações individualizadas',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
+    operacoes:{title:'Operações realizadas',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
     prisoes:{title:'Prisões e conduções por tipificação',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']]},
     'veiculos-operacionais':{title:'Veículos operacionais detalhados',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE_ESTATISTICO','FIPE (somente CLONE/SIVA-R)']]},
     cirvc:{title:'CIRVC — custódia',cols:[['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']]},
@@ -204,14 +205,14 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const meta=catalog.find(x=>x.codigo===analysisIndicator)||metric||{},cur=Number(metric?.totalPeriodo||0),old=Number(metric?.totalReferencia||0),
          pct=old?((cur-old)/old*100):(cur===0?null:null),period=r.periodo||{},ref=r.referencia||{},pstats=period.sourceStats||{};
    setSourceNote(pstats);
-   $('title').textContent='Análise integrada';
+   $('title').textContent='Comparação de indicadores';
    $('subtitle').textContent=Number(pstats.rows||0)>0&&cur===0
-     ?'Há dados consolidados no período selecionado, mas não houve registro positivo para este indicador.'
-     :'Indicadores essenciais consolidados. A comparação usa explicitamente a janela de referência indicada abaixo.';
+     ?'Existem dados registrados no período escolhido, mas o indicador selecionado teve valor zero.'
+     :'Escolha um indicador e compare o resultado do período escolhido com outro período definido por você.';
    const opts=catalog.map(x=>'<option value="'+esc(x.codigo)+'" '+(x.codigo===analysisIndicator?'selected':'')+'>'+esc(x.nome)+'</option>').join('');
-   const refOptions=[['previous','Período imediatamente anterior (mesma duração)'],['month','Mesmo intervalo no mês anterior'],['year','Mesmo intervalo no ano anterior'],['custom','Período personalizado']].map(x=>'<option value="'+x[0]+'" '+(x[0]===analysisReference?'selected':'')+'>'+x[1]+'</option>').join('');
-   const custom=analysisReference==='custom'?'<div><label>Referência inicial</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.inicio||'')+'"></div><div><label>Referência final</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.fim||'')+'"></div>':'';
-   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Referência para comparação</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date(period.inicio)+' a '+date(period.fim)+'<br><strong>Janela de referência:</strong> '+date(ref.inicio)+' a '+date(ref.fim)+'<br>'+esc(meta.descricao||'')+'</div></div>';
+   const refOptions=[['previous','Período imediatamente anterior, com a mesma duração (recomendado)'],['month','Mesmo intervalo no mês anterior'],['year','Mesmo intervalo no ano anterior'],['custom','Escolher outro período manualmente']].map(x=>'<option value="'+x[0]+'" '+(x[0]===analysisReference?'selected':'')+'>'+x[1]+'</option>').join('');
+   const custom=analysisReference==='custom'?'<div><label>Início do período de comparação</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.inicio||'')+'"></div><div><label>Fim do período de comparação</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.fim||'')+'"></div>':'';
+   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>O que deseja medir?</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Qual período deseja usar para comparação?</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date(period.inicio)+' a '+date(period.fim)+'<br><strong>Período usado para comparação:</strong> '+date(ref.inicio)+' a '+date(ref.fim)+'<br>'+esc(meta.descricao||'')+'</div></div>';
    document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;renderAnalysisBundle()});
    document.getElementById('analysisReference')?.addEventListener('change',e=>{analysisReference=e.target.value;if(analysisReference==='custom'&&(!customRefStart||!customRefEnd)){const w=referenceWindow();customRefStart=w.start;customRefEnd=w.end}load()});
    document.getElementById('refStart')?.addEventListener('change',e=>{customRefStart=e.target.value;if(customRefEnd)load()});
@@ -220,15 +221,15 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
          refLabel=date(ref.inicio)+(ref.inicio!==ref.fim?' a '+date(ref.fim):''),
          porComp=metric?.periodoPorCompanhia||[],porData=metric?.periodoPorData||[],selected=selectedCompanies().length;
    $('stats').innerHTML=cards([
-     ['Total no período',cur,rangeLabel],
-     ['Total na referência',old,refLabel],
-     ['Variação vs referência',old?((pct>=0?'+':'')+pct.toFixed(1)+'%'):'Sem base',old?'Comparação com '+refLabel:'A referência é zero'],
-     ['Companhias selecionadas',selected,'Filtro aplicado'],
-     ['Companhias com ocorrência',porComp.length,'Neste indicador e período'],
-     ['Dias com ocorrência',porData.length,'Neste indicador e período']
+     ['Resultado no período escolhido',cur,rangeLabel+' • quantidade encontrada para este indicador'],
+     ['Resultado no período de comparação',old,refLabel+' • usado como base para comparar'],
+     ['Diferença em relação ao período de comparação',old?((pct>=0?'+':'')+pct.toFixed(1)+'%'):'Sem comparação possível',old?'Mostra quanto o resultado aumentou ou diminuiu':'O período de comparação também teve valor zero'],
+     ['Companhias incluídas',selected,'Quantidade de companhias marcadas nos filtros'],
+     ['Companhias que tiveram este indicador',porComp.length,'Companhias com valor maior que zero no período escolhido'],
+     ['Dias em que este indicador ocorreu',porData.length,'Dias com valor maior que zero no período escolhido']
    ]);
    const max=Math.max(1,...porComp.map(x=>Number(x.valor||0)));
-   $('chart').innerHTML=porComp.length?porComp.map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">'+(Number(pstats.rows||0)>0?'Há dados consolidados no período, porém este indicador não teve ocorrência.':'Nenhum dado consolidado encontrado para o período e filtros selecionados.')+'</div>';
+   $('chart').innerHTML=porComp.length?porComp.map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">'+(Number(pstats.rows||0)>0?'Há dados registrados no período selecionado, porém este indicador específico ficou em zero.':'Nenhum dado foi encontrado para o período e os filtros selecionados. Confira as datas, o batalhão e as companhias escolhidas.')+'</div>';
    $('thead').innerHTML='';$('tbody').innerHTML='';
  }
  async function loadRco(t){
@@ -247,7 +248,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    });
  }
  async function loadBi(t){
-   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel BI vinculado.':'Painel BI ainda não configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
+   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel de Indicadores configurado e pronto para apresentação.':'Ainda não há um Painel de Indicadores configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
    const wrap=$('biFrameWrap'),frame=$('biFrame');wrap.classList.toggle('hidden',!biUrl);if(biUrl&&frame.src!==biUrl)frame.src=biUrl;if(!biUrl)frame.removeAttribute('src');
  }
  function table(cols,items,head,body){head.innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr>';body.innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros selecionados.</td></tr>'}
@@ -257,8 +258,8 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  $('p3ActorMatricula').addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));
  $('p3ActorLogin').onclick=registerActor;
  $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
- $('biOpen').onclick=()=>{if(!biUrl){alert('O painel BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
- $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel BI (Looker Studio ou Power BI):',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do painel BI atualizada.')}catch(e){alert(e.message)}};
+ $('biOpen').onclick=()=>{if(!biUrl){alert('Ainda não há um Painel de Indicadores configurado.');return}window.open(biUrl,'_blank','noopener')};
+ $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL do painel visual que será usado para apresentar os indicadores aos oficiais:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('Painel de Indicadores atualizado.')}catch(e){alert(e.message)}};
  renderCompanyPicker(true);
  p3Actor=readActor();
  if(p3Actor?.matricula&&!token()){try{sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}p3Actor=null}
