@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
     try{
       if(typeof window.centralReportSave==='function'){return window.centralReportSave(true)!==false}
       if(typeof salvarRascunhoGuarnicao==='function'){salvarRascunhoGuarnicao(true);return true}
-      if(typeof salvarRascunho==='function' && /relatorio_cpu|relatorio_operacao|auto_remocao/.test(path)){salvarRascunho(true);return true}
+      if(typeof salvarRascunho==='function' && /relatorio_cpu|auto_remocao/.test(path)){salvarRascunho(true);return true}
       if(typeof saveDraft==='function' && /boletim_ocorrencia/.test(path)){saveDraft(true);return true}
     }catch(_){}
     return false;
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
     try{
       if(typeof window.centralReportLoad==='function'){return window.centralReportLoad(true)!==false}
       if(typeof carregarRascunhoGuarnicao==='function'){carregarRascunhoGuarnicao();return true}
-      if(typeof carregarRascunho==='function' && /relatorio_cpu|relatorio_operacao|auto_remocao/.test(path)){carregarRascunho();return true}
+      if(typeof carregarRascunho==='function' && /relatorio_cpu|auto_remocao/.test(path)){carregarRascunho();return true}
       if(typeof loadDraft==='function' && /boletim_ocorrencia/.test(path)){loadDraft(true);return true}
     }catch(_){}
     return false;
