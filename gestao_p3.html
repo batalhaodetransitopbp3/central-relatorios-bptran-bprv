@@ -127,7 +127,16 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  async function loadRco(t){
    const r=await CentralCloud.jsonp('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
    $('rcoStats').innerHTML=cards([['RCOs',items.length],['Retificados',ret.length],['Com CPU',items.filter(x=>x.MODO_CONSOLIDACAO==='CPU').length],['P3/Oficial',items.filter(x=>x.MODO_CONSOLIDACAO==='SEM_CPU').length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_GUARNICOES)||0),0)]]);
-   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];table(cols,items,$('rcoHead'),$('rcoBody'));
+   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];
+   $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th>Ação</th></tr>';
+   $('rcoBody').innerHTML=items.length?items.map((x,i)=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'<td><button type="button" class="secondary" data-reopen-rco="'+i+'">Reabrir para retificação</button></td></tr>').join(''):'<tr><td colspan="'+(cols.length+1)+'" class="empty">Nenhum RCO para os filtros selecionados.</td></tr>';
+   $('rcoBody').querySelectorAll('[data-reopen-rco]').forEach(b=>b.onclick=async()=>{
+     const x=items[Number(b.dataset.reopenRco)];if(!x)return;
+     const motivo=prompt('Motivo da retificação deste RCO:','Correção de dado consolidado')||'';if(!motivo.trim())return;
+     const autor=prompt('Identifique o P3/oficial que autoriza a retificação (posto/graduação, nome e/ou matrícula):','')||'';if(!autor.trim()){alert('Informe quem está autorizando a retificação.');return}
+     if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
+     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autor:autor.trim()},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');await loadRco(t)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
+   });
  }
  async function loadBi(t){
    const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel Power BI vinculado.':'Power BI ainda não configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
