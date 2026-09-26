@@ -1222,6 +1222,8 @@ function closeRcoDraft_(reportId){var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=
    Esta ação complementar preserva origens, auditoria e garante que cada
    operação continue individualizada após a consolidação. */
 function rcoSupplementalUpsert_(payload) {
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
   var pkg=payload||{}, rco=pkg.rco||pkg, stat=pkg.estatisticaP3||rco.estatisticaP3||{};
   var reportId=String((rco||{}).reportId||(rco.state||{}).reportId||pkg.reportId||stat.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
@@ -1357,7 +1359,8 @@ function rcoSupplementalUpsert_(payload) {
   });
   audit_('RCO',reportId,version,old?'RETIFICADO':'CONSOLIDADO',obj.CONSOLIDADOR_MATRICULA,obj.CONSOLIDADOR_NOME,batt,comp,pkg);
   closeRcoDraft_(reportId);
-  return {ok:true,message:old?'RCO retificado; origens e operações atualizadas.':'RCO consolidado; origens e operações registradas.',reportId:reportId};
+  return {ok:true,message:old?'RCO retificado; origens e operações atualizadas.':'RCO consolidado; origens e operações registradas.',reportId:reportId,version:version};
+  }finally{lock.releaseLock();}
 }
 function audit_(tipo,id,versao,acao,mat,nome,batt,comp,snapshot) {
   append_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES'),{AUDITORIA_ID:uid_('audit'),TIPO_ENTIDADE:tipo,ENTIDADE_ID:id,VERSAO:versao,DATA_HORA:nowIso_(),ACAO:acao,
