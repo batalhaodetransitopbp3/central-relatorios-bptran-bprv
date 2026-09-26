@@ -9,15 +9,17 @@
 :root{--b:#17375e;--b2:#315f93;--bg:#edf3f7;--line:#c9d6e0;--text:#19334b;--muted:#64798b;--ok:#176b3a;--warn:#8a5b00;--danger:#9a2b3e}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,Helvetica,sans-serif;color:var(--text)}.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:17px}.head h1{margin:0;font-size:23px}.head p{margin:4px 0 0;opacity:.9}.wrap{max-width:1500px;margin:auto;padding:12px}
 .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px;box-shadow:0 3px 10px #1231}
-.main-menu{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.main-menu button,.main-menu a{min-height:66px;display:flex;flex-direction:column;gap:4px;justify-content:center;text-align:center;text-decoration:none}.main-menu small{font-size:9px;font-weight:600;opacity:.8}.main-menu .active{background:var(--b)}
+.main-menu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.main-menu button,.main-menu a{min-height:66px;display:flex;flex-direction:column;gap:4px;justify-content:center;text-align:center;text-decoration:none}.main-menu small{font-size:9px;font-weight:600;opacity:.8}.main-menu .active{background:var(--b)}
 button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.danger{background:var(--danger)}
-.filters{display:grid;grid-template-columns:1fr 1fr 1fr 1.25fr 1fr 1.3fr auto;gap:8px;align-items:end}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
+.filters{display:grid;grid-template-columns:1fr 1fr .8fr 2.2fr 1fr 1.2fr auto;gap:8px;align-items:end}
+.company-picker{border:1px solid #becdd8;border-radius:9px;background:#fff;padding:7px}.company-actions{display:flex;gap:6px;align-items:center;margin-bottom:6px}.company-actions button{padding:4px 7px;font-size:10px}.company-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}.company-chip{display:flex;align-items:center;gap:4px;border:1px solid #d6e0e7;border-radius:7px;background:#f8fbfd;padding:5px;font-size:9px;font-weight:800}.company-chip input{width:auto;min-height:0;margin:0}
+.progress-box{display:none;margin-top:9px;padding:8px;border:1px solid #c9d6e0;border-radius:9px;background:#f8fbfd}.progress-box.show{display:block}.progress-line{height:8px;background:#e2e9ef;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--b2),var(--b));transition:width .25s ease}.progress-text{font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}.source-note{display:none;margin-top:7px;font-size:9px;color:#7b8d9b;font-style:italic}.source-note.show{display:block}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
 .toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}
 .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:9px}.section-head h2{margin:0;color:var(--b);font-size:19px}.note{font-size:11px;color:var(--muted)}.tablewrap{overflow:auto;max-height:66vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f;text-transform:uppercase}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}.empty{text-align:center;padding:28px;color:#6b7f90}.hidden{display:none!important}
 .chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}
 .powerbi-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:16px;border:1px solid #c9d6e0;border-radius:12px;background:#f8fbfd}.admin-session{display:grid;grid-template-columns:.8fr 1fr 1.2fr auto 1.8fr auto;gap:8px;align-items:end}.admin-session-state{min-height:38px;display:flex;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#f7fafc;color:var(--muted);font-size:11px}.admin-session-state.ok{background:#eaf6ee;color:#176b3a;border-color:#b9dac4}.admin-session-state strong{color:inherit}.admin-session button{min-height:38px}
 .powerbi-state{font-weight:900;color:var(--b)}.powerbi-url{font-family:monospace;font-size:10px;word-break:break-all;color:var(--muted);margin-top:5px}.powerbi-frame-wrap{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f5f8fa;min-height:120px}.powerbi-frame{display:block;width:100%;height:min(72vh,760px);border:0;background:#fff}.powerbi-frame-note{padding:10px;font-size:11px;color:var(--muted)}.history-source{font-size:9px;text-transform:uppercase;font-weight:900}.rco-status{font-weight:900}.rco-retificado{color:#8a5b00}.quick-links{display:flex;gap:7px;flex-wrap:wrap}
-@media(max-width:950px){.admin-session{grid-template-columns:1fr 1fr}.admin-session-state{grid-column:1/-1}.main-menu{grid-template-columns:1fr 1fr}.main-menu>*:last-child{grid-column:1/-1}.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.main-menu{grid-template-columns:1fr}.main-menu>*:last-child{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.toolbar>*{flex:1 1 40%}.subnav button{flex:1 1 42%}}
+@media(max-width:950px){.admin-session{grid-template-columns:1fr 1fr}.admin-session-state{grid-column:1/-1}.main-menu{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}.filters .companies{grid-column:1/-1}.filters button#apply{grid-column:1/-1}.company-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.main-menu{grid-template-columns:1fr}.main-menu>*:last-child{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.toolbar>*{flex:1 1 40%}.subnav button{flex:1 1 42%}}
 </style>
 </head>
 <body>
@@ -38,34 +40,31 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <nav class="main-menu">
   <button class="active" data-main="painel"><strong>Painel Geral</strong><small>Resumo e análises</small></button>
   <a class="btn" href="tabela_operacional_p3.html"><strong>Tabela Operacional</strong><small>Formato do RCO</small></a>
-  <button data-main="historico"><strong>Histórico</strong><small>Dados importados/legados</small></button>
   <button data-main="rco"><strong>Controle de RCOs</strong><small>Recebidos e retificados</small></button>
-  <button data-main="powerbi"><strong>Power BI</strong><small>Painel institucional</small></button>
+  <button data-main="powerbi"><strong>Painel BI</strong><small>Looker Studio / Power BI</small></button>
  </nav>
  <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a></div>
 </section>
+
+<div class="subnav card" id="panelSubnav">
+ <button class="active" data-sub="controle-diario">Resumo</button><button data-sub="operacoes">Operações</button><button data-sub="prisoes">Prisões/Conduções</button><button data-sub="veiculos-operacionais">Veículos</button><button data-sub="cirvc">CIRVC</button><button data-sub="fisco">Fisco</button><button data-sub="nace-cicc">NACE/CICC</button><button data-sub="auditoria">Auditoria</button><button data-sub="analise">Análise integrada</button>
+</div>
 
 <section class="card" id="filterCard">
  <div class="filters">
   <div><label>Data inicial</label><input id="di" type="date"></div><div><label>Data final</label><input id="df" type="date"></div>
   <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
-  <div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div>
+  <div class="companies"><label>Companhias</label><div class="company-picker"><div class="company-actions"><button type="button" class="secondary" id="allCompanies">Marcar todas</button><button type="button" class="secondary" id="clearCompanies">Limpar</button><span id="companyCount"></span></div><div id="companyGrid" class="company-grid"></div></div></div>
   <div><label>Turno</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"></div>
-  <div><label>Guarnição</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button>
+  <div><label>Guarnição (consulta detalhada)</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button>
  </div>
+ <div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
+ <div id="sourceNote" class="source-note">ℹ O período consultado inclui dados importados anteriores à implantação digital, integrados automaticamente à série estatística.</div>
 </section>
 
 <section id="painelView">
- <div class="subnav card">
-  <button class="active" data-sub="controle-diario">Resumo</button><button data-sub="operacoes">Operações</button><button data-sub="prisoes">Prisões/Conduções</button><button data-sub="veiculos-operacionais">Veículos</button><button data-sub="cirvc">CIRVC</button><button data-sub="fisco">Fisco</button><button data-sub="nace-cicc">NACE/CICC</button><button data-sub="auditoria">Auditoria</button><button data-sub="analise">Análise estatística</button>
- </div>
  <div id="stats" class="stats"></div>
  <section class="card"><div class="section-head"><div><h2 id="title">Painel Geral</h2><div class="note" id="subtitle"></div></div></div><div id="analysisControls"></div><div id="chart" class="chart"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
-</section>
-
-<section id="historicoView" class="hidden">
- <div id="historyStats" class="stats"></div>
- <section class="card"><div class="section-head"><div><h2>Histórico</h2><div class="note">Registros cuja origem foi identificada como importação, legado, migração ou histórico. Não são confundidos com a produção digital corrente.</div></div></div><div class="tablewrap"><table class="tbl"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table></div></section>
 </section>
 
 <section id="rcoView" class="hidden">
@@ -74,14 +73,14 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 </section>
 
 <section id="powerbiView" class="hidden">
- <section class="card"><div class="section-head"><div><h2>Power BI</h2><div class="note">Vínculo para o painel institucional Microsoft Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o Microsoft Power BI impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
+ <section class="card"><div class="section-head"><div><h2>Painel BI</h2><div class="note">Vínculo para painel institucional. Compatível com Looker Studio e Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o provedor do painel impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
 </section>
 </main>
 <script src="central_cloud.js?v=10.6.3-rc1"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
- let main='painel',sub='controle-diario',analysisIndicator='',biUrl='',p3Actor=null;
+ let main='painel',sub='controle-diario',analysisIndicator='',analysisReference='previous',customRefStart='',customRefEnd='',biUrl='',p3Actor=null,progressTimer=null,progressValue=0;
  const P3_ACTOR_KEY='pmpb-p3-actor-v1';
  function readActor(){try{return JSON.parse(sessionStorage.getItem(P3_ACTOR_KEY)||'null')}catch(_){return null}}
  function saveActor(a){p3Actor=a||null;try{if(a)sessionStorage.setItem(P3_ACTOR_KEY,JSON.stringify(a));else sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}renderActor()}
@@ -108,8 +107,19 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
      await load();
    }catch(e){CentralCloud.clearToken('p3');saveActor(null);alert('Não foi possível identificar o responsável: '+e.message)}
  }
- $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
  const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
+ function visibleCompanies(){const b=$('bat').value;return cias.filter(x=>!b||(b==='BPTran'?/CPTran/.test(x):/CPRv/.test(x)))}
+ function renderCompanyPicker(selectAll=true){const vis=visibleCompanies(),prev=new Set([...document.querySelectorAll('#companyGrid input:checked')].map(x=>x.value));$('companyGrid').innerHTML=vis.map(co=>'<label class="company-chip"><input type="checkbox" value="'+esc(co)+'" '+((selectAll||prev.has(co))?'checked':'')+'>'+esc(co)+'</label>').join('');$('companyGrid').querySelectorAll('input').forEach(x=>x.onchange=updateCompanyCount);updateCompanyCount()}
+ function selectedCompanies(){return [...document.querySelectorAll('#companyGrid input:checked')].map(x=>x.value)}
+ function updateCompanyCount(){$('companyCount').textContent=selectedCompanies().length+' selecionada(s)'}
+ function beginProgress(msg){clearInterval(progressTimer);progressValue=7;$('progressBox').classList.add('show');$('progressBar').style.width=progressValue+'%';$('progressText').textContent=msg||'Consultando a Central...';progressTimer=setInterval(()=>{progressValue=Math.min(92,progressValue+(progressValue<50?8:progressValue<75?4:2));$('progressBar').style.width=progressValue+'%'},450)}
+ function progressStep(value,msg){progressValue=Math.max(progressValue,Math.min(95,Number(value)||0));$('progressBar').style.width=progressValue+'%';if(msg)$('progressText').textContent=msg}
+ function endProgress(ok,msg){clearInterval(progressTimer);progressValue=100;$('progressBar').style.width='100%';$('progressText').textContent=msg||(ok?'Consulta concluída.':'Consulta interrompida.');setTimeout(()=>{$('progressBox').classList.remove('show');$('progressBar').style.width='0'},650)}
+ function setSourceNote(stats){$('sourceNote').classList.toggle('show',!!(stats&&Number(stats.historico||0)>0))}
+ function isoDate(d){return d.toISOString().slice(0,10)}
+ function shiftMonths(iso,delta){const a=String(iso||'').split('-').map(Number);if(a.length<3)return '';const d=new Date(a[0],a[1]-1+delta,1,12),last=new Date(d.getFullYear(),d.getMonth()+1,0,12).getDate();d.setDate(Math.min(a[2],last));return isoDate(d)}
+ function shiftYears(iso,delta){const a=String(iso||'').split('-').map(Number);if(a.length<3)return '';const d=new Date(a[0]+delta,a[1]-1,1,12),last=new Date(d.getFullYear(),d.getMonth()+1,0,12).getDate();d.setDate(Math.min(a[2],last));return isoDate(d)}
+ function referenceWindow(){const s=$('di').value,e=$('df').value;if(!s||!e)return {start:'',end:'',label:'—'};if(analysisReference==='month')return {start:shiftMonths(s,-1),end:shiftMonths(e,-1)};if(analysisReference==='year')return {start:shiftYears(s,-1),end:shiftYears(e,-1)};if(analysisReference==='custom'&&customRefStart&&customRefEnd)return {start:customRefStart,end:customRefEnd};const a=new Date(s+'T12:00:00'),b=new Date(e+'T12:00:00'),days=Math.max(1,Math.round((b-a)/86400000)+1),re=new Date(a.getTime()-86400000),rs=new Date(re.getTime()-(days-1)*86400000);return {start:isoDate(rs),end:isoDate(re)}}
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
  function token(){return CentralCloud.getToken('p3')||''}
  async function ensure(){
@@ -118,18 +128,29 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const t=token();if(!t)throw new Error('A credencial administrativa expirou. Encerre a sessão e identifique novamente o responsável.');
    return t
  }
- function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,turno:$('turno').value,guarnicao:$('guarnicao').value}}
+ function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhias:selectedCompanies().join('|'),turno:$('turno').value,guarnicao:$('guarnicao').value}}
  function cards(items){return items.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
- function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
+ function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE'||k==='VALOR_FIPE_ESTATISTICO')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
  const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:45000});
- async function load(){try{const t=await ensure();if(main==='painel')return loadPanel(t);if(main==='historico')return loadHistory(t);if(main==='rco')return loadRco(t);if(main==='powerbi')return loadBi(t)}catch(e){if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}showError(e.message)}}
- function showError(msg){const target=main==='historico'?$('historyBody'):main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
+ async function load(){
+   const show=main!=='powerbi';let ok=false;if(show)beginProgress('Consultando a Central e aplicando os filtros...');setSourceNote(null);
+   try{
+     const t=await ensure();
+     if(main==='painel')await loadPanel(t);else if(main==='rco')await loadRco(t);else if(main==='powerbi')await loadBi(t);
+     ok=true;
+   }catch(e){
+     if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}
+     showError(e.message);
+   }finally{if(show)endProgress(ok,ok?'Consulta atualizada.':'Falha na consulta.')}
+ }
+ function showError(msg){const target=main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
  async function loadPanel(t){
    $('chart').innerHTML='';$('analysisControls').innerHTML='';
    if(sub==='analise')return loadAnalysis(t);
-   const r=await p3Get('p3-query',p(t,sub));
+   progressStep(32,'Buscando registros do módulo selecionado...');
+   const r=await p3Get('p3-query',p(t,sub));progressStep(78,'Organizando os resultados...');
    if(sub==='controle-diario')return renderControl(r);
    const items=r.items||[];renderList(sub,items);
  }
@@ -144,12 +165,13 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const defs={
     operacoes:{title:'Operações individualizadas',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
     prisoes:{title:'Prisões e conduções por tipificação',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']]},
-    'veiculos-operacionais':{title:'Veículos operacionais detalhados',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE','FIPE']]},
+    'veiculos-operacionais':{title:'Veículos operacionais detalhados',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE_ESTATISTICO','FIPE (somente CLONE/SIVA-R)']]},
     cirvc:{title:'CIRVC — custódia',cols:[['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']]},
     fisco:{title:'Fisco Estadual — registros legados',cols:[['DATA','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['EFETIVO','Efetivo'],['VIATURA','Viatura'],['QUANTIDADE_OCORRENCIAS','Ocorrências'],['ALTERACOES_EFETIVO','Alterações de efetivo'],['ALTERACOES_VIATURA','Alterações de viatura'],['MATERIAL_CARGA','Material/carga'],['ORIGEM_RELATORIO','Origem']]},
     'nace-cicc':{title:'NACE / CICC — violência no trânsito',cols:[['DATA','Data'],['HORA','Hora'],['TIPO_OCORRENCIA','Tipo'],['NATUREZA','Natureza'],['COM_VITIMAS','Com vítimas'],['QUANTIDADE_VITIMAS','Vítimas'],['OBITOS','Óbitos'],['MUNICIPIO','Município'],['RODOVIA','Rodovia'],['KM','Km'],['BAIRRO_LOCALIDADE','Bairro/localidade'],['FONTE','Fonte'],['NUMERO_CICC','Nº CICC'],['OBSERVACOES','Observações']]},
     auditoria:{title:'Auditoria e versões',cols:[['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']]}
-   },d=defs[v];$('title').textContent=d.title;$('subtitle').textContent='Dados filtrados diretamente do banco P3.';table(d.cols,items,$('thead'),$('tbody'));
+   },d=defs[v];
+   if(v==='veiculos-operacionais')items=items.map(x=>{const cls=String(x.TIPO_RECUPERACAO_DETALHADA||x.CLASSIFICACAO_P3||x.SITUACAO||'');return {...x,VALOR_FIPE_ESTATISTICO:/SIVA-R|CLONE/i.test(cls)?Number(x.VALOR_FIPE||0):0}});$('title').textContent=d.title;$('subtitle').textContent=v==='nace-cicc'?'Fonte externa preparada para importação. No momento, a aba NACE_CICC não possui alimentação automática vinculada à Central.':'Dados filtrados diretamente do banco P3.';table(d.cols,items,$('thead'),$('tbody'));
    if(v==='operacoes'){
      const motos=items.reduce((a,x)=>a+(Number(x.MOTOCICLETAS_ABORDADAS)||0),0),autos=items.reduce((a,x)=>a+(Number(x.AUTOMOVEIS_ABORDADOS)||0),0);
      const especiais=items.reduce((a,x)=>a+(Number(x.ART_165)||0)+(Number(x.ART_165_A)||0)+(Number(x.ART_230_XI)||0),0);
@@ -158,27 +180,32 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
      $('stats').innerHTML=cards([['Operações',items.length],['Motocicletas abordadas',motos],['Automóveis abordados',autos],['AITs especiais',especiais],['AITs com abordagem',comAb],['AITs sem abordagem',semAb]]);
    }
    else if(v==='prisoes')$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Flagrantes',items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Mandados',items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Adolescentes',items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Tipificações',new Set(items.map(x=>x.TIPIFICACAO_PRINCIPAL).filter(Boolean)).size]]);
-   else if(v==='veiculos-operacionais')$('stats').innerHTML=cards([['Registros',items.length],['Recuperados',items.filter(x=>String(x.CONTA_COMO_RECUPERADO||'').toUpperCase()==='SIM').length],['Adulterados',items.filter(x=>/ADULTER|CLON|SINAL/i.test((x.SITUACAO||'')+' '+(x.TIPO_RECUPERACAO_DETALHADA||''))).length],['Com placa original',items.filter(x=>String(x.PLACA_ORIGINAL_IDENTIFICADA||'').toLowerCase()==='sim'||x.PLACA_ORIGINAL_UF).length],['Conduzidos',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_CONDUZIDOS)||0),0)],['FIPE total','R$ '+items.reduce((a,x)=>a+(Number(x.VALOR_FIPE)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})]]);
+   else if(v==='veiculos-operacionais')$('stats').innerHTML=cards([['Registros',items.length],['Recuperados',items.filter(x=>String(x.CONTA_COMO_RECUPERADO||'').toUpperCase()==='SIM').length],['Adulterados',items.filter(x=>/ADULTER|CLON|SINAL/i.test((x.SITUACAO||'')+' '+(x.TIPO_RECUPERACAO_DETALHADA||''))).length],['Com placa original',items.filter(x=>String(x.PLACA_ORIGINAL_IDENTIFICADA||'').toLowerCase()==='sim'||x.PLACA_ORIGINAL_UF).length],['Conduzidos',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_CONDUZIDOS)||0),0)],['FIPE recuperados','R$ '+items.reduce((a,x)=>a+(Number(x.VALOR_FIPE_ESTATISTICO)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})]]);
    else if(v==='cirvc')$('stats').innerHTML=cards([['CIRVCs',items.length],['Aguardando transporte',items.filter(x=>/AGUARDANDO/i.test(x.STATUS_CUSTODIA||'')).length],['Em transporte',items.filter(x=>/TRANSPORTE/i.test(x.STATUS_CUSTODIA||'')).length],['Baixados',items.filter(x=>/BAIX/i.test(x.STATUS_CUSTODIA||'')).length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Veículos',new Set(items.map(x=>x.PLACA).filter(Boolean)).size]]);
    else if(v==='fisco')$('stats').innerHTML=cards([['Registros',items.length],['Ocorrências',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_OCORRENCIAS)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO).filter(Boolean)).size],['Viaturas',new Set(items.map(x=>x.VIATURA).filter(Boolean)).size],['Fonte','Base legada preservada']]);
-   else if(v==='nace-cicc')$('stats').innerHTML=cards([['Registros',items.length],['Com vítimas',items.filter(x=>/SIM|S|TRUE/i.test(String(x.COM_VITIMAS||''))).length],['Vítimas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_VITIMAS)||0),0)],['Óbitos',items.reduce((a,x)=>a+(Number(x.OBITOS)||0),0)],['Municípios',new Set(items.map(x=>x.MUNICIPIO).filter(Boolean)).size],['Fonte','NACE/CICC']]);
+   else if(v==='nace-cicc')$('stats').innerHTML=cards([['Registros',items.length],['Com vítimas',items.filter(x=>/SIM|S|TRUE/i.test(String(x.COM_VITIMAS||''))).length],['Vítimas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_VITIMAS)||0),0)],['Óbitos',items.reduce((a,x)=>a+(Number(x.OBITOS)||0),0)],['Municípios',new Set(items.map(x=>x.MUNICIPIO).filter(Boolean)).size],['Fonte','Importação externa']]);
    else $('stats').innerHTML=cards([['Eventos',items.length],['RSD',items.filter(x=>x.TIPO_ENTIDADE==='RSD').length],['RCO',items.filter(x=>x.TIPO_ENTIDADE==='RCO').length],['Operações',items.filter(x=>x.TIPO_ENTIDADE==='OPERACAO').length],['Responsáveis',new Set(items.map(x=>x.RESPONSAVEL_MATRICULA).filter(Boolean)).size],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size]]);
  }
  async function loadAnalysis(t){
+   progressStep(25,'Calculando o indicador do período analisado...');
    const base={...p(t,'produtividade'),indicador:analysisIndicator};delete base.view;
-   let r=await p3Get('p3-analysis',base);if(!analysisIndicator&&r.indicadores?.length){analysisIndicator=r.indicadores[0];r=await p3Get('p3-analysis',{...base,indicador:analysisIndicator})}
-   const a=new Date($('di').value+'T12:00:00'),b=new Date($('df').value+'T12:00:00'),days=Math.max(1,Math.round((b-a)/86400000)+1),pe=new Date(a.getTime()-86400000),ps=new Date(pe.getTime()-(days-1)*86400000),iso=d=>d.toISOString().slice(0,10);
-   const prev=await p3Get('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:iso(ps),dataFim:iso(pe)});
-   $('title').textContent='Análise estatística';$('subtitle').textContent='Comparação com período anterior equivalente.';
-   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+(r.indicadores||[]).map(x=>'<option '+(x===analysisIndicator?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><div class="note">Período anterior: '+date(iso(ps))+' a '+date(iso(pe))+'</div></div>';
+   let r=await p3Get('p3-analysis',base),catalog=Array.isArray(r.indicadores)?r.indicadores:[];
+   if(!analysisIndicator&&catalog.length)analysisIndicator=String((r.indicador||catalog[0]).codigo||catalog[0].codigo||'');
+   const ref=referenceWindow();progressStep(58,'Calculando a janela de referência...');
+   const prev=await p3Get('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:ref.start,dataFim:ref.end});progressStep(84,'Montando a comparação...');
+   const meta=r.indicador||catalog.find(x=>x.codigo===analysisIndicator)||{},cur=Number(r.total||0),old=Number(prev.total||0),pct=old?((cur-old)/old*100):null;
+   setSourceNote(r.sourceStats);
+   $('title').textContent='Análise integrada';$('subtitle').textContent='Indicadores essenciais consolidados. A variação sempre é calculada contra a janela de referência exibida abaixo.';
+   const opts=catalog.map(x=>'<option value="'+esc(x.codigo)+'" '+(x.codigo===analysisIndicator?'selected':'')+'>'+esc(x.nome)+'</option>').join('');
+   const refOptions=[['previous','Período imediatamente anterior (mesma duração)'],['month','Mesmo intervalo no mês anterior'],['year','Mesmo intervalo no ano anterior'],['custom','Período personalizado']].map(x=>'<option value="'+x[0]+'" '+(x[0]===analysisReference?'selected':'')+'>'+x[1]+'</option>').join('');
+   const custom=analysisReference==='custom'?'<div><label>Referência inicial</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.start)+'"></div><div><label>Referência final</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.end)+'"></div>':'';
+   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Referência para comparação</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date($('di').value)+' a '+date($('df').value)+'<br><strong>Janela de referência:</strong> '+date(ref.start)+' a '+date(ref.end)+'<br>'+esc(meta.descricao||'')+'</div></div>';
    document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
-   const cur=Number(r.total||0),old=Number(prev.total||0),pct=old?((cur-old)/old*100):null;$('stats').innerHTML=cards([['Total atual',cur],['Período anterior',old],['Variação',pct===null?'—':((pct>=0?'+':'')+pct.toFixed(1)+'%')],['Companhias',(r.porCompanhia||[]).length],['Dias com registro',(r.porData||[]).length],['Indicador',analysisIndicator||'—']]);
+   document.getElementById('analysisReference')?.addEventListener('change',e=>{analysisReference=e.target.value;if(analysisReference==='custom'&&(!customRefStart||!customRefEnd)){const w=referenceWindow();customRefStart=w.start;customRefEnd=w.end}load()});
+   document.getElementById('refStart')?.addEventListener('change',e=>{customRefStart=e.target.value;if(customRefEnd)load()});
+   document.getElementById('refEnd')?.addEventListener('change',e=>{customRefEnd=e.target.value;if(customRefStart)load()});
+   $('stats').innerHTML=cards([['Período analisado',cur],['Referência',old],['Variação vs referência',pct===null?'Sem base':((pct>=0?'+':'')+pct.toFixed(1)+'%')],['Companhias',(r.porCompanhia||[]).length],['Dias com registro',(r.porData||[]).length],['Indicador',meta.nome||analysisIndicator||'—']]);
    const max=Math.max(1,...(r.porCompanhia||[]).map(x=>Number(x.valor||0)));$('chart').innerHTML=(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join('')||'<div class="empty">Sem dados.</div>';$('thead').innerHTML='';$('tbody').innerHTML='';
- }
- async function loadHistory(t){
-   const r=await p3Get('p3-query',p(t,'historico')),items=r.items||[];
-   $('historyStats').innerHTML=cards([['Registros históricos',r.totalHistorico??items.length],['Exibidos',items.length],['Somatório exibido',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME).filter(Boolean)).size],['Registros digitais no período',r.totalDigital||0]]);
-   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['GRUPO_NOME','Grupo'],['INDICADOR_NOME','Indicador'],['QUANTIDADE','Qtd.'],['ORIGEM_RELATORIO','Origem']];table(cols,items,$('historyHead'),$('historyBody'));
  }
  async function loadRco(t){
    const r=await p3Get('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
@@ -196,18 +223,19 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    });
  }
  async function loadBi(t){
-   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel Power BI vinculado.':'Power BI ainda não configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
+   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel BI vinculado.':'Painel BI ainda não configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
    const wrap=$('biFrameWrap'),frame=$('biFrame');wrap.classList.toggle('hidden',!biUrl);if(biUrl&&frame.src!==biUrl)frame.src=biUrl;if(!biUrl)frame.removeAttribute('src');
  }
  function table(cols,items,head,body){head.innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr>';body.innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros selecionados.</td></tr>'}
- function switchMain(v){main=v;document.querySelectorAll('[data-main]').forEach(b=>b.classList.toggle('active',b.dataset.main===v));$('painelView').classList.toggle('hidden',v!=='painel');$('historicoView').classList.toggle('hidden',v!=='historico');$('rcoView').classList.toggle('hidden',v!=='rco');$('powerbiView').classList.toggle('hidden',v!=='powerbi');$('filterCard').classList.toggle('hidden',v==='powerbi');load()}
+ function switchMain(v){main=v;document.querySelectorAll('[data-main]').forEach(b=>b.classList.toggle('active',b.dataset.main===v));$('painelView').classList.toggle('hidden',v!=='painel');$('rcoView').classList.toggle('hidden',v!=='rco');$('powerbiView').classList.toggle('hidden',v!=='powerbi');$('panelSubnav').classList.toggle('hidden',v!=='painel');$('filterCard').classList.toggle('hidden',v==='powerbi');load()}
  document.querySelectorAll('[data-main]').forEach(b=>b.onclick=()=>switchMain(b.dataset.main));document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{sub=b.dataset.sub;document.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('active',x.dataset.sub===sub));load()});
- $('apply').onclick=load;$('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach(o=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false})};
+ $('apply').onclick=load;$('bat').onchange=()=>renderCompanyPicker(true);$('allCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=true);updateCompanyCount()};$('clearCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=false);updateCompanyCount()};
  $('p3ActorMatricula').addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));
  $('p3ActorLogin').onclick=registerActor;
  $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
- $('biOpen').onclick=()=>{if(!biUrl){alert('O Power BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
- $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel Microsoft Power BI:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do Power BI atualizada.')}catch(e){alert(e.message)}};
+ $('biOpen').onclick=()=>{if(!biUrl){alert('O painel BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
+ $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel BI (Looker Studio ou Power BI):',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do painel BI atualizada.')}catch(e){alert(e.message)}};
+ renderCompanyPicker(true);
  p3Actor=readActor();
  if(p3Actor?.matricula&&!token()){try{sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}p3Actor=null}
  renderActor();if(p3Actor?.matricula&&token())setTimeout(load,400);
