@@ -1275,6 +1275,27 @@ function rcoSupplementalUpsert_(payload) {
   (rco.rcoOrigens||[]).forEach(function(o){append_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'),{REGISTRO_ID:uid_('orig'),RCO_REPORT_ID:reportId,RSD_REPORT_ID:o.rsdReportId||'',
     GUARNICAO:o.guarnicao||'',VERSAO_RSD:o.versao||'',STATUS_ORIGEM:o.status||'INCLUIDO',ADICIONADO_EM:o.adicionadoEm||nowIso_(),ATUALIZADO_EM:nowIso_(),CONSOLIDADOR_MATRICULA:obj.CONSOLIDADOR_MATRICULA});});
   var originIds=(rco.rcoOrigens||[]).map(function(o){return String(o.rsdReportId||'')}).filter(Boolean);
+
+  var rsdSheet=sheet_(P3_SHEET_ID,'RSD'),rsdRows=objects_(rsdSheet);
+  rsdRows.forEach(function(rr){
+    var rid=String(rr.REPORT_ID||''),linked=String(rr.RCO_REPORT_ID||'')===reportId,current=originIds.indexOf(rid)>=0,changed=false;
+    if(linked&&!current){
+      rr.RCO_REPORT_ID='';rr.INCLUIDO_RCO_EM='';changed=true;
+      if(String(rr.STATUS||'')==='INCLUIDO_RCO'){
+        var review=String(rr.REVIEW_STATUS||'');
+        rr.STATUS=['DEFERIDO','DEFERIDO_COM_RESSALVAS'].indexOf(review)>=0?review:'DEFERIDO';
+      }
+      rr.SINCRONIZADO_EM=nowIso_();
+      if(changed){
+        upsert_(rsdSheet,'REPORT_ID',rid,rr);
+        audit_('RSD',rid,Number(rr.VERSAO||1),'REMOVIDO_RCO_RETIFICACAO','',obj.CONSOLIDADOR_NOME,batt,comp,{rcoReportId:reportId,statusRestaurado:rr.STATUS});
+      }
+    }else if(current&&['DEFERIDO','DEFERIDO_COM_RESSALVAS','INCLUIDO_RCO'].indexOf(String(rr.STATUS||''))>=0){
+      rr.STATUS='INCLUIDO_RCO';rr.RCO_REPORT_ID=reportId;rr.INCLUIDO_RCO_EM=nowIso_();rr.SINCRONIZADO_EM=nowIso_();changed=true;
+      upsert_(rsdSheet,'REPORT_ID',rid,rr);
+    }
+  });
+
   var ps=sheet_(P3_SHEET_ID,'PRISOES'),plist=objects_(ps);
   plist.forEach(function(pr){
     var changed=false;
