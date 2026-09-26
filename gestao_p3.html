@@ -160,34 +160,90 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function renderControl(r){
    const rsd=r.rsd||[],rco=r.rco||[],pending=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'];
    $('title').textContent='Situação do serviço';$('subtitle').textContent='Mostra quantos relatórios existem no período escolhido e em que etapa cada um se encontra.';
-   $('stats').innerHTML=cards([['RSDs',rsd.length],['Em serviço',rsd.filter(x=>x.STATUS==='EM_SERVICO'||x.STATUS==='PASSAGEM_DISPONIVEL').length],['Aguardando análise',rsd.filter(x=>x.STATUS==='AGUARDANDO_ANALISE').length],['Deferidos',rsd.filter(x=>/DEFERIDO/.test(x.STATUS||'')).length],['Pendências',rsd.filter(x=>pending.includes(x.STATUS)).length],['RCOs',rco.length]]);
-   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','RCO']];
+   $('stats').innerHTML=cards([
+     ['RSDs encontrados',rsd.length,'Relatórios de Serviço Diário das guarnições que atendem aos filtros'],
+     ['Guarnições ainda em serviço',rsd.filter(x=>x.STATUS==='EM_SERVICO'||x.STATUS==='PASSAGEM_DISPONIVEL').length,'Relatórios que ainda não concluíram todo o fluxo'],
+     ['Aguardando análise',rsd.filter(x=>x.STATUS==='AGUARDANDO_ANALISE').length,'RSDs enviados e ainda não analisados pelo coordenador'],
+     ['RSDs deferidos',rsd.filter(x=>/DEFERIDO/.test(x.STATUS||'')).length,'Relatórios já analisados e aceitos'],
+     ['Com alguma pendência',rsd.filter(x=>pending.includes(x.STATUS)).length,'Relatórios ainda em serviço, aguardando análise ou correção'],
+     ['RCOs encontrados',rco.length,'Relatórios do Coordenador no período consultado']
+   ]);
+   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','Identificador do RCO']];
    table(cols,rsd,$('thead'),$('tbody'));
  }
  function renderList(v,items){
    const defs={
-    operacoes:{title:'Operações realizadas',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
-    prisoes:{title:'Prisões e conduções por tipificação',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']]},
-    'veiculos-operacionais':{title:'Veículos operacionais detalhados',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE_ESTATISTICO','FIPE (somente CLONE/SIVA-R)']]},
-    cirvc:{title:'CIRVC — custódia',cols:[['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']]},
-    fisco:{title:'Fisco Estadual',cols:[['DATA','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['EFETIVO','Efetivo'],['VIATURA','Viatura'],['QUANTIDADE_OCORRENCIAS','Ocorrências'],['ALTERACOES_EFETIVO','Alterações de efetivo'],['ALTERACOES_VIATURA','Alterações de viatura'],['MATERIAL_CARGA','Material/carga'],['ORIGEM_RELATORIO','Origem']]},
-    'nace-cicc':{title:'NACE / CICC — violência no trânsito',cols:[['DATA','Data'],['HORA','Hora'],['TIPO_OCORRENCIA','Tipo'],['NATUREZA','Natureza'],['COM_VITIMAS','Com vítimas'],['QUANTIDADE_VITIMAS','Vítimas'],['OBITOS','Óbitos'],['MUNICIPIO','Município'],['RODOVIA','Rodovia'],['KM','Km'],['BAIRRO_LOCALIDADE','Bairro/localidade'],['FONTE','Fonte'],['NUMERO_CICC','Nº CICC'],['OBSERVACOES','Observações']]},
-    auditoria:{title:'Auditoria e versões',cols:[['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']]}
+    operacoes:{title:'Operações realizadas',desc:'Lista cada operação registrada pelas guarnições no período escolhido, com local, abordagens, autuações e prisões informadas.',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','Situação do POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
+    prisoes:{title:'Prisões e conduções registradas',desc:'Mostra as pessoas conduzidas ou presas, agrupadas pela situação e pela principal tipificação informada no relatório.',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']]},
+    'veiculos-operacionais':{title:'Veículos recuperados ou apreendidos',desc:'Detalha os veículos registrados no período. O valor FIPE só é considerado nas recuperações classificadas como CLONE ou SIVA-R.',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE_ESTATISTICO','FIPE (somente CLONE/SIVA-R)']]},
+    cirvc:{title:'CIRVC — controle de remoção e custódia',desc:'Acompanha os veículos controlados pelo CIRVC, incluindo local de custódia, situação do transporte e baixa.',cols:[['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']]},
+    fisco:{title:'Fisco Estadual',desc:'Consulta os registros de serviço relacionados ao Fisco Estadual no período e unidades selecionadas.',cols:[['DATA','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['EFETIVO','Efetivo'],['VIATURA','Viatura'],['QUANTIDADE_OCORRENCIAS','Ocorrências'],['ALTERACOES_EFETIVO','Alterações de efetivo'],['ALTERACOES_VIATURA','Alterações de viatura'],['MATERIAL_CARGA','Material/carga'],['ORIGEM_RELATORIO','Origem']]},
+    'nace-cicc':{title:'Sinistros de trânsito — NACE/CICC',desc:'Consulta destinada aos dados de sinistros provenientes de fonte externa NACE/CICC. Esta base ainda não é alimentada automaticamente pela Central.',cols:[['DATA','Data'],['HORA','Hora'],['TIPO_OCORRENCIA','Tipo'],['NATUREZA','Natureza'],['COM_VITIMAS','Com vítimas'],['QUANTIDADE_VITIMAS','Vítimas'],['OBITOS','Óbitos'],['MUNICIPIO','Município'],['RODOVIA','Rodovia'],['KM','Km'],['BAIRRO_LOCALIDADE','Bairro/localidade'],['FONTE','Fonte'],['NUMERO_CICC','Nº CICC'],['OBSERVACOES','Observações']]},
+    auditoria:{title:'Auditoria das alterações',desc:'Mostra quem alterou registros, quando a alteração ocorreu e qual versão ficou gravada, permitindo rastrear mudanças feitas no sistema.',cols:[['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']]}
    },d=defs[v];
-   if(v==='veiculos-operacionais')items=items.map(x=>{const cls=String(x.TIPO_RECUPERACAO_DETALHADA||x.CLASSIFICACAO_P3||x.SITUACAO||'');return {...x,VALOR_FIPE_ESTATISTICO:/SIVA-R|CLONE/i.test(cls)?Number(x.VALOR_FIPE||0):0}});$('title').textContent=d.title;$('subtitle').textContent=v==='nace-cicc'?'Fonte externa preparada para importação. No momento, a aba NACE_CICC não possui alimentação automática vinculada à Central.':'Dados filtrados diretamente do banco P3.';table(d.cols,items,$('thead'),$('tbody'));
+   if(v==='veiculos-operacionais')items=items.map(x=>{const cls=String(x.TIPO_RECUPERACAO_DETALHADA||x.CLASSIFICACAO_P3||x.SITUACAO||'');return {...x,VALOR_FIPE_ESTATISTICO:/SIVA-R|CLONE/i.test(cls)?Number(x.VALOR_FIPE||0):0}});$('title').textContent=d.title;$('subtitle').textContent=d.desc||'Resultados encontrados de acordo com os filtros selecionados.';table(d.cols,items,$('thead'),$('tbody'));
    if(v==='operacoes'){
      const motos=items.reduce((a,x)=>a+(Number(x.MOTOCICLETAS_ABORDADAS)||0),0),autos=items.reduce((a,x)=>a+(Number(x.AUTOMOVEIS_ABORDADOS)||0),0);
      const especiais=items.reduce((a,x)=>a+(Number(x.ART_165)||0)+(Number(x.ART_165_A)||0)+(Number(x.ART_230_XI)||0),0);
      const comAb=items.reduce((a,x)=>a+(Number(x.ART_165)||0)+(Number(x.ART_165_A)||0)+(Number(x.ART_230_XI)||0)+(Number(x.OUTROS_AITS_COM_ABORDAGEM)||0),0);
      const semAb=items.reduce((a,x)=>a+(Number(x.AITS_SEM_ABORDAGEM)||0),0);
-     $('stats').innerHTML=cards([['Operações',items.length],['Motocicletas abordadas',motos],['Automóveis abordados',autos],['AITs especiais',especiais],['AITs com abordagem',comAb],['AITs sem abordagem',semAb]]);
+     $('stats').innerHTML=cards([
+       ['Operações encontradas',items.length,'Quantidade de operações registradas no período'],
+       ['Motocicletas abordadas',motos,'Soma informada nas operações encontradas'],
+       ['Automóveis abordados',autos,'Soma informada nas operações encontradas'],
+       ['AITs específicos',especiais,'Soma dos arts. 165, 165-A e 230, XI'],
+       ['AITs com abordagem',comAb,'Autuações vinculadas a abordagem do veículo/condutor'],
+       ['AITs sem abordagem',semAb,'Autuações lavradas sem abordagem']
+     ]);
    }
-   else if(v==='prisoes')$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Flagrantes',items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Mandados',items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Adolescentes',items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Tipificações',new Set(items.map(x=>x.TIPIFICACAO_PRINCIPAL).filter(Boolean)).size]]);
-   else if(v==='veiculos-operacionais')$('stats').innerHTML=cards([['Registros',items.length],['Recuperados',items.filter(x=>String(x.CONTA_COMO_RECUPERADO||'').toUpperCase()==='SIM').length],['Adulterados',items.filter(x=>/ADULTER|CLON|SINAL/i.test((x.SITUACAO||'')+' '+(x.TIPO_RECUPERACAO_DETALHADA||''))).length],['Com placa original',items.filter(x=>String(x.PLACA_ORIGINAL_IDENTIFICADA||'').toLowerCase()==='sim'||x.PLACA_ORIGINAL_UF).length],['Conduzidos',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_CONDUZIDOS)||0),0)],['FIPE recuperados','R$ '+items.reduce((a,x)=>a+(Number(x.VALOR_FIPE_ESTATISTICO)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})]]);
-   else if(v==='cirvc')$('stats').innerHTML=cards([['CIRVCs',items.length],['Aguardando transporte',items.filter(x=>/AGUARDANDO/i.test(x.STATUS_CUSTODIA||'')).length],['Em transporte',items.filter(x=>/TRANSPORTE/i.test(x.STATUS_CUSTODIA||'')).length],['Baixados',items.filter(x=>/BAIX/i.test(x.STATUS_CUSTODIA||'')).length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Veículos',new Set(items.map(x=>x.PLACA).filter(Boolean)).size]]);
-   else if(v==='fisco')$('stats').innerHTML=cards([['Registros',items.length],['Ocorrências',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_OCORRENCIAS)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO).filter(Boolean)).size],['Viaturas',new Set(items.map(x=>x.VIATURA).filter(Boolean)).size],['Fonte','Relatórios Fisco']]);
-   else if(v==='nace-cicc')$('stats').innerHTML=cards([['Registros',items.length],['Com vítimas',items.filter(x=>/SIM|S|TRUE/i.test(String(x.COM_VITIMAS||''))).length],['Vítimas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_VITIMAS)||0),0)],['Óbitos',items.reduce((a,x)=>a+(Number(x.OBITOS)||0),0)],['Municípios',new Set(items.map(x=>x.MUNICIPIO).filter(Boolean)).size],['Fonte','Importação externa']]);
-   else $('stats').innerHTML=cards([['Eventos',items.length],['RSD',items.filter(x=>x.TIPO_ENTIDADE==='RSD').length],['RCO',items.filter(x=>x.TIPO_ENTIDADE==='RCO').length],['Operações',items.filter(x=>x.TIPO_ENTIDADE==='OPERACAO').length],['Responsáveis',new Set(items.map(x=>x.RESPONSAVEL_MATRICULA).filter(Boolean)).size],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size]]);
+   else if(v==='prisoes')$('stats').innerHTML=cards([
+     ['Registros encontrados',items.length,'Quantidade de lançamentos que atendem aos filtros'],
+     ['Pessoas conduzidas/presas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),'Total de pessoas contabilizadas nesses registros'],
+     ['Prisões em flagrante',items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),'Pessoas registradas em situação de flagrante'],
+     ['Cumprimentos de mandado',items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),'Pessoas conduzidas por mandado de prisão'],
+     ['Adolescentes apreendidos',items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),'Adolescentes contabilizados nos registros'],
+     ['Tipos de ocorrência',new Set(items.map(x=>x.TIPIFICACAO_PRINCIPAL).filter(Boolean)).size,'Quantidade de tipificações principais diferentes']
+   ]);
+   else if(v==='veiculos-operacionais')$('stats').innerHTML=cards([
+     ['Registros de veículos',items.length,'Veículos encontrados conforme os filtros'],
+     ['Veículos recuperados',items.filter(x=>String(x.CONTA_COMO_RECUPERADO||'').toUpperCase()==='SIM').length,'Registros que contam estatisticamente como recuperação'],
+     ['Com indício de adulteração',items.filter(x=>/ADULTER|CLON|SINAL/i.test((x.SITUACAO||'')+' '+(x.TIPO_RECUPERACAO_DETALHADA||''))).length,'Registros com classificação relacionada a sinais identificadores/adulteração'],
+     ['Com placa original identificada',items.filter(x=>String(x.PLACA_ORIGINAL_IDENTIFICADA||'').toLowerCase()==='sim'||x.PLACA_ORIGINAL_UF).length,'Veículos em que foi possível registrar a placa original'],
+     ['Pessoas conduzidas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_CONDUZIDOS)||0),0),'Conduzidos vinculados a esses registros de veículos'],
+     ['Valor FIPE das recuperações','R$ '+items.reduce((a,x)=>a+(Number(x.VALOR_FIPE_ESTATISTICO)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),'Somente veículos classificados como CLONE ou SIVA-R']
+   ]);
+   else if(v==='cirvc')$('stats').innerHTML=cards([
+     ['Registros CIRVC',items.length,'Veículos encontrados no controle de remoção/custódia'],
+     ['Aguardando transporte',items.filter(x=>/AGUARDANDO/i.test(x.STATUS_CUSTODIA||'')).length,'Ainda não iniciaram o transporte'],
+     ['Em transporte',items.filter(x=>/TRANSPORTE/i.test(x.STATUS_CUSTODIA||'')).length,'Transporte registrado como em andamento'],
+     ['Finalizados/baixados',items.filter(x=>/BAIX/i.test(x.STATUS_CUSTODIA||'')).length,'Registros cuja custódia foi encerrada'],
+     ['Companhias envolvidas',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size,'Companhias presentes nos resultados'],
+     ['Veículos distintos',new Set(items.map(x=>x.PLACA).filter(Boolean)).size,'Placas distintas encontradas']
+   ]);
+   else if(v==='fisco')$('stats').innerHTML=cards([
+     ['Registros encontrados',items.length,'Relatórios do Fisco que atendem aos filtros'],
+     ['Ocorrências informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_OCORRENCIAS)||0),0),'Soma das ocorrências registradas nesses relatórios'],
+     ['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size,'Companhias presentes na consulta'],
+     ['Guarnições',new Set(items.map(x=>x.GUARNICAO).filter(Boolean)).size,'Guarnições distintas encontradas'],
+     ['Viaturas',new Set(items.map(x=>x.VIATURA).filter(Boolean)).size,'Viaturas distintas registradas'],
+     ['Origem dos dados','Relatórios Fisco','Dados provenientes dos relatórios específicos do Fisco']
+   ]);
+   else if(v==='nace-cicc')$('stats').innerHTML=cards([
+     ['Registros de sinistros',items.length,'Ocorrências encontradas na fonte NACE/CICC'],
+     ['Sinistros com vítimas',items.filter(x=>/SIM|S|TRUE/i.test(String(x.COM_VITIMAS||''))).length,'Registros marcados como ocorrência com vítima'],
+     ['Vítimas informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_VITIMAS)||0),0),'Soma das vítimas informadas nos registros'],
+     ['Óbitos informados',items.reduce((a,x)=>a+(Number(x.OBITOS)||0),0),'Soma dos óbitos informados'],
+     ['Municípios',new Set(items.map(x=>x.MUNICIPIO).filter(Boolean)).size,'Municípios diferentes encontrados'],
+     ['Origem dos dados','NACE/CICC','Fonte externa; integração automática ainda não ativada']
+   ]);
+   else $('stats').innerHTML=cards([
+     ['Alterações registradas',items.length,'Quantidade de eventos de auditoria encontrados'],
+     ['Alterações em RSD',items.filter(x=>x.TIPO_ENTIDADE==='RSD').length,'Mudanças relacionadas a Relatórios de Serviço Diário'],
+     ['Alterações em RCO',items.filter(x=>x.TIPO_ENTIDADE==='RCO').length,'Mudanças relacionadas a Relatórios do Coordenador'],
+     ['Alterações em operações',items.filter(x=>x.TIPO_ENTIDADE==='OPERACAO').length,'Mudanças relacionadas a registros de operações'],
+     ['Responsáveis identificados',new Set(items.map(x=>x.RESPONSAVEL_MATRICULA).filter(Boolean)).size,'Militares distintos associados às alterações'],
+     ['Companhias envolvidas',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size,'Companhias presentes na auditoria']
+   ]);
  }
  async function loadAnalysis(t){
    const ref=referenceWindow(),base={...p(t,'produtividade'),refInicio:ref.start,refFim:ref.end};delete base.view;
@@ -212,8 +268,9 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const opts=catalog.map(x=>'<option value="'+esc(x.codigo)+'" '+(x.codigo===analysisIndicator?'selected':'')+'>'+esc(x.nome)+'</option>').join('');
    const refOptions=[['previous','Período imediatamente anterior, com a mesma duração (recomendado)'],['month','Mesmo intervalo no mês anterior'],['year','Mesmo intervalo no ano anterior'],['custom','Escolher outro período manualmente']].map(x=>'<option value="'+x[0]+'" '+(x[0]===analysisReference?'selected':'')+'>'+x[1]+'</option>').join('');
    const custom=analysisReference==='custom'?'<div><label>Início do período de comparação</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.inicio||'')+'"></div><div><label>Fim do período de comparação</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.fim||'')+'"></div>':'';
-   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>O que deseja medir?</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Qual período deseja usar para comparação?</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date(period.inicio)+' a '+date(period.fim)+'<br><strong>Período usado para comparação:</strong> '+date(ref.inicio)+' a '+date(ref.fim)+'<br>'+esc(meta.descricao||'')+'</div></div>';
+   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>O que deseja medir?</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Qual período deseja usar para comparação?</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date(period.inicio)+' a '+date(period.fim)+'<br><strong>Período usado para comparação:</strong> '+date(ref.inicio)+' a '+date(ref.fim)+'<br><strong>O que este indicador mede:</strong> '+esc(meta.descricao||'')+'</div><div><button type="button" id="analysisPresent">Apresentar este resultado em gráficos</button><div class="plain-note">Abre o Painel de Indicadores para uso em briefing, reunião ou apresentação.</div></div></div>';
    document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;renderAnalysisBundle()});
+   document.getElementById('analysisPresent')?.addEventListener('click',()=>switchMain('powerbi'));
    document.getElementById('analysisReference')?.addEventListener('change',e=>{analysisReference=e.target.value;if(analysisReference==='custom'&&(!customRefStart||!customRefEnd)){const w=referenceWindow();customRefStart=w.start;customRefEnd=w.end}load()});
    document.getElementById('refStart')?.addEventListener('change',e=>{customRefStart=e.target.value;if(customRefEnd)load()});
    document.getElementById('refEnd')?.addEventListener('change',e=>{customRefEnd=e.target.value;if(customRefStart)load()});
