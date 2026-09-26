@@ -14,6 +14,9 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 - recebimento de passagem pela nuvem com lista de passagens disponíveis;
 - preenchimento automático do serviço recebido e identificação do novo comandante pelo Cadastro Mestre;
 - passagem em estado aguardando recebimento;
+- no RCO, botão próprio `Receber passagem de serviço`, com busca em nuvem e cards somente dos RCOs disponibilizados;
+- RCO recebido preserva o relatório existente, abre novo segmento de CPU e exige novo cadastro/autenticação do responsável;
+- passagem do RCO pode ser retificada ou cancelada antes do recebimento;
 - retificação e cancelamento de passagem antes do recebimento;
 - proteção de recebimento simultâneo;
 - cancelamento lógico/auditável de RSD;
