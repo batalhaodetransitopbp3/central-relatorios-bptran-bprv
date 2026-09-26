@@ -594,7 +594,12 @@ function rsdList_(p) {
     var k=[x.BATALHAO,x.COMPANHIA,dateText_(x.DATA_SERVICO),String(x.GUARNICAO||'').trim().toUpperCase()].join('|');
     if(!servicesByKey[k])servicesByKey[k]={};
     var sid=String(x.SERVICE_ID||x.REPORT_ID||'');
-    if(sid)servicesByKey[k][sid]=true;
+    if(sid){
+      var meta=servicesByKey[k][sid]||{justified:false,iniciadoEm:String(x.INICIADO_EM||'')};
+      if(String(x.DUPLICATE_OVERRIDE_JUSTIFICATIVA||'').trim())meta.justified=true;
+      if(!meta.iniciadoEm)meta.iniciadoEm=String(x.INICIADO_EM||'');
+      servicesByKey[k][sid]=meta;
+    }
   });
   return filtered.map(function(x){
     var rv=vtrs.filter(function(v){return String(v.RSD_REPORT_ID)===String(x.REPORT_ID);}).sort(function(a,b){return Number(a.ORDEM||0)-Number(b.ORDEM||0);});
@@ -604,7 +609,9 @@ function rsdList_(p) {
       iniciadoEm:x.INICIADO_EM,finalizadoEm:x.FINALIZADO_EM,ultimoRascunhoEm:x.ULTIMO_RASCUNHO_EM,rcoReportId:x.RCO_REPORT_ID,editDeviceId:x.EDIT_DEVICE_ID||'',editLeaseUntil:x.EDIT_LEASE_UNTIL||'',
       reviewStatus:x.REVIEW_STATUS||'',reviewMotivo:x.REVIEW_MOTIVO||'',reviewObservacao:x.REVIEW_OBSERVACAO||'',reviewAutorNome:x.REVIEW_AUTOR_NOME||'',reviewEm:x.REVIEW_EM||'',
       canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorPerfil:x.CANCELADO_POR_PERFIL||'',canceladoEm:x.CANCELADO_EM||'',
-      possibleDuplicate:Object.keys(servicesByKey[key]||{}).length>1,duplicateCount:Math.max(1,Object.keys(servicesByKey[key]||{}).length),
+      duplicateJustification:x.DUPLICATE_OVERRIDE_JUSTIFICATIVA||'',
+      possibleDuplicate:(function(){var svc=servicesByKey[key]||{},ids=Object.keys(svc);if(ids.length<=1)return false;var justified=ids.filter(function(id){return !!svc[id].justified;}).length;return justified<ids.length-1;})(),
+      duplicateCount:Math.max(1,Object.keys(servicesByKey[key]||{}).length),
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
   });
 }
