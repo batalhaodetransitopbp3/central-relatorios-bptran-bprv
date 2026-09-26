@@ -499,6 +499,8 @@ function rsdDraftObject_(r,old,deviceId) {
     EDIT_DEVICE_ID:String(deviceId||old&&old.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),DRAFT_REVISION:rev};
 }
 function rsdStart_(payload) {
+  var lock=LockService.getScriptLock();lock.waitLock(15000);
+  try{
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
@@ -536,6 +538,7 @@ function rsdStart_(payload) {
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   audit_('RSD',reportId,obj.DRAFT_REVISION,old?'RASCUNHO_ATUALIZADO':'INICIADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,obj.BATALHAO,obj.COMPANHIA,r);
   return {ok:true,message:old?'Serviço em andamento atualizado na nuvem.':'Guarnição registrada em serviço e disponível ao coordenador.',reportId:reportId,serviceId:obj.SERVICE_ID,segmento:obj.SEGMENTO,draftRevision:obj.DRAFT_REVISION,status:'EM_SERVICO'};
+  }finally{lock.releaseLock();}
 }
 function rsdDraftSync_(payload){
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
