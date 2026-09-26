@@ -203,7 +203,9 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
  $('biOpen').onclick=()=>{if(!biUrl){alert('O Power BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
  $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel Microsoft Power BI:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do Power BI atualizada.')}catch(e){alert(e.message)}};
- p3Actor=readActor();renderActor();if(p3Actor?.matricula&&token())setTimeout(load,400);
+ p3Actor=readActor();
+ if(p3Actor?.matricula&&!token()){try{sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}p3Actor=null}
+ renderActor();if(p3Actor?.matricula&&token())setTimeout(load,400);
 })();
 </script>
 </body>
