@@ -1307,14 +1307,14 @@ function p3ProductionScan_(p){
   var s=sheet_(P3_SHEET_ID,'PRODUCAO'),h=headers_(s),last=s.getLastRow(),n=Math.max(0,last-1);
   if(!n)return {sheet:s,headers:h,matched:[],effective:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
   var dateIdx=h.indexOf('DATA_SERVICO'),battIdx=h.indexOf('BATALHAO'),compIdx=h.indexOf('COMPANHIA'),guIdx=h.indexOf('GUARNICAO'),origIdx=h.indexOf('ORIGEM_RELATORIO');
-  var dv=s.getRange(2,dateIdx+1,n,1).getValues(),bv=s.getRange(2,battIdx+1,n,1).getDisplayValues(),
-      cv=s.getRange(2,compIdx+1,n,1).getDisplayValues(),gv=s.getRange(2,guIdx+1,n,1).getDisplayValues(),
-      ov=s.getRange(2,origIdx+1,n,1).getDisplayValues();
+  var indexCols=[dateIdx,battIdx,compIdx,guIdx],indexStart=Math.min.apply(null,indexCols),indexEnd=Math.max.apply(null,indexCols),
+      iv=s.getRange(2,indexStart+1,n,indexEnd-indexStart+1).getValues(),ov=s.getRange(2,origIdx+1,n,1).getDisplayValues();
+  function ix(row,col){return row[col-indexStart];}
   var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
       gu=String(p.guarnicao||'').toLowerCase(),matched=[],digitalKeys={};
   if(p.turno)return {sheet:s,headers:h,matched:[],effective:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
   for(var i=0;i<n;i++){
-    var d=dateText_(dv[i][0]),b=String(bv[i][0]||''),co=String(cv[i][0]||''),g=String(gv[i][0]||''),o=String(ov[i][0]||'');
+    var row=iv[i],d=dateText_(ix(row,dateIdx)),b=String(ix(row,battIdx)||''),co=String(ix(row,compIdx)||''),g=String(ix(row,guIdx)||''),o=String(ov[i][0]||'');
     if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;if(batt&&b!==batt)continue;if(comp&&co!==comp)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
     var hist=p3HistoricalOrigin_(o),key=[d,b,co].join('|'),m={row:i+2,data:d,batalhao:b,companhia:co,guarnicao:g,origem:o,historico:hist,key:key};
     matched.push(m);if(!hist)digitalKeys[key]=1;
