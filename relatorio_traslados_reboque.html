@@ -38,7 +38,24 @@ td input,td select{min-height:31px;padding:4px 5px;border-radius:5px;font-size:1
 td .other-reason{margin-top:4px}
 .table-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .count{font-size:11px;color:var(--muted);font-weight:800}
-.signature{margin-top:34px;text-align:center;break-inside:avoid}
+.signature{margin-top:16px;text-align:center;break-inside:avoid}
+.signature-card{width:min(560px,100%);margin:0 auto;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+.signature-title{font-size:10px;text-transform:uppercase;font-weight:900;color:#34495e;margin-bottom:7px}
+.signature-box{border:2px dashed #9daca4;border-radius:10px;background:#fbfcfb;min-height:128px;display:grid;place-items:center;overflow:hidden;cursor:pointer;position:relative}
+.signature-box.has-signature .signature-placeholder{display:none}
+.signature-preview{display:none;max-width:100%;max-height:118px;object-fit:contain}
+.signature-box.has-signature .signature-preview{display:block}
+.signature-placeholder{color:#6e7b75;font-size:12px;padding:12px}
+.signature-actions{display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+.signature-modal{position:fixed;inset:0;z-index:9999;background:rgba(8,23,38,.82);display:none;align-items:stretch;justify-content:stretch;padding:0}
+.signature-modal.open{display:flex}
+.signature-modal-card{width:100vw;height:100vh;background:#fff;display:grid;grid-template-rows:auto 1fr auto;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:9px}
+.signature-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.signature-modal-head h3{margin:0;color:var(--navy);font-size:18px}
+.signature-canvas-wrap{border:2px solid var(--navy);border-radius:10px;overflow:hidden;min-height:0;background:#fff;touch-action:none}
+#signatureCanvas{display:block;width:100%;height:100%;touch-action:none}
+.signature-modal-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+body.signature-open{overflow:hidden}
+.print-signature{display:none;max-width:100%;height:44px;object-fit:contain;margin:0 auto 2px}
 .signature-line{width:min(420px,75%);margin:0 auto;border-top:1px solid #222;height:6px}
 .signature-label{font-size:10px;text-transform:uppercase;font-weight:800;color:#34495e}
 .print-value{display:none}
@@ -50,7 +67,7 @@ td .other-reason{margin-top:4px}
  .table-wrap{overflow:visible;border:0;border-radius:0}table{min-width:0;font-size:8.4px;table-layout:fixed}th,td{padding:2px;border-color:#7f909f}th{font-size:7.5px;background:#e6edf4!important}
  th:nth-child(1){width:3.3%}th:nth-child(2){width:8%}th:nth-child(3){width:8%}th:nth-child(4){width:8%}th:nth-child(5){width:8%}th:nth-child(6){width:6%}th:nth-child(7){width:8%}th:nth-child(8){width:15%}th:nth-child(9){width:15%}th:nth-child(10){width:20.7%}
  td .print-value{border:0!important;padding:0!important;min-height:0!important;font-size:8.3px}
- .signature{margin-top:22px}.signature-line{width:45%}.signature-label{font-size:8.5px}
+ .signature{margin-top:14px}.signature-card{border:0!important;padding:0!important}.signature-box,.signature-actions,.signature-modal{display:none!important}.print-signature{display:block!important;height:13mm}.signature-line{width:45%}.signature-label{font-size:8.5px}
 }
 </style>
 </head>
@@ -107,9 +124,37 @@ td .other-reason{margin-top:4px}
 </section>
 
 <section class="signature">
-  <div class="signature-line"></div>
-  <div class="signature-label">Assinatura do militar responsável pelo preenchimento</div>
+  <div class="signature-card">
+    <div class="signature-title">Assinatura do militar responsável pelo preenchimento</div>
+    <div class="signature-box no-print" id="signatureBox" role="button" tabindex="0" aria-label="Abrir assinatura em tela cheia">
+      <img id="signaturePreview" class="signature-preview" alt="Assinatura do militar responsável">
+      <div class="signature-placeholder">Toque ou clique aqui para assinar em tela cheia.</div>
+    </div>
+    <div class="signature-actions no-print">
+      <button type="button" class="secondary" id="openSignatureBtn">Assinar em tela cheia</button>
+      <button type="button" class="danger" id="clearSignatureBtn">Limpar assinatura</button>
+    </div>
+    <img id="signaturePrint" class="print-signature" alt="Assinatura">
+    <div class="signature-line"></div>
+    <div class="signature-label">Assinatura do militar responsável pelo preenchimento</div>
+  </div>
 </section>
+
+<div class="signature-modal no-print" id="signatureModal" aria-hidden="true">
+  <div class="signature-modal-card">
+    <div class="signature-modal-head">
+      <h3>Assinatura do militar responsável</h3>
+      <button type="button" class="secondary" id="closeSignatureBtn">Fechar</button>
+    </div>
+    <div class="signature-canvas-wrap" id="signatureCanvasWrap">
+      <canvas id="signatureCanvas"></canvas>
+    </div>
+    <div class="signature-modal-actions">
+      <button type="button" class="danger" id="modalClearSignatureBtn">Limpar</button>
+      <button type="button" class="ok" id="saveSignatureBtn">Salvar assinatura</button>
+    </div>
+  </div>
+</div>
 </main>
 
 <script>
@@ -134,7 +179,7 @@ function rowData(tr){
   return {term:get('term'),brand:get('brand'),type:get('type'),model:get('model'),color:get('color'),plate:get('plate'),reason:get('reason'),otherReason:get('otherReason'),place:get('place'),nameMat:get('nameMat')};
 }
 function collect(){
-  return {data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,responsavel:document.getElementById('responsavel').value,vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData)};
+  return {data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,responsavel:document.getElementById('responsavel').value,signature:signatureData||'',vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData)};
 }
 function save(){
   try{localStorage.setItem(STORE_KEY,JSON.stringify(collect()))}catch(_){}
@@ -167,12 +212,80 @@ function addVehicle(data={}){
 }
 function syncCellPrint(el){const p=el.parentElement?.querySelector(':scope > .print-value');if(p)p.textContent=(el.value||'—')}
 function renumber(){const rows=[...document.querySelectorAll('#vehicleRows tr')];rows.forEach((tr,i)=>tr.querySelector('.order').textContent=String(i+1).padStart(2,'0'));document.getElementById('vehicleCount').textContent=rows.length+' veículo(s) na relação'}
+let signatureData='';
+const signatureModal=document.getElementById('signatureModal');
+const signatureCanvas=document.getElementById('signatureCanvas');
+const signatureCtx=signatureCanvas.getContext('2d');
+let signatureDrawing=false,signatureLast=null,signatureSnapshot='';
+
+function setupSignatureContext(dpr=1){
+  signatureCtx.setTransform(dpr,0,0,dpr,0,0);
+  signatureCtx.lineCap='round';signatureCtx.lineJoin='round';signatureCtx.lineWidth=2.4;signatureCtx.strokeStyle='#111';
+}
+function drawSignatureContained(data){
+  if(!data)return;
+  const r=signatureCanvas.getBoundingClientRect(),im=new Image();
+  im.onload=()=>{const scale=Math.min(r.width/im.naturalWidth,r.height/im.naturalHeight),w=im.naturalWidth*scale,h=im.naturalHeight*scale,x=(r.width-w)/2,y=(r.height-h)/2;signatureCtx.drawImage(im,x,y,w,h)};
+  im.src=data;
+}
+function resizeSignatureCanvas(){
+  const r=signatureCanvas.getBoundingClientRect();if(!r.width||!r.height)return;
+  const dpr=Math.max(1,window.devicePixelRatio||1),prev=signatureSnapshot||signatureData;
+  signatureCanvas.width=Math.max(1,Math.round(r.width*dpr));signatureCanvas.height=Math.max(1,Math.round(r.height*dpr));
+  setupSignatureContext(dpr);if(prev)drawSignatureContained(prev);
+}
+function signaturePos(ev){const r=signatureCanvas.getBoundingClientRect();return [ev.clientX-r.left,ev.clientY-r.top]}
+function signatureStart(ev){if(ev.pointerType==='mouse'&&ev.button!==0)return;signatureDrawing=true;signatureLast=signaturePos(ev);try{signatureCanvas.setPointerCapture(ev.pointerId)}catch(_){}ev.preventDefault()}
+function signatureMove(ev){if(!signatureDrawing)return;const p=signaturePos(ev);signatureCtx.beginPath();signatureCtx.moveTo(...signatureLast);signatureCtx.lineTo(...p);signatureCtx.stroke();signatureLast=p;ev.preventDefault()}
+function cropSignature(){
+  const w=signatureCanvas.width,h=signatureCanvas.height;if(!w||!h)return '';
+  let img;try{img=signatureCtx.getImageData(0,0,w,h)}catch(_){return signatureCanvas.toDataURL('image/png')}
+  const d=img.data;let minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=d[(y*w+x)*4+3];if(a>8){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}
+  if(maxX<0)return '';
+  const pad=Math.max(8,Math.round(Math.max(w,h)*.012));minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);
+  const cw=maxX-minX+1,ch=maxY-minY+1,tmp=document.createElement('canvas');tmp.width=cw;tmp.height=ch;tmp.getContext('2d').drawImage(signatureCanvas,minX,minY,cw,ch,0,0,cw,ch);return tmp.toDataURL('image/png');
+}
+function signatureEnd(ev){if(!signatureDrawing)return;signatureDrawing=false;signatureSnapshot=cropSignature();try{signatureCanvas.releasePointerCapture(ev.pointerId)}catch(_){}}
+signatureCanvas.addEventListener('pointerdown',signatureStart,{passive:false});signatureCanvas.addEventListener('pointermove',signatureMove,{passive:false});signatureCanvas.addEventListener('pointerup',signatureEnd,{passive:false});signatureCanvas.addEventListener('pointercancel',signatureEnd,{passive:false});
+
+function openSignature(){
+  signatureSnapshot=signatureData||'';
+  signatureModal.classList.add('open');signatureModal.setAttribute('aria-hidden','false');document.body.classList.add('signature-open');
+  setTimeout(()=>{resizeSignatureCanvas();if(signatureSnapshot)drawSignatureContained(signatureSnapshot)},60);
+}
+function closeSignature(){
+  signatureModal.classList.remove('open');signatureModal.setAttribute('aria-hidden','true');document.body.classList.remove('signature-open');
+}
+function saveSignature(){
+  signatureSnapshot=cropSignature();signatureData=signatureSnapshot||'';updateSignatureUi();save();closeSignature();
+}
+function clearSignatureCanvas(){signatureSnapshot='';signatureCtx.clearRect(0,0,signatureCanvas.width,signatureCanvas.height)}
+function clearSignature(){
+  if(signatureData&&!confirm('Limpar a assinatura registrada?'))return;
+  signatureData='';signatureSnapshot='';signatureCtx.clearRect(0,0,signatureCanvas.width,signatureCanvas.height);updateSignatureUi();save();
+}
+function updateSignatureUi(){
+  const box=document.getElementById('signatureBox'),prev=document.getElementById('signaturePreview'),pr=document.getElementById('signaturePrint');
+  box.classList.toggle('has-signature',!!signatureData);
+  if(signatureData){prev.src=signatureData;pr.src=signatureData;pr.style.visibility='visible'}else{prev.removeAttribute('src');pr.removeAttribute('src');pr.style.visibility='hidden'}
+}
+document.getElementById('signatureBox').addEventListener('click',openSignature);
+document.getElementById('signatureBox').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSignature()}});
+document.getElementById('openSignatureBtn').addEventListener('click',openSignature);
+document.getElementById('clearSignatureBtn').addEventListener('click',clearSignature);
+document.getElementById('closeSignatureBtn').addEventListener('click',closeSignature);
+document.getElementById('modalClearSignatureBtn').addEventListener('click',clearSignatureCanvas);
+document.getElementById('saveSignatureBtn').addEventListener('click',saveSignature);
+window.addEventListener('resize',()=>{if(signatureModal.classList.contains('open'))setTimeout(resizeSignatureCanvas,80)});
+
 function load(){
   let p=null;try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}
   const today=localDate();
-  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';(p.vehicles||[]).forEach(addVehicle)}
+  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';(p.vehicles||[]).forEach(addVehicle)}
   else{document.getElementById('data').value=today;addVehicle()}
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(el=>{syncPrint(el);el.addEventListener('input',()=>{if(el.id==='prefixo')el.value=String(el.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,10);syncPrint(el);save()});el.addEventListener('change',()=>{syncPrint(el);save()})});
+  updateSignatureUi();
 }
 function validate(){
   if(!document.getElementById('data').value){alert('Informe a data do serviço.');return false}
@@ -185,7 +298,7 @@ function generatePdf(){
   if(!validate())return;
   document.querySelectorAll('#vehicleRows tr').forEach(tr=>{tr.querySelectorAll('input:not([data-k="otherReason"]),select:not([data-k="reason"])').forEach(syncCellPrint);const sel=tr.querySelector('[data-k="reason"]'),inp=tr.querySelector('[data-k="otherReason"]'),pr=tr.querySelector('.reason-print');if(pr){const text=sel?.value==='Outro'?(inp?.value?('Outro — '+inp.value):'Outro'):(sel?.value||'');pr.textContent=text||'—'}});
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);
-  renumber();save();
+  renumber();updateSignatureUi();save();
   const old=document.title,resp=document.getElementById('responsavel').value.trim()||'REBOQUE',date=fmtDate(document.getElementById('data').value).replaceAll('/','.');
   document.title='TRASLADOS REBOQUE - '+resp+' - '+date;
   window.print();
