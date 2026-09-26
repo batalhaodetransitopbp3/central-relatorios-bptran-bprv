@@ -77,7 +77,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <section class="card"><div class="section-head"><div><h2>Power BI</h2><div class="note">Vínculo para o painel institucional Microsoft Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o Microsoft Power BI impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
 </section>
 </main>
-<script src="central_cloud.js?v=10.6.0-rc1"></script>
+<script src="central_cloud.js?v=10.6.3-rc1"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -123,12 +123,13 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
+ const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:45000});
  async function load(){try{const t=await ensure();if(main==='painel')return loadPanel(t);if(main==='historico')return loadHistory(t);if(main==='rco')return loadRco(t);if(main==='powerbi')return loadBi(t)}catch(e){if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}showError(e.message)}}
  function showError(msg){const target=main==='historico'?$('historyBody'):main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
  async function loadPanel(t){
    $('chart').innerHTML='';$('analysisControls').innerHTML='';
    if(sub==='analise')return loadAnalysis(t);
-   const r=await CentralCloud.jsonp('p3-query',p(t,sub));
+   const r=await p3Get('p3-query',p(t,sub));
    if(sub==='controle-diario')return renderControl(r);
    const items=r.items||[];renderList(sub,items);
  }
@@ -161,9 +162,9 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  }
  async function loadAnalysis(t){
    const base={...p(t,'produtividade'),indicador:analysisIndicator};delete base.view;
-   let r=await CentralCloud.jsonp('p3-analysis',base);if(!analysisIndicator&&r.indicadores?.length){analysisIndicator=r.indicadores[0];r=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator})}
+   let r=await p3Get('p3-analysis',base);if(!analysisIndicator&&r.indicadores?.length){analysisIndicator=r.indicadores[0];r=await p3Get('p3-analysis',{...base,indicador:analysisIndicator})}
    const a=new Date($('di').value+'T12:00:00'),b=new Date($('df').value+'T12:00:00'),days=Math.max(1,Math.round((b-a)/86400000)+1),pe=new Date(a.getTime()-86400000),ps=new Date(pe.getTime()-(days-1)*86400000),iso=d=>d.toISOString().slice(0,10);
-   const prev=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:iso(ps),dataFim:iso(pe)});
+   const prev=await p3Get('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:iso(ps),dataFim:iso(pe)});
    $('title').textContent='Análise estatística';$('subtitle').textContent='Comparação com período anterior equivalente.';
    $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+(r.indicadores||[]).map(x=>'<option '+(x===analysisIndicator?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><div class="note">Período anterior: '+date(iso(ps))+' a '+date(iso(pe))+'</div></div>';
    document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
@@ -171,12 +172,12 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const max=Math.max(1,...(r.porCompanhia||[]).map(x=>Number(x.valor||0)));$('chart').innerHTML=(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join('')||'<div class="empty">Sem dados.</div>';$('thead').innerHTML='';$('tbody').innerHTML='';
  }
  async function loadHistory(t){
-   const r=await CentralCloud.jsonp('p3-query',p(t,'historico')),items=r.items||[];
-   $('historyStats').innerHTML=cards([['Registros históricos',items.length],['Somatório',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO).filter(Boolean)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME).filter(Boolean)).size],['Registros digitais',r.totalDigital||0]]);
+   const r=await p3Get('p3-query',p(t,'historico')),items=r.items||[];
+   $('historyStats').innerHTML=cards([['Registros históricos',r.totalHistorico??items.length],['Exibidos',items.length],['Somatório exibido',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME).filter(Boolean)).size],['Registros digitais no período',r.totalDigital||0]]);
    const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['GRUPO_NOME','Grupo'],['INDICADOR_NOME','Indicador'],['QUANTIDADE','Qtd.'],['ORIGEM_RELATORIO','Origem']];table(cols,items,$('historyHead'),$('historyBody'));
  }
  async function loadRco(t){
-   const r=await CentralCloud.jsonp('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
+   const r=await p3Get('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
    $('rcoStats').innerHTML=cards([['RCOs',items.length],['Retificados',ret.length],['Com CPU',items.filter(x=>x.MODO_CONSOLIDACAO==='CPU').length],['P3/Oficial',items.filter(x=>x.MODO_CONSOLIDACAO==='SEM_CPU').length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_GUARNICOES)||0),0)]]);
    const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['VERSAO','Versão'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];
    $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th>Ação</th></tr>';
