@@ -800,7 +800,7 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.5.2-20260925j"></script>
+<script src="central_cloud.js?v=10.6.0-rc1"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
