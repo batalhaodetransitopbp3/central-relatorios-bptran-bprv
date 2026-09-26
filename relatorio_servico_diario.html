@@ -876,7 +876,7 @@ async function publishPass(){
       await fetchCloudOperations(true);await carregarRemocoesDoDia(true);if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();
       const p=window.payloadV2();p.guarnicao.matricula=mat;p.servico.iniciadoEm=serviceStartedAt;p.servico.finalizadoEm=new Date().toISOString();
       if(!confirm(summaryText(p)+'\n\nFinalizar e enviar este RSD para análise do Coordenador?'))return;
-      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'});if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}setTimeout(()=>prepareAndPrint(),180)
+      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'}});if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}setTimeout(()=>prepareAndPrint(),180)
     }catch(e){
       try{const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:10000});if(atual?.rsd){renderReviewBanner(atual.rsd);alert(reviewMessage(atual.rsd));return}}catch(_){}
       alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.')
