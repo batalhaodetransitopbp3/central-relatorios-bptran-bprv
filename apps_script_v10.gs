@@ -8,7 +8,7 @@
  *      CENTRAL_TOKEN = chave operacional dos módulos
  *      COORD_TOKEN   = chave exclusiva de CPU/Coordenação
  *      P3_TOKEN      = chave exclusiva da Gestão P3/Oficial
- *      MASTER_ADMIN_TOKEN = chave exclusiva do Controle Geral do Serviço
+ *      O Controle Geral usa senha exclusiva validada por hash SHA-256 no backend.
  * 4. Implantar > Aplicativo da Web > Executar como proprietário > acesso conforme política institucional.
  * 5. Substitua CENTRAL_CLOUD_ENDPOINT, no front-end, pela URL /exec da implantação.
  *
@@ -16,6 +16,7 @@
  */
 
 var CENTRAL_V10_VERSION = '10.6.6-rc1';
+var MASTER_ADMIN_PASSWORD_SHA256 = '2d11357a0a62d1da1e857aed32060b06c73e6c5db1c2398179176090cc999ad1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -253,7 +254,6 @@ function assertToken_(token, kind) {
   var central = String(props.getProperty('CENTRAL_TOKEN') || '');
   var p3 = String(props.getProperty('P3_TOKEN') || '');
   var coord = String(props.getProperty('COORD_TOKEN') || '');
-  var master = String(props.getProperty('MASTER_ADMIN_TOKEN') || '');
   token = String(token || '');
   if (kind === 'master-session') {
     var cached=CacheService.getScriptCache().get('master-session:'+hash_(token));
@@ -262,8 +262,8 @@ function assertToken_(token, kind) {
     return true;
   }
   if (kind === 'master') {
-    if (!master) throw new Error('Controle Geral não configurado: defina MASTER_ADMIN_TOKEN nas Propriedades do script.');
-    if (token !== master) throw new Error('Senha do Controle Geral inválida.');
+    if (!MASTER_ADMIN_PASSWORD_SHA256) throw new Error('Controle Geral não configurado.');
+    if (sha256Hex_(token) !== MASTER_ADMIN_PASSWORD_SHA256) throw new Error('Senha do Controle Geral inválida.');
     return true;
   }
   if (kind === 'coord') {
@@ -375,6 +375,10 @@ function dateText_(v) {
 }
 function hash_(text) {
   var b=Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(text||''), Utilities.Charset.UTF_8);
+  return b.map(function(x){var z=(x<0?x+256:x).toString(16);return z.length===1?'0'+z:z;}).join('');
+}
+function sha256Hex_(text) {
+  var b=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text||''), Utilities.Charset.UTF_8);
   return b.map(function(x){var z=(x<0?x+256:x).toString(16);return z.length===1?'0'+z:z;}).join('');
 }
 function jsonp_(obj, callback) {
