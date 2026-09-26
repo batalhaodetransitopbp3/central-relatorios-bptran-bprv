@@ -769,6 +769,12 @@ function passagemReceber_(payload) {
 }
 
 
+function linkedRcoInRetification_(rsdRow){
+  var rid=String((rsdRow||{}).RCO_REPORT_ID||'');if(!rid)return false;
+  var d=findOne_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),'RCO_REPORT_ID',rid);
+  return !!(d&&String(d.STATUS)==='EM_RETIFICACAO');
+}
+
 function rsdReview_(payload){
   var reportId=String(payload.reportId||''),decision=String(payload.decision||'').toUpperCase(),s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',reportId);
   if(!row)throw new Error('RSD não localizado.');
@@ -776,6 +782,10 @@ function rsdReview_(payload){
   var allowed={DEFERIDO:'DEFERIDO',DEFERIDO_COM_RESSALVAS:'DEFERIDO_COM_RESSALVAS',RETIFICACAO_SOLICITADA:'RETIFICACAO_SOLICITADA',INDEFERIDO:'INDEFERIDO'};
   if(!allowed[decision])throw new Error('Decisão de análise inválida.');
   if(['CANCELADO','ENCERRADO_PASSAGEM'].indexOf(String(row.STATUS))>=0)throw new Error('Este RSD não pode ser analisado neste estado.');
+  if(String(row.STATUS)==='INCLUIDO_RCO'){
+    if(!linkedRcoInRetification_(row))throw new Error('Este RSD já integra um RCO consolidado. O P3 deve reabrir formalmente o RCO para retificação antes de qualquer correção.');
+    if(['RETIFICACAO_SOLICITADA','INDEFERIDO'].indexOf(decision)<0)throw new Error('Durante a retificação do RCO, um RSD já incluído somente pode ser devolvido para correção ou indeferido.');
+  }
   if((decision==='RETIFICACAO_SOLICITADA'||decision==='INDEFERIDO'||decision==='DEFERIDO_COM_RESSALVAS')&&!String(payload.motivo||payload.observacao||'').trim())throw new Error('Informe o motivo/observação da decisão.');
   row.STATUS=allowed[decision];row.REVIEW_STATUS=allowed[decision];row.REVIEW_MOTIVO=String(payload.motivo||'');row.REVIEW_OBSERVACAO=String(payload.observacao||'');
   row.REVIEW_AUTOR_MATRICULA=normMat_(payload.autorMatricula||'');row.REVIEW_AUTOR_NOME=String(payload.autorNome||'');row.REVIEW_EM=nowIso_();row.SINCRONIZADO_EM=nowIso_();
@@ -787,7 +797,10 @@ function rsdCancel_(payload){
   var reportId=String(payload.reportId||''),s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
   if(String(row.STATUS)==='CANCELADO')return {ok:true,message:'RSD já se encontra cancelado.',status:'CANCELADO'};
   if(String(row.STATUS)==='PASSAGEM_DISPONIVEL')throw new Error('Há uma passagem de serviço aguardando recebimento. Cancele primeiro a passagem e, se necessário, cancele depois o registro.');
-  if(String(row.STATUS)==='INCLUIDO_RCO')throw new Error('Este RSD já foi incorporado ao RCO. A correção deve seguir o fluxo de retificação pelo Coordenador/P3.');
+  if(String(row.STATUS)==='INCLUIDO_RCO'){
+    if(String(payload.perfil||'').toUpperCase()==='GUARNICAO')throw new Error('Este RSD já foi incorporado ao RCO e não pode ser cancelado pela guarnição.');
+    if(!linkedRcoInRetification_(row))throw new Error('Este RSD já foi incorporado a um RCO consolidado. O P3 deve reabrir formalmente o RCO para retificação antes do cancelamento.');
+  }
   if(!String(payload.motivo||'').trim())throw new Error('Informe o motivo do cancelamento.');
   ensureHeaders_(s,['CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL']);
   row.STATUS='CANCELADO';row.CANCELADO_EM=nowIso_();row.CANCELADO_MOTIVO=String(payload.motivo||'');row.CANCELADO_POR_MATRICULA=normMat_(payload.autorMatricula||'');row.CANCELADO_POR_NOME=String(payload.autorNome||'');row.CANCELADO_POR_PERFIL=String(payload.perfil||'');row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=nowIso_();
@@ -1097,7 +1110,12 @@ function p3Query_(p) {
     return {ok:true,items:hist.slice(-5000).reverse(),totalHistorico:hist.length,totalDigital:allProd.length-hist.length};
   }
   else if(view==='rco'){
-    list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RCO')),p);
+    var draftMap={};objects_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS')).forEach(function(d){draftMap[String(d.RCO_REPORT_ID||'')]=d});
+    list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'RCO')),p).map(function(x){
+      var d=draftMap[String(x.REPORT_ID||'')]||{};
+      x.DRAFT_STATUS=d.STATUS||'';x.RETIFICACAO_MOTIVO=d.RETIFICACAO_MOTIVO||'';x.RETIFICACAO_ABERTA_EM=d.RETIFICACAO_ABERTA_EM||'';x.RETIFICACAO_ABERTA_POR=d.RETIFICACAO_ABERTA_POR||'';
+      return x;
+    });
   }
   else if(view==='rco-origens'){
     list=objects_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'));
