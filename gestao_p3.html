@@ -189,7 +189,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  async function loadAnalysis(t){
    progressStep(25,'Calculando o indicador do período analisado...');
    const base={...p(t,'produtividade'),indicador:analysisIndicator};delete base.view;
-   let r=await p3Get('p3-analysis',base),catalog=Array.isArray(r.indicadores)?r.indicadores:[];
+   let r=await p3Get('p3-analysis',base),catalog=Array.isArray(r.catalogo)?r.catalogo:(Array.isArray(r.indicadores)?r.indicadores.map(x=>({codigo:String(x),nome:String(x),descricao:''})):[]);
    if(!analysisIndicator&&catalog.length)analysisIndicator=String((r.indicador||catalog[0]).codigo||catalog[0].codigo||'');
    const ref=referenceWindow();progressStep(58,'Calculando a janela de referência...');
    const prev=await p3Get('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:ref.start,dataFim:ref.end});progressStep(84,'Montando a comparação...');
