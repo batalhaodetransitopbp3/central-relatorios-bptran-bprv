@@ -9,7 +9,7 @@ function getDeviceId(){try{let d=localStorage.getItem(DEVICE_KEY)||'';if(!d){d=u
 function getToken(kind='central'){try{return localStorage.getItem(kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY)||''}catch(_){return ''}}
 function setToken(v,kind='central'){try{const k=kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY;if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(_){}}
 function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;t=prompt(message||(kind==='p3'?'Informe a Chave P3:':'Informe a chave operacional da Central:'))||'';t=t.trim();if(t)setToken(t,kind);return t}
-const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert']);
+const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
 function tokenKindForAction(action){return P3_ACTIONS.has(String(action||''))?'p3':'central'}
 function isAuthError(err){return err?.code==='AUTH_INVALID'||/chave inválida/i.test(String(err?.message||err||''))}
 function authError(action,message,token){const e=new Error(message||'Chave inválida.');if(/chave inválida/i.test(e.message)){const kind=tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind)}return e}
