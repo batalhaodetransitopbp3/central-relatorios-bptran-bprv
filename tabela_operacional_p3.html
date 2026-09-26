@@ -36,7 +36,7 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
 </section>
 <section class="card"><div class="legend">Os registros são exibidos por companhia. As colunas representam as guarnições e a coluna TOTAL reproduz a lógica de consolidação do RCO.</div><div id="tables"></div></section>
 </main>
-<script src="central_cloud.js?v=10.6.0-rc1"></script>
+<script src="central_cloud.js?v=10.6.3-rc1"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -87,13 +87,14 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
    return '<div class="company-block"><div class="company-title"><span>'+esc(company||'Companhia não informada')+'</span><span>'+guards.length+' guarnição(ões)</span></div><div class="table-wrap"><table class="matrix"><thead><tr><th>Grupo</th><th>Indicador</th>'+guards.map(g=>'<th>'+esc(g)+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+body+'</tbody></table></div></div>';
  }
  async function load(){
-   const tk=token();if(!tk)return;const params={token:tk,view:'produtividade',dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,guarnicao:$('guarnicao').value};
+   const tk=token();if(!tk)return;const params={token:tk,view:'produtividade-matriz',dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,guarnicao:$('guarnicao').value};
    $('status').textContent='Carregando produtividade...';
    try{
-     const r=await CentralCloud.jsonp('p3-query',params),items=r.items||[],groups=new Map(),a=actor();
+     const r=await CentralCloud.jsonp('p3-query',params,{timeout:45000}),items=r.items||[],groups=new Map(),a=actor();
      items.forEach(x=>{const c=String(x.COMPANHIA||'Não informada');if(!groups.has(c))groups.set(c,[]);groups.get(c).push(x)});
      $('tables').innerHTML=groups.size?[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR')).map(([c,a])=>renderCompany(c,a)).join(''):'<div class="empty">Nenhum registro de produtividade para os filtros selecionados.</div>';
-     $('status').textContent=[items.length+' registro(s) de produtividade • '+groups.size+' companhia(s)',a?.matricula?'Sessão: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
+     const src=r.sourceStats||{},sourceTxt=(src.digital||src.historico||src.historicoSuprimido)?('Fontes: digital '+(src.digital||0)+' • histórico '+(src.historico||0)+(src.historicoSuprimido?' • sobreposição histórica substituída por RCO digital: '+src.historicoSuprimido:'')):'';
+     $('status').textContent=[(r.rawRows??items.length)+' registro(s)-base • '+items.length+' linha(s) consolidadas • '+groups.size+' companhia(s)',sourceTxt,a?.matricula?'Sessão: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
    }catch(e){if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tables').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.'}
  }
  $('apply').onclick=load;
