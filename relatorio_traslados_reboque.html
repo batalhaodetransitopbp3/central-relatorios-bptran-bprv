@@ -74,10 +74,17 @@ body.signature-open{overflow:hidden}
 <body>
 <main class="page">
 <div class="toolbar no-print" id="reboqueToolbar">
-  <button class="ok edit-action" type="button" onclick="saveCloudDraft()">Salvar rascunho</button>
-  <button class="secondary edit-action" type="button" onclick="loadCloudDraft()">Carregar rascunho</button>
+  <button class="ok edit-action" type="button" onclick="saveCloudDraft()">Salvar rascunho na Central</button>
+  <button class="secondary edit-action" type="button" onclick="loadCloudDraft()">Carregar rascunho da Central</button>
   <button class="edit-action" type="button" onclick="finalizeCloud()">Finalizar serviço</button>
   <button class="secondary edit-action" type="button" onclick="addVehicle()">+ Acrescentar veículo</button>
+  <details class="edit-action no-print" style="position:relative">
+    <summary style="cursor:pointer;font-weight:800;padding:9px 11px;border:1px solid #d4c28f;border-radius:9px;background:#fff8e8;color:#71521a">⚠ Contingência</summary>
+    <div style="position:absolute;z-index:50;top:calc(100% + 5px);left:0;min-width:245px;padding:8px;background:#fff;border:1px solid #d8c38f;border-radius:10px;box-shadow:0 10px 28px #0002;display:grid;gap:6px">
+      <button class="secondary" type="button" onclick="saveLocalDraft()">Salvar neste aparelho</button>
+      <button class="secondary" type="button" onclick="loadLocalDraft()">Carregar deste aparelho</button>
+    </div>
+  </details>
   <button type="button" data-viewer-keep="1" onclick="generatePdf()">Gerar PDF</button>
   <a class="btn secondary" data-viewer-keep="1" href="index.html">Voltar à Central</a>
   <span id="cloudStatus" style="font-size:11px;font-weight:800;color:#52697f"></span>
@@ -192,7 +199,14 @@ function rowData(tr){
   const get=k=>tr.querySelector('[data-k="'+k+'"]')?.value||'';
   return {term:get('term'),brand:get('brand'),type:get('type'),model:get('model'),color:get('color'),plate:get('plate'),reason:get('reason'),otherReason:get('otherReason'),place:get('place'),nameMat:get('nameMat')};
 }
-function activeContext(){try{return JSON.parse(localStorage.getItem(ACTIVE_CONTEXT_KEY)||'{}')||{}}catch(_){return {}}}
+function activeContext(){
+  try{
+    const current=JSON.parse(localStorage.getItem(ACTIVE_CONTEXT_KEY)||'{}')||{};
+    if(current.serviceId&&current.rsdReportId)return current;
+    const local=JSON.parse(localStorage.getItem(STORE_KEY)||'{}')||{};
+    return local.contextoServico||{};
+  }catch(_){return {}}
+}
 function collect(){
   const ctx=activeContext();
   return {schema:'pmpb-reboque-traslados-v2',reportId:reboqueReportId,status:cloudFinalized?'FINALIZADO':'EM_SERVICO',
@@ -205,6 +219,12 @@ function save(){
   if(VIEW_ONLY||suspendSave)return;
   try{localStorage.setItem(STORE_KEY,JSON.stringify(collect()))}catch(_){}
 }
+function saveLocalDraft(){if(VIEW_ONLY)return;save();setCloudStatus('Rascunho salvo neste aparelho','warn');alert('Rascunho salvo neste aparelho. Use esta opção como contingência quando a nuvem estiver indisponível.')}
+function loadLocalDraft(){
+  if(VIEW_ONLY)return;let p=null;try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}
+  if(!p){alert('Nenhum rascunho local foi encontrado neste aparelho.');return}
+  applyCloudPayload(p,'aparelho');setCloudStatus('Rascunho local carregado','warn');
+}
 function setCloudStatus(t,kind=''){const e=document.getElementById('cloudStatus');if(!e)return;e.textContent=t||'';e.style.color=kind==='ok'?'#18745f':kind==='warn'?'#8a5a00':kind==='err'?'#9a2745':'#52697f'}
 function assertReboqueContext(){
   const ctx=activeContext();
@@ -214,14 +234,22 @@ function assertReboqueContext(){
 }
 async function saveCloudDraft(silent=false){
   if(VIEW_ONLY)return false;
-  if(!window.CentralCloud)throw new Error('Conexão com a Central indisponível.');
-  const ctx=assertReboqueContext(),token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
+  if(!window.CentralCloud){if(!silent)alert('Conexão com a Central indisponível. O rascunho permanece salvo neste aparelho.');save();return false}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){if(!silent)alert(e.message);return false}
+  const token=CentralCloud.getToken('central')||(!silent?CentralCloud.askToken('central'):'');if(!token){save();return false}
   const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
-  setCloudStatus('Salvando na Central…');
-  try{const r=await CentralCloud.submitForm('reboque-draft-upsert',{reboque:p},token,{popup:false});reboqueReportId=r.reportId||reboqueReportId;localStorage.setItem(REPORT_KEY,reboqueReportId);cloudFinalized=false;save();setCloudStatus('Rascunho salvo na Central', 'ok');if(!silent)alert('Rascunho do reboque salvo na Central.');return true}
-  catch(e){setCloudStatus('Falha ao salvar', 'err');if(!silent)alert('Não foi possível salvar o rascunho: '+e.message);return false}
+  save();
+  if(!navigator.onLine&&silent){setCloudStatus('Sem internet — rascunho preservado neste aparelho','warn');return true}
+  setCloudStatus(navigator.onLine?'Salvando na Central…':'Sem internet — envio ficará pendente','warn');
+  try{
+    const r=await CentralCloud.postOrQueue('reboque-draft-upsert',{reboque:p},{token,unit:ctx.unidade||{},popup:false});
+    if(r.reportId)reboqueReportId=r.reportId;localStorage.setItem(REPORT_KEY,reboqueReportId);cloudFinalized=false;save();
+    if(r.queued){setCloudStatus('Rascunho preservado — sincronização pendente','warn');if(!silent)alert('Sem conexão suficiente. O rascunho foi preservado neste aparelho e ficou pendente para sincronização.')}
+    else{setCloudStatus('Rascunho salvo na Central','ok');if(!silent)alert('Rascunho do reboque salvo na Central.')}
+    return true;
+  }catch(e){setCloudStatus('Rascunho preservado localmente — falha na sincronização','warn');if(!silent)alert('Não foi possível sincronizar agora: '+e.message+'\n\nO rascunho permanece salvo neste aparelho.');return false}
 }
-function applyCloudPayload(p){
+function applyCloudPayload(p,source='Central'){
   suspendSave=true;
   try{
     reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';
@@ -231,7 +259,7 @@ function applyCloudPayload(p){
     document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);updateSignatureUi();renumber();
     try{if(!VIEW_ONLY){localStorage.setItem(REPORT_KEY,reboqueReportId);localStorage.setItem(STORE_KEY,JSON.stringify(p))}}catch(_){}
   }finally{suspendSave=false}
-  setCloudStatus(cloudFinalized?'Relatório finalizado':'Rascunho carregado da Central',cloudFinalized?'ok':'');
+  setCloudStatus(cloudFinalized?'Relatório finalizado':('Rascunho carregado '+(source==='Central'?'da Central':'do '+source)),cloudFinalized?'ok':(source==='Central'?'':'warn'));
 }
 async function loadCloudDraft(){
   if(VIEW_ONLY)return;
@@ -240,7 +268,7 @@ async function loadCloudDraft(){
   const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
   setCloudStatus('Consultando a Central…');
   try{
-    const r=await CentralCloud.jsonp('reboque-list',{rsdReportId:ctx.rsdReportId,serviceId:ctx.serviceId,token});
+    const r=await CentralCloud.jsonp('reboque-list',{serviceId:ctx.serviceId,token});
     const items=r.items||[];if(!items.length){setCloudStatus('Nenhum rascunho na Central','warn');alert('Não há relatório de traslado salvo para este serviço.');return}
     const pick=items.find(x=>String(x.status).toUpperCase()==='EM_SERVICO')||items[0];
     const g=await CentralCloud.jsonp('reboque-get',{reportId:pick.reportId,token});applyCloudPayload(g.reboque||{});
@@ -255,8 +283,12 @@ async function finalizeCloud(){
   const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
   const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
   setCloudStatus('Finalizando na Central…');
-  try{const r=await CentralCloud.submitForm('reboque-finalize',{reboque:p},token,{popup:false});reboqueReportId=r.reportId||reboqueReportId;cloudFinalized=true;save();setCloudStatus('Finalizado e disponível ao Coordenador','ok');alert('Relatório finalizado. O Coordenador já pode gerar o PDF diretamente pelo RCO.')}
-  catch(e){setCloudStatus('Falha na finalização','err');alert('Não foi possível finalizar: '+e.message)}
+  try{
+    const r=await CentralCloud.postOrQueue('reboque-finalize',{reboque:p},{token,unit:ctx.unidade||{},popup:false});
+    if(r.reportId)reboqueReportId=r.reportId;cloudFinalized=true;save();
+    if(r.queued){setCloudStatus('Finalização registrada — sincronização pendente','warn');alert('A finalização foi preservada neste aparelho e será sincronizada quando a conexão retornar. O Coordenador só verá o documento após essa sincronização.')}
+    else{setCloudStatus('Finalizado e disponível ao Coordenador','ok');alert('Relatório finalizado. O Coordenador já pode gerar o PDF diretamente pelo RCO.')}
+  }catch(e){save();setCloudStatus('Dados preservados localmente — finalização não sincronizada','warn');alert('Não foi possível sincronizar a finalização agora: '+e.message+'\n\nOs dados permanecem salvos neste aparelho.')}
 }
 async function loadCloudViewer(){
   if(!VIEW_ONLY||!window.CentralCloud)return;
@@ -394,8 +426,9 @@ function generatePdf(){
 load();
 if(!VIEW_ONLY){
   let cloudTimer=null;
-  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().rsdReportId)saveCloudDraft(true)},7000)},true);
-  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().rsdReportId)saveCloudDraft(true)},3000)},true);
+  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},7000)},true);
+  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},3000)},true);
+  window.addEventListener('online',()=>setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},1200));
 }
 </script>
 <style>.hidden{display:none!important}</style>
