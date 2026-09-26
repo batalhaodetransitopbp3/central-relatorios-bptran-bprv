@@ -603,7 +603,8 @@ function rsdList_(p) {
       data:x.DATA_SERVICO,batalhao:x.BATALHAO,companhia:x.COMPANHIA,guarnicao:x.GUARNICAO,status:x.STATUS,responsavel:x.RESPONSAVEL_NOME,matricula:x.RESPONSAVEL_MATRICULA,
       iniciadoEm:x.INICIADO_EM,finalizadoEm:x.FINALIZADO_EM,ultimoRascunhoEm:x.ULTIMO_RASCUNHO_EM,rcoReportId:x.RCO_REPORT_ID,editDeviceId:x.EDIT_DEVICE_ID||'',editLeaseUntil:x.EDIT_LEASE_UNTIL||'',
       reviewStatus:x.REVIEW_STATUS||'',reviewMotivo:x.REVIEW_MOTIVO||'',reviewObservacao:x.REVIEW_OBSERVACAO||'',reviewAutorNome:x.REVIEW_AUTOR_NOME||'',reviewEm:x.REVIEW_EM||'',
-      canceladoMotivo:x.CANCELADO_MOTIVO||'',possibleDuplicate:Object.keys(servicesByKey[key]||{}).length>1,duplicateCount:Math.max(1,Object.keys(servicesByKey[key]||{}).length),
+      canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorPerfil:x.CANCELADO_POR_PERFIL||'',canceladoEm:x.CANCELADO_EM||'',
+      possibleDuplicate:Object.keys(servicesByKey[key]||{}).length>1,duplicateCount:Math.max(1,Object.keys(servicesByKey[key]||{}).length),
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
   });
 }
