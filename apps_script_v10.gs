@@ -1201,19 +1201,24 @@ function rcoDraftClaim_(payload){
   }finally{lock.releaseLock();}
 }
 function rcoRetificationOpen_(payload){
-  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),autor=String(payload.autor||payload.autorNome||'').trim();
+  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),perfil=String(payload.autorPerfil||payload.perfil||'P3').toUpperCase(),mat=normMat_(payload.autorMatricula||payload.matricula||'');
   if(!reportId)throw new Error('Informe o REPORT_ID do RCO.');
   if(!motivo)throw new Error('Informe o motivo da retificação.');
-  if(!autor)throw new Error('Identifique o P3/oficial que autoriza a retificação.');
+  if(['P3','OFICIAL'].indexOf(perfil)<0)throw new Error('A reabertura para retificação exige perfil P3 ou Oficial.');
+  if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Identifique o P3/oficial responsável por matrícula válida.');
+  var cad=cadastroSearch_({tipo:'militar',q:mat}).items||[],m=null;
+  for(var i=0;i<cad.length;i++)if(normMat_(cad[i].MATRICULA)===mat){m=cad[i];break;}
+  if(!m)throw new Error('P3/oficial não localizado no Cadastro Mestre.');
+  var autorNome=String(m.NOME||''),autorPosto=String(m.POSTO_GRAD||''),autorTexto=[autorPosto,autorNome,mat].filter(Boolean).join(' — ');
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS');
-  ensureHeaders_(s,['RETIFICACAO_MOTIVO','RETIFICACAO_ABERTA_EM','RETIFICACAO_ABERTA_POR']);
+  ensureHeaders_(s,['RETIFICACAO_MOTIVO','RETIFICACAO_ABERTA_EM','RETIFICACAO_ABERTA_POR','RETIFICACAO_ABERTA_POR_MATRICULA','RETIFICACAO_ABERTA_POR_PERFIL']);
   var row=findOne_(s,'RCO_REPORT_ID',reportId);if(!row)throw new Error('Rascunho original do RCO não localizado.');
-  if(String(row.STATUS)==='EM_RETIFICACAO')return {ok:true,message:'Este RCO já está aberto para retificação.',reportId:reportId,status:'EM_RETIFICACAO'};
+  if(String(row.STATUS)==='EM_RETIFICACAO')return {ok:true,message:'Este RCO já está aberto para retificação.',reportId:reportId,status:'EM_RETIFICACAO',autor:{perfil:perfil,matricula:mat,nome:autorNome,postoGrad:autorPosto}};
   if(String(row.STATUS)!=='FINALIZADO')throw new Error('O RCO só pode ser reaberto para retificação após a consolidação/finalização.');
-  row.STATUS='EM_RETIFICACAO';row.RETIFICACAO_MOTIVO=motivo;row.RETIFICACAO_ABERTA_EM=nowIso_();row.RETIFICACAO_ABERTA_POR=autor;
+  row.STATUS='EM_RETIFICACAO';row.RETIFICACAO_MOTIVO=motivo;row.RETIFICACAO_ABERTA_EM=nowIso_();row.RETIFICACAO_ABERTA_POR=autorTexto;row.RETIFICACAO_ABERTA_POR_MATRICULA=mat;row.RETIFICACAO_ABERTA_POR_PERFIL=perfil;
   row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',reportId,row);
-  audit_('RCO',reportId,Number(row.REVISAO||1),'RETIFICACAO_ABERTA','',row.RETIFICACAO_ABERTA_POR,row.BATALHAO,row.COMPANHIA,{motivo:motivo});
-  return {ok:true,message:'RCO reaberto para retificação. O responsável poderá carregá-lo em “Continuar serviço”.',reportId:reportId,status:'EM_RETIFICACAO'};
+  audit_('RCO',reportId,Number(row.REVISAO||1),'RETIFICACAO_ABERTA',mat,autorNome,row.BATALHAO,row.COMPANHIA,{motivo:motivo,perfil:perfil,postoGrad:autorPosto});
+  return {ok:true,message:'RCO reaberto para retificação. O responsável poderá carregá-lo em “Continuar serviço”.',reportId:reportId,status:'EM_RETIFICACAO',autor:{perfil:perfil,matricula:mat,nome:autorNome,postoGrad:autorPosto}};
 }
 
 function closeRcoDraft_(reportId){var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',String(reportId||''));if(row){row.STATUS='FINALIZADO';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',String(reportId),row);}}
