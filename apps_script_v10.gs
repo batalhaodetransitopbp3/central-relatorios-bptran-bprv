@@ -1606,6 +1606,177 @@ function p3Query_(p) {
   return {ok:true,items:(list||[]).slice(-2000).reverse()};
 }
 
+
+/* =========================
+   Controle Geral do Serviço — Administrador-mestre
+   ========================= */
+function masterFilter_(x,p,dateFields){
+  p=p||{};var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),data=dateText_(p.data||'');
+  if(batt&&String(x.BATALHAO||'')!==batt)return false;
+  if(comp&&String(x.COMPANHIA||'')!==comp)return false;
+  if(data){
+    var d='';(dateFields||['DATA_SERVICO','DATA']).some(function(k){d=dateText_(x[k]||'');return !!d;});
+    if(d!==data)return false;
+  }
+  return true;
+}
+function masterLeaseState_(row){
+  var until=String((row||{}).EDIT_LEASE_UNTIL||''),active=leaseActive_(row);
+  return {active:active,deviceId:String((row||{}).EDIT_DEVICE_ID||''),until:until};
+}
+function masterOverview_(p){
+  p=p||{};var rsd=objects_(sheet_(P3_SHEET_ID,'RSD')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      rco=objects_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      pass=objects_(sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      aud=objects_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES')).filter(function(x){
+        if(p.batalhao&&String(x.BATALHAO||'')!==normBattalion_(p.batalhao))return false;
+        if(p.companhia&&String(x.COMPANHIA||'')!==String(p.companhia))return false;
+        if(p.data&&dateText_(x.DATA_HORA)!==dateText_(p.data))return false;
+        return true;
+      }).slice(-250).reverse(),
+      mainVtr=rsdMainVtrMap_(),now=Date.now();
+  var rsds=rsd.map(function(x){
+    var lease=masterLeaseState_(x);
+    return {reportId:String(x.REPORT_ID||''),serviceId:String(x.SERVICE_ID||''),segmento:Number(x.SEGMENTO||1),data:dateText_(x.DATA_SERVICO),
+      batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||''),guarnicao:String(x.GUARNICAO||''),tipo:String(x.GUARNICAO_TIPO||''),
+      vtrPrincipal:normVtrPrefix_(x.VTR_PRINCIPAL||mainVtr[String(x.REPORT_ID||'')]||''),status:String(x.STATUS||''),
+      responsavel:String(x.RESPONSAVEL_NOME||''),postoGrad:String(x.RESPONSAVEL_POSTO_GRAD||''),matricula:String(x.RESPONSAVEL_MATRICULA||''),
+      iniciadoEm:String(x.INICIADO_EM||''),finalizadoEm:String(x.FINALIZADO_EM||''),ultimoSync:String(x.ULTIMO_RASCUNHO_EM||x.SINCRONIZADO_EM||''),
+      rcoReportId:String(x.RCO_REPORT_ID||''),lease:lease,canceladoMotivo:String(x.CANCELADO_MOTIVO||''),canceladoEm:String(x.CANCELADO_EM||''),
+      canceladoPor:String(x.CANCELADO_POR_NOME||''),reviewStatus:String(x.REVIEW_STATUS||'')};
+  }).sort(function(a,b){return String(b.ultimoSync||b.iniciadoEm||'').localeCompare(String(a.ultimoSync||a.iniciadoEm||''));});
+  var rcos=rco.map(function(x){
+    var lease=masterLeaseState_(x);
+    return {reportId:String(x.RCO_REPORT_ID||''),data:dateText_(x.DATA_SERVICO),batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||''),
+      status:String(x.STATUS||''),responsavel:String(x.RESPONSAVEL_NOME||''),matricula:String(x.RESPONSAVEL_MATRICULA||''),revision:Number(x.REVISAO||0),
+      ultimoSync:String(x.ULTIMO_SYNC_EM||x.ATUALIZADO_EM||''),lease:lease,origem:String(x.ORIGEM||'')};
+  }).sort(function(a,b){return String(b.ultimoSync||'').localeCompare(String(a.ultimoSync||''));});
+  var passagens=pass.map(function(x){
+    return {passagemId:String(x.PASSAGEM_ID||''),serviceId:String(x.SERVICE_ID||''),data:dateText_(x.DATA_SERVICO),batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||''),
+      guarnicao:String(x.GUARNICAO||''),status:String(x.STATUS||''),entreguePor:String(x.ENTREGUE_POR_NOME||''),entregueMatricula:String(x.ENTREGUE_POR_MATRICULA||''),
+      disponibilizadaEm:String(x.DISPONIBILIZADA_EM||''),recebidaPor:String(x.RECEBIDA_POR_NOME||''),recebidaMatricula:String(x.RECEBIDA_POR_MATRICULA||''),
+      recebidaEm:String(x.RECEBIDA_EM||''),observacoes:String(x.OBSERVACOES||''),atualizadoEm:String(x.ATUALIZADO_EM||'')};
+  }).sort(function(a,b){return String(b.atualizadoEm||b.disponibilizadaEm||'').localeCompare(String(a.atualizadoEm||a.disponibilizadaEm||''));});
+  var auditoria=aud.map(function(x){return {id:String(x.AUDITORIA_ID||''),tipo:String(x.TIPO_ENTIDADE||''),entidadeId:String(x.ENTIDADE_ID||''),acao:String(x.ACAO||''),
+    dataHora:String(x.DATA_HORA||''),responsavel:String(x.RESPONSAVEL_NOME||''),matricula:String(x.RESPONSAVEL_MATRICULA||''),batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||'')};});
+  var activeStatuses=['EM_SERVICO','PASSAGEM_DISPONIVEL','RETIFICACAO_SOLICITADA'];
+  return {ok:true,geradoEm:nowIso_(),resumo:{
+    rsdTotal:rsds.length,guarnicoesEmServico:rsds.filter(function(x){return activeStatuses.indexOf(x.status)>=0;}).length,
+    rsdAguardandoAnalise:rsds.filter(function(x){return x.status==='AGUARDANDO_ANALISE';}).length,
+    rsdCancelados:rsds.filter(function(x){return x.status==='CANCELADO';}).length,
+    rsdComTrava:rsds.filter(function(x){return x.lease&&x.lease.active;}).length,
+    rcoEmAndamento:rcos.filter(function(x){return ['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(x.status)>=0;}).length,
+    rcoComTrava:rcos.filter(function(x){return x.lease&&x.lease.active;}).length,
+    passagensPendentes:passagens.filter(function(x){return x.status==='AGUARDANDO_RECEBIMENTO';}).length
+  },rsds:rsds,rcos:rcos,passagens:passagens,auditoria:auditoria};
+}
+function masterEmptyProduction_(){
+  return {
+    'apreensoes-veiculos-recolhimentos':{motocicletas:0,ciclomotores:0,automoveis:0,outros:0},
+    'remocoes-sinistros':{motocicletas:0,ciclomotores:0,automoveis:0,outros:0},
+    'sinistros-sem-embriaguez':{'c-vitimas':0,'c-vitimas-s-cnh':0,'s-vitimas-menores':0,'s-vitimas-vtr-pmpb':0,atropelamentos:0,outros:0},
+    'sinistros-embriaguez':{'c-vitimas':0,'s-vitimas':0,atropelamentos:0,outros:0},
+    acionamentos:{bsts:0,'apoio-outras-unidades':0},
+    notificacoes:{'art-165':0,'art-165-a':0,'art-230-xi':0,'demais-aits-com-abordagem':0,'aits-sem-abordagem':0,'total-aits':0},
+    'cnh-etilometro':{'cnhs-recolhidas':0,'testes-etilometro':0},
+    apreensoes:{armas:0,drogas:0,menores:0,'siva-r':0,sinais:0},
+    prisoes:{embriaguez:0,sinistro:0,armas:0,drogas:0,mandado:0,'siva-r':0,sinais:0,'tco-sasp':0,outros:0},
+    abordagens:{pessoas:0,motocicletas:0,ciclomotores:0,automoveis:0,outros:0,checkpoints:0}
+  };
+}
+function masterRsdCreate_(payload){
+  payload=payload||{};var data=dateText_(payload.data||''),batt=normBattalion_(payload.batalhao||'BPTran'),
+      comp=String(payload.companhia||normCompany_(batt,payload.companhiaNumero)),tipo=normGuarnicaoTipo_(payload.tipo||''),
+      vtr=normVtrPrefix_(payload.vtr||payload.vtrPrincipal||''),mat=normMat_(payload.matricula||''),nome=String(payload.nome||'').trim(),
+      posto=String(payload.postoGrad||'').trim(),turno=String(payload.turno||'').trim(),motivo=String(payload.motivo||'').trim();
+  if(!data)throw new Error('Informe a data do serviço.');if(!tipo)throw new Error('Informe o tipo da guarnição.');if(!vtr)throw new Error('Informe a VTR principal.');
+  if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Informe uma matrícula válida.');if(!nome)throw new Error('Informe o responsável pela guarnição.');
+  if(!motivo)throw new Error('Informe o motivo da inclusão administrativa.');
+  var now=nowIso_(),reportId=uid_('sd-master'),serviceId=uid_('svc'),n=Number(String(comp).match(/\d+/)&&String(comp).match(/\d+/)[0]||1);
+  var r={schema:'pmpb-transito-servico-diario-v2',schemaVersion:2,reportId:reportId,generatedAt:now,tipoRelatorio:'servico-diario-guarnicao',
+    unidade:{batalhao:batt,batalhaoSigla:batt,companhiaNumero:n,companhiaTipo:batt==='BPRv'?'CPRv':'CPTran',companhia:comp},
+    servico:{data:data,iniciadoEm:now,serviceId:serviceId,segmento:1,turno:turno},
+    guarnicao:{tipo:tipo,nome:'',viatura:vtr,vtrPrincipal:vtr,responsavel:nome,matricula:mat,postoGrad:posto,efetivo:'',viaturas:[{prefixo:vtr,ordem:1,origem:'MASTER_ADMIN'}]},
+    producao:masterEmptyProduction_(),alteracoes:{viatura:'',servico:'',materialCarga:'',planoOperacionalDiario:''},observacoes:'Inclusão administrativa: '+motivo,
+    ocorrencias:[],operacoes:[],veiculosRecuperados:[],tcos:[],arvc:[],fisco:{ativo:false,quantidadeOcorrencias:0,alteracoesEfetivo:''},
+    auditoria:{schema:'pmpb-transito-auditoria-rsd-v2',version:2,activated:false,activeSlot:1,actors:{1:{}},events:[],passagens:[],snapshots:{}},
+    viaturas:[{prefixo:vtr,ordem:1,origem:'MASTER_ADMIN'}],serviceId:serviceId,segmento:1,origem:'MASTER_ADMIN'};
+  var out=rsdStart_({rsd:r,deviceId:'',forceTakeover:true});
+  audit_('RSD',out.reportId,1,'MASTER_CRIADO_EM_NOME_DA_GUARNICAO','', 'ADMINISTRADOR MESTRE',batt,comp,{motivo:motivo,responsavel:nome,matricula:mat,vtr:vtr});
+  out.message='RSD criado administrativamente e deixado livre para continuidade pela guarnição.';return out;
+}
+function masterRsdUnlock_(payload){
+  var id=String((payload||{}).reportId||''),motivo=String((payload||{}).motivo||'').trim(),s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',id);
+  if(!row)throw new Error('RSD não localizado.');if(!motivo)throw new Error('Informe o motivo do destravamento.');
+  row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=nowIso_();upsert_(s,'REPORT_ID',id,row);
+  audit_('RSD',id,Number(row.VERSAO||1),'MASTER_DESTRAVADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo});
+  return {ok:true,message:'Trava do RSD removida. O serviço pode ser continuado em outro aparelho.'};
+}
+function masterRsdCancel_(payload){
+  payload=Object.assign({},payload||{},{perfil:'MASTER',autorNome:'ADMINISTRADOR MESTRE',autorMatricula:''});
+  var out=rsdCancel_(payload);return out;
+}
+function masterRsdReassign_(payload){
+  payload=payload||{};var id=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),mat=normMat_(payload.matricula||''),nome=String(payload.nome||'').trim(),posto=String(payload.postoGrad||'').trim(),
+      s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',id);
+  if(!row)throw new Error('RSD não localizado.');if(!motivo)throw new Error('Informe o motivo da correção.');if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Informe nome e matrícula válidos.');
+  if(['CANCELADO','INCLUIDO_RCO'].indexOf(String(row.STATUS||''))>=0)throw new Error('Este RSD não pode ter o responsável corrigido neste estado.');
+  var before={nome:row.RESPONSAVEL_NOME||'',matricula:row.RESPONSAVEL_MATRICULA||'',postoGrad:row.RESPONSAVEL_POSTO_GRAD||''};
+  row.RESPONSAVEL_NOME=nome;row.RESPONSAVEL_MATRICULA=mat;row.RESPONSAVEL_POSTO_GRAD=posto;row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=nowIso_();
+  try{
+    var p=loadJsonPayload_(row)||{};p.guarnicao=p.guarnicao||{};p.guarnicao.responsavel=nome;p.guarnicao.matricula=mat;p.guarnicao.postoGrad=posto;
+    p.observacoes=String(p.observacoes||'')+(p.observacoes?'\n':'')+'Correção administrativa de responsável: '+motivo;
+    var json=JSON.stringify(p),saved=saveJsonPayload_(id,Number(row.VERSAO||1),json,null,null,row.PAYLOAD_FILE_ID||'');
+    row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
+  }catch(_){}
+  upsert_(s,'REPORT_ID',id,row);
+  audit_('RSD',id,Number(row.VERSAO||1),'MASTER_RESPONSAVEL_CORRIGIDO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo,antes:before,depois:{nome:nome,matricula:mat,postoGrad:posto}});
+  return {ok:true,message:'Responsável do RSD corrigido e trava liberada.'};
+}
+function masterRcoUnlock_(payload){
+  var id=String((payload||{}).reportId||''),motivo=String((payload||{}).motivo||'').trim(),s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',id);
+  if(!row)throw new Error('RCO não localizado.');if(!motivo)throw new Error('Informe o motivo do destravamento.');
+  row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',id,row);
+  audit_('RCO',id,Number(row.REVISAO||1),'MASTER_DESTRAVADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo});
+  return {ok:true,message:'Trava do RCO removida. Outro coordenador poderá assumir o relatório.'};
+}
+function masterRcoCancel_(payload){
+  payload=payload||{};var id=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',id);
+  if(!row)throw new Error('RCO não localizado.');if(!motivo)throw new Error('Informe o motivo do cancelamento.');
+  if(['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(row.STATUS||''))<0)throw new Error('Somente RCO em andamento ou em retificação pode ser cancelado administrativamente.');
+  row.STATUS='CANCELADO_ADMIN';row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',id,row);
+  audit_('RCO',id,Number(row.REVISAO||1),'MASTER_CANCELADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo});
+  return {ok:true,message:'RCO cancelado administrativamente e preservado para auditoria.'};
+}
+function masterRcoReassign_(payload){
+  payload=payload||{};var id=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),mat=normMat_(payload.matricula||''),nome=String(payload.nome||'').trim(),posto=String(payload.postoGrad||'').trim(),
+      s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',id);
+  if(!row)throw new Error('RCO não localizado.');if(!motivo)throw new Error('Informe o motivo da correção.');if(!/^\d{3}\.\d{3}-\d$/.test(mat)||!nome)throw new Error('Informe nome e matrícula válidos.');
+  if(['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(row.STATUS||''))<0)throw new Error('Somente RCO em andamento/retificação pode ter o responsável corrigido.');
+  var before={nome:row.RESPONSAVEL_NOME||'',matricula:row.RESPONSAVEL_MATRICULA||''};
+  row.RESPONSAVEL_NOME=nome;row.RESPONSAVEL_MATRICULA=mat;row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();
+  try{
+    var p=loadJsonPayload_(row)||{};p.consolidacaoResponsavel=p.consolidacaoResponsavel||{};p.consolidacaoResponsavel.nome=nome;p.consolidacaoResponsavel.matricula=mat;p.consolidacaoResponsavel.postoGrad=posto;
+    var json=JSON.stringify(p),saved=saveJsonPayload_(id,'draft-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
+    row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
+  }catch(_){}
+  upsert_(s,'RCO_REPORT_ID',id,row);
+  audit_('RCO',id,Number(row.REVISAO||1),'MASTER_RESPONSAVEL_CORRIGIDO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo,antes:before,depois:{nome:nome,matricula:mat,postoGrad:posto}});
+  return {ok:true,message:'Responsável do RCO corrigido e trava liberada.'};
+}
+function masterPassagemCancel_(payload){
+  payload=Object.assign({},payload||{},{autorNome:'ADMINISTRADOR MESTRE',autorMatricula:''});
+  var out=passagemCancelar_(payload);var s=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'),row=findOne_(s,'PASSAGEM_ID',String(payload.passagemId||''));
+  if(row)audit_('PASSAGEM',row.PASSAGEM_ID,1,'MASTER_PASSAGEM_CANCELADA','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:payload.motivo||''});
+  return out;
+}
+function masterPassagemAnular_(payload){
+  payload=Object.assign({},payload||{},{autorNome:'ADMINISTRADOR MESTRE',autorMatricula:''});
+  var out=passagemAnular_(payload);var s=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'),row=findOne_(s,'PASSAGEM_ID',String(payload.passagemId||''));
+  if(row)audit_('PASSAGEM',row.PASSAGEM_ID,1,'MASTER_RECEBIMENTO_ANULADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:payload.motivo||''});
+  return out;
+}
+
 /* =========================
    RCO — rascunho em nuvem
    ========================= */
