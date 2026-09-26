@@ -1357,7 +1357,7 @@ function p3ProductivityMatrix_(p){
     var ic=p3IndicatorLeaf_(x.INDICADOR_CODIGO),co=String(x.COMPANHIA||'Não informada'),gc=String(x.GRUPO_CODIGO||'');
     companies[co]=1;
     var k=[co,gc,ic].join('||');
-    if(!map[k])map[k]={COMPANHIA:co,GRUPO_CODIGO:gc,GRUPO_NOME:x.GRUPO_NOME,INDICADOR_CODIGO:ic,INDICADOR_NOME:x.INDICADOR_NOME,QUANTIDADE:0};
+    if(!map[k])map[k]={COMPANHIA:co,GUARNICAO:'CONSOLIDADO',GRUPO_CODIGO:gc,GRUPO_NOME:x.GRUPO_NOME,INDICADOR_CODIGO:ic,INDICADOR_NOME:x.INDICADOR_NOME,QUANTIDADE:0};
     map[k].QUANTIDADE+=Number(x.QUANTIDADE||0);
   });
   var items=Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){
@@ -1401,15 +1401,15 @@ function p3MetricContribution_(x,code){
   return 0;
 }
 function p3Analysis_(p) {
-  var catalog=p3IntegratedCatalog_(),code=String(p.indicador||catalog[0].codigo),meta=catalog.filter(function(x){return x.codigo===code})[0]||catalog[0];
-  code=meta.codigo;
+  var catalog=p3IntegratedCatalog_(),requested=String(p.indicador||catalog[0].codigo),
+      meta=catalog.filter(function(x){return x.codigo===requested||x.nome===requested})[0]||catalog[0],code=meta.codigo;
   var facts=p3ProductionFacts_(p,'effective',0),list=facts.items,byCompany={},byDate={},total=0;
   list.forEach(function(x){
     var q=p3MetricContribution_(x,code);if(!q)return;
     var co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||'');
     total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
   });
-  return {ok:true,indicadores:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
+  return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
     porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
     porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
 }
