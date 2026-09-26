@@ -1231,6 +1231,28 @@ function rcoSupplementalUpsert_(payload) {
     var cs=sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA'),clist=objects_(cs);
     clist.forEach(function(cv){if(originIds.indexOf(String(cv.RSD_REPORT_ID||''))>=0){cv.RCO_REPORT_ID=reportId;cv.ATUALIZADO_EM=nowIso_();upsert_(cs,'CIRVC_ID',cv.CIRVC_ID,cv)}});
   }
+  var podRows=stat.podExecucao||pkg.podExecucao||[],podSheet=sheet_(P3_SHEET_ID,'POD_EXECUCAO');
+  ensureHeaders_(podSheet,['RCO_REPORT_ID']);
+  if(Array.isArray(podRows)){
+    podRows.forEach(function(x){
+      var rid=String(x.registroId||x.REGISTRO_ID||x.origemRegistroId||x.ORIGEM_REGISTRO_ID||uid_('pod'));
+      var oldPod=findOne_(podSheet,'REGISTRO_ID',rid)||{};
+      upsert_(podSheet,'REGISTRO_ID',rid,Object.assign({},oldPod,{
+        REGISTRO_ID:rid,REPORT_ID:oldPod.REPORT_ID||rid,RCO_REPORT_ID:reportId,
+        DATA:dateText_(x.data||x.DATA||obj.DATA_SERVICO),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:x.guarnicao||x.GUARNICAO||oldPod.GUARNICAO||'',
+        OPERACAO:x.operacao||x.OPERACAO||oldPod.OPERACAO||'',TURNO:x.turno||x.TURNO||oldPod.TURNO||'',
+        STATUS_CUMPRIMENTO:x.statusCumprimento||x.STATUS_CUMPRIMENTO||oldPod.STATUS_CUMPRIMENTO||'',
+        LOCAL_PREVISTO:x.localPrevisto||x.LOCAL_PREVISTO||oldPod.LOCAL_PREVISTO||'',COORDENADAS_PREVISTAS:x.coordenadasPrevistas||x.COORDENADAS_PREVISTAS||oldPod.COORDENADAS_PREVISTAS||'',
+        LOCAL_EXECUTADO:x.localExecutado||x.LOCAL_EXECUTADO||oldPod.LOCAL_EXECUTADO||'',COORDENADAS_EXECUTADAS:x.coordenadasExecutadas||x.COORDENADAS_EXECUTADAS||oldPod.COORDENADAS_EXECUTADAS||'',
+        HORA_INICIO:x.horaInicio||x.HORA_INICIO||oldPod.HORA_INICIO||'',HORA_FIM:x.horaFim||x.HORA_FIM||oldPod.HORA_FIM||'',
+        HOUVE_ALTERACAO:(x.houveAlteracao===true||String(x.houveAlteracao||x.HOUVE_ALTERACAO||'').toUpperCase()==='SIM')?'SIM':'NÃO',
+        MOTIVO_ALTERACAO:x.motivoAlteracao||x.MOTIVO_ALTERACAO||oldPod.MOTIVO_ALTERACAO||'',
+        ORIGEM_RELATORIO:x.origemRelatorio||x.ORIGEM_RELATORIO||oldPod.ORIGEM_RELATORIO||'RCO',
+        ORIGEM_REGISTRO_ID:x.origemRegistroId||x.ORIGEM_REGISTRO_ID||oldPod.ORIGEM_REGISTRO_ID||rid,ENVIADO_EM:nowIso_()
+      }));
+    });
+  }
+
   var ops=pkg.operacoesCompletas||rco.operacoes||[];
   ops.forEach(function(o){var id=String(o.reportId||o.id||uid_('op'));var row=findOne_(sheet_(P3_SHEET_ID,'OPERACOES'),'REGISTRO_ID',id)||{};
     row.REGISTRO_ID=id;row.REPORT_ID=reportId;row.RCO_REPORT_ID=reportId;row.RSD_REPORT_ID=row.RSD_REPORT_ID||o.rsdReportId||'';row.DATA=row.DATA||dateText_(obj.DATA_SERVICO);
