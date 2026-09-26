@@ -594,7 +594,7 @@ function rsdStart_(payload) {
   var mainVtrMap=rsdMainVtrMap_();
   if(old&&normVtrPrefix_(old.VTR_PRINCIPAL||mainVtrMap[String(old.REPORT_ID||'')]||'')&&normVtrPrefix_(old.VTR_PRINCIPAL||mainVtrMap[String(old.REPORT_ID||'')]||'')!==vtr0)throw new Error('A VTR principal identifica este serviço e não pode ser alterada. Registre eventual substituição como VTR adicional/alteração de serviço.');
 
-  if(!old&&data0&&!payload.overrideDuplicate&&!passagem0){
+  if(!old&&data0&&!passagem0){
     var candidates=objects_(s).filter(function(x){
       var xv=normVtrPrefix_(x.VTR_PRINCIPAL||mainVtrMap[String(x.REPORT_ID||'')]||'');
       return ['CANCELADO','INDEFERIDO'].indexOf(String(x.STATUS))<0 &&
@@ -607,13 +607,11 @@ function rsdStart_(payload) {
       return String(b.ULTIMO_RASCUNHO_EM||b.INICIADO_EM||b.FINALIZADO_EM||'').localeCompare(String(a.ULTIMO_RASCUNHO_EM||a.INICIADO_EM||a.FINALIZADO_EM||''));
     });
     if(candidates.length){
-      return {ok:true,existing:true,possible_duplicate:true,message:'A VTR '+vtr0+' já identifica um serviço nesta unidade e data. Continue o serviço existente ou justifique excepcionalmente a criação de outro serviço.',
+      return {ok:true,existing:true,possible_duplicate:true,message:'A VTR '+vtr0+' já identifica um serviço nesta unidade e data. Continue o serviço existente. Se o cadastro anterior estiver incorreto, cancele-o auditavelmente antes de registrar novamente.',
         candidates:candidates.slice(0,8).map(function(x){return {reportId:String(x.REPORT_ID||''),serviceId:String(x.SERVICE_ID||''),segmento:Number(x.SEGMENTO||1),status:String(x.STATUS||''),guarnicao:String(x.GUARNICAO||''),vtrPrincipal:normVtrPrefix_(x.VTR_PRINCIPAL||mainVtrMap[String(x.REPORT_ID||'')]||''),responsavel:String(x.RESPONSAVEL_NOME||''),matricula:String(x.RESPONSAVEL_MATRICULA||''),iniciadoEm:String(x.INICIADO_EM||''),finalizadoEm:String(x.FINALIZADO_EM||'')};}),
         reportId:String(candidates[0].REPORT_ID||''),serviceId:String(candidates[0].SERVICE_ID||''),segmento:Number(candidates[0].SEGMENTO||1),status:String(candidates[0].STATUS||'')};
     }
   }
-  if(!old&&payload.overrideDuplicate&&!String(payload.overrideJustification||'').trim())throw new Error('Informe a justificativa para criar um segundo serviço potencialmente duplicado.');
-
   if(old){
     g0.nome=String(old.GUARNICAO||g0.nome||'');
     g0.tipo=normGuarnicaoTipo_(old.GUARNICAO_TIPO||tipo0)||tipo0;
@@ -632,7 +630,6 @@ function rsdStart_(payload) {
   if(old&&old.RESPONSAVEL_MATRICULA&&newMat&&normMat_(old.RESPONSAVEL_MATRICULA)!==newMat)throw new Error('O comandante deste segmento já está definido. Para mudança de comandante, realize a passagem de serviço.');
   assertLease_(old,deviceId,!!payload.forceTakeover);
   var obj=rsdDraftObject_(r,old,deviceId);
-  if(payload.overrideDuplicate)obj.DUPLICATE_OVERRIDE_JUSTIFICATIVA=String(payload.overrideJustification||'');
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   audit_('RSD',reportId,obj.DRAFT_REVISION,old?'RASCUNHO_ATUALIZADO':'INICIADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,obj.BATALHAO,obj.COMPANHIA,r);
   return {ok:true,message:old?'Serviço em andamento atualizado na nuvem.':'Guarnição '+obj.GUARNICAO+' registrada em serviço e disponível ao coordenador.',reportId:reportId,serviceId:obj.SERVICE_ID,segmento:obj.SEGMENTO,draftRevision:obj.DRAFT_REVISION,status:'EM_SERVICO',guarnicaoNome:obj.GUARNICAO,guarnicaoTipo:obj.GUARNICAO_TIPO,guarnicaoOrdem:Number(obj.GUARNICAO_ORDEM||0),vtrPrincipal:obj.VTR_PRINCIPAL};
