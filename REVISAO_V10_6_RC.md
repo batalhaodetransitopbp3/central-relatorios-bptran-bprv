@@ -86,6 +86,19 @@ Arquivos:
 
 O acesso foi incluído na página principal da Central.
 
+## Gestão P3
+
+A Gestão P3 foi reorganizada em cinco acessos principais: **Painel Geral**, **Tabela Operacional**, **Histórico**, **Controle de RCOs** e **Power BI**.
+
+- A Tabela Operacional fica em `tabela_operacional_p3.html` e segue a mesma ordem de grupos/indicadores do quadro do RCO, com colunas por guarnição e total.
+- Histórico separa registros identificados como importação, legado, migração ou histórico da produção digital corrente.
+- Controle de RCOs mostra responsável, modo de consolidação, versão, REPORT_ID e permite ao P3 reabrir formalmente um RCO finalizado para retificação, com motivo e autor.
+- RCO finalizado não pode ser reaberto por autosave antigo. Após autorização do P3, ele entra em `EM_RETIFICACAO`, mantém o mesmo REPORT_ID e recebe versões incrementais a cada nova consolidação.
+- O backend v10 reconhece `state.reportId`, lê corretamente o período do RCO e sincroniza diretamente a produção e o POD do pacote estatístico.
+- Foi criada a base `VEICULOS_OPERACIONAIS` para registros civis detalhados, separada do Cadastro Mestre `VIATURAS`.
+- O Painel Geral distingue motocicletas e automóveis abordados, AITs especiais (165, 165-A e 230 XI), AITs com abordagem e AITs sem abordagem.
+- Power BI utiliza a configuração `POWERBI_URL`. Quando configurado e permitido pelo serviço Microsoft, o painel é exibido dentro da própria Gestão P3; o botão para abrir em nova aba permanece disponível.
+
 ## Backend Apps Script
 
 A versão de código desta branch está identificada como `10.6.0-rc1`.
@@ -184,6 +197,14 @@ A validação estática não substitui homologação funcional com o Apps Script
 39. Após deferir ou devolver um RSD, manter a tela antiga aberta e pressionar “Finalizar serviço” novamente; confirmar que o estado não é reaberto e a devolutiva é exibida.
 40. Conferir os motivos padronizados de devolução e cancelamento no RCO e no cancelamento pela própria guarnição.
 41. Manter um RSD em serviço ou aguardando análise e tentar “Consolidar P3”; confirmar que a consolidação é bloqueada com indicação de pendência.
+42. Abrir a Gestão P3 e conferir os cinco acessos principais.
+43. Comparar a Tabela Operacional com a ordem de grupos e indicadores do RCO.
+44. Consolidar um RCO e confirmar sua presença no Controle de RCOs com versão e REPORT_ID.
+45. Reabrir o RCO pelo P3 para retificação, informar motivo e autor, continuar o mesmo RCO e reenviá-lo.
+46. Confirmar que o reenvio do mesmo RCO incrementa a versão e não duplica a produtividade.
+47. Abrir Histórico e confirmar a separação entre dados importados/legados e produção digital.
+48. Conferir a visualização Veículos e a separação entre motocicletas/automóveis abordados e AITs no Painel Geral.
+49. Testar Power BI sem URL e, depois, com uma URL de homologação.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
@@ -193,3 +214,9 @@ A validação estática não substitui homologação funcional com o Apps Script
 - `relatorio_cpu_ios.html`
 - `relatorio_operacao.html`
 - `relatorio_operacao_ios.html`
+- `relatorio_traslados_reboque.html`
+- `relatorio_traslados_reboque_ios.html`
+- `gestao_p3.html`
+- `tabela_operacional_p3.html`
+- `ajuda.html`
+- `index.html`
