@@ -1128,8 +1128,15 @@ function reboqueUpsert_(payload,finalizar){
   var unidade=r.unidade||ctx.unidade||{},batt=normBattalion_(unidade.batalhao||unidade.batalhaoSigla||'BPTran'),
       comp=unidade.companhia||normCompany_(batt,unidade.companhiaNumero),gu=String(r.guarnicao||ctx.guarnicao||'REBOQUE').trim();
   var s=reboqueSheet_(),old=findOne_(s,'REBOQUE_REPORT_ID',reportId);
-  if(old&&String(old.STATUS||'')==='FINALIZADO'&&!finalizar)throw new Error('Este relatório de traslados já foi finalizado.');
+  if(!old&&serviceId){
+    var sameService=objects_(s).filter(function(x){return String(x.SERVICE_ID||'')===serviceId;}).sort(function(a,b){return String(b.ULTIMO_SYNC_EM||b.CRIADO_EM||'').localeCompare(String(a.ULTIMO_SYNC_EM||a.CRIADO_EM||''));});
+    if(sameService.length){old=sameService[0];reportId=String(old.REBOQUE_REPORT_ID||reportId);}
+  }
   if(old&&old.SERVICE_ID&&String(old.SERVICE_ID)!==serviceId)throw new Error('Este relatório de traslados pertence a outro serviço.');
+  if(old&&String(old.STATUS||'')==='FINALIZADO'){
+    if(!finalizar)throw new Error('Este relatório de traslados já foi finalizado.');
+    return {ok:true,message:'Relatório de traslados já finalizado.',reportId:reportId,status:'FINALIZADO',revision:Number(old.REVISAO||1),serviceId:serviceId,rsdReportId:old.RSD_REPORT_ID||rsdReportId,veiculosQtd:Number(old.VEICULOS_QTD||0)};
+  }
   var vehicles=Array.isArray(r.vehicles)?r.vehicles:[],revision=old?Number(old.REVISAO||0)+1:1,now=nowIso_(),
       status=finalizar?'FINALIZADO':'EM_SERVICO';
   var normalized={};
