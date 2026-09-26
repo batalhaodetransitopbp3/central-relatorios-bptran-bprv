@@ -73,10 +73,14 @@ body.signature-open{overflow:hidden}
 </head>
 <body>
 <main class="page">
-<div class="toolbar no-print">
-  <button class="ok" type="button" onclick="addVehicle()">+ Acrescentar veículo</button>
-  <button type="button" onclick="generatePdf()">Gerar PDF</button>
-  <a class="btn secondary" href="index.html">Voltar à Central</a>
+<div class="toolbar no-print" id="reboqueToolbar">
+  <button class="ok edit-action" type="button" onclick="saveCloudDraft()">Salvar rascunho</button>
+  <button class="secondary edit-action" type="button" onclick="loadCloudDraft()">Carregar rascunho</button>
+  <button class="edit-action" type="button" onclick="finalizeCloud()">Finalizar serviço</button>
+  <button class="secondary edit-action" type="button" onclick="addVehicle()">+ Acrescentar veículo</button>
+  <button type="button" data-viewer-keep="1" onclick="generatePdf()">Gerar PDF</button>
+  <a class="btn secondary" data-viewer-keep="1" href="index.html">Voltar à Central</a>
+  <span id="cloudStatus" style="font-size:11px;font-weight:800;color:#52697f"></span>
 </div>
 
 <header class="card doc-head">
@@ -157,8 +161,18 @@ body.signature-open{overflow:hidden}
 </div>
 </main>
 
+<script src="central_cloud.js?v=10.6.2-rc1"></script>
 <script>
 const STORE_KEY='pmpb-relatorio-traslados-reboque-v1';
+const REPORT_KEY='pmpb-relatorio-traslados-reboque-report-id-v1';
+const ACTIVE_CONTEXT_KEY='pmpb-active-service-v1';
+const CLOUD_VIEW_REPORT=new URLSearchParams(location.search).get('cloudView')||'';
+const VIEW_ONLY=!!CLOUD_VIEW_REPORT;
+window.CENTRAL_READONLY_VIEWER=VIEW_ONLY;
+let suspendSave=false,cloudFinalized=false;
+let reboqueReportId=localStorage.getItem(REPORT_KEY)||((window.CentralCloud&&CentralCloud.uid)?CentralCloud.uid('reboque'):('reboque-'+Date.now()));
+try{localStorage.setItem(REPORT_KEY,reboqueReportId)}catch(_){}
+
 const TYPES=['Automóvel','Motocicleta','Motoneta','Ciclomotor','Caminhonete','Camioneta','Utilitário','Caminhão','Caminhão-trator','Ônibus','Micro-ônibus','Reboque','Semirreboque','Trator de rodas','Quadriciclo','Outro'];
 const REASONS=['Transporte para DETRAN','Transporte para Delegacia','Sinistro de trânsito','Outro'];
 
@@ -178,11 +192,83 @@ function rowData(tr){
   const get=k=>tr.querySelector('[data-k="'+k+'"]')?.value||'';
   return {term:get('term'),brand:get('brand'),type:get('type'),model:get('model'),color:get('color'),plate:get('plate'),reason:get('reason'),otherReason:get('otherReason'),place:get('place'),nameMat:get('nameMat')};
 }
+function activeContext(){try{return JSON.parse(localStorage.getItem(ACTIVE_CONTEXT_KEY)||'{}')||{}}catch(_){return {}}}
 function collect(){
-  return {data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,responsavel:document.getElementById('responsavel').value,signature:signatureData||'',vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData)};
+  const ctx=activeContext();
+  return {schema:'pmpb-reboque-traslados-v2',reportId:reboqueReportId,status:cloudFinalized?'FINALIZADO':'EM_SERVICO',
+    data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,
+    responsavel:document.getElementById('responsavel').value,signature:signatureData||'',vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData),
+    contextoServico:ctx,serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',segmento:Number(ctx.segmento||1)||1,
+    guarnicao:ctx.guarnicao||'',unidade:ctx.unidade||{}};
 }
 function save(){
+  if(VIEW_ONLY||suspendSave)return;
   try{localStorage.setItem(STORE_KEY,JSON.stringify(collect()))}catch(_){}
+}
+function setCloudStatus(t,kind=''){const e=document.getElementById('cloudStatus');if(!e)return;e.textContent=t||'';e.style.color=kind==='ok'?'#18745f':kind==='warn'?'#8a5a00':kind==='err'?'#9a2745':'#52697f'}
+function assertReboqueContext(){
+  const ctx=activeContext();
+  if(!ctx.rsdReportId||!ctx.serviceId)throw new Error('Abra primeiro o RSD da guarnição REBOQUE e registre/continue o serviço pela nuvem.');
+  if(ctx.guarnicao&&!/^REBOQUE\b/i.test(String(ctx.guarnicao)))throw new Error('O relatório de traslados deve ser vinculado a uma guarnição do tipo REBOQUE.');
+  return ctx;
+}
+async function saveCloudDraft(silent=false){
+  if(VIEW_ONLY)return false;
+  if(!window.CentralCloud)throw new Error('Conexão com a Central indisponível.');
+  const ctx=assertReboqueContext(),token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
+  const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
+  setCloudStatus('Salvando na Central…');
+  try{const r=await CentralCloud.submitForm('reboque-draft-upsert',{reboque:p},token,{popup:false});reboqueReportId=r.reportId||reboqueReportId;localStorage.setItem(REPORT_KEY,reboqueReportId);cloudFinalized=false;save();setCloudStatus('Rascunho salvo na Central', 'ok');if(!silent)alert('Rascunho do reboque salvo na Central.');return true}
+  catch(e){setCloudStatus('Falha ao salvar', 'err');if(!silent)alert('Não foi possível salvar o rascunho: '+e.message);return false}
+}
+function applyCloudPayload(p){
+  suspendSave=true;
+  try{
+    reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';
+    document.getElementById('data').value=p.data||localDate();document.getElementById('turno').value=p.turno||'';
+    document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';
+    signatureData=p.signature||'';document.getElementById('vehicleRows').innerHTML='';(p.vehicles||[]).forEach(addVehicle);if(!(p.vehicles||[]).length)addVehicle();
+    document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);updateSignatureUi();renumber();
+    try{if(!VIEW_ONLY){localStorage.setItem(REPORT_KEY,reboqueReportId);localStorage.setItem(STORE_KEY,JSON.stringify(p))}}catch(_){}
+  }finally{suspendSave=false}
+  setCloudStatus(cloudFinalized?'Relatório finalizado':'Rascunho carregado da Central',cloudFinalized?'ok':'');
+}
+async function loadCloudDraft(){
+  if(VIEW_ONLY)return;
+  if(!window.CentralCloud){alert('Conexão com a Central indisponível.');return}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){alert(e.message);return}
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  setCloudStatus('Consultando a Central…');
+  try{
+    const r=await CentralCloud.jsonp('reboque-list',{rsdReportId:ctx.rsdReportId,serviceId:ctx.serviceId,token});
+    const items=r.items||[];if(!items.length){setCloudStatus('Nenhum rascunho na Central','warn');alert('Não há relatório de traslado salvo para este serviço.');return}
+    const pick=items.find(x=>String(x.status).toUpperCase()==='EM_SERVICO')||items[0];
+    const g=await CentralCloud.jsonp('reboque-get',{reportId:pick.reportId,token});applyCloudPayload(g.reboque||{});
+    if(cloudFinalized)alert('Este relatório já foi finalizado. Ele foi carregado para consulta/PDF.');
+  }catch(e){setCloudStatus('Falha ao carregar','err');alert('Não foi possível carregar o rascunho: '+e.message)}
+}
+async function finalizeCloud(){
+  if(VIEW_ONLY)return;
+  if(!validate())return;if(!signatureData){alert('Registre a assinatura do militar responsável antes de finalizar o serviço.');return}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){alert(e.message);return}
+  if(!confirm('Finalizar o relatório de traslados deste serviço?\n\nApós a finalização ele ficará disponível ao Coordenador para geração do PDF.'))return;
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
+  setCloudStatus('Finalizando na Central…');
+  try{const r=await CentralCloud.submitForm('reboque-finalize',{reboque:p},token,{popup:false});reboqueReportId=r.reportId||reboqueReportId;cloudFinalized=true;save();setCloudStatus('Finalizado e disponível ao Coordenador','ok');alert('Relatório finalizado. O Coordenador já pode gerar o PDF diretamente pelo RCO.')}
+  catch(e){setCloudStatus('Falha na finalização','err');alert('Não foi possível finalizar: '+e.message)}
+}
+async function loadCloudViewer(){
+  if(!VIEW_ONLY||!window.CentralCloud)return;
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  document.body.classList.add('cloud-viewer');setCloudStatus('Carregando documento…');
+  try{
+    const r=await CentralCloud.jsonp('reboque-get',{reportId:CLOUD_VIEW_REPORT,token});applyCloudPayload(r.reboque||{});
+    document.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=true);
+    document.querySelectorAll('button').forEach(b=>{if(!b.dataset.viewerKeep)b.disabled=true});
+    document.querySelectorAll('.action,.table-actions').forEach(e=>e.style.display='none');
+    setCloudStatus('Documento recuperado da Central — somente leitura','ok');
+  }catch(e){setCloudStatus('Não foi possível abrir o documento','err');alert(e.message)}
 }
 function renderReason(tr,reason='',other=''){
   const wrap=tr.querySelector('.reason-wrap');
@@ -280,12 +366,13 @@ document.getElementById('saveSignatureBtn').addEventListener('click',saveSignatu
 window.addEventListener('resize',()=>{if(signatureModal.classList.contains('open'))setTimeout(resizeSignatureCanvas,80)});
 
 function load(){
-  let p=null;try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}
+  let p=null;if(!VIEW_ONLY){try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}}
   const today=localDate();
-  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';(p.vehicles||[]).forEach(addVehicle)}
+  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';(p.vehicles||[]).forEach(addVehicle)}
   else{document.getElementById('data').value=today;addVehicle()}
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(el=>{syncPrint(el);el.addEventListener('input',()=>{if(el.id==='prefixo')el.value=String(el.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,10);syncPrint(el);save()});el.addEventListener('change',()=>{syncPrint(el);save()})});
   updateSignatureUi();
+  if(VIEW_ONLY)setTimeout(loadCloudViewer,250);
 }
 function validate(){
   if(!document.getElementById('data').value){alert('Informe a data do serviço.');return false}
@@ -305,6 +392,11 @@ function generatePdf(){
   setTimeout(()=>document.title=old,800);
 }
 load();
+if(!VIEW_ONLY){
+  let cloudTimer=null;
+  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().rsdReportId)saveCloudDraft(true)},7000)},true);
+  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().rsdReportId)saveCloudDraft(true)},3000)},true);
+}
 </script>
 <style>.hidden{display:none!important}</style>
 </body>
