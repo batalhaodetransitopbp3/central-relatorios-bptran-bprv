@@ -1190,7 +1190,7 @@ function closeRcoDraft_(reportId){var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=
    Esta ação complementar preserva origens, auditoria e garante que cada
    operação continue individualizada após a consolidação. */
 function rcoSupplementalUpsert_(payload) {
-  var pkg=payload.rco||payload||{}, rco=pkg.rco||pkg, stat=pkg.estatisticaP3||rco.estatisticaP3||{};
+  var pkg=payload||{}, rco=pkg.rco||pkg, stat=pkg.estatisticaP3||rco.estatisticaP3||{};
   var reportId=String((rco||{}).reportId||(rco.state||{}).reportId||pkg.reportId||stat.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
   var old=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
