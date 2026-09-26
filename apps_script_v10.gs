@@ -6,7 +6,8 @@
  * 2. Cole este arquivo como Code.gs.
  * 3. Em Propriedades do script, defina:
  *      CENTRAL_TOKEN = chave operacional dos módulos
- *      P3_TOKEN      = chave exclusiva da Gestão P3
+ *      COORD_TOKEN   = chave exclusiva de CPU/Coordenação
+ *      P3_TOKEN      = chave exclusiva da Gestão P3/Oficial
  * 4. Implantar > Aplicativo da Web > Executar como proprietário > acesso conforme política institucional.
  * 5. Substitua CENTRAL_CLOUD_ENDPOINT, no front-end, pela URL /exec da implantação.
  *
@@ -1168,15 +1169,16 @@ function rcoDraftClaim_(payload){
   }finally{lock.releaseLock();}
 }
 function rcoRetificationOpen_(payload){
-  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||'').trim();
+  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),autor=String(payload.autor||payload.autorNome||'').trim();
   if(!reportId)throw new Error('Informe o REPORT_ID do RCO.');
   if(!motivo)throw new Error('Informe o motivo da retificação.');
+  if(!autor)throw new Error('Identifique o P3/oficial que autoriza a retificação.');
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS');
   ensureHeaders_(s,['RETIFICACAO_MOTIVO','RETIFICACAO_ABERTA_EM','RETIFICACAO_ABERTA_POR']);
   var row=findOne_(s,'RCO_REPORT_ID',reportId);if(!row)throw new Error('Rascunho original do RCO não localizado.');
   if(String(row.STATUS)==='EM_RETIFICACAO')return {ok:true,message:'Este RCO já está aberto para retificação.',reportId:reportId,status:'EM_RETIFICACAO'};
   if(String(row.STATUS)!=='FINALIZADO')throw new Error('O RCO só pode ser reaberto para retificação após a consolidação/finalização.');
-  row.STATUS='EM_RETIFICACAO';row.RETIFICACAO_MOTIVO=motivo;row.RETIFICACAO_ABERTA_EM=nowIso_();row.RETIFICACAO_ABERTA_POR=String(payload.autor||payload.autorNome||'P3');
+  row.STATUS='EM_RETIFICACAO';row.RETIFICACAO_MOTIVO=motivo;row.RETIFICACAO_ABERTA_EM=nowIso_();row.RETIFICACAO_ABERTA_POR=autor;
   row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',reportId,row);
   audit_('RCO',reportId,Number(row.REVISAO||1),'RETIFICACAO_ABERTA','',row.RETIFICACAO_ABERTA_POR,row.BATALHAO,row.COMPANHIA,{motivo:motivo});
   return {ok:true,message:'RCO reaberto para retificação. O responsável poderá carregá-lo em “Continuar serviço”.',reportId:reportId,status:'EM_RETIFICACAO'};
