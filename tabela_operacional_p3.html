@@ -55,7 +55,12 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
  $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
  const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
- function token(){return CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3 para consultar a Tabela Operacional:')}
+ function actor(){try{return JSON.parse(sessionStorage.getItem('pmpb-p3-actor-v1')||'null')}catch(_){return null}}
+ function token(){
+   const a=actor(),t=CentralCloud.getToken('p3')||'';
+   if(!a?.matricula||!t){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return ''}
+   return t
+ }
  function key(g,i){return String(g||'')+'||'+String(i||'')}
  function norm(s){return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
  function findOrderRow(x){
@@ -85,15 +90,15 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
    const tk=token();if(!tk)return;const params={token:tk,view:'produtividade',dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,guarnicao:$('guarnicao').value};
    $('status').textContent='Carregando produtividade...';
    try{
-     const r=await CentralCloud.jsonp('p3-query',params),items=r.items||[],groups=new Map();
+     const r=await CentralCloud.jsonp('p3-query',params),items=r.items||[],groups=new Map(),a=actor();
      items.forEach(x=>{const c=String(x.COMPANHIA||'Não informada');if(!groups.has(c))groups.set(c,[]);groups.get(c).push(x)});
      $('tables').innerHTML=groups.size?[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR')).map(([c,a])=>renderCompany(c,a)).join(''):'<div class="empty">Nenhum registro de produtividade para os filtros selecionados.</div>';
-     $('status').textContent=items.length+' registro(s) de produtividade • '+groups.size+' companhia(s).';
-   }catch(e){$('tables').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.'}
+     $('status').textContent=[items.length+' registro(s) de produtividade • '+groups.size+' companhia(s)',a?.matricula?'Sessão: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
+   }catch(e){if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tables').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.'}
  }
  $('apply').onclick=load;
  $('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach(o=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false});};
- setTimeout(load,350);
+ if(actor()?.matricula&&CentralCloud.getToken('p3'))setTimeout(load,350);else location.replace('gestao_p3.html?return=tabela_operacional_p3.html');
 })();
 </script>
 </body></html>
