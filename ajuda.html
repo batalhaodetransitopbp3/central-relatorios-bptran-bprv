@@ -1,16 +1,226 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ajuda — Central de Relatórios</title><style>
-:root{--navy:#17375e;--blue:#0f4c81;--bg:#eef3f7;--line:#d4dee7;--muted:#68798a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#1b2b3a;font:14px/1.45 Arial,sans-serif}.page{width:min(880px,100%);margin:auto;padding:12px}.top{background:linear-gradient(145deg,var(--navy),var(--blue));color:#fff;border-radius:16px;padding:17px}.top h1{margin:0 0 4px;font-size:22px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px;box-shadow:0 5px 17px rgba(15,45,75,.06)}.btn{display:inline-flex;text-decoration:none;background:var(--blue);color:#fff;padding:8px 11px;border-radius:9px;font-weight:800;margin:4px 5px 0 0}.secondary{background:#eef2f6;color:#263c53;border:1px solid #cbd6e0}.muted{color:var(--muted)}ul{padding-left:20px;margin-bottom:0}@media(max-width:600px){.page{padding:7px}.top{border-radius:11px;padding:12px}.top h1{font-size:19px}}
-</style></head><body><main class="page"><header class="top"><h1 id="title">Tire aqui a sua dúvida</h1><p id="subtitle">Orientações rápidas para preenchimento.</p></header><section class="card"><h2 id="reportName">Relatório</h2><p id="desc"></p><ul id="tips"></ul><div style="margin-top:12px"><a id="guideLink" class="btn" href="documentos_normativos.html">Abrir guia prático</a><a id="papLink" class="btn secondary" href="documentos_normativos.html">Abrir PAP</a><a class="btn secondary" href="documentos_normativos.html">Biblioteca normativa</a><a class="btn secondary" href="index.html">Voltar à Central de Relatórios</a></div></section><section class="card"><strong>Material visual de apoio</strong><p class="muted">O botão “Abrir guia prático” disponibiliza uma orientação simples e direta para usuários com pouca familiaridade com tecnologia. Para regras e responsabilidades, consulte também o PAP.</p></section></main><script>
-const DATA={
- bopm:{name:'Boletim de Ocorrência (BOPM)',desc:'Registro estruturado de ocorrências que demandem boletim próprio.',pap:'documentos/PAP_REL_004_Boletim_de_Ocorrencia_BOPM.docx',guide:'documentos/Guia_Rapido_BOPM.docx',tips:['Preencha o Nº FICHA, confira a data automática e informe a hora da ocorrência.','Cadastre as guarnições, envolvidos e testemunhas conforme o caso.','Revise o relato em ordem cronológica e colha as assinaturas exigidas.','Use Gerar PDF ao final. Para voltar, utilize “Voltar à Central de Relatórios”.']},
- rsd:{name:'Relatório de Serviço Diário (RSD)',desc:'Relatório das guarnições e equipes de serviço, destinado à conferência e consolidação pelo Coordenador.',pap:'documentos/PAP_REL_002_Relatorio_de_Servico_Diario_RSD.docx',guide:'documentos/Guia_Rapido_RSD.docx',tips:['Para começar um serviço realmente novo, use “Início do serviço (limpar histórico)”. Isso limpa somente os dados locais do aparelho; registros já salvos na Central não são apagados.','Se for o mesmo comandante retomando um serviço já registrado, use “Continuar serviço”. A Central localiza o RSD existente na nuvem.','Na troca de comandante, quem sai usa “Realizar passagem de serviço” e quem entra usa “Receber passagem de serviço”. O novo comandante localiza a guarnição disponível e informa sua própria matrícula; o mesmo RSD continua em novo segmento.','Enquanto a passagem não for recebida, ela pode ser retificada ou cancelada. Após o recebimento, o registro da passagem pode ser retificado e uma assunção feita por engano pode ser anulada enquanto o novo segmento ainda não possuir movimentação relevante.','Use “Carregar operações do dia” e “Carregar remoções do dia” para incorporar os registros correspondentes. As funções por arquivo .json ficam agrupadas em “Inserir manualmente” e são apenas contingência.','Ao finalizar, o RSD é enviado para análise do Coordenador. A devolutiva poderá ser deferido, deferido com ressalvas, devolvido para retificação ou indeferido. Se devolvido, corrija e reenvie o mesmo RSD; não crie outro registro.']},
- rop:{name:'Relatório de Operação (ROP)',desc:'Registro de execução das operações do Plano Operacional Diário e geração de texto para WhatsApp.',pap:'documentos/PAP_REL_007_Relatorio_de_Operacao_ROP.docx',guide:'documentos/Guia_Rapido_ROP.docx',tips:['Preencha a operação logo após sua realização e use “Salvar operação do dia”. Depois do salvamento, o formulário fica preparado para o próximo lançamento.','O aviso do topo mostra quantas operações de cada tipo já foram salvas para a data, por exemplo “2 Operações Zero Álcool e 1 Operação Randandan salvas”.','Informe coordenadas no checkpoint/blitz; nas rondas, abordagens ou patrulhamento, descreva a circunscrição efetivamente coberta.','Use “Gerar relatório para WhatsApp” quando precisar compartilhar o resumo da operação.','“Apagar operações do histórico” limpa somente o histórico local exibido naquele aparelho; operações já registradas na Central não são excluídas por essa função.']},
- cvtr:{name:'Checklist de Viatura (CVTR)',desc:'Inspeção da viatura no início do serviço para envio ao responsável pela motomecanização.',pap:'documentos/PAP_REL_001_Checklist_de_Viatura_CVTR.docx',guide:'documentos/Guia_Rapido_CVTR.docx',tips:['Preencha o checklist normalmente; o rascunho é salvo automaticamente neste aparelho.','Registre as fotos e descreva qualquer avaria ou pendência.','Revise o contador de pendências antes de gerar ou compartilhar.','Quando for fazer outro checklist, use “Novo checklist”. O sistema pedirá confirmação antes de apagar o anterior.']},
- rco:{name:'Relatório do Coordenador (RCO)',desc:'Relatório consolidado do serviço e mesa de conferência dos RSDs das guarnições.',pap:'documentos/PAP_REL_003_Relatorio_do_Coordenador_RCO.docx',guide:'documentos/Guia_Rapido_RCO.docx',tips:['Antes de atuar no RCO, registre formalmente o CPU/Coordenador pela matrícula e credencial de Coordenação. Quando a consolidação for feita sem CPU, registre o P3/Oficial com a credencial administrativa.','Use “Buscar guarnições / RSDs” para localizar os relatórios da companhia/data. Em cada RSD, o Coordenador pode adicionar, devolver para retificação, indeferir, excluir registro indevido ou apenas remover daquela consolidação.','RSD finalizado deve ser analisado como “Deferido” ou “Deferido com ressalvas” antes de ser incorporado. Se houver erro que precise de correção, use “Devolver para retificação”.','Na troca de CPU, use “Realizar passagem de serviço”. O novo Coordenador utiliza “Receber passagem de serviço”, localiza o mesmo RCO na nuvem e registra sua própria entrada; não é criado outro RCO.','As funções .json ficam agrupadas em “Inserir manualmente” e são apenas contingência. Antes de “Consolidar P3”, resolva duplicidades e pendências indicadas pelo sistema. O responsável pela consolidação e o eventual substituto legal são preenchidos a partir do Cadastro Mestre.']},
- cirvc:{name:'Auto Interno de Remoção e Entrega de Veículo (CIRVC)',desc:'Controle interno da remoção, guarda e entrega de veículos, distinto do ARVC oficial utilizado em convênio com o DETRAN.',pap:'documentos/PAP_REL_006_Auto_Interno_Remocao_Entrega_Veiculo_CIRVC.docx',guide:'documentos/Guia_Rapido_CIRVC.docx',tips:['No início do plantão, use “Início do serviço”. Os CIRVCs ficam salvos automaticamente no aparelho.','Preencha Guarnição/VTR no primeiro CIRVC. Nos seguintes, o sistema reaproveita essa informação.','Use “+ Novo CIRVC” para cada novo veículo. A numeração é organizada por guarnição, permitindo que guarnições diferentes tenham seu próprio CIRVC 01 sem conflito.','Registre as fotos e colha as assinaturas do militar responsável e do recebedor.','Ao final, use “Gerar PDF dos CIRVCs do serviço”. Os registros também ficam disponíveis para “Carregar remoções do dia” no RSD/RCO.']},
- rfe:{name:'Relatório do Fisco Estadual (RFE)',desc:'Uso exclusivo do efetivo escalado para apoio ao Fisco Estadual da 1ª CPRv.',pap:'documentos/PAP_REL_005_Relatorio_do_Fisco_Estadual_RFE.docx',guide:'documentos/Guia_Rapido_RFE.docx',tips:['Abra um registro para cada ocorrência do Fisco.','Informe local, horário, equipe e resultado do acionamento.','Adicione e enquadre as fotografias antes de gerar o relatório.']},
- reboque:{name:'Relatório de Traslados do Reboque',desc:'Registro diário dos veículos trasladados pelo reboque durante o serviço, inclusive quando o veículo não passou por CIRVC.',pap:'documentos_normativos.html',guide:'documentos_normativos.html',tips:['Preencha a data, o turno/horário, o prefixo da VTR/Reboque e o nome do militar mais antigo responsável.','Use “+ Acrescentar veículo” para cada traslado. A ordem 01, 02, 03... é gerada automaticamente.','Informe nº do termo, marca, tipo, modelo, cor, placa, motivo, bairro/cidade e nome/matrícula. Em “Outro”, especifique o motivo.','Este relatório não substitui o CIRVC quando houver remoção/custódia interna formal do veículo.','Ao final, assine em tela cheia e use “Gerar PDF”. O documento possui apenas a assinatura do militar responsável pelo preenchimento.']},
- rae:{name:'Relatório de Ações Educativas (RAE)',desc:'Módulo em manutenção e amadurecimento pelo NITE.',pap:'documentos_normativos.html',guide:'documentos_normativos.html',tips:['Siga as orientações vigentes do NITE enquanto o fluxo definitivo estiver em revisão.']}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17375e">
+<title>Tire aqui a sua dúvida — Central de Relatórios</title>
+<style>
+:root{--navy:#17375e;--blue:#315f93;--bg:#eef3f7;--line:#c8d7e8;--text:#1d3348;--muted:#607486;--ok:#176b45;--warn:#9a6412;--danger:#a62d43}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Arial,Helvetica,sans-serif}.page{width:min(1180px,100%);margin:auto;padding:12px}
+.top{background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff;border-radius:18px;padding:18px;box-shadow:0 8px 24px #17375e1a}.toprow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.top h1{margin:0;font-size:25px}.top p{margin:6px 0 0;opacity:.92}.home{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:10px;background:#ffffff18;border:1px solid #ffffff38;color:#fff;text-decoration:none;font-size:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:14px;margin-top:12px;box-shadow:0 4px 18px #17375e0b}.card h2,.card h3{color:var(--navy)}
+.search-wrap{display:grid;grid-template-columns:1fr auto;gap:8px}.search-wrap input{width:100%;border:1px solid #b9ccdf;border-radius:10px;padding:13px;font-size:15px}.search-wrap button,.btn{border:0;border-radius:9px;padding:10px 12px;font-weight:800;background:var(--blue);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#eef3f7;color:var(--navy);border:1px solid #c9d6df}.small{padding:6px 8px;font-size:10px}
+#resultCount{font-size:11px;color:var(--muted);margin-top:6px}.decision-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.decision{border:1px solid #d6e2ec;border-radius:10px;padding:11px;background:#f9fbfd}.decision b{display:block;color:var(--navy)}.decision span{display:block;margin-top:4px;color:var(--blue);font-weight:800}
+.filters{display:flex;gap:6px;flex-wrap:wrap}.filter-btn{background:#eef3f7;color:var(--navy);border:1px solid #c8d6e1;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.filter-btn.active{background:var(--navy);color:#fff}
+.section-title{display:flex;justify-content:space-between;gap:8px;align-items:end;margin:18px 0 8px}.section-title h2{margin:0;color:var(--navy);font-size:20px}.section-title p{margin:0;color:var(--muted);font-size:11px}
+.flow-grid,.tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.flow,.tool{border:1px solid #d5e0e9;border-radius:12px;background:#fff;overflow:hidden}.flow summary,.tool summary{cursor:pointer;list-style:none;padding:12px 13px;font-weight:850;color:var(--navy);background:#f8fbfd}.flow summary::-webkit-details-marker,.tool summary::-webkit-details-marker{display:none}.flow summary:after,.tool summary:after{content:"+";float:right;color:#6b86a0;font-size:18px}.flow[open] summary:after,.tool[open] summary:after{content:"–"}.flow-body,.tool-body{padding:12px}.meta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}.tag{font-size:9px;font-weight:850;border-radius:999px;padding:4px 7px;background:#eaf2fb;color:#315e8c;border:1px solid #c6d9ee}.tag.actor{background:#edf7f1;color:#176b45;border-color:#c7e4d2}.tag.warn{background:#fff5df;color:#875a10;border-color:#ead5a2}
+.steps{margin:8px 0 0;padding-left:20px}.steps li{margin:5px 0}.attention{margin-top:9px;background:#fff6e6;border:1px solid #e6d3a5;border-radius:9px;padding:9px;font-size:11px}.quick{background:#edf7f1;border:1px solid #c7e4d2;border-radius:9px;padding:9px;margin-top:8px;font-size:11px}.visual{margin:9px 0;border:1px dashed #b9cad7;border-radius:10px;padding:10px;background:#f9fbfd;text-align:center;color:var(--muted);font-size:10px}.visual img{max-width:100%;border-radius:8px;display:block;margin:auto}
+.tool-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.faq-group{margin-top:10px}.faq-group h3{margin:15px 0 7px;font-size:16px}.faq-item{border:1px solid #d8e3ee;border-radius:10px;margin:7px 0;background:#fbfdff;overflow:hidden}.faq-item summary{cursor:pointer;font-weight:750;color:#244b70;padding:11px 13px;list-style:none}.faq-item summary::-webkit-details-marker{display:none}.faq-item summary:after{content:"+";float:right;font-size:18px;color:#6b86a0}.faq-item[open] summary:after{content:"–"}.faq-answer{padding:0 13px 13px;color:#42586d;font-size:12px}.faq-item[hidden],.searchable[hidden]{display:none!important}.group-empty{display:none;color:var(--muted);font-size:11px}
+.help-note{font-size:11px;color:var(--muted)}.save-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.save-card{border-radius:10px;padding:10px;border:1px solid #d7e3ef;font-size:11px}.save-card b{display:block;color:var(--navy);margin-bottom:4px}.local{background:#fff8e8}.cloud{background:#eef7ff}.sync{background:#edf8f0}.pending{background:#fff3e8}
+@media(max-width:850px){.decision-grid,.save-grid{grid-template-columns:1fr 1fr}.flow-grid,.tool-grid{grid-template-columns:1fr}.toprow{align-items:center}}@media(max-width:560px){.page{padding:7px}.top{border-radius:12px;padding:13px}.top h1{font-size:21px}.decision-grid,.save-grid{grid-template-columns:1fr}.search-wrap{grid-template-columns:1fr}.section-title{display:block}.filters{overflow:auto;flex-wrap:nowrap;padding-bottom:3px}.filter-btn{white-space:nowrap}}
+</style>
+</head>
+<body><main class="page">
+<header class="top"><div class="toprow"><div><h1>Tire aqui a sua dúvida</h1><p>Pesquise como você falaria normalmente. A Central mostra a resposta rápida, o passo a passo, o fluxo do seu papel e as dúvidas relacionadas.</p></div><a class="home" href="index.html" aria-label="Home" title="Home">⌂</a></div></header>
+
+<section class="card">
+ <div class="search-wrap"><input id="faqSearch" type="search" placeholder="Ex.: sumiu meu relatório, troquei de celular, como passar o serviço, não aparece no coordenador..."><button id="clearSearch" class="secondary">Limpar</button></div>
+ <div id="resultCount">Digite uma dúvida ou use os filtros abaixo.</div>
+ <div class="filters" id="actorFilters" style="margin-top:10px">
+  <button class="filter-btn active" data-actor="">Todos os atores</button>
+  <button class="filter-btn" data-actor="guarnicao">Guarnição</button>
+  <button class="filter-btn" data-actor="recebedor">Novo comandante</button>
+  <button class="filter-btn" data-actor="coordenador">Coordenador / CPU</button>
+  <button class="filter-btn" data-actor="p3">P3 / Oficial</button>
+  <button class="filter-btn" data-actor="reboque">Reboque</button>
+  <button class="filter-btn" data-actor="checklist">Checklist</button>
+  <button class="filter-btn" data-actor="motomecanizacao">Motomecanização</button>
+  <button class="filter-btn" data-actor="educacao">Educação / NITE</button>
+ </div>
+</section>
+
+<section class="card">
+ <h2 style="margin-top:0">Qual botão eu uso?</h2>
+ <div class="decision-grid">
+  <div class="decision"><b>Estou começando agora</b><span>→ Início do serviço</span></div>
+  <div class="decision"><b>Já comecei e quero voltar</b><span>→ Continuar serviço</span></div>
+  <div class="decision"><b>Só quero proteger o que digitei</b><span>→ Salvar rascunho</span></div>
+  <div class="decision"><b>Mudou o responsável</b><span>→ Realizar passagem → Receber passagem</span></div>
+ </div>
+ <h3>Entenda isto antes de usar</h3>
+ <div class="save-grid">
+  <div class="save-card local"><b>Salvar rascunho</b>Guarda temporariamente neste aparelho/navegador.</div>
+  <div class="save-card cloud"><b>Registrar / Continuar serviço</b>Usa o serviço salvo na Central e permite recuperá-lo em outro aparelho.</div>
+  <div class="save-card sync"><b>☁ Sincronizado</b>Não há envio pendente naquele momento.</div>
+  <div class="save-card pending"><b>☁ Envios pendentes</b>Há informação aguardando envio. Mantenha a internet ativa e confira novamente.</div>
+ </div>
+</section>
+
+<div class="section-title"><div><h2>Fluxos por ator</h2><p>Cada pessoa vê somente o caminho que precisa executar.</p></div></div>
+<section class="flow-grid" id="flowGrid"></section>
+
+<div class="section-title"><div><h2>Ajuda por ferramenta</h2><p>Abra a ferramenta para ver finalidade, botões e erros mais comuns.</p></div></div>
+<section class="tool-grid" id="toolGrid"></section>
+
+<div class="section-title"><div><h2>Dúvidas frequentes</h2><p>As respostas priorizam primeiro o que fazer e depois explicam o motivo.</p></div></div>
+<section class="card" id="faqList"></section>
+</main>
+
+<script>
+(function(){
+const FLOW_IMG_BASE='documentos/fluxogramas/';
+const flows=[
+ {id:'ATOR-01',actor:'guarnicao',title:'Comandante / responsável da guarnição',question:'Como faço meu serviço do início ao fim?',keywords:'iniciar rsd guarnição vtr produção operação cirvc finalizar passagem serviço',tools:['RSD','Operação/POD','CIRVC','BOPM'],image:'ATOR_01_GUARNICAO.png',
+ quick:'Inicie um único RSD para a guarnição, trabalhe sempre nesse mesmo serviço e finalize somente após conferir tudo.',
+ steps:['Abra o RSD e use “Início do serviço (limpar histórico)” somente se for realmente um serviço novo.','Confira unidade, companhia, data, tipo de guarnição, VTR principal, turno e responsável.','Use “Registrar guarnição no serviço”. A numeração da guarnição é atribuída automaticamente.','Durante o serviço, registre produção, ocorrências, operações/POD, veículos e CIRVC nas ferramentas correspondentes.','Se apenas trocar de aparelho, use “Continuar serviço”.','Se mudar o comandante/responsável, use “Realizar passagem de serviço”.','Ao fim, confira os registros e use “Finalizar serviço”.'],
+ attention:'Não crie outro RSD para continuar o mesmo serviço. A VTR principal identifica a guarnição naquele serviço.'},
+ {id:'ATOR-02',actor:'recebedor',title:'Novo comandante / quem recebe a passagem',question:'Como assumo um serviço que já estava em andamento?',keywords:'receber passagem novo comandante assumir serviço segmento troca responsável',tools:['RSD'],image:'ATOR_02_NOVO_COMANDANTE.png',
+ quick:'O novo comandante recebe a passagem e continua o mesmo serviço em um novo segmento; não cria um segundo serviço.',
+ steps:['Abra o RSD da mesma unidade/companhia.','Use “Receber passagem de serviço”.','Localize a passagem correta pela guarnição, VTR, data e responsável anterior.','Informe sua própria matrícula e confirme sua entrada.','O sistema preserva o histórico anterior e inicia seu segmento.','Registre somente a produção ocorrida a partir da sua assunção.','Ao sair, faça nova passagem ou finalize o serviço.'],
+ attention:'Mudou apenas o celular? Não é passagem: use “Continuar serviço”.'},
+ {id:'ATOR-03',actor:'coordenador',title:'Coordenador / CPU',question:'Como acompanho e consolido o serviço da companhia?',keywords:'coordenador cpu rco buscar guarnições analisar rsd deferir retificar consolidar p3 pdf',tools:['RCO'],image:'ATOR_03_COORDENADOR_CPU.png',
+ quick:'Use um único RCO por companhia/data, analise os RSDs da Central e consolide somente após resolver pendências.',
+ steps:['Abra o RCO e use “Início do serviço (limpar histórico)” apenas para um RCO novo.','Identifique o Coordenador e confira companhia/data.','Use “Buscar guarnições / RSDs” para localizar os relatórios do serviço.','Analise cada RSD: visualizar, gerar PDF, deferir/incorporar ou devolver para correção quando necessário.','Confira operações/POD, veículos, CIRVC e demais dados consolidados.','Se houver troca de Coordenador, use a passagem do RCO; o novo CPU usa “Receber passagem de serviço”.','Ao final, use “Consolidar P3” / “Enviar ao P3” conforme a etapa mostrada.'],
+ attention:'Não crie outro RCO apenas porque mudou o Coordenador. O RCO da companhia/data deve continuar o mesmo.'},
+ {id:'ATOR-04',actor:'p3',title:'P3 / Oficial responsável',question:'Como recebo, confiro e uso os dados consolidados?',keywords:'p3 oficial rco gestão estatística produtividade indicadores power bi painel',tools:['RCO','Gestão P3'],image:'ATOR_04_P3_OFICIAL.png',
+ quick:'Confira a consolidação, corrija pendências pelo fluxo próprio e use a Gestão P3 para consulta; o Painel de Indicadores serve para apresentação visual.',
+ steps:['Acesse os RCOs recebidos/consolidados da companhia e do período correto.','Confira responsáveis, guarnições e indicadores antes de validar a informação.','Quando houver erro, utilize retificação/correção do mesmo registro; não crie duplicidade.','Na Gestão P3, filtre período, batalhão e uma ou mais companhias.','Use a Tabela de produtividade para conferência comparativa.','Use “Comparar indicadores” para analisar período atual e período de comparação.','Use “Painel de Indicadores” para briefing, reunião e apresentação gerencial.'],
+ attention:'Gestão P3 é para consulta/conferência; o Painel de Indicadores é a apresentação visual dos mesmos dados.'},
+ {id:'ATOR-05',actor:'reboque',title:'Reboqueiro / guarnição REBOQUE',question:'Como registro os traslados e os transportes do reboque?',keywords:'reboque traslado transporte cirvc detran rascunho turno veículos',tools:['RSD','Relatório de Traslados','Transporte CIRVC'],image:'ATOR_05_REBOQUE.png',
+ quick:'Registre a guarnição REBOQUE no RSD, mantenha o Relatório de Traslados durante todo o turno e use o fluxo CIRVC quando houver custódia/remoção formal.',
+ steps:['Registre a guarnição REBOQUE no RSD usando a VTR principal.','Abra o Relatório de Traslados e mantenha o mesmo rascunho durante todo o serviço.','Acrescente cada veículo trasladado na ordem 01, 02, 03...','Quando o veículo vier de um CIRVC, use o módulo Transporte CIRVC para transporte/entrega.','Quando houver apenas traslado sem CIRVC, mantenha o registro no Relatório de Traslados.','Salve o rascunho na Central durante o dia.','Ao final, confira, assine e finalize; o Coordenador poderá gerar o PDF pela Central.'],
+ attention:'Traslado e CIRVC não são a mesma coisa. Use CIRVC quando houver a remoção/custódia interna formal.'},
+ {id:'ATOR-06',actor:'guarnicao',title:'Militar responsável pelo CIRVC',question:'Como registro uma remoção sem duplicar o veículo?',keywords:'cirvc remoção veículo custódia rco rsd novo cirvc pdf',tools:['CIRVC','RSD','RCO'],image:'ATOR_06_CIRVC_POLICIAL.png',
+ quick:'Cada veículo removido recebe um CIRVC individual; depois o registro segue para o RSD e, por consolidação, para o RCO.',
+ steps:['Abra o CIRVC no contexto do serviço correto.','Use “+ Novo CIRVC” para cada novo veículo.','Preencha e confira identificadores, circunstâncias, destino/custódia e responsáveis.','Registre fotos e assinaturas quando exigidas.','Mantenha o CIRVC salvo no serviço.','No RSD, incorpore o CIRVC existente em vez de digitá-lo novamente.','O Coordenador confere o registro no RCO antes da consolidação.'],
+ attention:'Fluxo correto: CIRVC individual → RSD → RCO. Não crie um segundo CIRVC para o mesmo veículo.'},
+ {id:'ATOR-07',actor:'guarnicao',title:'Militar que registra Operação / POD',question:'Como registro operações sem misturar os dados?',keywords:'operação pod zero álcool randandan sinais salvar operação local resultado',tools:['Operação/POD','RSD','RCO'],image:'ATOR_07_OPERACAO_POD.png',
+ quick:'Cada operação deve ser salva individualmente e depois incorporada ao RSD/RCO.',
+ steps:['Abra o Relatório de Operação no contexto do serviço correto.','Use “Início do serviço” ou “Continuar serviço” conforme o caso.','Identifique a operação, data, horário, responsável e local real.','Preencha abordagens, notificações, prisões, remoções e demais resultados.','Use “Salvar operação do dia”.','Para outra operação, inicie novo lançamento; não misture operações diferentes.','No RSD/RCO, carregue/importa as operações já registradas.'],
+ attention:'Zero Álcool, Randandan, Sinais e outras operações devem ser registros distintos.'},
+ {id:'ATOR-08',actor:'checklist',title:'Responsável pelo Checklist de Viatura',question:'Como registrar corretamente a situação da viatura?',keywords:'checklist viatura avaria foto pendência motorista comandante manutenção',tools:['Checklist'],image:'ATOR_08_CHECKLIST.png',
+ quick:'O checklist deve retratar a condição real da viatura no momento da conferência.',
+ steps:['Identifique unidade, companhia, viatura e responsáveis.','Confira documentação, equipamentos, elétrica, mecânica, pneus e conservação.','Quando houver problema, use o detalhamento/observação correspondente.','Inclua fotografias quando necessário.','Confira o indicador de pendências.','Salve o rascunho se precisar interromper.','Ao concluir, gere/compartilhe o checklist.'],
+ attention:'Não marque “normal” sem conferir. A pendência registrada alimenta o acompanhamento da Motomecanização.'},
+ {id:'ATOR-09',actor:'motomecanizacao',title:'Motomecanização',question:'Como trato uma pendência informada no checklist?',keywords:'motomecanização pendência viatura manutenção atualizar salvar providência liberar',tools:['Motomecanização','Checklist'],image:'ATOR_09_MOTOMECANIZACAO.png',
+ quick:'Consulte a pendência, registre a providência e atualize a situação da viatura.',
+ steps:['Abra Motomecanização e use “Atualizar”.','Localize a viatura e a pendência informada.','Confira a descrição/fotos do checklist.','Registre a providência adotada.','Atualize a situação da viatura conforme o resultado.','Use “Salvar atualização”.','Mantenha a pendência aberta se a providência ainda não estiver concluída.'],
+ attention:'Não encerre uma pendência sem registrar o que foi efetivamente feito.'},
+ {id:'ATOR-10',actor:'educacao',title:'Equipe executora de ação educativa',question:'Como registro uma ação educativa?',keywords:'ação educativa equipe escola palestra campanha nite pnatran',tools:['Ações Educativas'],image:'ATOR_10_EQUIPE_EDUCATIVA.png',
+ quick:'A equipe registra os fatos da ação e encaminha o registro para a etapa de consolidação do NITE.',
+ steps:['Abra o relatório da equipe executora.','Identifique data, local, equipe e atividade realizada.','Registre os fatos e quantitativos efetivamente observados.','Inclua registros/fotos quando previstos.','Revise antes de remeter.','Encaminhe o registro ao fluxo do NITE.'],
+ attention:'O módulo de Ações Educativas permanece em amadurecimento pelo NITE; siga a orientação vigente exibida no sistema.'},
+ {id:'ATOR-11',actor:'educacao',title:'NITE',question:'Como consolido as ações educativas recebidas?',keywords:'nite pnatran consolidar ação educativa enquadramento indicador institucional',tools:['Ações Educativas'],image:'ATOR_11_NITE.png',
+ quick:'O NITE recebe os registros das equipes, confere, enquadra e consolida os indicadores institucionais.',
+ steps:['Acesse a área de uso exclusivo do NITE.','Localize os registros remetidos pelas equipes.','Confira dados, evidências e quantitativos.','Faça o enquadramento PNATRANS conforme o fluxo vigente.','Consolide os indicadores.','Gere o relatório institucional quando aplicável.'],
+ attention:'Não altere fatos registrados pela equipe sem deixar a correção devidamente fundamentada no fluxo próprio.'}
+];
+
+const tools=[
+ {id:'rsd',title:'Relatório de Serviço Diário (RSD)',actors:'guarnicao recebedor',keywords:'rsd serviço guarnição vtr iniciar continuar passagem receber finalizar',page:'relatorio_servico_diario.html',buttons:['Início do serviço (limpar histórico)','Continuar serviço','Registrar guarnição no serviço','Realizar passagem de serviço','Receber passagem de serviço','Finalizar serviço','Salvar rascunho','Carregar rascunho'],answer:'É o relatório-base da guarnição. Um mesmo serviço deve continuar no mesmo RSD, mesmo quando houver troca de aparelho.'},
+ {id:'rco',title:'Relatório do Coordenador (RCO)',actors:'coordenador p3',keywords:'rco coordenador cpu p3 consolidar guarnições rsd pdf',page:'relatorio_cpu.html',buttons:['Início do serviço (limpar histórico)','Continuar serviço','Buscar guarnições / RSDs','Realizar passagem de serviço','Receber passagem de serviço','Gerar PDF do serviço (RCO)','Consolidar P3','Enviar ao P3'],answer:'É a mesa de conferência e consolidação dos RSDs da companhia. O Coordenador/P3 não deve criar outro RCO apenas por troca de responsável.'},
+ {id:'operacao',title:'Relatório de Operação / POD',actors:'guarnicao',keywords:'operação pod zero álcool randandan sinais localização salvar',page:'relatorio_operacao.html',buttons:['Início do serviço','Continuar serviço','Salvar operação do dia','Gerar / atualizar texto'],answer:'Cada operação é registrada separadamente para preservar local, horário e indicadores estatísticos.'},
+ {id:'cirvc',title:'CIRVC — remoção e custódia',actors:'guarnicao reboque coordenador',keywords:'cirvc veículo remoção entrega custódia',page:'auto_remocao_veiculos.html',buttons:['Início do serviço','Continuar serviço','+ Novo CIRVC','Gerar PDF dos CIRVCs do serviço'],answer:'Cada veículo removido deve possuir um CIRVC individual. Depois, o mesmo registro é incorporado ao RSD e consolidado no RCO.'},
+ {id:'cirvc-transporte',title:'CIRVC — transporte / entrega',actors:'reboque',keywords:'cirvc reboque transporte detran entrega baixar',page:'cirvc_transporte.html',buttons:['Atualizar veículos disponíveis','Transportes em andamento','Iniciar transporte com selecionados','Registrar entrega final e baixar veículos'],answer:'É o fluxo de continuidade da custódia para veículos CIRVC que aguardam transporte e entrega.'},
+ {id:'reboque',title:'Relatório de Traslados do Reboque',actors:'reboque',keywords:'reboque traslado termo veículo rascunho assinatura',page:'relatorio_traslados_reboque.html',buttons:['Salvar rascunho na Central','Carregar rascunho da Central','+ Acrescentar veículo','Finalizar serviço'],answer:'Registra todos os traslados do turno, inclusive veículos que não passaram por CIRVC. O rascunho acompanha o serviço inteiro.'},
+ {id:'checklist',title:'Checklist de Viatura',actors:'checklist motomecanizacao',keywords:'checklist viatura avaria pendência foto',page:'checklist_viatura.html',buttons:['Salvar rascunho','Carregar rascunho'],answer:'Registra a situação real da viatura e alimenta o acompanhamento das pendências pela Motomecanização.'},
+ {id:'motomecanizacao',title:'Motomecanização',actors:'motomecanizacao',keywords:'motomecanização manutenção pendência frota',page:'motomecanizacao.html',buttons:['Atualizar','Salvar atualização'],answer:'Recebe as pendências da frota, registra a providência e atualiza a situação da viatura.'},
+ {id:'bopm',title:'Boletim de Ocorrência (BOPM)',actors:'guarnicao',keywords:'bopm ocorrência boletim envolvidos relato assinatura pdf',page:'boletim_ocorrencia_bptrans_1cprv.html',buttons:['Gerar PDF'],answer:'Use para o registro estruturado de ocorrência, mantendo dados dos envolvidos, relato e assinaturas conforme o caso.'},
+ {id:'fisco',title:'Relatório do Fisco Estadual',actors:'guarnicao',keywords:'fisco ocorrência equipe foto relatório',page:'relatorio_fisco.html',buttons:[],answer:'Registre cada ocorrência do Fisco com local, horário, equipe, resultado e fotografias quando cabíveis.'},
+ {id:'educacao',title:'Ações Educativas / NITE',actors:'educacao',keywords:'educação trânsito nite pnatran equipe ação campanha escola',page:'relatorio_acoes_educativas_equipe.html',buttons:[],answer:'Fluxo em etapas: a equipe registra os fatos da ação e o NITE confere/enquadra/consolida os indicadores.'},
+ {id:'gestao-p3',title:'Gestão P3 / Painel de Indicadores',actors:'p3',keywords:'gestão p3 estatística tabela produtividade indicadores painel gráficos',page:'gestao_p3.html',buttons:['Consultar dados','Apresentar este resultado em gráficos'],answer:'A Gestão P3 serve para consultar e conferir os números; o Painel de Indicadores serve para apresentá-los visualmente em reuniões e briefings.'}
+];
+
+const faqs=[
+ ['Primeiro: qual botão eu uso?','Estou começando o serviço agora. O que faço?','Abra o relatório correto, preencha e confira o cabeçalho e use “Início do serviço”. No RSD, só depois registre a guarnição no serviço.','guarnicao','rsd início começar'],
+ ['Primeiro: qual botão eu uso?','Eu já comecei o serviço antes e só fechei a página. O que faço?','Use “Continuar serviço”. O sistema procura o serviço já registrado na Central e recupera o que foi sincronizado. Não crie outro serviço só porque fechou a página.','guarnicao','rsd continuar sumiu fechei página'],
+ ['Primeiro: qual botão eu uso?','Troquei de celular, computador ou navegador. Preciso iniciar outro serviço?','Não. Use “Continuar serviço”. Mudar de aparelho não significa começar outro serviço.','guarnicao','troquei celular computador aparelho continuar'],
+ ['Primeiro: qual botão eu uso?','Mudou o comandante da guarnição. Uso “Continuar serviço”?','Não. Quem sai usa “Realizar passagem de serviço” e o novo comandante usa “Receber passagem de serviço”.','guarnicao recebedor','mudou comandante responsável passagem receber'],
+ ['Rascunho, nuvem e continuidade','Quero apenas garantir que o que digitei não se perca. O que faço?','Use “Salvar rascunho”. Ele guarda uma cópia temporária neste aparelho. Se o serviço já estiver registrado na Central, confirme também que está sincronizado.','guarnicao coordenador reboque checklist','salvar rascunho proteger digitei perder'],
+ ['Rascunho, nuvem e continuidade','Qual a diferença entre “Salvar rascunho” e “Continuar serviço”?','“Salvar rascunho” protege temporariamente o que está neste aparelho. “Continuar serviço” recupera da Central um serviço já registrado e permite retomá-lo em outro aparelho.','guarnicao coordenador','rascunho continuar nuvem diferença'],
+ ['Rascunho, nuvem e continuidade','Apareceu “envio pendente”. Perdi meus dados?','Não necessariamente. Há informação aguardando envio. Mantenha a internet ativa e confira se o indicador volta para “☁ Sincronizado”.','guarnicao coordenador','envio pendente sincronizado internet'],
+ ['Rascunho, nuvem e continuidade','Estou sem internet. Posso continuar preenchendo?','Você pode continuar preenchendo e salvar rascunho no aparelho. As consultas e a continuidade pela Central dependem de internet; quando a conexão voltar, confira a sincronização.','guarnicao','sem internet offline rascunho'],
+ ['Cabeçalho e cadastro','Por que a companhia é tão importante?','A Central separa os serviços por unidade e companhia. Uma companhia errada faz o relatório aparecer no lugar errado para Coordenador/P3 e prejudica a estatística.','guarnicao coordenador','companhia errada unidade'],
+ ['Cabeçalho e cadastro','A busca do comandante não encontrou o militar. O que faço?','Confira a matrícula no padrão 000.000-0. Se não localizar, não invente dados: procure o responsável pelo Cadastro Mestre/P3.','guarnicao','matrícula não encontrou comandante cadastro mestre'],
+ ['RSD','O sistema disse que já existe serviço em andamento. O que faço?','Não crie outro. Localize o serviço existente e use “Continuar serviço”.','guarnicao','serviço já existe duplicidade vtr'],
+ ['RSD','Apareceram vários serviços ao usar “Continuar serviço”. Qual escolho?','Compare companhia, data, guarnição/VTR e responsável. Selecione somente o serviço que corresponde ao trabalho que você quer continuar.','guarnicao','vários serviços continuar escolher'],
+ ['Passagem','Qual é a diferença entre “Continuar serviço” e “Receber passagem de serviço”?','“Continuar serviço” é para o mesmo responsável retomar o serviço. “Receber passagem de serviço” é para um novo responsável assumir após a passagem formal.','guarnicao recebedor','continuar receber passagem diferença'],
+ ['Passagem','O novo comandante começa do zero?','Ele começa um novo segmento do mesmo serviço. O histórico anterior permanece, e a produção do novo comandante registra somente o que ocorrer após a assunção.','recebedor','novo comandante segmento produção zerada'],
+ ['Passagem','O novo comandante não encontrou a passagem. O que conferir?','Confira se a passagem realmente foi realizada, se unidade/companhia/guarnição estão corretas e se há internet. Depois tente novamente em “Receber passagem de serviço”.','recebedor','passagem não encontrada'],
+ ['RCO','Uma guarnição não apareceu no RCO. O que devo verificar?','Confirme se o RSD foi registrado na Central, se companhia e data estão corretas e se o relatório está na etapa exigida para análise/incorporação.','coordenador','rsd não aparece rco guarnição'],
+ ['RCO','Troquei de Coordenador. Crio outro RCO?','Não. O novo Coordenador deve continuar/receber a passagem do mesmo RCO. O histórico dos responsáveis fica preservado.','coordenador','troca coordenador cpu rco duplicar'],
+ ['RCO','Qual a diferença entre “Remover do RCO” e cancelar/excluir um RSD?','“Remover do RCO” só tira o RSD daquela consolidação. O cancelamento/exclusão administrativa muda o status global do registro e o preserva apenas para auditoria.','coordenador p3','remover rco excluir cancelar rsd'],
+ ['Operação / POD','Fiz duas operações diferentes no mesmo serviço. Coloco tudo em um único registro?','Não. Cada operação deve ser registrada individualmente para preservar local, horário e estatística.','guarnicao','duas operações zero álcool sinais randandan'],
+ ['Operação / POD','A operação não apareceu no RSD/RCO. O que faço?','Confira se ela foi salva no contexto do serviço correto. Depois carregue/importa as operações do dia no relatório correspondente.','guarnicao coordenador','operação não aparece rsd rco'],
+ ['CIRVC','Já fiz o CIRVC. Preciso digitar tudo de novo no RSD?','Não. Incorpore/carregue o CIRVC já existente e confira a lista. Redigitar cria risco de duplicidade.','guarnicao','cirvc rsd digitar novamente duplicidade'],
+ ['CIRVC','O veículo não aparece para o reboqueiro. O que conferir?','Confira se o CIRVC foi registrado, se o veículo está pendente de transporte e use “Atualizar veículos disponíveis”.','reboque','veículo não aparece reboque cirvc'],
+ ['Reboque','O traslado sem CIRVC deve ser ignorado?','Não. Registre-o no Relatório de Traslados do Reboque. O CIRVC só é usado quando houver remoção/custódia interna formal.','reboque','traslado sem cirvc'],
+ ['Reboque','Preciso finalizar o Relatório de Traslados a cada veículo?','Não. Mantenha um único rascunho durante o turno, acrescente os veículos e finalize somente ao término do serviço.','reboque','traslados rascunho turno finalizar'],
+ ['Checklist','Posso marcar tudo como normal sem conferir item por item?','Não. O checklist deve representar a situação real da viatura. Registre alteração, observação e foto quando necessário.','checklist','checklist normal conferir'],
+ ['Motomecanização','A Motomecanização não está vendo uma pendência. O que fazer?','Use “Atualizar” e confirme se a pendência foi registrada no checklist correto e na viatura correta.','motomecanizacao','pendência não aparece motomecanização'],
+ ['Gestão P3','O que significa “resultado no período de comparação”?','É o valor do mesmo indicador no período escolhido para comparação. Ele serve de base para saber se o resultado atual aumentou, diminuiu ou permaneceu igual.','p3','referência período comparação indicador'],
+ ['Gestão P3','Para que serve o Painel de Indicadores?','Para apresentar visualmente os dados consultados na Gestão P3 em gráficos, comparações e evoluções para briefing, reunião e análise gerencial.','p3','power bi painel indicadores gráficos'],
+ ['Erros gerais','Apareceu “falha de comunicação com a Central”. O que faço?','Confira a internet, salve o rascunho se houver informação digitada e tente novamente. Não crie novos relatórios para contornar o erro.','guarnicao coordenador p3 reboque','falha comunicação central timeout'],
+ ['Erros gerais','Apareceu “tempo esgotado”. Devo apertar várias vezes?','Não. Aguarde alguns segundos, confira a conexão e tente uma vez novamente. Repetir várias vezes pode dificultar saber o que foi enviado.','guarnicao coordenador p3','tempo esgotado timeout'],
+ ['Erros gerais','Como evitar duplicidades?','Antes de criar qualquer registro, verifique se o serviço/operação/CIRVC já existe. Se existir, continue ou incorpore o registro em vez de criar outro.','guarnicao coordenador p3 reboque','duplicidade evitar novo registro']
+];
+
+let actorFilter='',toolParam=(new URLSearchParams(location.search).get('relatorio')||'').toLowerCase();
+const toolAliases={rop:'operacao',cvtr:'checklist',rfe:'fisco',rae:'educacao'};
+if(toolAliases[toolParam])toolParam=toolAliases[toolParam];
+
+function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s-]/g,' ')}
+function terms(){return norm(document.getElementById('faqSearch').value).split(/\s+/).filter(Boolean)}
+function matches(el){
+ const q=terms(),hay=norm(el.dataset.search||el.textContent),actors=String(el.dataset.actors||'');
+ const okActor=!actorFilter||actors.split(/\s+/).includes(actorFilter);
+ const okTool=!toolParam||String(el.dataset.tools||'').split(/\s+/).includes(toolParam)||hay.includes(norm(toolParam));
+ return okActor&&okTool&&q.every(t=>hay.includes(t));
 }
-const p=new URLSearchParams(location.search).get('relatorio')||'rsd',d=DATA[p]||DATA.rsd;document.getElementById('reportName').textContent=d.name;document.getElementById('desc').textContent=d.desc;document.getElementById('papLink').href=d.pap;document.getElementById('guideLink').href=d.guide||d.pap;document.getElementById('tips').innerHTML=d.tips.map(x=>`<li>${x}</li>`).join('');
-</script></body></html>
+function update(){
+ const els=[...document.querySelectorAll('.searchable')];let visible=0;
+ els.forEach(el=>{const show=matches(el);el.hidden=!show;if(show)visible++});
+ document.querySelectorAll('.faq-group').forEach(g=>{g.hidden=!g.querySelector('.faq-item:not([hidden])')});
+ const q=document.getElementById('faqSearch').value.trim();
+ document.getElementById('resultCount').textContent=(q||actorFilter||toolParam)?visible+' resultado(s) encontrado(s).':'Use a busca ou abra um dos fluxos abaixo.';
+}
+function renderFlows(){
+ const root=document.getElementById('flowGrid');
+ root.innerHTML=flows.map(f=>`<details class="flow searchable" data-actors="${f.actor}" data-tools="${f.tools.map(x=>norm(x).replace(/\s+/g,'-')).join(' ')}" data-search="${f.id} ${f.actor} ${f.title} ${f.question} ${f.keywords} ${f.quick} ${f.steps.join(' ')}">
+  <summary>${f.title}</summary><div class="flow-body">
+   <div class="meta"><span class="tag actor">${f.id}</span><span class="tag">${f.tools.join(' • ')}</span></div>
+   <div class="quick"><b>Resposta rápida:</b> ${f.quick}</div>
+   <div class="visual"><img src="${FLOW_IMG_BASE+f.image}" alt="Fluxograma visual: ${f.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span style="display:none">Fluxograma visual em preparação pelo NotebookLM. O passo a passo abaixo já está válido.</span></div>
+   <ol class="steps">${f.steps.map(s=>'<li>'+s+'</li>').join('')}</ol>
+   <div class="attention"><b>ATENÇÃO:</b> ${f.attention}</div>
+  </div></details>`).join('');
+}
+function renderTools(){
+ const root=document.getElementById('toolGrid');
+ root.innerHTML=tools.map(t=>`<details class="tool searchable" data-actors="${t.actors}" data-tools="${t.id}" data-search="${t.id} ${t.title} ${t.keywords} ${t.answer} ${t.buttons.join(' ')}">
+  <summary>${t.title}</summary><div class="tool-body">
+   <div class="quick">${t.answer}</div>
+   ${t.buttons.length?'<p><b>Botões relacionados:</b> '+t.buttons.map(x=>'“'+x+'”').join(' • ')+'</p>':''}
+   <div class="tool-actions"><a class="btn small" href="${t.page}">Abrir ferramenta</a><button class="btn secondary small" data-search-tool="${t.id}">Ver somente dúvidas desta ferramenta</button></div>
+  </div></details>`).join('');
+}
+function renderFaq(){
+ const root=document.getElementById('faqList'),groups={};
+ faqs.forEach((f,i)=>(groups[f[0]]??=[]).push({f,i}));
+ root.innerHTML=Object.entries(groups).map(([g,arr])=>`<section class="faq-group"><h3>${g}</h3>${arr.map(({f,i})=>`<details class="faq-item searchable" data-actors="${f[3]}" data-tools="${norm(f[4]).replace(/\s+/g,' ')}" data-search="${f.join(' ')}"><summary>${f[1]}</summary><div class="faq-answer">${f[2]}</div></details>`).join('')}</section>`).join('');
+}
+renderFlows();renderTools();renderFaq();
+document.getElementById('faqSearch').addEventListener('input',()=>{toolParam='';update()});
+document.getElementById('clearSearch').onclick=()=>{document.getElementById('faqSearch').value='';toolParam='';actorFilter='';document.querySelectorAll('.filter-btn').forEach((b,i)=>b.classList.toggle('active',i===0));update()};
+document.getElementById('actorFilters').addEventListener('click',e=>{const b=e.target.closest('[data-actor]');if(!b)return;actorFilter=b.dataset.actor||'';document.querySelectorAll('.filter-btn').forEach(x=>x.classList.toggle('active',x===b));update()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-search-tool]');if(!b)return;toolParam=b.dataset.searchTool||'';document.getElementById('faqSearch').value='';update();window.scrollTo({top:document.getElementById('faqList').offsetTop-10,behavior:'smooth'})});
+if(toolParam){
+ const tool=tools.find(t=>t.id===toolParam);
+ if(tool)document.getElementById('resultCount').textContent='Ajuda filtrada para '+tool.title+'. Use “Limpar” para ver tudo.';
+}
+update();
+})();
+</script>
+</body></html>
