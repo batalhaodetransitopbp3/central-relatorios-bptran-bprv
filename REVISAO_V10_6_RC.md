@@ -131,6 +131,21 @@ Passagem:
 - `CANCELADA`
 - `ANULADA`
 
+## Reconciliação de retificações do RCO
+
+A retificação do RCO é reconciliada nos dois sentidos, sem apagar os registros operacionais originais:
+
+- `PRODUCAO`: a versão anterior do mesmo REPORT_ID é substituída integralmente, inclusive quando a nova versão não possui determinado item;
+- `RCO_ORIGENS`: a relação de RSDs é reconstruída conforme a versão atual;
+- `RSD`: relatórios que saem da nova versão perdem o vínculo com o RCO; se ainda estavam apenas em `INCLUIDO_RCO`, voltam ao resultado da análise anterior;
+- `PRISOES` e `CIRVC_CUSTODIA`: vínculos antigos com o RCO são removidos e somente as origens atuais são vinculadas novamente;
+- `POD_EXECUCAO` e `OPERACOES`: registros retirados da retificação deixam de apontar para aquele RCO, mas permanecem preservados como registros operacionais;
+- `VEICULOS_OPERACIONAIS`: a versão detalhada dos veículos é reconstruída por REPORT_ID;
+- a consolidação/retificação é protegida por `LockService`, evitando duas versões simultâneas do mesmo RCO;
+- enquanto houver RCO `EM_RETIFICACAO` para unidade/data, não é possível iniciar um segundo RCO concorrente;
+- a ponte v10 só é acionada depois que o envio P3 principal passa pelas validações e é submetido;
+- se a Central v10 estiver indisponível/offline, o pacote complementar é preservado na fila de sincronização.
+
 ## Auditoria e segurança
 
 - cancelamentos são lógicos, não exclusões físicas;
@@ -146,7 +161,8 @@ Passagem:
 ## Validação estática realizada
 
 Em 25/09/2026:
-- `apps_script_v10.gs`: sintaxe JavaScript validada;
+- `apps_script_v10.gs`
+- `central_cloud.js`: sintaxe JavaScript validada;
 - scripts inline de RSD desktop/iOS: sintaxe validada;
 - scripts inline de RCO desktop/iOS: sintaxe validada;
 - scripts inline do Relatório de Operação desktop/iOS: sintaxe validada;
@@ -205,6 +221,14 @@ A validação estática não substitui homologação funcional com o Apps Script
 47. Abrir Histórico e confirmar a separação entre dados importados/legados e produção digital.
 48. Conferir a visualização Veículos e a separação entre motocicletas/automóveis abordados e AITs no Painel Geral.
 49. Testar Power BI sem URL e, depois, com uma URL de homologação.
+50. Retirar um RSD de um RCO já consolidado após reabertura formal para retificação; reenviar e confirmar que o RSD perde o vínculo com o RCO e que a produção dele deixa de compor a nova versão.
+51. Em uma retificação, retirar uma operação/POD e confirmar que o registro operacional permanece existente, mas deixa de apontar para aquele RCO.
+52. Em uma retificação, retirar um RSD com prisão e/ou CIRVC e confirmar que os registros permanecem preservados, porém sem vínculo com o RCO retificado.
+53. Durante um RCO em `EM_RETIFICACAO`, tentar iniciar outro RCO para a mesma unidade/data e confirmar o bloqueio.
+54. Tentar dois envios simultâneos do mesmo RCO e confirmar que a consolidação é serializada e não gera versões concorrentes.
+55. Colocar o navegador offline no momento do envio complementar v10 e confirmar que o pacote fica na fila de sincronização, sem ser apresentado como “sincronizado”.
+56. Clicar em “Enviar ao P3” sem chave ou com pacote inválido e confirmar que a ponte v10 não é disparada.
+57. Confirmar que o cadastro do CPU exige `COORD_TOKEN` e o cadastro P3/Oficial exige `P3_TOKEN`.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
