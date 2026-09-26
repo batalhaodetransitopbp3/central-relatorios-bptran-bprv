@@ -15,13 +15,25 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 .toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}
 .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:9px}.section-head h2{margin:0;color:var(--b);font-size:19px}.note{font-size:11px;color:var(--muted)}.tablewrap{overflow:auto;max-height:66vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f;text-transform:uppercase}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}.empty{text-align:center;padding:28px;color:#6b7f90}.hidden{display:none!important}
 .chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}
-.powerbi-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:16px;border:1px solid #c9d6e0;border-radius:12px;background:#f8fbfd}.powerbi-state{font-weight:900;color:var(--b)}.powerbi-url{font-family:monospace;font-size:10px;word-break:break-all;color:var(--muted);margin-top:5px}.powerbi-frame-wrap{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f5f8fa;min-height:120px}.powerbi-frame{display:block;width:100%;height:min(72vh,760px);border:0;background:#fff}.powerbi-frame-note{padding:10px;font-size:11px;color:var(--muted)}.history-source{font-size:9px;text-transform:uppercase;font-weight:900}.rco-status{font-weight:900}.rco-retificado{color:#8a5b00}.quick-links{display:flex;gap:7px;flex-wrap:wrap}
-@media(max-width:950px){.main-menu{grid-template-columns:1fr 1fr}.main-menu>*:last-child{grid-column:1/-1}.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.main-menu{grid-template-columns:1fr}.main-menu>*:last-child{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.toolbar>*{flex:1 1 40%}.subnav button{flex:1 1 42%}}
+.powerbi-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:16px;border:1px solid #c9d6e0;border-radius:12px;background:#f8fbfd}.admin-session{display:grid;grid-template-columns:.8fr 1fr 1.2fr auto 1.8fr auto;gap:8px;align-items:end}.admin-session-state{min-height:38px;display:flex;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#f7fafc;color:var(--muted);font-size:11px}.admin-session-state.ok{background:#eaf6ee;color:#176b3a;border-color:#b9dac4}.admin-session-state strong{color:inherit}.admin-session button{min-height:38px}
+.powerbi-state{font-weight:900;color:var(--b)}.powerbi-url{font-family:monospace;font-size:10px;word-break:break-all;color:var(--muted);margin-top:5px}.powerbi-frame-wrap{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f5f8fa;min-height:120px}.powerbi-frame{display:block;width:100%;height:min(72vh,760px);border:0;background:#fff}.powerbi-frame-note{padding:10px;font-size:11px;color:var(--muted)}.history-source{font-size:9px;text-transform:uppercase;font-weight:900}.rco-status{font-weight:900}.rco-retificado{color:#8a5b00}.quick-links{display:flex;gap:7px;flex-wrap:wrap}
+@media(max-width:950px){.admin-session{grid-template-columns:1fr 1fr}.admin-session-state{grid-column:1/-1}.main-menu{grid-template-columns:1fr 1fr}.main-menu>*:last-child{grid-column:1/-1}.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.main-menu{grid-template-columns:1fr}.main-menu>*:last-child{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.toolbar>*{flex:1 1 40%}.subnav button{flex:1 1 42%}}
 </style>
 </head>
 <body>
 <header class="head"><h1>Gestão P3</h1><p>BPTran / BPRv • conferência, produtividade, histórico e controle de consolidações</p></header>
 <main class="wrap">
+<section class="card" id="p3AdminSessionCard">
+ <div class="section-head"><div><h2>Sessão administrativa</h2><div class="note">Identifique o P3 ou Oficial responsável. A matrícula é validada no Cadastro Mestre e a credencial P3 é exigida para acessar a Gestão.</div></div></div>
+ <div class="admin-session">
+  <div><label>Perfil</label><select id="p3ActorPerfil"><option value="P3">P3</option><option value="OFICIAL">Oficial responsável</option></select></div>
+  <div><label>Matrícula</label><input id="p3ActorMatricula" inputmode="numeric" maxlength="9" placeholder="000.000-0"></div>
+  <div><label>Senha P3/Oficial</label><input id="p3ActorSenha" type="password" autocomplete="off" placeholder="Credencial administrativa"></div>
+  <button id="p3ActorLogin" type="button">Identificar responsável</button>
+  <div id="p3ActorState" class="admin-session-state">Sessão não identificada.</div>
+  <button id="p3ActorLogout" type="button" class="secondary" hidden>Encerrar sessão</button>
+ </div>
+</section>
 <section class="card">
  <nav class="main-menu">
   <button class="active" data-main="painel"><strong>Painel Geral</strong><small>Resumo e análises</small></button>
@@ -69,12 +81,43 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
- let main='painel',sub='controle-diario',analysisIndicator='',biUrl='';
+ let main='painel',sub='controle-diario',analysisIndicator='',biUrl='',p3Actor=null;
+ const P3_ACTOR_KEY='pmpb-p3-actor-v1';
+ function readActor(){try{return JSON.parse(sessionStorage.getItem(P3_ACTOR_KEY)||'null')}catch(_){return null}}
+ function saveActor(a){p3Actor=a||null;try{if(a)sessionStorage.setItem(P3_ACTOR_KEY,JSON.stringify(a));else sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}renderActor()}
+ function renderActor(){
+   const st=$('p3ActorState'),login=$('p3ActorLogin'),logout=$('p3ActorLogout'),perfil=$('p3ActorPerfil'),mat=$('p3ActorMatricula'),senha=$('p3ActorSenha');
+   if(p3Actor?.matricula){
+     st.classList.add('ok');st.innerHTML='<strong>'+esc([p3Actor.postoGrad,p3Actor.nome].filter(Boolean).join(' '))+'</strong>&nbsp;—&nbsp;'+esc(p3Actor.matricula)+'&nbsp;•&nbsp;'+esc(p3Actor.perfil);
+     perfil.value=p3Actor.perfil||'P3';mat.value=p3Actor.matricula||'';perfil.disabled=true;mat.disabled=true;senha.value='';senha.disabled=true;login.hidden=true;logout.hidden=false;
+   }else{
+     st.classList.remove('ok');st.textContent='Sessão não identificada.';perfil.disabled=false;mat.disabled=false;senha.disabled=false;login.hidden=false;logout.hidden=true;
+   }
+ }
+ async function registerActor(){
+   if(!await CentralCloud.probe()){alert('Não foi possível conectar ao backend v10.');return}
+   const perfil=$('p3ActorPerfil').value,mat=CentralCloud.formatMatricula($('p3ActorMatricula').value),senha=String($('p3ActorSenha').value||'').trim();$('p3ActorMatricula').value=mat;
+   if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return}
+   if(!senha){alert('Informe a senha administrativa P3/Oficial.');return}
+   try{
+     const r=await CentralCloud.submitForm('rco-responsavel-validar',{perfil,matricula:mat},senha,{popup:false}),m=r.militar||{};
+     CentralCloud.setToken(senha,'p3');saveActor({perfil,matricula:m.matricula||mat,nome:m.nome||'',postoGrad:m.postoGrad||'',batalhao:m.batalhao||'',companhia:m.companhia||''});
+     $('p3ActorSenha').value='';
+     const ret=new URLSearchParams(location.search).get('return');
+     if(ret==='tabela_operacional_p3.html'){location.replace(ret);return}
+     await load();
+   }catch(e){CentralCloud.clearToken('p3');saveActor(null);alert('Não foi possível identificar o responsável: '+e.message)}
+ }
  $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
  const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
- function token(){return CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3:')}
- async function ensure(){if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');const t=token();if(!t)throw new Error('Informe a Chave P3.');return t}
+ function token(){return CentralCloud.getToken('p3')||''}
+ async function ensure(){
+   if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');
+   if(!p3Actor?.matricula)throw new Error('Identifique primeiro o P3/Oficial responsável na Sessão administrativa.');
+   const t=token();if(!t)throw new Error('A credencial administrativa expirou. Encerre a sessão e identifique novamente o responsável.');
+   return t
+ }
  function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,turno:$('turno').value,guarnicao:$('guarnicao').value}}
  function cards(items){return items.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
@@ -141,9 +184,10 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    $('rcoBody').querySelectorAll('[data-reopen-rco]').forEach(b=>b.onclick=async()=>{
      const x=items[Number(b.dataset.reopenRco)];if(!x)return;
      const motivo=prompt('Motivo da retificação deste RCO:','Correção de dado consolidado')||'';if(!motivo.trim())return;
-     const autor=prompt('Identifique o P3/oficial que autoriza a retificação (posto/graduação, nome e/ou matrícula):','')||'';if(!autor.trim()){alert('Informe quem está autorizando a retificação.');return}
-     if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
-     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autor:autor.trim()},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');await loadRco(t)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
+     if(!p3Actor?.matricula){alert('A sessão administrativa não está identificada.');return}
+     const autor=[p3Actor.postoGrad,p3Actor.nome,p3Actor.matricula].filter(Boolean).join(' ');
+     if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nAutorizado por: '+autor+'\n\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
+     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autorMatricula:p3Actor.matricula,autorPerfil:p3Actor.perfil},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');await loadRco(t)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
    });
  }
  async function loadBi(t){
@@ -154,9 +198,12 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function switchMain(v){main=v;document.querySelectorAll('[data-main]').forEach(b=>b.classList.toggle('active',b.dataset.main===v));$('painelView').classList.toggle('hidden',v!=='painel');$('historicoView').classList.toggle('hidden',v!=='historico');$('rcoView').classList.toggle('hidden',v!=='rco');$('powerbiView').classList.toggle('hidden',v!=='powerbi');$('filterCard').classList.toggle('hidden',v==='powerbi');load()}
  document.querySelectorAll('[data-main]').forEach(b=>b.onclick=()=>switchMain(b.dataset.main));document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{sub=b.dataset.sub;document.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('active',x.dataset.sub===sub));load()});
  $('apply').onclick=load;$('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach(o=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false})};
+ $('p3ActorMatricula').addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));
+ $('p3ActorLogin').onclick=registerActor;
+ $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
  $('biOpen').onclick=()=>{if(!biUrl){alert('O Power BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
- $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel Microsoft Power BI:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim()},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do Power BI atualizada.')}catch(e){alert(e.message)}};
- setTimeout(load,400);
+ $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel Microsoft Power BI:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do Power BI atualizada.')}catch(e){alert(e.message)}};
+ p3Actor=readActor();renderActor();if(p3Actor?.matricula&&token())setTimeout(load,400);
 })();
 </script>
 </body>
