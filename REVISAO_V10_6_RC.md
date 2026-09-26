@@ -36,10 +36,14 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 - preenchimento automático do responsável pela consolidação no rodapé;
 - substituto legal pesquisável no Cadastro Mestre;
 - ações do Coordenador por RSD: Adicionar, Devolver para retificação, Excluir, Indeferir, Visualizar e Remover do RCO;
+- decisões de análise usam seleção explícita entre `Deferido` e `Deferido com ressalvas`;
+- devoluções usam motivos padronizados (identificação, comandante/efetivo, VTR, produção, operação, CIRVC, companhia/data, possível duplicidade ou outro);
+- cancelamentos usam motivos padronizados (duplicidade, teste, guarnição incorreta, companhia incorreta, novo cadastro por engano ou outro);
 - estados `DEFERIDO`, `DEFERIDO_COM_RESSALVAS`, `RETIFICACAO_SOLICITADA`, `INDEFERIDO` e `CANCELADO`;
 - alerta de possível duplicidade considerando serviços raiz distintos, sem confundir segmentos legítimos do mesmo serviço;
 - indicação de pendências antes da consolidação;
 - bloqueio da consolidação P3 se houver pendências relevantes;
+- qualquer RSD da unidade/data em `EM_SERVICO`, `PASSAGEM_DISPONIVEL`, `AGUARDANDO_ANALISE`, `RETIFICACAO_SOLICITADA` ou `INDEFERIDO` impede a consolidação até ser resolvido;
 - remoção da inclusão independente de TCO; TCO permanece vinculado às ocorrências;
 - submenu de contingência `Inserir manualmente`;
 - funções de rascunho mantidas ao final;
@@ -178,6 +182,8 @@ A validação estática não substitui homologação funcional com o Apps Script
 37. Cancelar um RSD já incorporado a um RCO ainda aberto e, ao atualizar a lista, confirmar sua retirada automática e o recálculo.
 38. Usar “Mostrar cancelados” e conferir motivo, autor e data/hora do cancelamento.
 39. Após deferir ou devolver um RSD, manter a tela antiga aberta e pressionar “Finalizar serviço” novamente; confirmar que o estado não é reaberto e a devolutiva é exibida.
+40. Conferir os motivos padronizados de devolução e cancelamento no RCO e no cancelamento pela própria guarnição.
+41. Manter um RSD em serviço ou aguardando análise e tentar “Consolidar P3”; confirmar que a consolidação é bloqueada com indicação de pendência.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
