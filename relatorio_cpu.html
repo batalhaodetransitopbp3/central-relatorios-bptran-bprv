@@ -699,6 +699,25 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(t)return t;const a=rcoRoleActor();if(!a.matricula){alert('Registre primeiro o CPU ou P3/oficial responsável pelo RCO.');return ''}
     t=(prompt(a.perfil==='P3'||a.perfil==='OFICIAL'?'Informe a senha administrativa P3/Oficial:':'Informe a senha de Coordenação:')||'').trim();if(t)try{sessionStorage.setItem('pmpb-rco-role-token-v1',t)}catch(_){}return t
   }
+
+  function rcoDecisionDialog(cfg){
+    return new Promise(resolve=>{
+      const old=document.getElementById('rcoDecisionDialog');if(old)old.remove();
+      const ov=document.createElement('div');ov.id='rcoDecisionDialog';ov.className='rco-pass-dialog';
+      const opts=(cfg.options||[]).map(o=>'<option value="'+esc(o.value)+'" '+(o.value===cfg.selected?'selected':'')+'>'+esc(o.label)+'</option>').join('');
+      ov.innerHTML='<div class="rco-pass-dialog-card"><div class="rco-pass-dialog-head"><div><h3>'+esc(cfg.title||'Ação no RSD')+'</h3>'+(cfg.intro?'<div class="hint">'+esc(cfg.intro)+'</div>':'')+'</div><button type="button" class="secondary small" data-close>Fechar</button></div><div class="field"><label>'+esc(cfg.choiceLabel||'Opção')+'</label><select data-choice>'+opts+'</select></div><div class="field" style="margin-top:8px"><label>'+esc(cfg.noteLabel||'Observação')+'</label><textarea data-note rows="4" placeholder="'+esc(cfg.notePlaceholder||'')+'"></textarea></div><div class="actions" style="margin-top:10px"><button type="button" class="ok" data-confirm>'+esc(cfg.confirmLabel||'Confirmar')+'</button><button type="button" class="secondary" data-cancel>Cancelar</button></div></div>';
+      document.body.appendChild(ov);
+      const close=v=>{ov.remove();resolve(v)},choice=ov.querySelector('[data-choice]'),note=ov.querySelector('[data-note]');
+      const validate=()=>{
+        const c=choice.value,n=String(note.value||'').trim();
+        if(cfg.requireNoteFor?.includes(c)&&!n){alert(cfg.requireMessage||'Preencha a observação para continuar.');return}
+        close({choice:c,note:n});
+      };
+      ov.querySelector('[data-confirm]').onclick=validate;ov.querySelector('[data-close]').onclick=()=>close(null);ov.querySelector('[data-cancel]').onclick=()=>close(null);ov.addEventListener('click',e=>{if(e.target===ov)close(null)});
+    });
+  }
+  function composeReason(choice,note){return choice==='Outro'?(note||'Outro'):(note?choice+' — '+note:choice)}
+
   async function reviewRsd(item,decision,motivo='',observacao=''){
     const token=rcoRoleToken();if(!token)return false;const a=rcoRoleActor();
     try{await CentralCloud.submitForm('rsd-review',{reportId:item.reportId,decision,motivo,observacao,autorMatricula:a.matricula,autorNome:a.nome,perfil:a.perfil},token,{popup:false});return true}catch(e){try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}alert('Não foi possível registrar a análise: '+e.message);return false}
@@ -711,18 +730,58 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(st==='RETIFICACAO_SOLICITADA'||st==='INDEFERIDO'||st==='CANCELADO'){alert('Este RSD não está disponível para inclusão enquanto permanecer em '+st.replaceAll('_',' ')+'.');return}
     if(st==='EM_SERVICO'||st==='PASSAGEM_DISPONIVEL'){await addCloud(item);return}
     if(st==='AGUARDANDO_ANALISE'||st==='FINALIZADO'||st==='RETIFICADO'){
-      const obs=prompt('Análise do RSD\n\nSe houver ressalva, descreva-a abaixo. Deixe em branco para DEFERIR sem ressalvas.\n\nCancelar = não analisar agora.','');if(obs===null)return;
-      const decision=obs.trim()?'DEFERIDO_COM_RESSALVAS':'DEFERIDO';if(!await reviewRsd(item,decision,obs.trim()?'Ressalva registrada pelo Coordenador.':'',obs.trim()))return;item.status=decision;item.reviewStatus=decision;await addCloud(item);await loadCloud();return
+      const ans=await rcoDecisionDialog({
+        title:'Análise do RSD',
+        intro:(item.guarnicao||'Guarnição')+' — escolha o resultado da conferência antes de adicionar ao RCO.',
+        choiceLabel:'Decisão',
+        options:[{value:'DEFERIDO',label:'Deferir'},{value:'DEFERIDO_COM_RESSALVAS',label:'Deferir com ressalvas'}],
+        selected:'DEFERIDO',
+        noteLabel:'Observação do Coordenador',
+        notePlaceholder:'Obrigatória apenas se houver ressalva.',
+        requireNoteFor:['DEFERIDO_COM_RESSALVAS'],
+        requireMessage:'Informe a ressalva do Coordenador.',
+        confirmLabel:'Registrar análise e adicionar'
+      });if(!ans)return;
+      const motivo=ans.choice==='DEFERIDO_COM_RESSALVAS'?'Ressalva registrada pelo Coordenador.':'';
+      if(!await reviewRsd(item,ans.choice,motivo,ans.note))return;item.status=ans.choice;item.reviewStatus=ans.choice;await addCloud(item);await loadCloud();return
     }
     await addCloud(item);
   }
-  async function returnForCorrection(item,defaultReason='Conferir/corrigir informações do RSD'){
-    const motivo=prompt('Motivo da devolução para retificação:',defaultReason)||'';if(!motivo.trim())return;const obs=prompt('Orientação do Coordenador para a guarnição:',motivo)||motivo;
-    if(await reviewRsd(item,'RETIFICACAO_SOLICITADA',motivo.trim(),String(obs||'').trim())){removeFromRco(item,true);await loadCloud();alert('RSD devolvido para retificação. O comandante verá a orientação ao continuar o serviço.')}
+  async function returnForCorrection(item,defaultReason=''){
+    const options=['Identificação da guarnição','Comandante/efetivo','VTR','Produção','Operação','CIRVC','Companhia/data','Possível duplicidade','Outro'].map(x=>({value:x,label:x}));
+    const selected=options.some(x=>x.value===defaultReason)?defaultReason:(/duplic/i.test(defaultReason)?'Possível duplicidade':'Identificação da guarnição');
+    const ans=await rcoDecisionDialog({
+      title:'Devolver RSD para retificação',
+      intro:(item.guarnicao||'Guarnição')+' — o mesmo RSD será reaberto para correção; não será criado outro registro.',
+      choiceLabel:'Motivo',
+      options,selected,
+      noteLabel:'Orientação do Coordenador',
+      notePlaceholder:defaultReason&&!options.some(x=>x.value===defaultReason)?defaultReason:'Descreva objetivamente o que precisa ser corrigido.',
+      requireNoteFor:['Outro'],
+      requireMessage:'Especifique o motivo da devolução.',
+      confirmLabel:'Enviar para retificação'
+    });if(!ans)return;
+    const motivo=composeReason(ans.choice,ans.choice==='Outro'?ans.note:'');
+    const orientacao=ans.note||motivo;
+    if(await reviewRsd(item,'RETIFICACAO_SOLICITADA',motivo,orientacao)){removeFromRco(item,true);await loadCloud();alert('RSD devolvido para retificação. O comandante verá a orientação ao continuar o serviço.')}
   }
   async function cancelRsdByCoordinator(item){
-    const motivo=prompt('Motivo da exclusão/cancelamento do registro:','Cadastro duplicado')||'';if(!motivo.trim())return;if(!confirm('Excluir este registro da Central?\n\nEle deixará de contar na consolidação, mas será preservado para auditoria.'))return;
-    const token=rcoRoleToken();if(!token)return;const a=rcoRoleActor();try{await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,motivo:motivo.trim(),perfil:a.perfil||'CPU',autorMatricula:a.matricula,autorNome:a.nome},token,{popup:false});removeFromRco(item,true);await loadCloud();alert('Registro cancelado e preservado para auditoria.')}catch(e){alert('Não foi possível excluir o registro: '+e.message)}
+    const options=['Cadastro duplicado','Cadastro de teste','Guarnição incorreta','Companhia incorreta','Serviço registrado novamente por engano','Outro'].map(x=>({value:x,label:x}));
+    const ans=await rcoDecisionDialog({
+      title:'Excluir registro da Central',
+      intro:'O registro deixará de contar no serviço e nas estatísticas, mas será preservado para auditoria.',
+      choiceLabel:'Motivo do cancelamento',
+      options,selected:item.possibleDuplicate?'Cadastro duplicado':'Cadastro duplicado',
+      noteLabel:'Detalhamento',
+      notePlaceholder:'Opcional, exceto quando selecionar “Outro”.',
+      requireNoteFor:['Outro'],
+      requireMessage:'Especifique o motivo do cancelamento.',
+      confirmLabel:'Excluir registro'
+    });if(!ans)return;
+    const motivo=composeReason(ans.choice,ans.note);
+    if(!confirm('Confirmar exclusão deste registro?\n\nEsta ação é auditável e não apaga fisicamente os dados.'))return;
+    const token=rcoRoleToken();if(!token)return;const a=rcoRoleActor();
+    try{await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,motivo,perfil:a.perfil||'CPU',autorMatricula:a.matricula,autorNome:a.nome},token,{popup:false});removeFromRco(item,true);await loadCloud();alert('Registro cancelado e preservado para auditoria.')}catch(e){alert('Não foi possível excluir o registro: '+e.message)}
   }
   async function denyRsd(item){const motivo=prompt('Motivo do indeferimento:','Contate o Coordenador para orientação.')||'';if(!motivo.trim())return;if(await reviewRsd(item,'INDEFERIDO',motivo.trim(),motivo.trim())){removeFromRco(item,true);await loadCloud();alert('RSD indeferido. A devolutiva ficará disponível ao comandante.')}}
   async function viewRsd(item){
