@@ -220,7 +220,11 @@ function sheet_(id, name) {
 function sheetOrCreate_(id,name,headers){
   var ss=ss_(id),s=ss.getSheetByName(name);
   if(!s){s=ss.insertSheet(name);if(headers&&headers.length)s.getRange(1,1,1,headers.length).setValues([headers]);}
-  else if(headers&&headers.length)ensureHeaders_(s,headers);
+  else if(headers&&headers.length){
+    var current=headers_(s).filter(function(x){return !!String(x||'').trim();});
+    if(!current.length)s.getRange(1,1,1,headers.length).setValues([headers]);
+    else ensureHeaders_(s,headers);
+  }
   return s;
 }
 function headers_(s) {
@@ -1106,8 +1110,8 @@ function p3Query_(p) {
   else if(view==='cirvc'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')),p);}
   else if(view==='auditoria'){list=filterCommon_(objects_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES')),p);}
   else if(view==='veiculos-operacionais'){
-    var vs=sheetOrCreate_(P3_SHEET_ID,'VEICULOS_OPERACIONAIS',['REGISTRO_ID','REPORT_ID','DATA','BATALHAO','COMPANHIA','GUARNICAO','PLACA_UF','TIPO','MARCA_MODELO','MARCA','MODELO','ANO','SITUACAO','CLASSIFICACAO_P3','TIPO_RECUPERACAO_DETALHADA','CONTA_COMO_RECUPERADO','PLACA_ORIGINAL_IDENTIFICADA','PLACA_ORIGINAL_UF','RESTRICAO_ORIGINAL','LOCAL','HOUVE_CONDUZIDOS','QUANTIDADE_CONDUZIDOS','VALOR_FIPE','ORIGEM_RELATORIO','ORIGEM_REGISTRO_ID','ENVIADO_EM']);
-    list=filterCommon_(objects_(vs),p);
+    var vs=ss_(P3_SHEET_ID).getSheetByName('VEICULOS_OPERACIONAIS');
+    list=vs?filterCommon_(objects_(vs),p):[];
   }
   else if(view==='viaturas'){list=objects_(sheet_(P3_SHEET_ID,'VIATURAS'));}
   else if(view==='militares'){list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));}
