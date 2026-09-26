@@ -16,7 +16,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 .company-picker{border:1px solid #becdd8;border-radius:9px;background:#fff;padding:8px}.company-actions{display:flex;gap:6px;align-items:center;margin-bottom:7px}.company-actions button{padding:4px 7px;font-size:10px}.company-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.company-chip{display:flex;align-items:center;justify-content:flex-start;gap:6px;border:1px solid #d6e0e7;border-radius:7px;background:#f8fbfd;padding:7px 8px;font-size:10px;font-weight:800;white-space:nowrap;min-width:0}.company-chip input{width:auto;min-height:0;margin:0;flex:0 0 auto}
 @media(min-width:1280px){.company-grid{grid-template-columns:repeat(10,minmax(0,1fr))}}
 .progress-box{display:none;margin-top:9px;padding:8px;border:1px solid #c9d6e0;border-radius:9px;background:#f8fbfd}.progress-box.show{display:block}.progress-line{height:8px;background:#e2e9ef;border-radius:999px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--b2),var(--b));transition:width .25s ease}.progress-text{font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}.source-note{display:none;margin-top:7px;font-size:9px;color:#7b8d9b;font-style:italic}.source-note.show{display:block}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
-.toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}
+.toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}.stat small{display:block;margin-top:4px;color:var(--muted);font-size:9px;line-height:1.25;text-transform:none}
 .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:9px}.section-head h2{margin:0;color:var(--b);font-size:19px}.note{font-size:11px;color:var(--muted)}.tablewrap{overflow:auto;max-height:66vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f;text-transform:uppercase}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}.empty{text-align:center;padding:28px;color:#6b7f90}.hidden{display:none!important}
 .chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}
 .powerbi-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:16px;border:1px solid #c9d6e0;border-radius:12px;background:#f8fbfd}.admin-session{display:grid;grid-template-columns:.8fr 1fr 1.2fr auto 1.8fr auto;gap:8px;align-items:end}.admin-session-state{min-height:38px;display:flex;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#f7fafc;color:var(--muted);font-size:11px}.admin-session-state.ok{background:#eaf6ee;color:#176b3a;border-color:#b9dac4}.admin-session-state strong{color:inherit}.admin-session button{min-height:38px}
@@ -78,11 +78,11 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <section class="card"><div class="section-head"><div><h2>Painel BI</h2><div class="note">Vínculo para painel institucional. Compatível com Looker Studio e Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o provedor do painel impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
 </section>
 </main>
-<script src="central_cloud.js?v=10.6.4-rc1"></script>
+<script src="central_cloud.js?v=10.6.5-rc1"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
- let main='painel',sub='controle-diario',analysisIndicator='',analysisReference='previous',customRefStart='',customRefEnd='',biUrl='',p3Actor=null,progressTimer=null,progressValue=0;
+ let main='painel',sub='controle-diario',analysisIndicator='',analysisReference='previous',customRefStart='',customRefEnd='',analysisBundle=null,biUrl='',p3Actor=null,progressTimer=null,progressValue=0;
  const P3_ACTOR_KEY='pmpb-p3-actor-v1';
  function readActor(){try{return JSON.parse(sessionStorage.getItem(P3_ACTOR_KEY)||'null')}catch(_){return null}}
  function saveActor(a){p3Actor=a||null;try{if(a)sessionStorage.setItem(P3_ACTOR_KEY,JSON.stringify(a));else sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}renderActor()}
@@ -131,11 +131,11 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    return t
  }
  function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhias:selectedCompanies().join('|'),turno:$('turno').value,guarnicao:$('guarnicao').value}}
- function cards(items){return items.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
+ function cards(items){return items.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b>'+(x[2]?'<small>'+esc(x[2])+'</small>':'')+'</div>').join('')}
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE'||k==='VALOR_FIPE_ESTATISTICO')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
- const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:45000});
+ const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:60000});
  async function load(){
    const show=main!=='powerbi';let ok=false;if(show)beginProgress('Consultando a Central e aplicando os filtros...');setSourceNote(null);
    try{
@@ -147,7 +147,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
      showError(e.message);
    }finally{if(show)endProgress(ok,ok?'Consulta atualizada.':'Falha na consulta.')}
  }
- function showError(msg){const target=main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
+ function showError(msg){if(main==='painel'&&sub==='analise'){$('chart').innerHTML='<div class="empty">'+esc(msg)+'</div>';return}const target=main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
  async function loadPanel(t){
    $('chart').innerHTML='';$('analysisControls').innerHTML='';
    if(sub==='analise')return loadAnalysis(t);
@@ -189,25 +189,47 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    else $('stats').innerHTML=cards([['Eventos',items.length],['RSD',items.filter(x=>x.TIPO_ENTIDADE==='RSD').length],['RCO',items.filter(x=>x.TIPO_ENTIDADE==='RCO').length],['Operações',items.filter(x=>x.TIPO_ENTIDADE==='OPERACAO').length],['Responsáveis',new Set(items.map(x=>x.RESPONSAVEL_MATRICULA).filter(Boolean)).size],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size]]);
  }
  async function loadAnalysis(t){
-   progressStep(25,'Calculando o indicador do período analisado...');
-   const base={...p(t,'produtividade'),indicador:analysisIndicator};delete base.view;
-   let r=await p3Get('p3-analysis',base),catalog=Array.isArray(r.catalogo)?r.catalogo:(Array.isArray(r.indicadores)?r.indicadores.map(x=>({codigo:String(x),nome:String(x),descricao:''})):[]);
-   if(!analysisIndicator&&catalog.length)analysisIndicator=String((r.indicador||catalog[0]).codigo||catalog[0].codigo||'');
-   const ref=referenceWindow();progressStep(58,'Calculando a janela de referência...');
-   const prev=await p3Get('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:ref.start,dataFim:ref.end});progressStep(84,'Montando a comparação...');
-   const meta=r.indicador||catalog.find(x=>x.codigo===analysisIndicator)||{},cur=Number(r.total||0),old=Number(prev.total||0),pct=old?((cur-old)/old*100):null;
-   setSourceNote(r.sourceStats);
-   $('title').textContent='Análise integrada';$('subtitle').textContent='Indicadores essenciais consolidados. A variação sempre é calculada contra a janela de referência exibida abaixo.';
+   const ref=referenceWindow(),base={...p(t,'produtividade'),refInicio:ref.start,refFim:ref.end};delete base.view;
+   progressStep(24,'Lendo os dados do período e da referência em uma única consulta...');
+   analysisBundle=await p3Get('p3-analysis-compare',base);progressStep(86,'Montando a comparação...');
+   const catalog=Array.isArray(analysisBundle.catalogo)?analysisBundle.catalogo:[];
+   if(!analysisIndicator&&catalog.length)analysisIndicator=String(catalog[0].codigo||'');
+   renderAnalysisBundle();
+ }
+ function renderAnalysisBundle(){
+   const r=analysisBundle||{},catalog=Array.isArray(r.catalogo)?r.catalogo:[],metrics=Array.isArray(r.metricas)?r.metricas:[];
+   if(!analysisIndicator&&catalog.length)analysisIndicator=String(catalog[0].codigo||'');
+   let metric=metrics.find(x=>x.codigo===analysisIndicator)||metrics[0]||null;
+   if(metric&&metric.codigo!==analysisIndicator)analysisIndicator=metric.codigo;
+   const meta=catalog.find(x=>x.codigo===analysisIndicator)||metric||{},cur=Number(metric?.totalPeriodo||0),old=Number(metric?.totalReferencia||0),
+         pct=old?((cur-old)/old*100):(cur===0?null:null),period=r.periodo||{},ref=r.referencia||{},pstats=period.sourceStats||{};
+   setSourceNote(pstats);
+   $('title').textContent='Análise integrada';
+   $('subtitle').textContent=Number(pstats.rows||0)>0&&cur===0
+     ?'Há dados consolidados no período selecionado, mas não houve registro positivo para este indicador.'
+     :'Indicadores essenciais consolidados. A comparação usa explicitamente a janela de referência indicada abaixo.';
    const opts=catalog.map(x=>'<option value="'+esc(x.codigo)+'" '+(x.codigo===analysisIndicator?'selected':'')+'>'+esc(x.nome)+'</option>').join('');
    const refOptions=[['previous','Período imediatamente anterior (mesma duração)'],['month','Mesmo intervalo no mês anterior'],['year','Mesmo intervalo no ano anterior'],['custom','Período personalizado']].map(x=>'<option value="'+x[0]+'" '+(x[0]===analysisReference?'selected':'')+'>'+x[1]+'</option>').join('');
-   const custom=analysisReference==='custom'?'<div><label>Referência inicial</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.start)+'"></div><div><label>Referência final</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.end)+'"></div>':'';
-   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Referência para comparação</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date($('di').value)+' a '+date($('df').value)+'<br><strong>Janela de referência:</strong> '+date(ref.start)+' a '+date(ref.end)+'<br>'+esc(meta.descricao||'')+'</div></div>';
-   document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
+   const custom=analysisReference==='custom'?'<div><label>Referência inicial</label><input id="refStart" type="date" value="'+esc(customRefStart||ref.inicio||'')+'"></div><div><label>Referência final</label><input id="refEnd" type="date" value="'+esc(customRefEnd||ref.fim||'')+'"></div>':'';
+   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+opts+'</select></div><div><label>Referência para comparação</label><select id="analysisReference">'+refOptions+'</select></div>'+custom+'<div class="note"><strong>Período analisado:</strong> '+date(period.inicio)+' a '+date(period.fim)+'<br><strong>Janela de referência:</strong> '+date(ref.inicio)+' a '+date(ref.fim)+'<br>'+esc(meta.descricao||'')+'</div></div>';
+   document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;renderAnalysisBundle()});
    document.getElementById('analysisReference')?.addEventListener('change',e=>{analysisReference=e.target.value;if(analysisReference==='custom'&&(!customRefStart||!customRefEnd)){const w=referenceWindow();customRefStart=w.start;customRefEnd=w.end}load()});
    document.getElementById('refStart')?.addEventListener('change',e=>{customRefStart=e.target.value;if(customRefEnd)load()});
    document.getElementById('refEnd')?.addEventListener('change',e=>{customRefEnd=e.target.value;if(customRefStart)load()});
-   $('stats').innerHTML=cards([['Período analisado',cur],['Referência',old],['Variação vs referência',pct===null?'Sem base':((pct>=0?'+':'')+pct.toFixed(1)+'%')],['Companhias',(r.porCompanhia||[]).length],['Dias com registro',(r.porData||[]).length],['Indicador',meta.nome||analysisIndicator||'—']]);
-   const max=Math.max(1,...(r.porCompanhia||[]).map(x=>Number(x.valor||0)));$('chart').innerHTML=(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join('')||'<div class="empty">Sem dados.</div>';$('thead').innerHTML='';$('tbody').innerHTML='';
+   const rangeLabel=date(period.inicio)+(period.inicio!==period.fim?' a '+date(period.fim):''),
+         refLabel=date(ref.inicio)+(ref.inicio!==ref.fim?' a '+date(ref.fim):''),
+         porComp=metric?.periodoPorCompanhia||[],porData=metric?.periodoPorData||[],selected=selectedCompanies().length;
+   $('stats').innerHTML=cards([
+     ['Total no período',cur,rangeLabel],
+     ['Total na referência',old,refLabel],
+     ['Variação vs referência',old?((pct>=0?'+':'')+pct.toFixed(1)+'%'):'Sem base',old?'Comparação com '+refLabel:'A referência é zero'],
+     ['Companhias selecionadas',selected,'Filtro aplicado'],
+     ['Companhias com ocorrência',porComp.length,'Neste indicador e período'],
+     ['Dias com ocorrência',porData.length,'Neste indicador e período']
+   ]);
+   const max=Math.max(1,...porComp.map(x=>Number(x.valor||0)));
+   $('chart').innerHTML=porComp.length?porComp.map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">'+(Number(pstats.rows||0)>0?'Há dados consolidados no período, porém este indicador não teve ocorrência.':'Nenhum dado consolidado encontrado para o período e filtros selecionados.')+'</div>';
+   $('thead').innerHTML='';$('tbody').innerHTML='';
  }
  async function loadRco(t){
    const r=await p3Get('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
