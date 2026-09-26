@@ -564,20 +564,26 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     return m;
   }
   function p3SetStatus(msg){const el=document.getElementById('p3Status');if(el)el.textContent=msg||''}
+  let p3Submitting=false;
   function p3Submit(){
+    if(p3Submitting)return;
     const m=p3EnsureModal(),input=m.querySelector('#p3TokenInput'),remember=m.querySelector('#p3Remember');
     const token=String(input.value||'').trim();
     if(!token){alert('Informe a Chave P3.');input.focus();return}
     let pkg;try{pkg=p3BuildPackage()}catch(err){alert(err.message||String(err));return}
     if(remember.checked)p3SetSavedToken(token);else p3SetSavedToken('');
     try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){}
+    p3Submitting=true;const sendBtn=m.querySelector('#p3Send');if(sendBtn)sendBtn.disabled=true;
     const winName='p3Consolidacao_'+Date.now();
     const w=window.open('about:blank',winName);
-    if(!w){alert('O navegador bloqueou a janela de confirmação do P3. Permita pop-ups para esta página e tente novamente.');return}
+    if(!w){p3Submitting=false;if(sendBtn)sendBtn.disabled=false;alert('O navegador bloqueou a janela de confirmação do P3. Permita pop-ups para esta página e tente novamente.');return}
     const form=document.createElement('form');form.method='POST';form.action=P3_ENDPOINT;form.target=winName;form.style.display='none';
     const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;form.appendChild(i)};
     add('token',token);add('payload',JSON.stringify(pkg));document.body.appendChild(form);form.submit();form.remove();
+    window.__centralP3Accepted={pkg,token,acceptedAt:Date.now()};
+    document.dispatchEvent(new CustomEvent('central-p3-submit-accepted',{detail:{acceptedAt:window.__centralP3Accepted.acceptedAt}}));
     m.classList.add('hidden');p3SetStatus('Envio aberto para confirmação.');
+    setTimeout(()=>{p3Submitting=false;if(sendBtn)sendBtn.disabled=false},1800);
     setTimeout(()=>p3SetStatus(''),12000);
   }
   window.abrirConsolidacaoP3=function(){
@@ -894,27 +900,27 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 
 <script id="rco-v10-finalize-bridge">
 (function(){
-  let busy=false;
+  let busy=false,lastAcceptedAt=0;
   async function supplemental(){
-    if(busy||!window.CentralCloud||!await CentralCloud.probe())return;
-    const p3Token=CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3 para registrar a consolidação no banco estatístico:');
-    if(!p3Token)return;
-    const centralToken=CentralCloud.getToken('central')||CentralCloud.askToken('central','Informe a chave operacional da Central para atualizar o status dos RSDs:');
-    let pkg,rco;try{pkg=typeof window.centralP3BuildPackage==='function'?window.centralP3BuildPackage():null;rco=pkg?.rco||window.collectState()}catch(_){return}
+    const accepted=window.__centralP3Accepted||{};
+    if(busy||!accepted.pkg||!accepted.token||!accepted.acceptedAt||accepted.acceptedAt===lastAcceptedAt||Date.now()-accepted.acceptedAt>10000)return;
+    if(!window.CentralCloud||!await CentralCloud.probe())return;
+    const pkg=accepted.pkg,rco=pkg.rco||{};
     const reportId=rco?.state?.reportId||rco?.reportId||pkg?.estatisticaP3?.reportId||'';
     if(!reportId)return;
-    if(!pkg)pkg={rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]};
-    busy=true;
+    busy=true;lastAcceptedAt=accepted.acceptedAt;
     try{
-      await CentralCloud.postOrQueue('rco-upsert',pkg,{token:p3Token,unit:pkg.unidade||rco.unidade,popup:false});
-      const ids=(rco.rcoOrigens||[]).map(x=>x.rsdReportId).filter(Boolean);
-      if(ids.length&&centralToken)await CentralCloud.postOrQueue('rsd-mark-included',{rcoReportId:reportId,rsdReportIds:ids},{token:centralToken,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+      const rr=await CentralCloud.postOrQueue('rco-upsert',pkg,{token:accepted.token,unit:pkg.unidade||rco.unidade,popup:false});
+      if(rr&&rr.ok!==false){
+        const v=rr.version?' v'+rr.version:'';
+        const el=document.getElementById('p3Status');if(el)el.textContent='RCO sincronizado na Central v10'+v+'.';
+      }
+    }catch(err){
+      console.error('Falha na sincronização complementar v10 do RCO',err);
+      const el=document.getElementById('p3Status');if(el)el.textContent='Envio principal aberto. A sincronização complementar v10 ficará pendente para nova tentativa.';
     }finally{busy=false}
   }
-  document.addEventListener('click',e=>{
-    const b=e.target?.closest?.('#p3Send');if(!b)return;
-    setTimeout(supplemental,350);
-  },true);
+  document.addEventListener('central-p3-submit-accepted',()=>setTimeout(supplemental,80));
 })();
 </script>
 <script id="v10-6-rco-responsavel-script">
