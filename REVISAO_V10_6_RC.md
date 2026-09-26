@@ -18,6 +18,9 @@ Branch de homologação: `feature/fluxos-rsd-rco-10-6`
 - após o recebimento, o novo segmento pode retificar o registro da passagem ou solicitar a anulação do recebimento enquanto ainda não houver movimentação relevante;
 - proteção de recebimento simultâneo;
 - cancelamento lógico/auditável de RSD;
+- no RCO, possíveis duplicidades podem ser comparadas antes da decisão, com identificação dos serviços raiz e segmentos;
+- registros cancelados ficam ocultos por padrão e podem ser exibidos em `Mostrar cancelados (n)`, com motivo, autor e data/hora;
+- se um RSD incorporado a um RCO ainda aberto for cancelado na origem, a próxima atualização o remove automaticamente da consolidação e recalcula os totais;
 - estados de análise do Coordenador e devolutiva ao comandante;
 - submenu de contingência `Inserir manualmente`;
 - `Início do serviço (limpar histórico)`;
@@ -118,6 +121,8 @@ Passagem:
 - RSD já incorporado ao RCO não pode ser cancelado silenciosamente;
 - uma passagem pendente deve ser cancelada antes de cancelar o RSD de origem;
 - `LockService` protege o recebimento simultâneo de passagem;
+- `LockService` também protege a criação simultânea do primeiro RSD, a criação inicial de um RCO e a assunção do RCO por outro aparelho;
+- RSD já finalizado/analisado não pode voltar silenciosamente para `EM_SERVICO`; ao tentar novo envio, a interface consulta e mostra a devolutiva existente;
 - segmentos com o mesmo `SERVICE_ID` não são sinalizados como duplicidade entre si;
 - registros JSON de contingência podem carregar origem `CONTINGENCIA_JSON`.
 
@@ -168,6 +173,11 @@ A validação estática não substitui homologação funcional com o Apps Script
 32. Anular imediatamente um recebimento de passagem e confirmar retorno ao segmento anterior.
 33. Confirmar bloqueio da anulação quando o novo segmento já possuir movimentação relevante.
 34. Testar a assinatura em tela cheia do Relatório de Traslados do Reboque e sua impressão no PDF.
+35. Tentar criar a mesma guarnição em dois aparelhos simultaneamente e confirmar que apenas um serviço raiz é criado.
+36. Em um RCO com possível duplicidade, usar “Comparar registros” e conferir serviço raiz, segmentos, comandante, VTR, datas e conteúdo.
+37. Cancelar um RSD já incorporado a um RCO ainda aberto e, ao atualizar a lista, confirmar sua retirada automática e o recálculo.
+38. Usar “Mostrar cancelados” e conferir motivo, autor e data/hora do cancelamento.
+39. Após deferir ou devolver um RSD, manter a tela antiga aberta e pressionar “Finalizar serviço” novamente; confirmar que o estado não é reaberto e a devolutiva é exibida.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
