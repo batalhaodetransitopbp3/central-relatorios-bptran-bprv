@@ -16,7 +16,7 @@
  */
 
 var CENTRAL_V10_VERSION = '10.6.6-rc1';
-var MASTER_ADMIN_PASSWORD_SHA256 = '2d11357a0a62d1da1e857aed32060b06c73e6c5db1c2398179176090cc999ad1';
+var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -256,9 +256,9 @@ function assertToken_(token, kind) {
   var coord = String(props.getProperty('COORD_TOKEN') || '');
   token = String(token || '');
   if (kind === 'master-session') {
-    var cached=CacheService.getScriptCache().get('master-session:'+hash_(token));
+    var cached=CacheService.getScriptCache().get('master-session-v2:'+hash_(token));
     if (!token || cached!=='OK') throw new Error('Sessão do Controle Geral expirada ou inválida.');
-    CacheService.getScriptCache().put('master-session:'+hash_(token),'OK',21600);
+    CacheService.getScriptCache().put('master-session-v2:'+hash_(token),'OK',21600);
     return true;
   }
   if (kind === 'master') {
@@ -1631,11 +1631,11 @@ function p3Query_(p) {
    ========================= */
 function masterLogin_(){
   var session=uid_('master')+'-'+Utilities.getUuid();
-  CacheService.getScriptCache().put('master-session:'+hash_(session),'OK',21600);
+  CacheService.getScriptCache().put('master-session-v2:'+hash_(session),'OK',21600);
   return {ok:true,message:'Acesso administrativo autorizado.',session:session,expiresInSeconds:21600};
 }
 function masterLogout_(session){
-  try{CacheService.getScriptCache().remove('master-session:'+hash_(session));}catch(_){}
+  try{CacheService.getScriptCache().remove('master-session-v2:'+hash_(session));}catch(_){}
   return {ok:true,message:'Sessão administrativa encerrada.'};
 }
 function masterFilter_(x,p,dateFields){
