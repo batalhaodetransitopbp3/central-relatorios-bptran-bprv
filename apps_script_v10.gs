@@ -1421,6 +1421,11 @@ function p3Query_(p) {
     list=p3MergeById_(newer,legacy,['CIRVC_ID','REGISTRO_ID']);
   }
   else if(view==='auditoria')list=p3FastObjects_('AUDITORIA_VERSOES',p,2000,['DATA_HORA']);
+  else if(view==='fisco')list=p3FastObjects_('FISCO',p,2000,['DATA']);
+  else if(view==='nace-cicc'){
+    var pn=Object.assign({},p);pn.batalhao='';pn.companhia='';pn.guarnicao='';pn.turno='';
+    list=p3FastObjects_('NACE_CICC',pn,2000,['DATA']);
+  }
   else if(view==='veiculos-operacionais'){
     var ss=ss_(P3_SHEET_ID),newSheet=ss.getSheetByName('VEICULOS_OPERACIONAIS'),oldSheet=ss.getSheetByName('VEICULOS_RECUPERADOS');
     var newRows=newSheet?p3FastObjects_('VEICULOS_OPERACIONAIS',p,2000,['DATA']):[],oldRows=oldSheet?p3FastObjects_('VEICULOS_RECUPERADOS',p,2000,['DATA']):[];
