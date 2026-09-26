@@ -87,6 +87,18 @@ Arquivos:
 O acesso foi incluído na página principal da Central.
 
 ## Gestão P3
+### Sessão administrativa P3/Oficial
+
+A Gestão P3 exige identificação formal antes de exibir os dados:
+
+- perfil `P3` ou `Oficial responsável`;
+- matrícula no padrão `000.000-0`;
+- militar existente no Cadastro Mestre;
+- validação da credencial `P3_TOKEN`;
+- identidade mantida somente na sessão do navegador;
+- a Tabela Operacional exige a mesma sessão e redireciona para identificação quando acessada diretamente;
+- a reabertura de RCO para retificação não aceita mais autor digitado livremente: nome, posto/graduação e matrícula são recuperados do Cadastro Mestre e gravados na auditoria.
+
 
 A Gestão P3 foi reorganizada em cinco acessos principais: **Painel Geral**, **Tabela Operacional**, **Histórico**, **Controle de RCOs** e **Power BI**.
 
@@ -229,6 +241,11 @@ A validação estática não substitui homologação funcional com o Apps Script
 55. Colocar o navegador offline no momento do envio complementar v10 e confirmar que o pacote fica na fila de sincronização, sem ser apresentado como “sincronizado”.
 56. Clicar em “Enviar ao P3” sem chave ou com pacote inválido e confirmar que a ponte v10 não é disparada.
 57. Confirmar que o cadastro do CPU exige `COORD_TOKEN` e o cadastro P3/Oficial exige `P3_TOKEN`.
+58. Abrir a Gestão P3 sem sessão administrativa e confirmar que nenhum dado é carregado antes da identificação do P3/Oficial.
+59. Identificar um P3/Oficial por matrícula + credencial e confirmar o nome/posto recuperados do Cadastro Mestre.
+60. Abrir diretamente a Tabela Operacional sem sessão e confirmar o redirecionamento para a Gestão P3; após autenticar, confirmar o retorno automático à tabela.
+61. Invalidar/limpar a Chave P3 durante a sessão e confirmar que a Gestão volta ao estado de identificação.
+62. Reabrir um RCO para retificação e confirmar que o autor é preenchido automaticamente pela sessão administrativa, sem campo livre.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
