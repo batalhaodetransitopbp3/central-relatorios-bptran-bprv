@@ -73,7 +73,7 @@ td .other-reason{margin-top:4px}
     <div class="field span2"><label>Data</label><input id="data" type="date"><span class="print-value" data-print-for="data"></span></div>
     <div class="field span3"><label>Turno de serviço</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"><span class="print-value" data-print-for="turno"></span></div>
     <div class="field span2"><label>Prefixo da VTR/Reboque</label><input id="prefixo" maxlength="10" placeholder="Ex.: 1698"><span class="print-value" data-print-for="prefixo"></span></div>
-    <div class="field span5"><label>Militar mais antigo responsável</label><input id="responsavel" placeholder="Posto/graduação e nome"><span class="print-value" data-print-for="responsavel"></span></div>
+    <div class="field span5"><label>Militar mais antigo responsável</label><input id="responsavel" placeholder="Nome do militar mais antigo responsável"><span class="print-value" data-print-for="responsavel"></span></div>
   </div>
 </section>
 
@@ -161,9 +161,9 @@ function addVehicle(data={}){
     '<td class="action no-print"><button class="danger small" type="button">Remover</button></td>';
   tbody.appendChild(tr);renderReason(tr,data.reason||'',data.otherReason||'');
   tr.querySelector('[data-k="plate"]').addEventListener('input',e=>{normalizePlate(e.target);syncCellPrint(e.target);save()});
-  tr.querySelectorAll('input:not([data-k="plate"]),select').forEach(el=>{el.addEventListener('input',()=>{syncCellPrint(el);save()});el.addEventListener('change',()=>{syncCellPrint(el);save()})});
+  tr.querySelectorAll('input:not([data-k="plate"]):not([data-k="otherReason"]),select:not([data-k="reason"])').forEach(el=>{el.addEventListener('input',()=>{syncCellPrint(el);save()});el.addEventListener('change',()=>{syncCellPrint(el);save()})});
   tr.querySelector('.action button').onclick=()=>{if(confirm('Retirar este veículo da relação?')){tr.remove();renumber();save()}};
-  tr.querySelectorAll('input,select').forEach(syncCellPrint);renumber();save();return tr;
+  tr.querySelectorAll('input:not([data-k="otherReason"]),select:not([data-k="reason"])').forEach(syncCellPrint);renumber();save();return tr;
 }
 function syncCellPrint(el){const p=el.parentElement?.querySelector(':scope > .print-value');if(p)p.textContent=(el.value||'—')}
 function renumber(){const rows=[...document.querySelectorAll('#vehicleRows tr')];rows.forEach((tr,i)=>tr.querySelector('.order').textContent=String(i+1).padStart(2,'0'));document.getElementById('vehicleCount').textContent=rows.length+' veículo(s) na relação'}
@@ -183,7 +183,7 @@ function validate(){
 }
 function generatePdf(){
   if(!validate())return;
-  document.querySelectorAll('#vehicleRows tr input,#vehicleRows tr select').forEach(syncCellPrint);
+  document.querySelectorAll('#vehicleRows tr').forEach(tr=>{tr.querySelectorAll('input:not([data-k="otherReason"]),select:not([data-k="reason"])').forEach(syncCellPrint);const sel=tr.querySelector('[data-k="reason"]'),inp=tr.querySelector('[data-k="otherReason"]'),pr=tr.querySelector('.reason-print');if(pr){const text=sel?.value==='Outro'?(inp?.value?('Outro — '+inp.value):'Outro'):(sel?.value||'');pr.textContent=text||'—'}});
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);
   renumber();save();
   const old=document.title,resp=document.getElementById('responsavel').value.trim()||'REBOQUE',date=fmtDate(document.getElementById('data').value).replaceAll('/','.');
