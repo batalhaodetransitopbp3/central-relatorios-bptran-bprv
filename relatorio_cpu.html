@@ -84,8 +84,8 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
 <style id="central-service-state-style">
 .service-state-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px;padding:6px 8px;border:1px solid #d5e0e8;border-radius:10px;background:#f8fafc}
 .service-state-bar .state-note{font-size:10.5px;color:#607286;margin-left:auto}
-.service-state-bar button,.service-state-bar .central-home-link{padding:6px 9px!important;min-height:30px!important;font-size:11px!important;box-shadow:none!important}.service-state-bar .central-home-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:8px;border:1px solid #c5d2dc;background:#fff;color:#173a57;font-weight:750}
-@media(max-width:620px){.service-state-bar{padding:5px}.service-state-bar button,.service-state-bar .central-home-link{flex:1 1 30%}.service-state-bar .state-note{width:100%;margin-left:0;text-align:center}}
+.service-state-bar button,.service-state-bar .central-home-link{padding:6px 9px!important;min-height:30px!important;font-size:11px!important;box-shadow:none!important}.service-state-bar .central-home-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:8px;border:1px solid #c5d2dc;background:#fff;color:#173a57;font-weight:750}.central-home-link svg{width:17px;height:17px;display:block;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.service-state-bar .central-home-link{flex:0 0 38px!important;min-width:38px!important;padding:6px!important}
+@media(max-width:620px){.service-state-bar{padding:5px}.service-state-bar button{flex:1 1 30%}.service-state-bar .central-home-link{flex:0 0 42px!important}.service-state-bar .state-note{width:100%;margin-left:0;text-align:center}}
 @media print{.service-state-bar{display:none!important}}
 </style>
 
@@ -496,7 +496,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     const ref=document.querySelector('.toolbar');
     if(ref && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
-      bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço (limpar histórico)</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><button type="button" class="secondary small" onclick="gerarPassagemServicoRco()">Realizar passagem de serviço</button><button type="button" class="secondary small" onclick="centralRcoReceivePassage()">Receber passagem de serviço</button><a class="secondary small central-home-link" href="index.html">Central</a><span class="state-note">Fluxo normal pela nuvem. Use Inserir manualmente apenas em contingência.</span>';
+      bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço (limpar histórico)</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><button type="button" class="secondary small" onclick="gerarPassagemServicoRco()">Realizar passagem de serviço</button><button type="button" class="secondary small" onclick="centralRcoReceivePassage()">Receber passagem de serviço</button><a class="secondary small central-home-link" href="index.html" aria-label="Home" title="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h5v-6h3v6h5V9.5"></path></svg></a><span class="state-note">Fluxo normal pela nuvem. Use Inserir manualmente apenas em contingência.</span>';
       ref.insertAdjacentElement('afterend',bar);
     }
     document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
