@@ -246,6 +246,8 @@ A validação estática não substitui homologação funcional com o Apps Script
 60. Abrir diretamente a Tabela Operacional sem sessão e confirmar o redirecionamento para a Gestão P3; após autenticar, confirmar o retorno automático à tabela.
 61. Invalidar/limpar a Chave P3 durante a sessão e confirmar que a Gestão volta ao estado de identificação.
 62. Reabrir um RCO para retificação e confirmar que o autor é preenchido automaticamente pela sessão administrativa, sem campo livre.
+63. Informar uma senha de Coordenação inválida no cadastro do CPU e confirmar que a chave operacional regular da Central permanece intacta.
+64. Informar uma credencial P3/Oficial inválida e confirmar que somente a sessão/chave administrativa P3 é encerrada, sem apagar a chave operacional.
 
 ## Arquivos alterados
 - `apps_script_v10.gs`
