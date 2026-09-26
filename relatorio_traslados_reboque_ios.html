@@ -226,6 +226,13 @@ function loadLocalDraft(){
   applyCloudPayload(p,'aparelho');setCloudStatus('Rascunho local carregado','warn');
 }
 function setCloudStatus(t,kind=''){const e=document.getElementById('cloudStatus');if(!e)return;e.textContent=t||'';e.style.color=kind==='ok'?'#18745f':kind==='warn'?'#8a5a00':kind==='err'?'#9a2745':'#52697f'}
+function updateFinalizedUi(){
+  if(VIEW_ONLY)return;
+  const locked=!!cloudFinalized;
+  document.querySelectorAll('#data,#turno,#prefixo,#responsavel,#vehicleRows input,#vehicleRows select').forEach(e=>e.disabled=locked);
+  document.querySelectorAll('.edit-action,.table-actions,.signature-actions').forEach(e=>e.style.display=locked?'none':'');
+  const box=document.getElementById('signatureBox');if(box)box.style.pointerEvents=locked?'none':'';
+}
 function assertReboqueContext(){
   const ctx=activeContext();
   if(!ctx.rsdReportId||!ctx.serviceId)throw new Error('Abra primeiro o RSD da guarnição REBOQUE e registre/continue o serviço pela nuvem.');
@@ -234,6 +241,7 @@ function assertReboqueContext(){
 }
 async function saveCloudDraft(silent=false){
   if(VIEW_ONLY)return false;
+  if(cloudFinalized){if(!silent)alert('Este relatório de traslados já foi finalizado. Use o PDF/consulta em modo somente leitura.');return false}
   if(!window.CentralCloud){if(!silent)alert('Conexão com a Central indisponível. O rascunho permanece salvo neste aparelho.');save();return false}
   let ctx;try{ctx=assertReboqueContext()}catch(e){if(!silent)alert(e.message);return false}
   const token=CentralCloud.getToken('central')||(!silent?CentralCloud.askToken('central'):'');if(!token){save();return false}
@@ -259,7 +267,7 @@ function applyCloudPayload(p,source='Central'){
     document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);updateSignatureUi();renumber();
     try{if(!VIEW_ONLY){localStorage.setItem(REPORT_KEY,reboqueReportId);localStorage.setItem(STORE_KEY,JSON.stringify(p))}}catch(_){}
   }finally{suspendSave=false}
-  setCloudStatus(cloudFinalized?'Relatório finalizado':('Rascunho carregado '+(source==='Central'?'da Central':'do '+source)),cloudFinalized?'ok':(source==='Central'?'':'warn'));
+  setCloudStatus(cloudFinalized?'Relatório finalizado':('Rascunho carregado '+(source==='Central'?'da Central':'do '+source)),cloudFinalized?'ok':(source==='Central'?'':'warn'));updateFinalizedUi();
 }
 async function loadCloudDraft(){
   if(VIEW_ONLY)return;
@@ -285,7 +293,7 @@ async function finalizeCloud(){
   setCloudStatus('Finalizando na Central…');
   try{
     const r=await CentralCloud.postOrQueue('reboque-finalize',{reboque:p},{token,unit:ctx.unidade||{},popup:false});
-    if(r.reportId)reboqueReportId=r.reportId;cloudFinalized=true;save();
+    if(r.reportId)reboqueReportId=r.reportId;cloudFinalized=true;save();updateFinalizedUi();
     if(r.queued){setCloudStatus('Finalização registrada — sincronização pendente','warn');alert('A finalização foi preservada neste aparelho e será sincronizada quando a conexão retornar. O Coordenador só verá o documento após essa sincronização.')}
     else{setCloudStatus('Finalizado e disponível ao Coordenador','ok');alert('Relatório finalizado. O Coordenador já pode gerar o PDF diretamente pelo RCO.')}
   }catch(e){save();setCloudStatus('Dados preservados localmente — finalização não sincronizada','warn');alert('Não foi possível sincronizar a finalização agora: '+e.message+'\n\nOs dados permanecem salvos neste aparelho.')}
@@ -399,11 +407,11 @@ window.addEventListener('resize',()=>{if(signatureModal.classList.contains('open
 
 function load(){
   let p=null;if(!VIEW_ONLY){try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}}
-  const today=localDate();
-  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';(p.vehicles||[]).forEach(addVehicle)}
-  else{document.getElementById('data').value=today;addVehicle()}
+  const today=localDate(),ctxNow=VIEW_ONLY?{}:activeContext(),expectedDate=ctxNow.data||today;
+  if(p&&p.data===expectedDate){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';(p.vehicles||[]).forEach(addVehicle)}
+  else{document.getElementById('data').value=expectedDate;cloudFinalized=false;if(!VIEW_ONLY){reboqueReportId=(window.CentralCloud&&CentralCloud.uid)?CentralCloud.uid('reboque'):('reboque-'+Date.now());try{localStorage.setItem(REPORT_KEY,reboqueReportId)}catch(_){}}addVehicle()}
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(el=>{syncPrint(el);el.addEventListener('input',()=>{if(el.id==='prefixo')el.value=String(el.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,10);syncPrint(el);save()});el.addEventListener('change',()=>{syncPrint(el);save()})});
-  updateSignatureUi();
+  updateSignatureUi();updateFinalizedUi();
   if(VIEW_ONLY)setTimeout(loadCloudViewer,250);
 }
 function validate(){
@@ -426,9 +434,9 @@ function generatePdf(){
 load();
 if(!VIEW_ONLY){
   let cloudTimer=null;
-  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},7000)},true);
-  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},3000)},true);
-  window.addEventListener('online',()=>setTimeout(()=>{if(activeContext().serviceId)saveCloudDraft(true)},1200));
+  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},7000)},true);
+  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},3000)},true);
+  window.addEventListener('online',()=>setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},1200));
 }
 </script>
 <style>.hidden{display:none!important}</style>
