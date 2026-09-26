@@ -1203,16 +1203,17 @@ function rcoSupplementalUpsert_(payload) {
   var pkg=payload||{}, rco=pkg.rco||pkg, stat=pkg.estatisticaP3||rco.estatisticaP3||{};
   var reportId=String((rco||{}).reportId||(rco.state||{}).reportId||pkg.reportId||stat.reportId||'');
   if(!reportId) throw new Error('RCO sem REPORT_ID.');
-  var old=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
+  var rcoSheet=sheet_(P3_SHEET_ID,'RCO');ensureHeaders_(rcoSheet,['VERSAO']);
+  var old=findOne_(rcoSheet,'REPORT_ID',reportId),version=old?Number(old.VERSAO||1)+1:1;
   var u=pkg.unidade||rco.unidade||{}, batt=normBattalion_(u.batalhao||pkg.batalhao),comp=u.companhia||pkg.companhia||normCompany_(batt,u.companhiaNumero);
   var cons=rco.consolidacaoResponsavel||{},periodo=rco.periodo||{};
-  var obj={REPORT_ID:reportId,DATA_SERVICO:dateText_(periodo.inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
+  var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dateText_(periodo.inicio||rco.data||''),BATALHAO:batt,COMPANHIA:comp,
     INICIO:periodo.inicio||'',TERMINO:periodo.termino||periodo.fim||'',HORARIO_SERVICO:periodo.horario||rco.horarioServico||'',SCHEMA_VERSION:pkg.schemaVersion||rco.schemaVersion||2,
     GERADO_EM:rco.generatedAt||'',ENVIADO_EM:nowIso_(),RETIFICADO_EM:old?nowIso_():'',STATUS:'ATIVO',
     QUANTIDADE_GUARNICOES:(rco.rcoOrigens||[]).length||'',OBSERVACOES:rco.observacoes||'',ORIGEM:'RCO',
     MODO_CONSOLIDACAO:rco.semGuarnicaoCpu?'SEM_CPU':'CPU',CONSOLIDADOR_MATRICULA:normMat_(cons.matricula||''),CONSOLIDADOR_POSTO_GRAD:cons.postoGrad||'',
     CONSOLIDADOR_NOME:cons.nome||'',CONSOLIDADOR_TURNO:cons.turno||''};
-  upsert_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId,obj);
+  upsert_(rcoSheet,'REPORT_ID',reportId,obj);
 
   var prodSheet=sheet_(P3_SHEET_ID,'PRODUCAO'),prodRows=stat.producao||pkg.producao||[];
   if(Array.isArray(prodRows)&&prodRows.length){
@@ -1288,7 +1289,7 @@ function rcoSupplementalUpsert_(payload) {
     row.LONGITUDE=row.LONGITUDE||((o.local||{}).longitude)||'';row.STATUS_REGISTRO='CONSOLIDADO';row.VERSAO_ORIGEM=Number(row.VERSAO_ORIGEM||1);row.ENVIADO_EM=nowIso_();
     upsert_(sheet_(P3_SHEET_ID,'OPERACOES'),'REGISTRO_ID',id,row);
   });
-  audit_('RCO',reportId,old?2:1,old?'RETIFICADO':'CONSOLIDADO',obj.CONSOLIDADOR_MATRICULA,obj.CONSOLIDADOR_NOME,batt,comp,pkg);
+  audit_('RCO',reportId,version,old?'RETIFICADO':'CONSOLIDADO',obj.CONSOLIDADOR_MATRICULA,obj.CONSOLIDADOR_NOME,batt,comp,pkg);
   closeRcoDraft_(reportId);
   return {ok:true,message:old?'RCO retificado; origens e operações atualizadas.':'RCO consolidado; origens e operações registradas.',reportId:reportId};
 }
