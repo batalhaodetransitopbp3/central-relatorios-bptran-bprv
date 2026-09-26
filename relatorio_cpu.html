@@ -551,6 +551,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     const estatisticaP3=p3BuildStatistics(rco,ops,cirvcs,data,u);
     return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,estatisticaP3};
   }
+  window.centralP3BuildPackage=p3BuildPackage;
   function p3GetSavedToken(){try{return localStorage.getItem(P3_TOKEN_KEY)||''}catch(_){return ''}}
   function p3SetSavedToken(v){try{if(v)localStorage.setItem(P3_TOKEN_KEY,v);else localStorage.removeItem(P3_TOKEN_KEY)}catch(_){}}
   function p3EnsureModal(){
@@ -894,12 +895,13 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const p3Token=CentralCloud.getToken('p3')||CentralCloud.askToken('p3','Informe a Chave P3 para registrar a consolidação no banco estatístico:');
     if(!p3Token)return;
     const centralToken=CentralCloud.getToken('central')||CentralCloud.askToken('central','Informe a chave operacional da Central para atualizar o status dos RSDs:');
-    let rco;try{rco=window.collectState()}catch(_){return}
-    const reportId=rco?.state?.reportId||rco?.reportId||'';
+    let pkg,rco;try{pkg=typeof window.centralP3BuildPackage==='function'?window.centralP3BuildPackage():null;rco=pkg?.rco||window.collectState()}catch(_){return}
+    const reportId=rco?.state?.reportId||rco?.reportId||pkg?.estatisticaP3?.reportId||'';
     if(!reportId)return;
+    if(!pkg)pkg={rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]};
     busy=true;
     try{
-      await CentralCloud.postOrQueue('rco-upsert',{rco,unidade:typeof currentUnit==='function'?currentUnit():rco.unidade,operacoesCompletas:rco.operacoes||[]},{token:p3Token,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
+      await CentralCloud.postOrQueue('rco-upsert',pkg,{token:p3Token,unit:pkg.unidade||rco.unidade,popup:false});
       const ids=(rco.rcoOrigens||[]).map(x=>x.rsdReportId).filter(Boolean);
       if(ids.length&&centralToken)await CentralCloud.postOrQueue('rsd-mark-included',{rcoReportId:reportId,rsdReportIds:ids},{token:centralToken,unit:typeof currentUnit==='function'?currentUnit():rco.unidade,popup:false});
     }finally{busy=false}
