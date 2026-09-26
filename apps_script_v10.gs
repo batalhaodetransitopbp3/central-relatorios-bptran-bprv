@@ -94,10 +94,10 @@ function doGet(e) {
       assertToken_(p.token, 'p3');
       out = checklistList_(p);
     } else if (action === 'master-overview') {
-      assertToken_(p.token, 'master');
+      assertToken_(p.token, 'master-session');
       out = masterOverview_(p);
     } else if (action === 'master-cadastros') {
-      assertToken_(p.token, 'master');
+      assertToken_(p.token, 'master-session');
       out = cadastroSearch_(p);
     } else {
       throw new Error('Ação GET não reconhecida: ' + action);
@@ -201,32 +201,38 @@ function doPost(e) {
     } else if (action === 'rco-upsert') {
       assertToken_(token, 'p3');
       out = rcoSupplementalUpsert_(payload);
+    } else if (action === 'master-login') {
+      assertToken_(token, 'master-session');
+      out = masterLogin_();
+    } else if (action === 'master-logout') {
+      assertToken_(token, 'master-session');
+      out = masterLogout_(token);
     } else if (action === 'master-rsd-create') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRsdCreate_(payload);
     } else if (action === 'master-rsd-unlock') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRsdUnlock_(payload);
     } else if (action === 'master-rsd-cancel') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRsdCancel_(payload);
     } else if (action === 'master-rsd-reassign') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRsdReassign_(payload);
     } else if (action === 'master-rco-unlock') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRcoUnlock_(payload);
     } else if (action === 'master-rco-cancel') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRcoCancel_(payload);
     } else if (action === 'master-rco-reassign') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterRcoReassign_(payload);
     } else if (action === 'master-passagem-cancel') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterPassagemCancel_(payload);
     } else if (action === 'master-passagem-anular') {
-      assertToken_(token, 'master');
+      assertToken_(token, 'master-session');
       out = masterPassagemAnular_(payload);
     } else {
       throw new Error('Ação POST não reconhecida: ' + action);
@@ -249,6 +255,12 @@ function assertToken_(token, kind) {
   var coord = String(props.getProperty('COORD_TOKEN') || '');
   var master = String(props.getProperty('MASTER_ADMIN_TOKEN') || '');
   token = String(token || '');
+  if (kind === 'master-session') {
+    var cached=CacheService.getScriptCache().get('master-session:'+hash_(token));
+    if (!token || cached!=='OK') throw new Error('Sessão do Controle Geral expirada ou inválida.');
+    CacheService.getScriptCache().put('master-session:'+hash_(token),'OK',21600);
+    return true;
+  }
   if (kind === 'master') {
     if (!master) throw new Error('Controle Geral não configurado: defina MASTER_ADMIN_TOKEN nas Propriedades do script.');
     if (token !== master) throw new Error('Senha do Controle Geral inválida.');
@@ -1610,6 +1622,15 @@ function p3Query_(p) {
 /* =========================
    Controle Geral do Serviço — Administrador-mestre
    ========================= */
+function masterLogin_(){
+  var session=uid_('master')+'-'+Utilities.getUuid();
+  CacheService.getScriptCache().put('master-session:'+hash_(session),'OK',21600);
+  return {ok:true,message:'Acesso administrativo autorizado.',session:session,expiresInSeconds:21600};
+}
+function masterLogout_(session){
+  try{CacheService.getScriptCache().remove('master-session:'+hash_(session));}catch(_){}
+  return {ok:true,message:'Sessão administrativa encerrada.'};
+}
 function masterFilter_(x,p,dateFields){
   p=p||{};var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),data=dateText_(p.data||'');
   if(batt&&String(x.BATALHAO||'')!==batt)return false;
