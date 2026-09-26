@@ -509,7 +509,7 @@ function rsdStart_(payload) {
       comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero),data0=dateText_((r.servico||{}).data),
       mat0=normMat_(g0.matricula||r.matriculaResponsavel||''),gu0=String(g0.nome||'').trim().toUpperCase();
 
-  if(!old&&gu0&&data0&&!payload.overrideDuplicate){
+  if(!old&&gu0&&data0&&!payload.overrideDuplicate&&!r.passagemOrigemId&&!(r.servico&&r.servico.passagemOrigemId)){
     var candidates=objects_(s).filter(function(x){
       return ['CANCELADO','INDEFERIDO'].indexOf(String(x.STATUS))<0 &&
         String(x.GUARNICAO||'').trim().toUpperCase()===gu0 &&
@@ -788,7 +788,7 @@ function passagemAnular_(payload){
   var rs=sheet_(P3_SHEET_ID,'RSD'),dest=row.RSD_DESTINO_ID?findOne_(rs,'REPORT_ID',String(row.RSD_DESTINO_ID)):null;
   if(dest&&Number(dest.DRAFT_REVISION||0)>1)throw new Error('O novo segmento já possui movimentação. A correção deverá ser realizada pelo Coordenador/P3.');
   ensureHeaders_(s,['ANULADA_EM','ANULADA_MOTIVO']);row.STATUS='ANULADA';row.ANULADA_EM=nowIso_();row.ANULADA_MOTIVO=String(payload.motivo||'Recebimento realizado por engano');row.ATUALIZADO_EM=nowIso_();upsert_(s,'PASSAGEM_ID',id,row);
-  if(dest){dest.STATUS='CANCELADO';dest.CANCELADO_EM=nowIso_();dest.CANCELADO_MOTIVO='Segmento cancelado por anulação de recebimento de passagem.';upsert_(rs,'REPORT_ID',String(dest.REPORT_ID),dest);}
+  if(dest){ensureHeaders_(rs,['CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL']);dest.STATUS='CANCELADO';dest.CANCELADO_EM=nowIso_();dest.CANCELADO_MOTIVO='Segmento cancelado por anulação de recebimento de passagem.';dest.CANCELADO_POR_MATRICULA=normMat_(payload.autorMatricula||'');dest.CANCELADO_POR_NOME=String(payload.autorNome||'');dest.CANCELADO_POR_PERFIL=String(payload.perfil||'COORDENACAO');upsert_(rs,'REPORT_ID',String(dest.REPORT_ID),dest);}
   var src=row.RSD_ORIGEM_ID?findOne_(rs,'REPORT_ID',String(row.RSD_ORIGEM_ID)):null;if(src){src.STATUS='EM_SERVICO';src.FINALIZADO_EM='';src.SINCRONIZADO_EM=nowIso_();upsert_(rs,'REPORT_ID',String(src.REPORT_ID),src);}
   return {ok:true,message:'Recebimento anulado. O serviço retornou ao segmento anterior.',status:'ANULADA'};
 }
