@@ -73,10 +73,21 @@ body.signature-open{overflow:hidden}
 </head>
 <body>
 <main class="page">
-<div class="toolbar no-print">
-  <button class="ok" type="button" onclick="addVehicle()">+ Acrescentar veículo</button>
-  <button type="button" onclick="generatePdf()">Gerar PDF</button>
-  <a class="btn secondary" href="index.html">Voltar à Central</a>
+<div class="toolbar no-print" id="reboqueToolbar">
+  <button class="ok edit-action" type="button" onclick="saveCloudDraft()">Salvar rascunho na Central</button>
+  <button class="secondary edit-action" type="button" onclick="loadCloudDraft()">Carregar rascunho da Central</button>
+  <button class="edit-action" type="button" onclick="finalizeCloud()">Finalizar serviço</button>
+  <button class="secondary edit-action" type="button" onclick="addVehicle()">+ Acrescentar veículo</button>
+  <details class="edit-action no-print" style="position:relative">
+    <summary style="cursor:pointer;font-weight:800;padding:9px 11px;border:1px solid #d4c28f;border-radius:9px;background:#fff8e8;color:#71521a">⚠ Contingência</summary>
+    <div style="position:absolute;z-index:50;top:calc(100% + 5px);left:0;min-width:245px;padding:8px;background:#fff;border:1px solid #d8c38f;border-radius:10px;box-shadow:0 10px 28px #0002;display:grid;gap:6px">
+      <button class="secondary" type="button" onclick="saveLocalDraft()">Salvar neste aparelho</button>
+      <button class="secondary" type="button" onclick="loadLocalDraft()">Carregar deste aparelho</button>
+    </div>
+  </details>
+  <button type="button" data-viewer-keep="1" onclick="generatePdf()">Gerar PDF</button>
+  <a class="btn secondary" data-viewer-keep="1" href="index.html">Voltar à Central</a>
+  <span id="cloudStatus" style="font-size:11px;font-weight:800;color:#52697f"></span>
 </div>
 
 <header class="card doc-head">
@@ -157,8 +168,18 @@ body.signature-open{overflow:hidden}
 </div>
 </main>
 
+<script src="central_cloud.js?v=10.6.2-rc1"></script>
 <script>
 const STORE_KEY='pmpb-relatorio-traslados-reboque-v1';
+const REPORT_KEY='pmpb-relatorio-traslados-reboque-report-id-v1';
+const ACTIVE_CONTEXT_KEY='pmpb-active-service-v1';
+const CLOUD_VIEW_REPORT=new URLSearchParams(location.search).get('cloudView')||'';
+const VIEW_ONLY=!!CLOUD_VIEW_REPORT;
+window.CENTRAL_READONLY_VIEWER=VIEW_ONLY;
+let suspendSave=false,cloudFinalized=false;
+let reboqueReportId=localStorage.getItem(REPORT_KEY)||((window.CentralCloud&&CentralCloud.uid)?CentralCloud.uid('reboque'):('reboque-'+Date.now()));
+try{localStorage.setItem(REPORT_KEY,reboqueReportId)}catch(_){}
+
 const TYPES=['Automóvel','Motocicleta','Motoneta','Ciclomotor','Caminhonete','Camioneta','Utilitário','Caminhão','Caminhão-trator','Ônibus','Micro-ônibus','Reboque','Semirreboque','Trator de rodas','Quadriciclo','Outro'];
 const REASONS=['Transporte para DETRAN','Transporte para Delegacia','Sinistro de trânsito','Outro'];
 
@@ -178,11 +199,116 @@ function rowData(tr){
   const get=k=>tr.querySelector('[data-k="'+k+'"]')?.value||'';
   return {term:get('term'),brand:get('brand'),type:get('type'),model:get('model'),color:get('color'),plate:get('plate'),reason:get('reason'),otherReason:get('otherReason'),place:get('place'),nameMat:get('nameMat')};
 }
+function activeContext(){
+  try{
+    const current=JSON.parse(localStorage.getItem(ACTIVE_CONTEXT_KEY)||'{}')||{};
+    if(current.serviceId&&current.rsdReportId)return current;
+    const local=JSON.parse(localStorage.getItem(STORE_KEY)||'{}')||{};
+    return local.contextoServico||{};
+  }catch(_){return {}}
+}
 function collect(){
-  return {data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,responsavel:document.getElementById('responsavel').value,signature:signatureData||'',vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData)};
+  const ctx=activeContext();
+  return {schema:'pmpb-reboque-traslados-v2',reportId:reboqueReportId,status:cloudFinalized?'FINALIZADO':'EM_SERVICO',
+    data:document.getElementById('data').value,turno:document.getElementById('turno').value,prefixo:document.getElementById('prefixo').value,
+    responsavel:document.getElementById('responsavel').value,signature:signatureData||'',vehicles:[...document.querySelectorAll('#vehicleRows tr')].map(rowData),
+    contextoServico:ctx,serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',segmento:Number(ctx.segmento||1)||1,
+    guarnicao:ctx.guarnicao||'',unidade:ctx.unidade||{}};
 }
 function save(){
+  if(VIEW_ONLY||suspendSave)return;
   try{localStorage.setItem(STORE_KEY,JSON.stringify(collect()))}catch(_){}
+}
+function saveLocalDraft(){if(VIEW_ONLY)return;save();setCloudStatus('Rascunho salvo neste aparelho','warn');alert('Rascunho salvo neste aparelho. Use esta opção como contingência quando a nuvem estiver indisponível.')}
+function loadLocalDraft(){
+  if(VIEW_ONLY)return;let p=null;try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}
+  if(!p){alert('Nenhum rascunho local foi encontrado neste aparelho.');return}
+  applyCloudPayload(p,'aparelho');setCloudStatus('Rascunho local carregado','warn');
+}
+function setCloudStatus(t,kind=''){const e=document.getElementById('cloudStatus');if(!e)return;e.textContent=t||'';e.style.color=kind==='ok'?'#18745f':kind==='warn'?'#8a5a00':kind==='err'?'#9a2745':'#52697f'}
+function updateFinalizedUi(){
+  if(VIEW_ONLY)return;
+  const locked=!!cloudFinalized;
+  document.querySelectorAll('#data,#turno,#prefixo,#responsavel,#vehicleRows input,#vehicleRows select').forEach(e=>e.disabled=locked);
+  document.querySelectorAll('.edit-action,.table-actions,.signature-actions').forEach(e=>e.style.display=locked?'none':'');
+  const box=document.getElementById('signatureBox');if(box)box.style.pointerEvents=locked?'none':'';
+}
+function assertReboqueContext(){
+  const ctx=activeContext();
+  if(!ctx.rsdReportId||!ctx.serviceId)throw new Error('Abra primeiro o RSD da guarnição REBOQUE e registre/continue o serviço pela nuvem.');
+  if(ctx.guarnicao&&!/^REBOQUE\b/i.test(String(ctx.guarnicao)))throw new Error('O relatório de traslados deve ser vinculado a uma guarnição do tipo REBOQUE.');
+  return ctx;
+}
+async function saveCloudDraft(silent=false){
+  if(VIEW_ONLY)return false;
+  if(cloudFinalized){if(!silent)alert('Este relatório de traslados já foi finalizado. Use o PDF/consulta em modo somente leitura.');return false}
+  if(!window.CentralCloud){if(!silent)alert('Conexão com a Central indisponível. O rascunho permanece salvo neste aparelho.');save();return false}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){if(!silent)alert(e.message);return false}
+  const token=CentralCloud.getToken('central')||(!silent?CentralCloud.askToken('central'):'');if(!token){save();return false}
+  const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
+  save();
+  if(!navigator.onLine&&silent){setCloudStatus('Sem internet — rascunho preservado neste aparelho','warn');return true}
+  setCloudStatus(navigator.onLine?'Salvando na Central…':'Sem internet — envio ficará pendente','warn');
+  try{
+    const r=await CentralCloud.postOrQueue('reboque-draft-upsert',{reboque:p},{token,unit:ctx.unidade||{},popup:false});
+    if(r.reportId)reboqueReportId=r.reportId;localStorage.setItem(REPORT_KEY,reboqueReportId);cloudFinalized=false;save();
+    if(r.queued){setCloudStatus('Rascunho preservado — sincronização pendente','warn');if(!silent)alert('Sem conexão suficiente. O rascunho foi preservado neste aparelho e ficou pendente para sincronização.')}
+    else{setCloudStatus('Rascunho salvo na Central','ok');if(!silent)alert('Rascunho do reboque salvo na Central.')}
+    return true;
+  }catch(e){setCloudStatus('Rascunho preservado localmente — falha na sincronização','warn');if(!silent)alert('Não foi possível sincronizar agora: '+e.message+'\n\nO rascunho permanece salvo neste aparelho.');return false}
+}
+function applyCloudPayload(p,source='Central'){
+  suspendSave=true;
+  try{
+    reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';
+    document.getElementById('data').value=p.data||localDate();document.getElementById('turno').value=p.turno||'';
+    document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';
+    signatureData=p.signature||'';document.getElementById('vehicleRows').innerHTML='';(p.vehicles||[]).forEach(addVehicle);if(!(p.vehicles||[]).length)addVehicle();
+    document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(syncPrint);updateSignatureUi();renumber();
+    try{if(!VIEW_ONLY){localStorage.setItem(REPORT_KEY,reboqueReportId);localStorage.setItem(STORE_KEY,JSON.stringify(p))}}catch(_){}
+  }finally{suspendSave=false}
+  setCloudStatus(cloudFinalized?'Relatório finalizado':('Rascunho carregado '+(source==='Central'?'da Central':'do '+source)),cloudFinalized?'ok':(source==='Central'?'':'warn'));updateFinalizedUi();
+}
+async function loadCloudDraft(){
+  if(VIEW_ONLY)return;
+  if(!window.CentralCloud){alert('Conexão com a Central indisponível.');return}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){alert(e.message);return}
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  setCloudStatus('Consultando a Central…');
+  try{
+    const r=await CentralCloud.jsonp('reboque-list',{serviceId:ctx.serviceId,token});
+    const items=r.items||[];if(!items.length){setCloudStatus('Nenhum rascunho na Central','warn');alert('Não há relatório de traslado salvo para este serviço.');return}
+    const pick=items.find(x=>String(x.status).toUpperCase()==='EM_SERVICO')||items[0];
+    const g=await CentralCloud.jsonp('reboque-get',{reportId:pick.reportId,token});applyCloudPayload(g.reboque||{});
+    if(cloudFinalized)alert('Este relatório já foi finalizado. Ele foi carregado para consulta/PDF.');
+  }catch(e){setCloudStatus('Falha ao carregar','err');alert('Não foi possível carregar o rascunho: '+e.message)}
+}
+async function finalizeCloud(){
+  if(VIEW_ONLY)return;
+  if(!validate())return;if(!signatureData){alert('Registre a assinatura do militar responsável antes de finalizar o serviço.');return}
+  let ctx;try{ctx=assertReboqueContext()}catch(e){alert(e.message);return}
+  if(!confirm('Finalizar o relatório de traslados deste serviço?\n\nApós a finalização ele ficará disponível ao Coordenador para geração do PDF.'))return;
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  const p=collect();p.contextoServico=ctx;p.serviceId=ctx.serviceId;p.rsdReportId=ctx.rsdReportId;p.segmento=Number(ctx.segmento||1)||1;p.guarnicao=ctx.guarnicao||p.guarnicao;p.unidade=ctx.unidade||p.unidade;
+  setCloudStatus('Finalizando na Central…');
+  try{
+    const r=await CentralCloud.postOrQueue('reboque-finalize',{reboque:p},{token,unit:ctx.unidade||{},popup:false});
+    if(r.reportId)reboqueReportId=r.reportId;cloudFinalized=true;save();updateFinalizedUi();
+    if(r.queued){setCloudStatus('Finalização registrada — sincronização pendente','warn');alert('A finalização foi preservada neste aparelho e será sincronizada quando a conexão retornar. O Coordenador só verá o documento após essa sincronização.')}
+    else{setCloudStatus('Finalizado e disponível ao Coordenador','ok');alert('Relatório finalizado. O Coordenador já pode gerar o PDF diretamente pelo RCO.')}
+  }catch(e){save();setCloudStatus('Dados preservados localmente — finalização não sincronizada','warn');alert('Não foi possível sincronizar a finalização agora: '+e.message+'\n\nOs dados permanecem salvos neste aparelho.')}
+}
+async function loadCloudViewer(){
+  if(!VIEW_ONLY||!window.CentralCloud)return;
+  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  document.body.classList.add('cloud-viewer');setCloudStatus('Carregando documento…');
+  try{
+    const r=await CentralCloud.jsonp('reboque-get',{reportId:CLOUD_VIEW_REPORT,token});applyCloudPayload(r.reboque||{});
+    document.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=true);
+    document.querySelectorAll('button').forEach(b=>{if(!b.dataset.viewerKeep)b.disabled=true});
+    document.querySelectorAll('.action,.table-actions').forEach(e=>e.style.display='none');
+    setCloudStatus('Documento recuperado da Central — somente leitura','ok');
+  }catch(e){setCloudStatus('Não foi possível abrir o documento','err');alert(e.message)}
 }
 function renderReason(tr,reason='',other=''){
   const wrap=tr.querySelector('.reason-wrap');
@@ -280,12 +406,13 @@ document.getElementById('saveSignatureBtn').addEventListener('click',saveSignatu
 window.addEventListener('resize',()=>{if(signatureModal.classList.contains('open'))setTimeout(resizeSignatureCanvas,80)});
 
 function load(){
-  let p=null;try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}
-  const today=localDate();
-  if(p&&p.data===today){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';(p.vehicles||[]).forEach(addVehicle)}
-  else{document.getElementById('data').value=today;addVehicle()}
+  let p=null;if(!VIEW_ONLY){try{p=JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){}}
+  const today=localDate(),ctxNow=VIEW_ONLY?{}:activeContext(),expectedDate=ctxNow.data||today;
+  if(p&&p.data===expectedDate){document.getElementById('data').value=p.data||today;document.getElementById('turno').value=p.turno||'';document.getElementById('prefixo').value=p.prefixo||'';document.getElementById('responsavel').value=p.responsavel||'';signatureData=p.signature||'';reboqueReportId=p.reportId||reboqueReportId;cloudFinalized=String(p.status||'').toUpperCase()==='FINALIZADO';(p.vehicles||[]).forEach(addVehicle)}
+  else{document.getElementById('data').value=expectedDate;cloudFinalized=false;if(!VIEW_ONLY){reboqueReportId=(window.CentralCloud&&CentralCloud.uid)?CentralCloud.uid('reboque'):('reboque-'+Date.now());try{localStorage.setItem(REPORT_KEY,reboqueReportId)}catch(_){}}addVehicle()}
   document.querySelectorAll('#data,#turno,#prefixo,#responsavel').forEach(el=>{syncPrint(el);el.addEventListener('input',()=>{if(el.id==='prefixo')el.value=String(el.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,10);syncPrint(el);save()});el.addEventListener('change',()=>{syncPrint(el);save()})});
-  updateSignatureUi();
+  updateSignatureUi();updateFinalizedUi();
+  if(VIEW_ONLY)setTimeout(loadCloudViewer,250);
 }
 function validate(){
   if(!document.getElementById('data').value){alert('Informe a data do serviço.');return false}
@@ -305,6 +432,12 @@ function generatePdf(){
   setTimeout(()=>document.title=old,800);
 }
 load();
+if(!VIEW_ONLY){
+  let cloudTimer=null;
+  document.addEventListener('input',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},7000)},true);
+  document.addEventListener('change',()=>{clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},3000)},true);
+  window.addEventListener('online',()=>setTimeout(()=>{if(!cloudFinalized&&activeContext().serviceId)saveCloudDraft(true)},1200));
+}
 </script>
 <style>.hidden{display:none!important}</style>
 </body>

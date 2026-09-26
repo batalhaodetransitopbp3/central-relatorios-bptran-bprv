@@ -14,7 +14,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.1-rc1';
+var CENTRAL_V10_VERSION = '10.6.2-rc1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -56,6 +56,12 @@ function doGet(e) {
     } else if (action === 'rco-draft-get') {
       assertToken_(p.token, 'central');
       out = {ok:true, rco:rcoDraftGet_(p.reportId)};
+    } else if (action === 'reboque-list') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, items:reboqueList_(p)};
+    } else if (action === 'reboque-get') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, reboque:reboqueGet_(p.reportId)};
     } else if (action === 'cirvc-list') {
       assertToken_(p.token, 'central');
       out = {ok:true, items:cirvcList_(p)};
@@ -146,6 +152,12 @@ function doPost(e) {
       out = rsdCancel_(payload);
     } else if (action === 'rco-responsavel-validar') {
       out = rcoResponsavelValidar_(payload, token);
+    } else if (action === 'reboque-draft-upsert') {
+      assertToken_(token, 'central');
+      out = reboqueUpsert_(payload, false);
+    } else if (action === 'reboque-finalize') {
+      assertToken_(token, 'central');
+      out = reboqueUpsert_(payload, true);
     } else if (action === 'cirvc-register') {
       assertToken_(token, 'central');
       out = cirvcRegister_(payload);
@@ -1064,6 +1076,82 @@ function cirvcTransportFinalize_(payload) {
     it.STATUS_ITEM='ENTREGUE';it.ENTREGUE_EM=now;upsert_(sheet_(P3_SHEET_ID,'CIRVC_TRANSPORTE_ITENS'),'ITEM_ID',it.ITEM_ID,it);
   });
   return {ok:true,message:'Entrega final registrada. '+items.length+' veículo(s) baixado(s) do controle da PMPB.',transporteId:tid,quantidade:items.length};
+}
+
+
+/* =========================
+   Traslados do Reboque — rascunho diário em nuvem
+   ========================= */
+
+function reboqueSheet_(){
+  return sheetOrCreate_(P3_SHEET_ID,'REBOQUE_TRASLADOS',[
+    'REBOQUE_REPORT_ID','RSD_REPORT_ID','SERVICE_ID','SEGMENTO','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO',
+    'PREFIXO','RESPONSAVEL','STATUS','VEICULOS_QTD','REVISAO','CRIADO_EM','ULTIMO_SYNC_EM','FINALIZADO_EM',
+    'PAYLOAD_JSON','PAYLOAD_FILE_ID','PAYLOAD_FILE_URL','PAYLOAD_HASH','ORIGEM'
+  ]);
+}
+function reboqueList_(p){
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=String(p.companhia||''),data=dateText_(p.data||''),
+      sid=String(p.serviceId||''),rid=String(p.rsdReportId||''),status=String(p.status||'').toUpperCase();
+  return objects_(reboqueSheet_()).filter(function(x){
+    if(batt&&String(x.BATALHAO)!==batt)return false;
+    if(comp&&String(x.COMPANHIA)!==comp)return false;
+    if(data&&dateText_(x.DATA_SERVICO)!==data)return false;
+    if(sid&&String(x.SERVICE_ID)!==sid)return false;
+    if(rid&&String(x.RSD_REPORT_ID)!==rid)return false;
+    if(status&&String(x.STATUS||'').toUpperCase()!==status)return false;
+    return true;
+  }).map(function(x){
+    return {reportId:x.REBOQUE_REPORT_ID||'',rsdReportId:x.RSD_REPORT_ID||'',serviceId:x.SERVICE_ID||'',segmento:Number(x.SEGMENTO||0)||1,
+      data:dateText_(x.DATA_SERVICO),batalhao:x.BATALHAO||'',companhia:x.COMPANHIA||'',guarnicao:x.GUARNICAO||'',prefixo:x.PREFIXO||'',
+      responsavel:x.RESPONSAVEL||'',status:x.STATUS||'',veiculosQtd:Number(x.VEICULOS_QTD||0),revision:Number(x.REVISAO||0),
+      criadoEm:x.CRIADO_EM||'',ultimoSyncEm:x.ULTIMO_SYNC_EM||'',finalizadoEm:x.FINALIZADO_EM||''};
+  }).sort(function(a,b){return String(b.ultimoSyncEm||b.finalizadoEm||b.criadoEm||'').localeCompare(String(a.ultimoSyncEm||a.finalizadoEm||a.criadoEm||''));});
+}
+function reboqueGet_(reportId){
+  var row=findOne_(reboqueSheet_(),'REBOQUE_REPORT_ID',String(reportId||''));if(!row)throw new Error('Relatório de traslados não localizado.');
+  var p=loadJsonPayload_(row);if(!p||!Object.keys(p).length)throw new Error('Conteúdo do relatório de traslados indisponível.');
+  p.reportId=row.REBOQUE_REPORT_ID||p.reportId||'';p.status=row.STATUS||p.status||'';p.revision=Number(row.REVISAO||p.revision||0);
+  p.serviceId=row.SERVICE_ID||p.serviceId||'';p.rsdReportId=row.RSD_REPORT_ID||p.rsdReportId||'';p.segmento=Number(row.SEGMENTO||p.segmento||1);
+  p.centralMeta={ultimoSyncEm:row.ULTIMO_SYNC_EM||'',finalizadoEm:row.FINALIZADO_EM||'',batalhao:row.BATALHAO||'',companhia:row.COMPANHIA||'',guarnicao:row.GUARNICAO||''};
+  return p;
+}
+function reboqueUpsert_(payload,finalizar){
+  var r=payload.reboque||payload||{},ctx=r.contextoServico||{},reportId=String(r.reportId||payload.reportId||'');
+  if(!reportId)reportId=uid_('reboque');
+  var data=dateText_(r.data||ctx.data||''),prefixo=normVtrPrefix_(r.prefixo||(ctx.vtrs||[])[0]||''),responsavel=String(r.responsavel||ctx.comandante||'').trim();
+  if(!data)throw new Error('Informe a data do serviço.');
+  if(!prefixo)throw new Error('Informe o prefixo da VTR/Reboque.');
+  if(!responsavel)throw new Error('Informe o militar mais antigo responsável.');
+  var serviceId=String(r.serviceId||ctx.serviceId||''),rsdReportId=String(r.rsdReportId||ctx.rsdReportId||'');
+  if(!serviceId||!rsdReportId)throw new Error('Para salvar na Central, abra este módulo a partir de uma guarnição REBOQUE já registrada no RSD.');
+  var unidade=r.unidade||ctx.unidade||{},batt=normBattalion_(unidade.batalhao||unidade.batalhaoSigla||'BPTran'),
+      comp=unidade.companhia||normCompany_(batt,unidade.companhiaNumero),gu=String(r.guarnicao||ctx.guarnicao||'REBOQUE').trim();
+  var s=reboqueSheet_(),old=findOne_(s,'REBOQUE_REPORT_ID',reportId);
+  if(!old&&serviceId){
+    var sameService=objects_(s).filter(function(x){return String(x.SERVICE_ID||'')===serviceId;}).sort(function(a,b){return String(b.ULTIMO_SYNC_EM||b.CRIADO_EM||'').localeCompare(String(a.ULTIMO_SYNC_EM||a.CRIADO_EM||''));});
+    if(sameService.length){old=sameService[0];reportId=String(old.REBOQUE_REPORT_ID||reportId);}
+  }
+  if(old&&old.SERVICE_ID&&String(old.SERVICE_ID)!==serviceId)throw new Error('Este relatório de traslados pertence a outro serviço.');
+  if(old&&String(old.STATUS||'')==='FINALIZADO'){
+    if(!finalizar)throw new Error('Este relatório de traslados já foi finalizado.');
+    return {ok:true,message:'Relatório de traslados já finalizado.',reportId:reportId,status:'FINALIZADO',revision:Number(old.REVISAO||1),serviceId:serviceId,rsdReportId:old.RSD_REPORT_ID||rsdReportId,veiculosQtd:Number(old.VEICULOS_QTD||0)};
+  }
+  var vehicles=Array.isArray(r.vehicles)?r.vehicles:[],revision=old?Number(old.REVISAO||0)+1:1,now=nowIso_(),
+      status=finalizar?'FINALIZADO':'EM_SERVICO';
+  var normalized={};
+  Object.keys(r).forEach(function(k){normalized[k]=r[k];});
+  normalized.reportId=reportId;normalized.status=status;normalized.revision=revision;normalized.serviceId=serviceId;normalized.rsdReportId=rsdReportId;
+  normalized.segmento=Number(r.segmento||ctx.segmento||1)||1;normalized.contextoServico=ctx;normalized.prefixo=prefixo;
+  var json=JSON.stringify(normalized),saved=saveJsonPayload_(reportId,revision,json,'RSD_PAYLOAD_FOLDER_ID','Central Reboque - Payloads',old&&old.PAYLOAD_FILE_ID||'');
+  var obj={REBOQUE_REPORT_ID:reportId,RSD_REPORT_ID:rsdReportId,SERVICE_ID:serviceId,SEGMENTO:normalized.segmento,DATA_SERVICO:data,
+    BATALHAO:batt,COMPANHIA:comp,GUARNICAO:gu,PREFIXO:prefixo,RESPONSAVEL:responsavel,STATUS:status,VEICULOS_QTD:vehicles.length,
+    REVISAO:revision,CRIADO_EM:old&&old.CRIADO_EM||now,ULTIMO_SYNC_EM:now,FINALIZADO_EM:finalizar?now:(old&&old.FINALIZADO_EM||''),
+    PAYLOAD_JSON:saved.json,PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),ORIGEM:'REBOQUE_WEB'};
+  upsert_(s,'REBOQUE_REPORT_ID',reportId,obj);
+  audit_('REBOQUE_TRASLADOS',reportId,revision,finalizar?'FINALIZADO':'RASCUNHO_SINCRONIZADO','',responsavel,batt,comp,normalized);
+  return {ok:true,message:finalizar?'Relatório de traslados finalizado e disponível ao Coordenador.':'Rascunho do reboque salvo na Central.',
+    reportId:reportId,status:status,revision:revision,serviceId:serviceId,rsdReportId:rsdReportId,veiculosQtd:vehicles.length};
 }
 
 /* =========================
