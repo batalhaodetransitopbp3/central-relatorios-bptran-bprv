@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102f50">
+<title>Controle Geral do Serviço</title>
+<style>
+:root{--b:#17375e;--b2:#2f659d;--bg:#edf3f7;--line:#cbd8e2;--text:#19344d;--muted:#687d8e;--ok:#18714b;--warn:#9a6412;--danger:#a62d43}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Arial,Helvetica,sans-serif}.hidden{display:none!important}
+header{background:linear-gradient(135deg,#102f50,#346b9f);color:#fff;padding:18px}.head{max-width:1500px;margin:auto;display:flex;gap:12px;align-items:center;justify-content:space-between}.head h1{margin:0;font-size:24px}.head p{margin:5px 0 0;opacity:.9}.head-actions{display:flex;gap:7px;flex-wrap:wrap}
+button,.btn{border:0;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer;background:var(--b2);color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#eef3f7;color:var(--b);border:1px solid #c5d2dc}.danger{background:#fff0f2;color:var(--danger);border:1px solid #e5bac3}.warn{background:#fff6e6;color:#825810;border:1px solid #e5d2a2}.ok{background:#e9f6ef;color:#17623f;border:1px solid #b9dbc9}
+.wrap{max-width:1500px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:0 3px 12px #14324c0c}.filters{display:grid;grid-template-columns:1.1fr .9fr 1.4fr auto auto;gap:8px;align-items:end}label{display:block;font-size:10px;font-weight:900;color:#526a7c;text-transform:uppercase;margin-bottom:4px}input,select,textarea{width:100%;min-height:39px;border:1px solid #bdccd8;border-radius:8px;padding:8px;background:#fff;color:var(--text);font:inherit}textarea{min-height:78px;resize:vertical}
+.stats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;font-size:10px;font-weight:900;text-transform:uppercase;color:#62778a}.stat b{display:block;font-size:25px;color:var(--b);margin-top:4px}.stat small{display:block;font-size:9px;color:var(--muted);margin-top:4px;line-height:1.25}
+.tabs{display:flex;gap:7px;flex-wrap:wrap}.tabs button.active{background:var(--b);color:#fff}.note{color:var(--muted);font-size:11px;line-height:1.4}.section-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}.section-head h2{margin:0;font-size:18px}.table-wrap{overflow:auto;border:1px solid #d5dfe7;border-radius:9px}table{border-collapse:collapse;width:100%;min-width:1050px;font-size:11px}th,td{border-bottom:1px solid #e1e7ec;padding:7px;text-align:left;vertical-align:top}th{background:#eff4f7;color:#4e6578;text-transform:uppercase;font-size:9px;position:sticky;top:0;z-index:1}tr:last-child td{border-bottom:0}.actions{display:flex;gap:4px;flex-wrap:wrap}.actions button{padding:5px 7px;font-size:9px}.pill{display:inline-flex;padding:3px 7px;border-radius:999px;background:#eef3f7;font-size:9px;font-weight:900}.pill.ok{background:#e8f5ed;color:#17623f;border:0}.pill.warn{background:#fff5de;color:#825810;border:0}.pill.danger{background:#fdecef;color:#9d2840;border:0}.lock{font-size:9px;color:var(--muted)}.empty{padding:28px;text-align:center;color:var(--muted)}
+.login-shell{min-height:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(145deg,#102f50,#eaf1f6 68%)}.login-card{width:min(460px,100%);background:#fff;border-radius:18px;padding:22px;box-shadow:0 18px 50px #0003}.login-card h1{margin:0 0 7px;color:var(--b)}.login-card p{color:var(--muted);line-height:1.45}.login-card button{width:100%;margin-top:9px;min-height:44px}.login-msg{margin-top:8px;font-size:11px;color:var(--danger)}
+.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.form-grid .wide{grid-column:span 2}.new-panel{background:#f8fbfd;border:1px solid #d5e0e8;border-radius:10px;padding:10px;margin-top:9px}.new-panel h3{margin:0 0 8px}.toolbar{display:flex;gap:7px;flex-wrap:wrap}.progress{display:none;margin-top:8px;font-size:10px;color:var(--muted)}.progress.show{display:block}.progress:before{content:"";display:inline-block;width:11px;height:11px;border:2px solid #b8c9d6;border-top-color:var(--b2);border-radius:50%;margin-right:7px;vertical-align:-2px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.audit-row strong{display:block}.audit-row small{color:var(--muted)}
+@media(max-width:950px){.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:auto}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.head{align-items:flex-start}.head-actions{justify-content:flex-end}}
+@media(max-width:600px){header{padding:12px}.head{display:block}.head-actions{margin-top:9px;justify-content:flex-start}.wrap{padding:7px}.filters,.form-grid{grid-template-columns:1fr}.filters button,.form-grid .wide{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.tabs{display:grid;grid-template-columns:1fr 1fr}.tabs button{width:100%}.section-head{align-items:flex-start;flex-direction:column}.card{padding:9px}}
+</style>
+</head>
+<body>
+<section id="loginShell" class="login-shell">
+ <div class="login-card">
+  <h1>Controle Geral do Serviço</h1>
+  <p>Área administrativa restrita. A senha-mestre é usada apenas para abrir uma sessão temporária e não fica salva neste dispositivo.</p>
+  <label>Senha do administrador-mestre</label>
+  <input id="masterPassword" type="password" autocomplete="current-password" placeholder="Digite sua senha exclusiva">
+  <button id="loginBtn">Entrar</button>
+  <div id="loginMsg" class="login-msg"></div>
+ </div>
+</section>
+
+<div id="app" class="hidden">
+<header><div class="head"><div><h1>Controle Geral do Serviço</h1><p>Visão administrativa de RSDs, RCOs, passagens, responsáveis e intervenções.</p></div><div class="head-actions"><button class="secondary" id="refreshBtn">Atualizar</button><button class="secondary" id="newBtn">Novo RSD em nome da guarnição</button><button class="danger" id="logoutBtn">Sair</button></div></div></header>
+<main class="wrap">
+ <section class="card">
+  <div class="filters">
+   <div><label>Data do serviço</label><input type="date" id="data"></div>
+   <div><label>Batalhão</label><select id="batalhao"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+   <div><label>Companhia</label><select id="companhia"><option value="">Todas</option></select></div>
+   <button id="consultBtn">Consultar</button>
+   <button class="secondary" id="todayBtn">Hoje</button>
+  </div>
+  <div id="progress" class="progress">Consultando o estado atual do serviço...</div>
+  <div class="note" style="margin-top:8px">Esta página não altera a interface das guarnições ou dos coordenadores. Toda intervenção administrativa fica registrada para auditoria.</div>
+  <div id="newPanel" class="new-panel hidden">
+   <h3>Criar RSD administrativamente</h3>
+   <div class="note">Use somente quando uma guarnição não conseguir iniciar o serviço. O registro será criado na nuvem e ficará livre para ela continuar normalmente em outro aparelho.</div>
+   <div class="form-grid" style="margin-top:9px">
+    <div><label>Data</label><input id="nData" type="date"></div>
+    <div><label>Batalhão</label><select id="nBatt"><option>BPTran</option><option>BPRv</option></select></div>
+    <div><label>Companhia</label><select id="nComp"></select></div>
+    <div><label>Tipo de guarnição</label><select id="nTipo"><option>BST</option><option>BASE</option><option>GTTRAN</option><option>TOR</option><option>REBOQUE</option></select></div>
+    <div><label>VTR principal</label><input id="nVtr" placeholder="Ex.: 9296"></div>
+    <div><label>Matrícula</label><div style="display:flex;gap:5px"><input id="nMat" placeholder="000.000-0"><button type="button" class="secondary" id="lookupBtn">Buscar</button></div></div>
+    <div><label>Posto/graduação</label><input id="nPosto" placeholder="Ex.: 2º TEN"></div>
+    <div><label>Responsável</label><input id="nNome" placeholder="Nome do comandante"></div>
+    <div><label>Turno</label><input id="nTurno" placeholder="Ex.: 07:00 às 19:00"></div>
+    <div class="wide"><label>Motivo da intervenção administrativa</label><input id="nMotivo" placeholder="Ex.: militar sem acesso ao aparelho no início do serviço"></div>
+   </div>
+   <div class="toolbar" style="margin-top:9px"><button id="createBtn">Criar RSD</button><button class="secondary" id="cancelNewBtn">Cancelar</button></div>
+  </div>
+ </section>
+
+ <section id="stats" class="stats"></section>
+
+ <section class="card"><div class="tabs">
+  <button class="active" data-tab="rsd">RSDs</button><button data-tab="rco">RCOs</button><button data-tab="passagens">Passagens</button><button data-tab="auditoria">Auditoria</button>
+ </div></section>
+
+ <section class="card tab-pane" id="pane-rsd"><div class="section-head"><div><h2>Relatórios de Serviço Diário</h2><div class="note">Mostra quem está em serviço, quem finalizou, cancelamentos, último sincronismo e eventuais travas de edição.</div></div></div><div id="rsdArea"></div></section>
+ <section class="card tab-pane hidden" id="pane-rco"><div class="section-head"><div><h2>Relatórios do Coordenador</h2><div class="note">Mostra o responsável atual, situação do RCO e se algum aparelho ainda mantém trava temporária de edição.</div></div></div><div id="rcoArea"></div></section>
+ <section class="card tab-pane hidden" id="pane-passagens"><div class="section-head"><div><h2>Passagens de serviço</h2><div class="note">Permite acompanhar quem entregou e quem recebeu o serviço. Passagens pendentes podem ser canceladas; recebimentos podem ser anulados administrativamente quando necessário.</div></div></div><div id="passArea"></div></section>
+ <section class="card tab-pane hidden" id="pane-auditoria"><div class="section-head"><div><h2>Trilha de auditoria</h2><div class="note">Registro cronológico das principais ações, correções e cancelamentos relacionados ao período consultado.</div></div></div><div id="auditArea"></div></section>
+</main>
+</div>
+<script src="central_cloud.js?v=10.6.6-rc1"></script>
+<script>
+(function(){
+ const $=id=>document.getElementById(id),SESSION_KEY='pmpb-master-session-v1',CIAS={
+  BPTran:['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran'],
+  BPRv:['1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv']
+ };
+ let session=sessionStorage.getItem(SESSION_KEY)||'',dataSet=null,activeTab='rsd';
+ const today=()=>new Date().toISOString().slice(0,10),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ function dt(v){if(!v)return '—';try{return new Date(v).toLocaleString('pt-BR')}catch(_){return String(v)}}
+ function d(v){if(!v)return '—';const a=String(v).slice(0,10).split('-');return a.length===3?a.reverse().join('/'):String(v)}
+ function formatMat(v){const x=String(v||'').replace(/\D/g,'').slice(0,7);return x.length===7?x.slice(0,3)+'.'+x.slice(3,6)+'-'+x.slice(6):v}
+ function statusLabel(s){return String(s||'—').replace(/_/g,' ')}
+ function pill(s){const x=String(s||''),k=/CANCEL|INDEFER/i.test(x)?'danger':/EM_SERVICO|EM_ANDAMENTO|RECEBIDA|DEFERIDO|FINALIZADO/i.test(x)?'ok':'warn';return '<span class="pill '+k+'">'+esc(statusLabel(x))+'</span>'}
+ function companyOptions(sel,batt,allText){const b=batt||'';let a=b?CIAS[b]:[...CIAS.BPTran,...CIAS.BPRv];sel.innerHTML=(allText?'<option value="">'+allText+'</option>':'')+a.map(x=>'<option>'+x+'</option>').join('')}
+ function showLogin(msg=''){$('loginShell').classList.remove('hidden');$('app').classList.add('hidden');$('loginMsg').textContent=msg}
+ function showApp(){$('loginShell').classList.add('hidden');$('app').classList.remove('hidden')}
+ function busy(v,msg){$('progress').classList.toggle('show',!!v);if(msg)$('progress').textContent=msg}
+ async function login(){
+   const password=$('masterPassword').value;if(!password)return $('loginMsg').textContent='Digite a senha.';
+   $('loginMsg').textContent='';$('loginBtn').disabled=true;
+   try{
+     const r=await CentralCloud.submitForm('master-login',{},password,{popup:false,timeout:30000,tokenKind:'master'});
+     session=r.session||'';if(!session)throw new Error('Sessão não recebida.');
+     sessionStorage.setItem(SESSION_KEY,session);$('masterPassword').value='';showApp();await load();
+   }catch(e){showLogin(e.message||'Acesso negado.')}finally{$('loginBtn').disabled=false}
+ }
+ async function logout(){
+   try{if(session)await CentralCloud.submitForm('master-logout',{},session,{popup:false,timeout:12000,tokenKind:'master'})}catch(_){}
+   session='';sessionStorage.removeItem(SESSION_KEY);dataSet=null;showLogin('Sessão encerrada.');
+ }
+ async function get(action,params={}){try{return await CentralCloud.jsonp(action,{...params,token:session},{timeout:30000})}catch(e){if(/sessão do controle geral/i.test(e.message||'')){sessionStorage.removeItem(SESSION_KEY);session='';showLogin('Sua sessão expirou. Digite a senha novamente.')}throw e}}
+ async function post(action,payload){try{return await CentralCloud.submitForm(action,payload,session,{popup:false,timeout:30000,tokenKind:'master'})}catch(e){if(/sessão do controle geral/i.test(e.message||'')){sessionStorage.removeItem(SESSION_KEY);session='';showLogin('Sua sessão expirou. Digite a senha novamente.')}throw e}}
+ function params(){return {data:$('data').value,batalhao:$('batalhao').value,companhia:$('companhia').value}}
+ async function load(){
+   if(!session)return showLogin();
+   busy(true,'Consultando o estado atual do serviço...');
+   try{const r=await get('master-overview',params());dataSet=r;render();showApp()}catch(e){if(session)alert('Não foi possível carregar o Controle Geral: '+e.message)}finally{busy(false)}
+ }
+ function render(){
+   const r=dataSet||{},s=r.resumo||{};
+   $('stats').innerHTML=[
+    ['Guarnições em serviço',s.guarnicoesEmServico||0,'RSDs ainda ativos ou em passagem'],
+    ['Aguardando análise',s.rsdAguardandoAnalise||0,'RSDs finalizados e enviados ao coordenador'],
+    ['RSDs cancelados',s.rsdCancelados||0,'Registros preservados apenas para auditoria'],
+    ['RSDs com trava',s.rsdComTrava||0,'Em edição temporária em algum aparelho'],
+    ['RCOs em andamento',s.rcoEmAndamento||0,'Consolidações ainda não finalizadas'],
+    ['RCOs com trava',s.rcoComTrava||0,'RCO em edição temporária'],
+    ['Passagens pendentes',s.passagensPendentes||0,'Aguardando recebimento pelo próximo responsável']
+   ].map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b><small>'+esc(x[2])+'</small></div>').join('');
+   renderRsd(r.rsds||[]);renderRco(r.rcos||[]);renderPass(r.passagens||[]);renderAudit(r.auditoria||[]);
+ }
+ function lockText(l){if(!l||!l.active)return '<span class="lock">Sem trava ativa</span>';return '<span class="pill warn">Em edição</span><div class="lock">até '+esc(dt(l.until))+'</div>'}
+ function renderRsd(items){
+   if(!items.length)return $('rsdArea').innerHTML='<div class="empty">Nenhum RSD encontrado com os filtros escolhidos.</div>';
+   $('rsdArea').innerHTML='<div class="table-wrap"><table><thead><tr><th>Guarnição / VTR</th><th>Responsável</th><th>Situação</th><th>Entrada / última atividade</th><th>RCO</th><th>Trava</th><th>Ações administrativas</th></tr></thead><tbody>'+items.map(x=>'<tr><td><strong>'+esc(x.guarnicao||'—')+'</strong><br>'+esc(x.vtrPrincipal||'VTR não informada')+'<br><small>'+esc(x.companhia)+' • segmento '+esc(x.segmento)+'</small></td><td>'+esc([x.postoGrad,x.responsavel].filter(Boolean).join(' ')||'—')+'<br><small>'+esc(x.matricula||'—')+'</small></td><td>'+pill(x.status)+(x.canceladoMotivo?'<br><small>Motivo: '+esc(x.canceladoMotivo)+'</small>':'')+'</td><td>Início: '+esc(dt(x.iniciadoEm))+'<br><small>Última atividade: '+esc(dt(x.ultimoSync))+'</small></td><td>'+esc(x.rcoReportId||'Não incluído')+'</td><td>'+lockText(x.lease)+'</td><td><div class="actions">'+((x.lease&&x.lease.active)?'<button class="warn" data-action="rsd-unlock" data-id="'+esc(x.reportId)+'">Destravar</button>':'')+(!/CANCELADO|INCLUIDO_RCO/.test(x.status)?'<button class="secondary" data-action="rsd-reassign" data-id="'+esc(x.reportId)+'">Corrigir responsável</button>':'')+(!/CANCELADO/.test(x.status)?'<button class="danger" data-action="rsd-cancel" data-id="'+esc(x.reportId)+'">Cancelar</button>':'')+'</div></td></tr>').join('')+'</tbody></table></div>';
+ }
+ function renderRco(items){
+   if(!items.length)return $('rcoArea').innerHTML='<div class="empty">Nenhum RCO encontrado com os filtros escolhidos.</div>';
+   $('rcoArea').innerHTML='<div class="table-wrap"><table><thead><tr><th>Unidade / data</th><th>Responsável atual</th><th>Situação</th><th>Último sincronismo</th><th>Trava</th><th>Ações administrativas</th></tr></thead><tbody>'+items.map(x=>'<tr><td><strong>'+esc(x.companhia)+'</strong><br>'+esc(d(x.data))+'<br><small>'+esc(x.reportId)+'</small></td><td>'+esc(x.responsavel||'Não definido')+'<br><small>'+esc(x.matricula||'—')+'</small></td><td>'+pill(x.status)+'</td><td>'+esc(dt(x.ultimoSync))+'</td><td>'+lockText(x.lease)+'</td><td><div class="actions">'+((x.lease&&x.lease.active)?'<button class="warn" data-action="rco-unlock" data-id="'+esc(x.reportId)+'">Destravar</button>':'')+(/EM_ANDAMENTO|EM_RETIFICACAO/.test(x.status)?'<button class="secondary" data-action="rco-reassign" data-id="'+esc(x.reportId)+'">Corrigir responsável</button><button class="danger" data-action="rco-cancel" data-id="'+esc(x.reportId)+'">Cancelar RCO</button>':'')+'</div></td></tr>').join('')+'</tbody></table></div>';
+ }
+ function renderPass(items){
+   if(!items.length)return $('passArea').innerHTML='<div class="empty">Nenhuma passagem encontrada com os filtros escolhidos.</div>';
+   $('passArea').innerHTML='<div class="table-wrap"><table><thead><tr><th>Guarnição</th><th>Entregue por</th><th>Disponibilizada</th><th>Recebida por</th><th>Situação</th><th>Ação</th></tr></thead><tbody>'+items.map(x=>'<tr><td><strong>'+esc(x.guarnicao||'—')+'</strong><br><small>'+esc(x.companhia)+'</small></td><td>'+esc(x.entreguePor||'—')+'<br><small>'+esc(x.entregueMatricula||'—')+'</small></td><td>'+esc(dt(x.disponibilizadaEm))+'</td><td>'+esc(x.recebidaPor||'—')+'<br><small>'+esc(x.recebidaMatricula||'—')+(x.recebidaEm?' • '+esc(dt(x.recebidaEm)):'')+'</small></td><td>'+pill(x.status)+'</td><td><div class="actions">'+(x.status==='AGUARDANDO_RECEBIMENTO'?'<button class="danger" data-action="pass-cancel" data-id="'+esc(x.passagemId)+'">Cancelar passagem</button>':x.status==='RECEBIDA'?'<button class="warn" data-action="pass-anular" data-id="'+esc(x.passagemId)+'">Anular recebimento</button>':'')+'</div></td></tr>').join('')+'</tbody></table></div>';
+ }
+ function renderAudit(items){
+   if(!items.length)return $('auditArea').innerHTML='<div class="empty">Nenhum evento de auditoria encontrado para o recorte escolhido.</div>';
+   $('auditArea').innerHTML='<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Ação</th><th>Registro</th><th>Responsável</th><th>Unidade</th></tr></thead><tbody>'+items.map(x=>'<tr class="audit-row"><td>'+esc(dt(x.dataHora))+'</td><td><strong>'+esc(statusLabel(x.acao))+'</strong></td><td>'+esc(x.tipo)+'<br><small>'+esc(x.entidadeId)+'</small></td><td>'+esc(x.responsavel||'Sistema')+'<br><small>'+esc(x.matricula||'—')+'</small></td><td>'+esc([x.batalhao,x.companhia].filter(Boolean).join(' • ')||'—')+'</td></tr>').join('')+'</tbody></table></div>';
+ }
+ function askReason(title){const x=prompt(title+'\n\nInforme o motivo para registrar na auditoria:','');return x===null?null:String(x).trim()}
+ function findRsd(id){return (dataSet?.rsds||[]).find(x=>x.reportId===id)||{}}
+ function findRco(id){return (dataSet?.rcos||[]).find(x=>x.reportId===id)||{}}
+ async function handleAction(action,id){
+   try{
+    if(action==='rsd-unlock'){const motivo=askReason('Destravar este RSD?');if(!motivo)return;await post('master-rsd-unlock',{reportId:id,motivo})}
+    else if(action==='rsd-cancel'){const motivo=askReason('Cancelar este RSD? O registro será preservado para auditoria.');if(!motivo)return;if(!confirm('Confirma o cancelamento administrativo deste RSD?'))return;await post('master-rsd-cancel',{reportId:id,motivo})}
+    else if(action==='rsd-reassign'){const x=findRsd(id),motivo=askReason('Corrigir o responsável deste RSD?');if(!motivo)return;const matricula=formatMat(prompt('Matrícula do responsável correto:',x.matricula||'')||'');if(!matricula)return;const nome=prompt('Nome do responsável correto:',x.responsavel||'')||'';if(!nome)return;const posto=prompt('Posto/graduação:',x.postoGrad||'')||'';await post('master-rsd-reassign',{reportId:id,motivo,matricula,nome,postoGrad:posto})}
+    else if(action==='rco-unlock'){const motivo=askReason('Destravar este RCO?');if(!motivo)return;await post('master-rco-unlock',{reportId:id,motivo})}
+    else if(action==='rco-cancel'){const motivo=askReason('Cancelar este RCO em andamento?');if(!motivo)return;if(!confirm('Confirma o cancelamento administrativo do RCO?'))return;await post('master-rco-cancel',{reportId:id,motivo})}
+    else if(action==='rco-reassign'){const x=findRco(id),motivo=askReason('Corrigir o responsável deste RCO?');if(!motivo)return;const matricula=formatMat(prompt('Matrícula correta:',x.matricula||'')||'');if(!matricula)return;const nome=prompt('Nome correto:',x.responsavel||'')||'';if(!nome)return;const posto=prompt('Posto/graduação:','')||'';await post('master-rco-reassign',{reportId:id,motivo,matricula,nome,postoGrad:posto})}
+    else if(action==='pass-cancel'){const motivo=askReason('Cancelar esta passagem pendente?');if(!motivo)return;await post('master-passagem-cancel',{passagemId:id,motivo})}
+    else if(action==='pass-anular'){const motivo=askReason('Anular o recebimento desta passagem?');if(!motivo)return;if(!confirm('Isso reverte administrativamente a passagem recebida. Confirma?'))return;await post('master-passagem-anular',{passagemId:id,motivo})}
+    await load();
+   }catch(e){alert('Ação não concluída: '+e.message)}
+ }
+ async function lookup(){
+   const q=$('nMat').value.trim();if(!q)return alert('Informe a matrícula.');
+   try{const r=await get('master-cadastros',{tipo:'militar',q,batalhao:$('nBatt').value,companhia:$('nComp').value}),m=(r.items||[])[0];if(!m)return alert('Militar não localizado no Cadastro Mestre.');$('nMat').value=formatMat(m.MATRICULA||'');$('nNome').value=m.NOME||'';$('nPosto').value=m.POSTO_GRAD||''}catch(e){alert(e.message)}
+ }
+ async function createRsd(){
+   const payload={data:$('nData').value,batalhao:$('nBatt').value,companhia:$('nComp').value,tipo:$('nTipo').value,vtr:$('nVtr').value,matricula:formatMat($('nMat').value),postoGrad:$('nPosto').value,nome:$('nNome').value,turno:$('nTurno').value,motivo:$('nMotivo').value};
+   if(!payload.data||!payload.vtr||!payload.matricula||!payload.nome||!payload.motivo)return alert('Preencha data, VTR, matrícula, responsável e motivo.');
+   if(!confirm('Criar este RSD em nome da guarnição?'))return;
+   try{busy(true,'Criando o RSD na Central...');const r=await post('master-rsd-create',payload);alert(r.message||'RSD criado.');$('newPanel').classList.add('hidden');await load()}catch(e){alert('Não foi possível criar o RSD: '+e.message)}finally{busy(false)}
+ }
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b)handleAction(b.dataset.action,b.dataset.id)});
+ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{activeTab=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tab-pane').forEach(x=>x.classList.toggle('hidden',x.id!=='pane-'+activeTab))});
+ $('loginBtn').onclick=login;$('masterPassword').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logoutBtn').onclick=logout;$('refreshBtn').onclick=load;$('consultBtn').onclick=load;$('todayBtn').onclick=()=>{$('data').value=today();load()};
+ $('batalhao').onchange=()=>companyOptions($('companhia'),$('batalhao').value,true);$('newBtn').onclick=()=>{$('newPanel').classList.toggle('hidden');$('nData').value=$('data').value||today();$('nBatt').value=$('batalhao').value||'BPTran';companyOptions($('nComp'),$('nBatt').value,false);if($('companhia').value)$('nComp').value=$('companhia').value};$('cancelNewBtn').onclick=()=>$('newPanel').classList.add('hidden');$('nBatt').onchange=()=>companyOptions($('nComp'),$('nBatt').value,false);$('lookupBtn').onclick=lookup;$('createBtn').onclick=createRsd;
+ $('data').value=today();$('nData').value=today();companyOptions($('companhia'),'',true);companyOptions($('nComp'),'BPTran',false);
+ if(session){showApp();load()}else showLogin();
+})();
+</script>
+</body></html>
