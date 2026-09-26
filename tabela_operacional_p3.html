@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17375e">
+<title>Tabela Operacional — Gestão P3</title>
+<style>
+:root{--b:#17375e;--b2:#315f93;--bg:#edf3f7;--line:#c9d6e0;--text:#19334b;--muted:#667b8d;--ok:#176b3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,Helvetica,sans-serif;color:var(--text)}
+.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:16px}.head h1{margin:0;font-size:22px}.head p{margin:4px 0 0;opacity:.9}
+.wrap{max-width:1600px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:0 3px 10px #1231}
+.filters{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr 1.2fr auto;gap:8px;align-items:end}label{display:block;font-size:10px;font-weight:900;color:#52697d;text-transform:uppercase;margin-bottom:4px}
+input,select{width:100%;min-height:38px;border:1px solid #bdccd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
+button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;background:var(--b2);color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#edf2f6;color:var(--b);border:1px solid #c4d1db}.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.status{font-size:11px;color:var(--muted);margin-top:7px}.company-block{margin:12px 0 20px;break-inside:avoid}.company-title{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#dceafa;border:1px solid #9fb4c6;padding:7px 9px;font-weight:900;color:var(--b);text-transform:uppercase}
+.table-wrap{overflow:auto;border:1px solid #9fb0bf;border-top:0}.matrix{border-collapse:collapse;width:100%;min-width:880px;font-size:11px}.matrix th,.matrix td{border:1px solid #9aaab7;padding:4px 5px;text-align:center;vertical-align:middle}.matrix th{background:#e8eff5;color:#17375e;font-size:9.5px;text-transform:uppercase;position:sticky;top:0;z-index:2}.matrix td.group{text-align:left;font-weight:900;background:#edf4fb;color:#17375e;width:210px}.matrix td.ind{text-align:left;font-weight:700;width:270px}.matrix td.total{font-weight:900;background:#f0f6f2}.matrix tr.total-ait td{font-weight:900;background:#fff5d8}.empty{padding:28px;text-align:center;color:var(--muted)}.legend{font-size:11px;color:var(--muted)}
+@media(max-width:850px){.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.toolbar>*{flex:1 1 42%}.wrap{padding:7px}.card{padding:8px}}
+@page{size:A4 landscape;margin:7mm}@media print{body{background:#fff}.head{background:#fff!important;color:#000;padding:0 0 6px}.head p,.filters,.toolbar,.status,.legend{display:none!important}.wrap{max-width:none;padding:0}.card{border:0;box-shadow:none;padding:0}.company-block{margin:0 0 8px}.company-title{background:#dceafa!important;padding:4px;font-size:10px}.table-wrap{overflow:visible}.matrix{min-width:0;font-size:7.5px;table-layout:fixed}.matrix th,.matrix td{padding:1.5px 2px}.matrix th{font-size:7px;position:static}.matrix td.group{width:18%}.matrix td.ind{width:22%}}
+</style>
+</head>
+<body>
+<header class="head"><h1>Tabela Operacional — Gestão P3</h1><p>Conferência da produtividade no mesmo agrupamento utilizado pelo RCO.</p></header>
+<main class="wrap">
+<section class="card">
+ <div class="filters">
+  <div><label>Data inicial</label><input id="di" type="date"></div>
+  <div><label>Data final</label><input id="df" type="date"></div>
+  <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+  <div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div>
+  <div><label>Guarnição</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div>
+  <button id="apply">Atualizar tabela</button>
+ </div>
+ <div class="toolbar"><a class="btn secondary" href="gestao_p3.html">Gestão P3</a><a class="btn secondary" href="index.html">Central</a><button class="secondary" onclick="window.print()">Imprimir / Gerar PDF</button></div>
+ <div class="status" id="status"></div>
+</section>
+<section class="card"><div class="legend">Os registros são exibidos por companhia. As colunas representam as guarnições e a coluna TOTAL reproduz a lógica de consolidação do RCO.</div><div id="tables"></div></section>
+</main>
+<script src="central_cloud.js?v=10.6.0-rc1"></script>
+<script>
+(function(){
+ const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
+ const ORDER=[
+  ['apreensoes-veiculos-recolhimentos','APREENSÕES DE VEÍCULOS (RECOLHIMENTOS)',[['motocicletas','MOTOCICLETAS'],['ciclomotores','CICLOMOTORES'],['automoveis','AUTOMÓVEIS'],['outros','OUTROS']]],
+  ['remocoes-sinistros','REMOÇÕES DECORRENTES DE SINISTROS DE TRÂNSITO',[['motocicletas','MOTOCICLETAS'],['ciclomotores','CICLOMOTORES'],['automoveis','AUTOMÓVEIS'],['outros','OUTROS']]],
+  ['sinistros-sem-embriaguez','SINISTROS (SEM EMBRIAGUEZ)',[['c-vitimas','C/ VÍTIMAS (TODOS)'],['s-vitimas-s-cnh','S/ VÍTIMAS (S/ CNH)'],['s-vitimas-menores','S/ VÍTIMAS (MENORES)'],['s-vitimas-vtr-pmpb','S/ VÍTIMAS (VTR PMPB)'],['atropelamentos','ATROPELAMENTOS'],['outros','OUTROS']]],
+  ['sinistros-embriaguez','SINISTROS POR EMBRIAGUEZ',[['c-vitimas','C/ VÍTIMAS'],['s-vitimas','S/ VÍTIMAS'],['atropelamentos','ATROPELAMENTOS'],['outros','OUTROS']]],
+  ['acionamentos','ACIONAMENTOS',[['bsts','BST’s'],['reboque-outras-unidades','REBOQUE para outras unidades'],['vtr-bst-apoio','VTRs de BST em apoio a outras unidades (ou órgãos)']]],
+  ['notificacoes','NOTIFICAÇÕES',[['art-165','ART. 165'],['art-165-a','ART. 165-A'],['art-230-xi','ART. 230 XI'],['demais-aits-com-abordagem','DEMAIS AITs COM ABORDAGEM'],['aits-sem-abordagem','AITs SEM ABORDAGEM'],['total-aits','TOTAL DE AITs LAVRADOS']]],
+  ['sem-grupo','',[['cnhs-recolhidas','CNH’s RECOLHIDAS'],['testes-etilometro','QUANTIDADE DE TESTE DE ETILÔMETRO REALIZADOS']]],
+  ['apreensoes','APREENSÕES',[['armas','ARMAS'],['drogas','DROGAS'],['menores','MENORES'],['siva-r','SIVA-R'],['sinais','SINAIS']]],
+  ['prisoes','PRISÕES',[['embriaguez','EMBRIAGUEZ NO TRÂNSITO'],['sinistro','SINISTRO DE TRÂNSITO'],['armas','PORTE/POSSE ARMAS'],['drogas','PORTE/POSSE DROGAS'],['mandado','MANDADO DE PRISÃO'],['siva-r','SIVA-R'],['sinais','SINAIS'],['tco-sasp','TCO - SASP'],['outros','OUTROS']]],
+  ['abordagens','ABORDAGENS',[['pessoas','PESSOAS'],['motocicletas','MOTOCICLETAS'],['ciclomotores','CICLOMOTORES'],['automoveis','AUTOMÓVEIS'],['outros','OUTROS'],['checkpoints','CHECK POINTS / BLITZ']]]
+ ];
+ $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
+ const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
+ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+ function actor(){try{return JSON.parse(sessionStorage.getItem('pmpb-p3-actor-v1')||'null')}catch(_){return null}}
+ function token(){
+   const a=actor(),t=CentralCloud.getToken('p3')||'';
+   if(!a?.matricula||!t){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return ''}
+   return t
+ }
+ function key(g,i){return String(g||'')+'||'+String(i||'')}
+ function norm(s){return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
+ function findOrderRow(x){
+   const gc=String(x.GRUPO_CODIGO||''),ic=String(x.INDICADOR_CODIGO||'');
+   for(let gi=0;gi<ORDER.length;gi++){const g=ORDER[gi];if(gc===g[0]){const ii=g[2].findIndex(z=>z[0]===ic);if(ii>=0)return [gi,ii]}}
+   return [999,999]
+ }
+ function renderCompany(company,items){
+   const guards=[...new Set(items.map(x=>String(x.GUARNICAO||'Não informada')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+   const values=new Map();
+   items.forEach(x=>{const k=key(x.GRUPO_CODIGO,x.INDICADOR_CODIGO),gu=String(x.GUARNICAO||'Não informada');if(!values.has(k))values.set(k,{});const o=values.get(k);o[gu]=(o[gu]||0)+(Number(x.QUANTIDADE)||0)});
+   const known=[];
+   ORDER.forEach(([gc,gn,inds])=>inds.forEach(([ic,inn])=>known.push({gc,gn,ic,inn})));
+   const extras=[];
+   items.forEach(x=>{const k=key(x.GRUPO_CODIGO,x.INDICADOR_CODIGO);if(!known.some(r=>key(r.gc,r.ic)===k)&&!extras.some(r=>key(r.gc,r.ic)===k))extras.push({gc:x.GRUPO_CODIGO||'',gn:x.GRUPO_NOME||'',ic:x.INDICADOR_CODIGO||'',inn:x.INDICADOR_NOME||x.INDICADOR_CODIGO||'Indicador'})});
+   extras.sort((a,b)=>(a.gn+' '+a.inn).localeCompare(b.gn+' '+b.inn,'pt-BR'));
+   const rows=[...known,...extras];
+   let lastGroup=null;
+   const body=rows.map(r=>{
+     const vals=values.get(key(r.gc,r.ic))||{},total=guards.reduce((a,g)=>a+(Number(vals[g])||0),0),showGroup=r.gn!==lastGroup;lastGroup=r.gn;
+     const ait=r.ic==='total-aits';
+     return '<tr class="'+(ait?'total-ait':'')+'"><td class="group">'+(showGroup?esc(r.gn||'—'):'')+'</td><td class="ind">'+esc(r.inn)+'</td>'+guards.map(g=>'<td>'+Number(vals[g]||0)+'</td>').join('')+'<td class="total">'+total+'</td></tr>'
+   }).join('');
+   return '<div class="company-block"><div class="company-title"><span>'+esc(company||'Companhia não informada')+'</span><span>'+guards.length+' guarnição(ões)</span></div><div class="table-wrap"><table class="matrix"><thead><tr><th>Grupo</th><th>Indicador</th>'+guards.map(g=>'<th>'+esc(g)+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+body+'</tbody></table></div></div>';
+ }
+ async function load(){
+   const tk=token();if(!tk)return;const params={token:tk,view:'produtividade',dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,guarnicao:$('guarnicao').value};
+   $('status').textContent='Carregando produtividade...';
+   try{
+     const r=await CentralCloud.jsonp('p3-query',params),items=r.items||[],groups=new Map(),a=actor();
+     items.forEach(x=>{const c=String(x.COMPANHIA||'Não informada');if(!groups.has(c))groups.set(c,[]);groups.get(c).push(x)});
+     $('tables').innerHTML=groups.size?[...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR')).map(([c,a])=>renderCompany(c,a)).join(''):'<div class="empty">Nenhum registro de produtividade para os filtros selecionados.</div>';
+     $('status').textContent=[items.length+' registro(s) de produtividade • '+groups.size+' companhia(s)',a?.matricula?'Sessão: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
+   }catch(e){if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tables').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.'}
+ }
+ $('apply').onclick=load;
+ $('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach(o=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false});};
+ if(actor()?.matricula&&CentralCloud.getToken('p3'))setTimeout(load,350);else location.replace('gestao_p3.html?return=tabela_operacional_p3.html');
+})();
+</script>
+</body></html>

@@ -1,98 +1,212 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gestão P3 — BPTran/BPRv</title><style>
-:root{--b:#17375e;--b2:#2e6696;--bg:#edf3f7;--line:#c9d6e0;--ok:#176b3a;--warn:#8a5b00}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial;color:#19334b}.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:16px}.head h1{margin:0;font-size:22px}.wrap{max-width:1400px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px;box-shadow:0 2px 8px #1231}.filters{display:grid;grid-template-columns:1fr 1fr 1.1fr 1.2fr 1fr 1.2fr auto;gap:8px;align-items:end}label{display:block;font-size:10px;font-weight:800;color:#536b7d;margin-bottom:4px}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff}button,.btn{border:0;border-radius:8px;background:var(--b2);color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#e7eef4;color:#17375e;border:1px solid #c2d0db}.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button.active{background:var(--b)}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat b{display:block;font-size:25px;color:var(--b)}.tablewrap{overflow:auto;max-height:65vh}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.ok{background:#e7f4ea;color:#176b3a}.warn{background:#fff3d5;color:#7d5600}.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.empty{text-align:center;padding:25px;color:#6b7f90}.note{font-size:11px;color:#64798b}.oploc{font-weight:800}.coords{font-family:monospace;font-size:11px}.view.hidden{display:none}.chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}.delta{font-weight:800}.delta.pos{color:#176b3a}.delta.neg{color:#9a2b3e}
-.hidden{display:none!important}.kpi-hidden{display:none!important}.custom-grid{display:flex;gap:8px;flex-wrap:wrap}.custom-opt{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:#f7fafc;font-size:12px}.custom-opt input{width:auto;min-height:0}.matrix-title{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0}.matrix-title h3{margin:0;color:var(--b)}
-@media(max-width:800px){.filters{grid-template-columns:1fr 1fr}.filters>div:nth-child(3),.filters>div:nth-child(4){grid-column:span 1}.filters button{grid-column:1/-1}.stats{grid-template-columns:1fr 1fr}.tabs button{flex:1 1 45%}}
-</style></head><body>
-<header class="head"><h1>Gestão P3 — Controle e Produtividade Operacional</h1><div>BPTran / BPRv • conferência, operações, estatística e auditoria</div></header>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17375e">
+<title>Gestão P3 — BPTran/BPRv</title>
+<style>
+:root{--b:#17375e;--b2:#315f93;--bg:#edf3f7;--line:#c9d6e0;--text:#19334b;--muted:#64798b;--ok:#176b3a;--warn:#8a5b00;--danger:#9a2b3e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,Helvetica,sans-serif;color:var(--text)}.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:17px}.head h1{margin:0;font-size:23px}.head p{margin:4px 0 0;opacity:.9}.wrap{max-width:1500px;margin:auto;padding:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px;box-shadow:0 3px 10px #1231}
+.main-menu{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.main-menu button,.main-menu a{min-height:66px;display:flex;flex-direction:column;gap:4px;justify-content:center;text-align:center;text-decoration:none}.main-menu small{font-size:9px;font-weight:600;opacity:.8}.main-menu .active{background:var(--b)}
+button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.secondary{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.danger{background:var(--danger)}
+.filters{display:grid;grid-template-columns:1fr 1fr 1fr 1.25fr 1fr 1.3fr auto;gap:8px;align-items:end}label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}input,select{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff;color:var(--text)}
+.toolbar,.subnav{display:flex;gap:7px;flex-wrap:wrap}.toolbar{margin-top:9px}.subnav{margin-bottom:11px}.subnav button{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.subnav button.active{background:var(--b);color:#fff}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase}.stat b{display:block;font-size:24px;color:var(--b);margin-top:2px}
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:9px}.section-head h2{margin:0;color:var(--b);font-size:19px}.note{font-size:11px;color:var(--muted)}.tablewrap{overflow:auto;max-height:66vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1000px}.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;z-index:1;font-size:10px;color:#516a7f;text-transform:uppercase}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}.empty{text-align:center;padding:28px;color:#6b7f90}.hidden{display:none!important}
+.chart{display:grid;gap:7px;margin:12px 0}.barrow{display:grid;grid-template-columns:minmax(110px,220px) 1fr 80px;gap:8px;align-items:center}.bartrack{height:20px;background:#edf2f6;border-radius:6px;overflow:hidden}.barfill{height:100%;background:linear-gradient(90deg,var(--b2),var(--b));border-radius:6px}.analysisctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.analysisctl>div{min-width:220px;flex:1}
+.powerbi-box{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:16px;border:1px solid #c9d6e0;border-radius:12px;background:#f8fbfd}.admin-session{display:grid;grid-template-columns:.8fr 1fr 1.2fr auto 1.8fr auto;gap:8px;align-items:end}.admin-session-state{min-height:38px;display:flex;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#f7fafc;color:var(--muted);font-size:11px}.admin-session-state.ok{background:#eaf6ee;color:#176b3a;border-color:#b9dac4}.admin-session-state strong{color:inherit}.admin-session button{min-height:38px}
+.powerbi-state{font-weight:900;color:var(--b)}.powerbi-url{font-family:monospace;font-size:10px;word-break:break-all;color:var(--muted);margin-top:5px}.powerbi-frame-wrap{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f5f8fa;min-height:120px}.powerbi-frame{display:block;width:100%;height:min(72vh,760px);border:0;background:#fff}.powerbi-frame-note{padding:10px;font-size:11px;color:var(--muted)}.history-source{font-size:9px;text-transform:uppercase;font-weight:900}.rco-status{font-weight:900}.rco-retificado{color:#8a5b00}.quick-links{display:flex;gap:7px;flex-wrap:wrap}
+@media(max-width:950px){.admin-session{grid-template-columns:1fr 1fr}.admin-session-state{grid-column:1/-1}.main-menu{grid-template-columns:1fr 1fr}.main-menu>*:last-child{grid-column:1/-1}.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:560px){.main-menu{grid-template-columns:1fr}.main-menu>*:last-child{grid-column:auto}.stats{grid-template-columns:1fr 1fr}.toolbar>*{flex:1 1 40%}.subnav button{flex:1 1 42%}}
+</style>
+</head>
+<body>
+<header class="head"><h1>Gestão P3</h1><p>BPTran / BPRv • conferência, produtividade, histórico e controle de consolidações</p></header>
 <main class="wrap">
-<section class="card"><div class="filters">
-<div><label>Data inicial</label><input id="di" type="date"></div><div><label>Data final</label><input id="df" type="date"></div>
-<div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
-<div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div><div><label>Turno</label><select id="turno"><option value="">Todos</option><option>Manhã</option><option>Tarde</option><option>Noite</option><option>Madrugada</option><option>24h</option></select></div><div><label>Guarnição</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button></div>
-<div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a><button class="secondary" id="customBtn">Personalizar indicadores</button><button class="secondary" id="biBtn">Power BI</button></div></section>
-<section class="card"><div class="tabs"><button data-view="controle-diario" class="active">Controle diário</button><button data-view="produtividade">Produtividade</button><button data-view="analise">Análise estatística</button><button data-view="operacoes">Operações</button><button data-view="prisoes">Prisões/Conduções</button><button data-view="cirvc">CIRVC</button><button data-view="auditoria">Auditoria</button></div></section>
-<div id="stats" class="stats"></div>
-<section id="customPanel" class="card hidden"><div class="matrix-title"><h3>Indicadores visíveis</h3><button type="button" class="secondary" id="customClose">Fechar</button></div><div id="customOptions" class="custom-grid"></div><div class="note">A preferência fica salva apenas neste navegador e pode ser alterada a qualquer momento.</div></section>
-<section class="card view" id="mainView"><div id="title"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
+<section class="card" id="p3AdminSessionCard">
+ <div class="section-head"><div><h2>Sessão administrativa</h2><div class="note">Identifique o P3 ou Oficial responsável. A matrícula é validada no Cadastro Mestre e a credencial P3 é exigida para acessar a Gestão.</div></div></div>
+ <div class="admin-session">
+  <div><label>Perfil</label><select id="p3ActorPerfil"><option value="P3">P3</option><option value="OFICIAL">Oficial responsável</option></select></div>
+  <div><label>Matrícula</label><input id="p3ActorMatricula" inputmode="numeric" maxlength="9" placeholder="000.000-0"></div>
+  <div><label>Senha P3/Oficial</label><input id="p3ActorSenha" type="password" autocomplete="off" placeholder="Credencial administrativa"></div>
+  <button id="p3ActorLogin" type="button">Identificar responsável</button>
+  <div id="p3ActorState" class="admin-session-state">Sessão não identificada.</div>
+  <button id="p3ActorLogout" type="button" class="secondary" hidden>Encerrar sessão</button>
+ </div>
+</section>
+<section class="card">
+ <nav class="main-menu">
+  <button class="active" data-main="painel"><strong>Painel Geral</strong><small>Resumo e análises</small></button>
+  <a class="btn" href="tabela_operacional_p3.html"><strong>Tabela Operacional</strong><small>Formato do RCO</small></a>
+  <button data-main="historico"><strong>Histórico</strong><small>Dados importados/legados</small></button>
+  <button data-main="rco"><strong>Controle de RCOs</strong><small>Recebidos e retificados</small></button>
+  <button data-main="powerbi"><strong>Power BI</strong><small>Painel institucional</small></button>
+ </nav>
+ <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a></div>
+</section>
+
+<section class="card" id="filterCard">
+ <div class="filters">
+  <div><label>Data inicial</label><input id="di" type="date"></div><div><label>Data final</label><input id="df" type="date"></div>
+  <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+  <div><label>Companhia</label><select id="cia"><option value="">Todas</option></select></div>
+  <div><label>Turno</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"></div>
+  <div><label>Guarnição</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Aplicar filtros</button>
+ </div>
+</section>
+
+<section id="painelView">
+ <div class="subnav card">
+  <button class="active" data-sub="controle-diario">Resumo</button><button data-sub="operacoes">Operações</button><button data-sub="prisoes">Prisões/Conduções</button><button data-sub="veiculos-operacionais">Veículos</button><button data-sub="cirvc">CIRVC</button><button data-sub="auditoria">Auditoria</button><button data-sub="analise">Análise estatística</button>
+ </div>
+ <div id="stats" class="stats"></div>
+ <section class="card"><div class="section-head"><div><h2 id="title">Painel Geral</h2><div class="note" id="subtitle"></div></div></div><div id="analysisControls"></div><div id="chart" class="chart"></div><div class="tablewrap"><table class="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div></section>
+</section>
+
+<section id="historicoView" class="hidden">
+ <div id="historyStats" class="stats"></div>
+ <section class="card"><div class="section-head"><div><h2>Histórico</h2><div class="note">Registros cuja origem foi identificada como importação, legado, migração ou histórico. Não são confundidos com a produção digital corrente.</div></div></div><div class="tablewrap"><table class="tbl"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table></div></section>
+</section>
+
+<section id="rcoView" class="hidden">
+ <div id="rcoStats" class="stats"></div>
+ <section class="card"><div class="section-head"><div><h2>Controle de RCOs</h2><div class="note">Consolidações recebidas pelo P3, responsáveis e eventual retificação do mesmo REPORT_ID.</div></div></div><div class="tablewrap"><table class="tbl"><thead id="rcoHead"></thead><tbody id="rcoBody"></tbody></table></div></section>
+</section>
+
+<section id="powerbiView" class="hidden">
+ <section class="card"><div class="section-head"><div><h2>Power BI</h2><div class="note">Vínculo para o painel institucional Microsoft Power BI.</div></div></div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Consultando configuração...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir painel</button><button class="secondary" id="biConfigure">Configurar / alterar URL</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel Power BI"></iframe><div class="powerbi-frame-note">Se o Microsoft Power BI impedir a incorporação nesta página, utilize “Abrir painel”.</div></div></section>
+</section>
 </main>
-<script src="central_cloud.js?v=10.5.1-20260925i"></script><script>
+<script src="central_cloud.js?v=10.6.0-rc1"></script>
+<script>
 (function(){
- const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];let view='controle-diario',last=null,analysisIndicator='';
+ const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
+ let main='painel',sub='controle-diario',analysisIndicator='',biUrl='',p3Actor=null;
+ const P3_ACTOR_KEY='pmpb-p3-actor-v1';
+ function readActor(){try{return JSON.parse(sessionStorage.getItem(P3_ACTOR_KEY)||'null')}catch(_){return null}}
+ function saveActor(a){p3Actor=a||null;try{if(a)sessionStorage.setItem(P3_ACTOR_KEY,JSON.stringify(a));else sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}renderActor()}
+ function renderActor(){
+   const st=$('p3ActorState'),login=$('p3ActorLogin'),logout=$('p3ActorLogout'),perfil=$('p3ActorPerfil'),mat=$('p3ActorMatricula'),senha=$('p3ActorSenha');
+   if(p3Actor?.matricula){
+     st.classList.add('ok');st.innerHTML='<strong>'+esc([p3Actor.postoGrad,p3Actor.nome].filter(Boolean).join(' '))+'</strong>&nbsp;—&nbsp;'+esc(p3Actor.matricula)+'&nbsp;•&nbsp;'+esc(p3Actor.perfil);
+     perfil.value=p3Actor.perfil||'P3';mat.value=p3Actor.matricula||'';perfil.disabled=true;mat.disabled=true;senha.value='';senha.disabled=true;login.hidden=true;logout.hidden=false;
+   }else{
+     st.classList.remove('ok');st.textContent='Sessão não identificada.';perfil.disabled=false;mat.disabled=false;senha.disabled=false;login.hidden=false;logout.hidden=true;
+   }
+ }
+ async function registerActor(){
+   if(!await CentralCloud.probe()){alert('Não foi possível conectar ao backend v10.');return}
+   const perfil=$('p3ActorPerfil').value,mat=CentralCloud.formatMatricula($('p3ActorMatricula').value),senha=String($('p3ActorSenha').value||'').trim();$('p3ActorMatricula').value=mat;
+   if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return}
+   if(!senha){alert('Informe a senha administrativa P3/Oficial.');return}
+   try{
+     const r=await CentralCloud.submitForm('rco-responsavel-validar',{perfil,matricula:mat},senha,{popup:false,tokenKind:'p3'}),m=r.militar||{};
+     CentralCloud.setToken(senha,'p3');saveActor({perfil,matricula:m.matricula||mat,nome:m.nome||'',postoGrad:m.postoGrad||'',batalhao:m.batalhao||'',companhia:m.companhia||''});
+     $('p3ActorSenha').value='';
+     const ret=new URLSearchParams(location.search).get('return');
+     if(ret==='tabela_operacional_p3.html'){location.replace(ret);return}
+     await load();
+   }catch(e){CentralCloud.clearToken('p3');saveActor(null);alert('Não foi possível identificar o responsável: '+e.message)}
+ }
  $('cia').innerHTML='<option value="">Todas</option>'+cias.map(x=>'<option>'+x+'</option>').join('');
  const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
- function t(){return CentralCloud.askToken('p3')}
- async function ensure(){if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');const x=t();if(!x)throw new Error('Informe a Chave P3.');return x}
- function params(token){return {token,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,turno:$('turno').value,guarnicao:$('guarnicao').value}}
- async function load(){try{const token=await ensure();if(view==='analise'){await loadAnalysis(token);return}const r=await CentralCloud.jsonp('p3-query',params(token));last=r;render(r)}catch(e){$('tbody').innerHTML='<tr><td class="empty">'+esc(e.message)+'</td></tr>'}}
- async function loadAnalysis(token){
-   const base={token,batalhao:$('bat').value,companhia:$('cia').value,turno:$('turno').value,guarnicao:$('guarnicao').value,dataInicio:$('di').value,dataFim:$('df').value,indicador:analysisIndicator};
-   let r=await CentralCloud.jsonp('p3-analysis',base);if(!analysisIndicator&&r.indicadores?.length){analysisIndicator=r.indicadores[0];r=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator})}
-   const a=new Date($('di').value+'T12:00:00'),b=new Date($('df').value+'T12:00:00'),days=Math.max(1,Math.round((b-a)/86400000)+1),prevEnd=new Date(a.getTime()-86400000),prevStart=new Date(prevEnd.getTime()-(days-1)*86400000);
-   const iso=d=>d.toISOString().slice(0,10),pr=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:iso(prevStart),dataFim:iso(prevEnd)});
-   renderAnalysis(r,pr,iso(prevStart),iso(prevEnd));
+ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+ function token(){return CentralCloud.getToken('p3')||''}
+ async function ensure(){
+   if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');
+   if(!p3Actor?.matricula)throw new Error('Identifique primeiro o P3/Oficial responsável na Sessão administrativa.');
+   const t=token();if(!t)throw new Error('A credencial administrativa expirou. Encerre a sessão e identifique novamente o responsável.');
+   return t
  }
- function columnsFor(v){
-  if(v==='produtividade')return [['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['GRUPO_NOME','Grupo'],['INDICADOR_NOME','Indicador'],['QUANTIDADE','Qtd.'],['ORIGEM_RELATORIO','Origem']];
-  if(v==='operacoes')return [['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','Cumprimento POD'],['LOCAL_PREVISTO','Local previsto'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas reais'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motos'],['ART_165','165'],['ART_165_A','165-A'],['AITS_SEM_ABORDAGEM','AIT s/abord.'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']];
-  if(v==='prisoes')return [['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']];
-  if(v==='cirvc')return [['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']];
-  if(v==='auditoria')return [['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']];
-  return [];
- }
- function render(r){
-  if(view==='controle-diario') return renderControl(r);
-  const items=r.items||[];
-  if(view==='produtividade') return renderProductivity(items);
-  const cols=columnsFor(view);$('title').innerHTML='<h2>'+({operacoes:'Operações individualizadas',prisoes:'Prisões e conduções por tipificação',cirvc:'CIRVC — custódia',auditoria:'Auditoria e versões'}[view]||view)+'</h2>';
-  $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr>';
-  $('tbody').innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros.</td></tr>';
-  if(view==='operacoes')renderOpStats(items);else if(view==='prisoes')renderPrisonStats(items);else $('stats').innerHTML='';
- }
- function renderAnalysis(r,prev,pdi,pdf){
-  $('title').innerHTML='<h2>Análise estatística</h2><div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+(r.indicadores||[]).map(x=>'<option '+(x===analysisIndicator?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><div class="note">Comparação automática com período anterior equivalente: '+esc(pdi)+' a '+esc(pdf)+'</div></div><div id="analysisChart" class="chart"></div>';
-  $('thead').innerHTML='';$('tbody').innerHTML='';
-  const cur=Number(r.total||0),old=Number(prev.total||0),pct=old?((cur-old)/old*100):null;
-  $('stats').innerHTML=cards([['Total atual',cur],['Período anterior',old],['Variação',pct===null?'—':((pct>=0?'+':'')+pct.toFixed(1)+'%')],['Companhias',(r.porCompanhia||[]).length],['Dias com registro',(r.porData||[]).length]]);
-  const max=Math.max(1,...(r.porCompanhia||[]).map(x=>Number(x.valor||0)));
-  $('analysisChart').innerHTML=(r.porCompanhia||[]).length?(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">Sem dados para este indicador/período.</div>';
-  document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
+ function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhia:$('cia').value,turno:$('turno').value,guarnicao:$('guarnicao').value}}
+ function cards(items){return items.map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
+ function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
+ function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
+ function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
+ async function load(){try{const t=await ensure();if(main==='painel')return loadPanel(t);if(main==='historico')return loadHistory(t);if(main==='rco')return loadRco(t);if(main==='powerbi')return loadBi(t)}catch(e){if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}showError(e.message)}}
+ function showError(msg){const target=main==='historico'?$('historyBody'):main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
+ async function loadPanel(t){
+   $('chart').innerHTML='';$('analysisControls').innerHTML='';
+   if(sub==='analise')return loadAnalysis(t);
+   const r=await CentralCloud.jsonp('p3-query',p(t,sub));
+   if(sub==='controle-diario')return renderControl(r);
+   const items=r.items||[];renderList(sub,items);
  }
  function renderControl(r){
-  const rsd=r.rsd||[],rco=r.rco||[];$('title').innerHTML='<h2>Controle diário</h2><div class="note">RSDs finalizados ficam disponíveis ao RCO sem troca de arquivos.</div>';
-  const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','RCO']];
-  $('thead').innerHTML='<tr>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr>';
-  $('tbody').innerHTML=rsd.length?rsd.map(x=>'<tr>'+cols.map(c=>'<td>'+formatCell(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="8" class="empty">Nenhum RSD localizado.</td></tr>';
-  const fin=rsd.filter(x=>x.STATUS==='FINALIZADO').length,inc=rsd.filter(x=>x.STATUS==='INCLUIDO_RCO').length,ret=rsd.filter(x=>Number(x.VERSAO||1)>1).length;
-  $('stats').innerHTML=cards([['RSDs',rsd.length],['Finalizados',fin],['Incluídos no RCO',inc],['Retificados',ret],['RCOs',rco.length]]);
+   const rsd=r.rsd||[],rco=r.rco||[],pending=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'];
+   $('title').textContent='Painel Geral';$('subtitle').textContent='Situação dos RSDs e RCOs no período selecionado.';
+   $('stats').innerHTML=cards([['RSDs',rsd.length],['Em serviço',rsd.filter(x=>x.STATUS==='EM_SERVICO'||x.STATUS==='PASSAGEM_DISPONIVEL').length],['Aguardando análise',rsd.filter(x=>x.STATUS==='AGUARDANDO_ANALISE').length],['Deferidos',rsd.filter(x=>/DEFERIDO/.test(x.STATUS||'')).length],['Pendências',rsd.filter(x=>pending.includes(x.STATUS)).length],['RCOs',rco.length]]);
+   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['STATUS','Status'],['RESPONSAVEL_NOME','Responsável'],['VERSAO','Versão'],['RCO_REPORT_ID','RCO']];
+   table(cols,rsd,$('thead'),$('tbody'));
  }
- function renderOpStats(items){
-  const types=new Set(items.map(x=>x.OPERACAO).filter(Boolean)),actual=items.filter(x=>x.LOCAL||x.LATITUDE).length,zero=items.filter(x=>/zero.?álcool/i.test(x.OPERACAO||'')).length,rand=items.filter(x=>/randandan/i.test(x.OPERACAO||'')).length;
-  $('stats').innerHTML=cards([['Operações executadas',items.length],['Tipos',types.size],['Com local executado',actual],['Zero Álcool',zero],['Randandan',rand]]);
+ function renderList(v,items){
+   const defs={
+    operacoes:{title:'Operações individualizadas',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO_RESPONSAVEL','Guarnição'],['OPERACAO','Operação'],['TURNO','Turno'],['POD_STATUS','POD'],['LOCAL_EXECUTADO','Local executado'],['COORDENADAS_EXECUTADAS','Coordenadas'],['PESSOAS_ABORDADAS','Pessoas'],['MOTOCICLETAS_ABORDADAS','Motocicletas'],['AUTOMOVEIS_ABORDADOS','Automóveis'],['CICLOMOTORES_ABORDADOS','Ciclomotores'],['ART_165','165'],['ART_165_A','165-A'],['ART_230_XI','230 XI'],['OUTROS_AITS_COM_ABORDAGEM','Outros AITs c/ abordagem'],['AITS_SEM_ABORDAGEM','AITs s/ abordagem'],['PRISOES','Prisões'],['STATUS_REGISTRO','Status']]},
+    prisoes:{title:'Prisões e conduções por tipificação',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['SITUACAO','Situação'],['TIPIFICACAO_PRINCIPAL','Tipificação principal'],['TIPIFICACOES_RELACIONADAS','Relacionadas'],['QUANTIDADE','Qtd.'],['OCORRENCIA_ID','Ocorrência'],['ORIGEM_RELATORIO','Origem']]},
+    'veiculos-operacionais':{title:'Veículos operacionais detalhados',cols:[['DATA','Data'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA_UF','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['SITUACAO','Situação'],['TIPO_RECUPERACAO_DETALHADA','Classificação detalhada'],['CONTA_COMO_RECUPERADO','Recuperado'],['PLACA_ORIGINAL_IDENTIFICADA','Placa original identificada'],['PLACA_ORIGINAL_UF','Placa original'],['RESTRICAO_ORIGINAL','Restrição'],['LOCAL','Local'],['QUANTIDADE_CONDUZIDOS','Conduzidos'],['VALOR_FIPE','FIPE']]},
+    cirvc:{title:'CIRVC — custódia',cols:[['DATA_CADASTRO','Cadastro'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['PLACA','Placa'],['TIPO','Tipo'],['MARCA_MODELO','Marca/modelo'],['LOCAL_CUSTODIA','Custódia'],['STATUS_CUSTODIA','Status'],['DESTINO_FINAL','Destino'],['BAIXADO_EM','Baixado em']]},
+    auditoria:{title:'Auditoria e versões',cols:[['DATA_HORA','Data/hora'],['TIPO_ENTIDADE','Entidade'],['ENTIDADE_ID','ID'],['VERSAO','Versão'],['ACAO','Ação'],['RESPONSAVEL_MATRICULA','Matrícula'],['RESPONSAVEL_NOME','Responsável'],['COMPANHIA','Companhia'],['ORIGEM','Origem']]}
+   },d=defs[v];$('title').textContent=d.title;$('subtitle').textContent='Dados filtrados diretamente do banco P3.';table(d.cols,items,$('thead'),$('tbody'));
+   if(v==='operacoes'){
+     const motos=items.reduce((a,x)=>a+(Number(x.MOTOCICLETAS_ABORDADAS)||0),0),autos=items.reduce((a,x)=>a+(Number(x.AUTOMOVEIS_ABORDADOS)||0),0);
+     const especiais=items.reduce((a,x)=>a+(Number(x.ART_165)||0)+(Number(x.ART_165_A)||0)+(Number(x.ART_230_XI)||0),0);
+     const comAb=items.reduce((a,x)=>a+(Number(x.ART_165)||0)+(Number(x.ART_165_A)||0)+(Number(x.ART_230_XI)||0)+(Number(x.OUTROS_AITS_COM_ABORDAGEM)||0),0);
+     const semAb=items.reduce((a,x)=>a+(Number(x.AITS_SEM_ABORDAGEM)||0),0);
+     $('stats').innerHTML=cards([['Operações',items.length],['Motocicletas abordadas',motos],['Automóveis abordados',autos],['AITs especiais',especiais],['AITs com abordagem',comAb],['AITs sem abordagem',semAb]]);
+   }
+   else if(v==='prisoes')$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Flagrantes',items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Mandados',items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Adolescentes',items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Tipificações',new Set(items.map(x=>x.TIPIFICACAO_PRINCIPAL).filter(Boolean)).size]]);
+   else if(v==='veiculos-operacionais')$('stats').innerHTML=cards([['Registros',items.length],['Recuperados',items.filter(x=>String(x.CONTA_COMO_RECUPERADO||'').toUpperCase()==='SIM').length],['Adulterados',items.filter(x=>/ADULTER|CLON|SINAL/i.test((x.SITUACAO||'')+' '+(x.TIPO_RECUPERACAO_DETALHADA||''))).length],['Com placa original',items.filter(x=>String(x.PLACA_ORIGINAL_IDENTIFICADA||'').toLowerCase()==='sim'||x.PLACA_ORIGINAL_UF).length],['Conduzidos',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_CONDUZIDOS)||0),0)],['FIPE total','R$ '+items.reduce((a,x)=>a+(Number(x.VALOR_FIPE)||0),0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})]]);
+   else if(v==='cirvc')$('stats').innerHTML=cards([['CIRVCs',items.length],['Aguardando transporte',items.filter(x=>/AGUARDANDO/i.test(x.STATUS_CUSTODIA||'')).length],['Em transporte',items.filter(x=>/TRANSPORTE/i.test(x.STATUS_CUSTODIA||'')).length],['Baixados',items.filter(x=>/BAIX/i.test(x.STATUS_CUSTODIA||'')).length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Veículos',new Set(items.map(x=>x.PLACA).filter(Boolean)).size]]);
+   else $('stats').innerHTML=cards([['Eventos',items.length],['RSD',items.filter(x=>x.TIPO_ENTIDADE==='RSD').length],['RCO',items.filter(x=>x.TIPO_ENTIDADE==='RCO').length],['Operações',items.filter(x=>x.TIPO_ENTIDADE==='OPERACAO').length],['Responsáveis',new Set(items.map(x=>x.RESPONSAVEL_MATRICULA).filter(Boolean)).size],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size]]);
  }
- function renderPrisonStats(items){const total=items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),fl=items.filter(x=>x.SITUACAO==='FLAGRANTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),mp=items.filter(x=>x.SITUACAO==='CUMPRIMENTO_MANDADO').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0),ad=items.filter(x=>x.SITUACAO==='APREENSAO_ADOLESCENTE').reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0);$('stats').innerHTML=cards([['Registros',items.length],['Pessoas',total],['Flagrantes',fl],['Mandados',mp],['Adolescentes',ad]])}
- function renderProductivity(items){
-  $('title').innerHTML='<div class="matrix-title"><div><h2>Produtividade operacional</h2><div class="note">Matriz de conferência construída a partir dos mesmos registros consolidados do RCO.</div></div></div>';
-  const companies=[...new Set(items.map(x=>String(x.COMPANHIA||'')).filter(Boolean))],oneCompany=companies.length===1;
-  const origins=[...new Set(items.map(x=>oneCompany?String(x.GUARNICAO||'Não informada'):(String(x.COMPANHIA||'—')+' / '+String(x.GUARNICAO||'Não informada'))))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-  const rows=new Map();
-  for(const x of items){const grupo=String(x.GRUPO_NOME||x.GRUPO_CODIGO||''),ind=String(x.INDICADOR_NOME||x.INDICADOR_CODIGO||'Indicador'),key=grupo+'||'+ind,origin=oneCompany?String(x.GUARNICAO||'Não informada'):(String(x.COMPANHIA||'—')+' / '+String(x.GUARNICAO||'Não informada')),q=Number(x.QUANTIDADE)||0;if(!rows.has(key))rows.set(key,{grupo,ind,val:{}});const r=rows.get(key);r.val[origin]=(r.val[origin]||0)+q}
-  if(!items.length){$('thead').innerHTML='';$('tbody').innerHTML='<tr><td class="empty">Nenhum registro de produtividade para os filtros.</td></tr>';$('stats').innerHTML=cards([['Registros',0],['Somatório exibido',0],['Companhias',0],['Guarnições',0],['Indicadores',0]]);return}
-  $('thead').innerHTML='<tr><th>Grupo</th><th>Indicador</th>'+origins.map(x=>'<th>'+esc(x)+'</th>').join('')+'<th>Total</th></tr>';
-  $('tbody').innerHTML=[...rows.values()].sort((a,b)=>(a.grupo+' '+a.ind).localeCompare(b.grupo+' '+b.ind,'pt-BR')).map(r=>{const total=origins.reduce((s,o)=>s+(r.val[o]||0),0);return '<tr><td>'+esc(r.grupo)+'</td><td><strong>'+esc(r.ind)+'</strong></td>'+origins.map(o=>'<td>'+Number(r.val[o]||0)+'</td>').join('')+'<td><strong>'+total+'</strong></td></tr>'}).join('');
-  renderProdStats(items);
+ async function loadAnalysis(t){
+   const base={...p(t,'produtividade'),indicador:analysisIndicator};delete base.view;
+   let r=await CentralCloud.jsonp('p3-analysis',base);if(!analysisIndicator&&r.indicadores?.length){analysisIndicator=r.indicadores[0];r=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator})}
+   const a=new Date($('di').value+'T12:00:00'),b=new Date($('df').value+'T12:00:00'),days=Math.max(1,Math.round((b-a)/86400000)+1),pe=new Date(a.getTime()-86400000),ps=new Date(pe.getTime()-(days-1)*86400000),iso=d=>d.toISOString().slice(0,10);
+   const prev=await CentralCloud.jsonp('p3-analysis',{...base,indicador:analysisIndicator,dataInicio:iso(ps),dataFim:iso(pe)});
+   $('title').textContent='Análise estatística';$('subtitle').textContent='Comparação com período anterior equivalente.';
+   $('analysisControls').innerHTML='<div class="analysisctl"><div><label>Indicador</label><select id="analysisIndicator">'+(r.indicadores||[]).map(x=>'<option '+(x===analysisIndicator?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><div class="note">Período anterior: '+date(iso(ps))+' a '+date(iso(pe))+'</div></div>';
+   document.getElementById('analysisIndicator')?.addEventListener('change',e=>{analysisIndicator=e.target.value;load()});
+   const cur=Number(r.total||0),old=Number(prev.total||0),pct=old?((cur-old)/old*100):null;$('stats').innerHTML=cards([['Total atual',cur],['Período anterior',old],['Variação',pct===null?'—':((pct>=0?'+':'')+pct.toFixed(1)+'%')],['Companhias',(r.porCompanhia||[]).length],['Dias com registro',(r.porData||[]).length],['Indicador',analysisIndicator||'—']]);
+   const max=Math.max(1,...(r.porCompanhia||[]).map(x=>Number(x.valor||0)));$('chart').innerHTML=(r.porCompanhia||[]).map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join('')||'<div class="empty">Sem dados.</div>';$('thead').innerHTML='';$('tbody').innerHTML='';
  }
- function renderProdStats(items){const total=items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0);$('stats').innerHTML=cards([['Registros',items.length],['Somatório exibido',total],['Companhias',new Set(items.map(x=>x.COMPANHIA)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME)).size]])}
- function pref(){try{return JSON.parse(localStorage.getItem('pmpb-p3-kpis-v1')||'{}')||{}}catch(_){return {}}}
- function setPref(o){try{localStorage.setItem('pmpb-p3-kpis-v1',JSON.stringify(o||{}))}catch(_){}}
- function cards(a){const hidden=new Set(pref()[view]||[]);return a.map(x=>'<div class="stat '+(hidden.has(String(x[0]))?'kpi-hidden':'')+'" data-kpi="'+esc(String(x[0]))+'"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')}
- function renderCustomize(){const box=$('customOptions'),items=[...document.querySelectorAll('#stats .stat[data-kpi]')];if(!items.length){box.innerHTML='<div class="note">Não há cards configuráveis nesta visualização.</div>';return}const p=pref(),hidden=new Set(p[view]||[]);box.innerHTML=items.map(el=>{const k=el.dataset.kpi||'';return '<label class="custom-opt"><input type="checkbox" data-kpi="'+esc(k)+'" '+(hidden.has(k)?'':'checked')+'> '+esc(k)+'</label>'}).join('');box.querySelectorAll('input[data-kpi]').forEach(ch=>ch.onchange=()=>{const key=ch.dataset.kpi,o=pref(),s=new Set(o[view]||[]);if(ch.checked)s.delete(key);else s.add(key);o[view]=[...s];setPref(o);document.querySelectorAll('#stats .stat[data-kpi]').forEach(el=>el.classList.toggle('kpi-hidden',s.has(el.dataset.kpi)))})}
- function formatCell(k,v,x){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return '<span class="pill '+(/FINAL|INCLUID|CONSOLID|BAIXADO/.test(v||'')?'ok':'warn')+'">'+esc(v||'—')+'</span>';if((k==='LOCAL'||k==='LOCAL_EXECUTADO')&&v)return '<span class="oploc">'+esc(v)+'</span>';if(k==='LATITUDE'||k==='LONGITUDE'||k==='COORDENADAS_EXECUTADAS')return '<span class="coords">'+esc(v||'')+'</span>';if(k==='POD_STATUS')return '<span class="pill '+(/conforme/i.test(v||'')?'ok':'warn')+'">'+esc(v||'—')+'</span>';return esc(v??'')}
- function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
- document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');view=b.dataset.view;load()});
- $('apply').onclick=load;$('customBtn').onclick=()=>{$('customPanel').classList.toggle('hidden');renderCustomize()};$('customClose').onclick=()=>$('customPanel').classList.add('hidden');$('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach((o,i)=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false});};
- $('biBtn').onclick=async()=>{try{const token=await ensure(),r=await CentralCloud.jsonp('p3-config',{token}),cfg=r.config||{};let url=cfg.POWERBI_URL||'';if(!url){url=prompt('O Power BI ainda não foi vinculado. Cole a URL institucional do painel:')||'';if(url)await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url},token,{popup:false})}if(url)window.open(url,'_blank','noopener')}catch(e){alert(e.message)}};
- setTimeout(load,450);
+ async function loadHistory(t){
+   const r=await CentralCloud.jsonp('p3-query',p(t,'historico')),items=r.items||[];
+   $('historyStats').innerHTML=cards([['Registros históricos',items.length],['Somatório',items.reduce((a,x)=>a+(Number(x.QUANTIDADE)||0),0)],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições',new Set(items.map(x=>x.GUARNICAO).filter(Boolean)).size],['Indicadores',new Set(items.map(x=>x.INDICADOR_NOME).filter(Boolean)).size],['Registros digitais',r.totalDigital||0]]);
+   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['GUARNICAO','Guarnição'],['GRUPO_NOME','Grupo'],['INDICADOR_NOME','Indicador'],['QUANTIDADE','Qtd.'],['ORIGEM_RELATORIO','Origem']];table(cols,items,$('historyHead'),$('historyBody'));
+ }
+ async function loadRco(t){
+   const r=await CentralCloud.jsonp('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
+   $('rcoStats').innerHTML=cards([['RCOs',items.length],['Retificados',ret.length],['Com CPU',items.filter(x=>x.MODO_CONSOLIDACAO==='CPU').length],['P3/Oficial',items.filter(x=>x.MODO_CONSOLIDACAO==='SEM_CPU').length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_GUARNICOES)||0),0)]]);
+   const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['VERSAO','Versão'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];
+   $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th>Ação</th></tr>';
+   $('rcoBody').innerHTML=items.length?items.map((x,i)=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'<td><button type="button" class="secondary" data-reopen-rco="'+i+'">Reabrir para retificação</button></td></tr>').join(''):'<tr><td colspan="'+(cols.length+1)+'" class="empty">Nenhum RCO para os filtros selecionados.</td></tr>';
+   $('rcoBody').querySelectorAll('[data-reopen-rco]').forEach(b=>b.onclick=async()=>{
+     const x=items[Number(b.dataset.reopenRco)];if(!x)return;
+     const motivo=prompt('Motivo da retificação deste RCO:','Correção de dado consolidado')||'';if(!motivo.trim())return;
+     if(!p3Actor?.matricula){alert('A sessão administrativa não está identificada.');return}
+     const autor=[p3Actor.postoGrad,p3Actor.nome,p3Actor.matricula].filter(Boolean).join(' ');
+     if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nAutorizado por: '+autor+'\n\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
+     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autorMatricula:p3Actor.matricula,autorPerfil:p3Actor.perfil},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');await loadRco(t)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
+   });
+ }
+ async function loadBi(t){
+   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel Power BI vinculado.':'Power BI ainda não configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
+   const wrap=$('biFrameWrap'),frame=$('biFrame');wrap.classList.toggle('hidden',!biUrl);if(biUrl&&frame.src!==biUrl)frame.src=biUrl;if(!biUrl)frame.removeAttribute('src');
+ }
+ function table(cols,items,head,body){head.innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr>';body.innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros selecionados.</td></tr>'}
+ function switchMain(v){main=v;document.querySelectorAll('[data-main]').forEach(b=>b.classList.toggle('active',b.dataset.main===v));$('painelView').classList.toggle('hidden',v!=='painel');$('historicoView').classList.toggle('hidden',v!=='historico');$('rcoView').classList.toggle('hidden',v!=='rco');$('powerbiView').classList.toggle('hidden',v!=='powerbi');$('filterCard').classList.toggle('hidden',v==='powerbi');load()}
+ document.querySelectorAll('[data-main]').forEach(b=>b.onclick=()=>switchMain(b.dataset.main));document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{sub=b.dataset.sub;document.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('active',x.dataset.sub===sub));load()});
+ $('apply').onclick=load;$('bat').onchange=()=>{const b=$('bat').value;$('cia').querySelectorAll('option').forEach(o=>{if(!o.value)return;o.hidden=b==='BPTran'?!/CPTran/.test(o.value):b==='BPRv'?!/CPRv/.test(o.value):false})};
+ $('p3ActorMatricula').addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));
+ $('p3ActorLogin').onclick=registerActor;
+ $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
+ $('biOpen').onclick=()=>{if(!biUrl){alert('O Power BI ainda não possui URL institucional configurada.');return}window.open(biUrl,'_blank','noopener')};
+ $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL institucional do painel Microsoft Power BI:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('URL do Power BI atualizada.')}catch(e){alert(e.message)}};
+ p3Actor=readActor();
+ if(p3Actor?.matricula&&!token()){try{sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}p3Actor=null}
+ renderActor();if(p3Actor?.matricula&&token())setTimeout(load,400);
 })();
-</script></body></html>
+</script>
+</body>
+</html>
