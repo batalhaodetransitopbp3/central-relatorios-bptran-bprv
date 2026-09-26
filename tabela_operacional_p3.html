@@ -21,24 +21,24 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
 </style>
 </head>
 <body>
-<header class="head"><h1>Tabela Operacional — Gestão P3</h1><p>Consolidação da produtividade por companhia, conforme os filtros aplicados.</p></header>
+<header class="head"><h1>Tabela de produtividade — Gestão P3</h1><p>Veja, lado a lado, os resultados operacionais das companhias escolhidas no período selecionado.</p></header>
 <main class="wrap">
 <section class="card">
  <div class="filters">
-  <div><label>Data inicial</label><input id="di" type="date"></div>
-  <div><label>Data final</label><input id="df" type="date"></div>
-  <div><label>Batalhão</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
+  <div><label>Início do período</label><input id="di" type="date"></div>
+  <div><label>Fim do período</label><input id="df" type="date"></div>
+  <div><label>Batalhão (opcional)</label><select id="bat"><option value="">Todos</option><option>BPTran</option><option>BPRv</option></select></div>
   <div class="companies"><label>Companhias que aparecerão como colunas</label><div class="company-picker"><div class="company-actions"><button type="button" class="secondary" id="allCompanies">Marcar todas</button><button type="button" class="secondary" id="clearCompanies">Limpar</button><span id="companyCount"></span></div><div id="companyGrid" class="company-grid"></div></div></div>
-  <button id="apply">Atualizar tabela</button>
+  <button id="apply">Consultar produtividade</button>
  </div>
  <div class="toolbar"><a class="btn secondary" href="gestao_p3.html">Gestão P3</a><a class="btn secondary" href="index.html">Central</a><button class="secondary" onclick="window.print()">Imprimir / Gerar PDF</button></div>
  <div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
  <div class="status" id="status"></div>
- <div class="source-note" id="sourceNote">ℹ O período consultado inclui registros importados anteriores à implantação digital. Eles são integrados à consolidação sem duplicar dias já substituídos por RCO digital.</div>
+ <div class="source-note" id="sourceNote">ℹ Parte deste período foi registrada antes da implantação da Central atual. Esses dados foram incorporados para manter a continuidade da série, sem duplicar informações já substituídas por RCO digital.</div>
 </section>
-<section class="card"><div class="legend">As colunas representam as companhias selecionadas. O TOTAL é recalculado somente com as colunas exibidas. A divisão por guarnição permanece preservada no banco para auditoria e consultas internas.</div><div id="tableArea"></div></section>
+<section class="card"><div class="legend"><strong>Como ler esta tabela:</strong> cada coluna mostra uma companhia selecionada. A coluna <strong>TOTAL</strong> soma somente as companhias que estão aparecendo na tela. A divisão por guarnição continua guardada no sistema para consultas detalhadas e auditoria, mas não aparece aqui para facilitar a leitura.</div><div id="tableArea"></div></section>
 </main>
-<script src="central_cloud.js?v=10.6.4-rc1"></script>
+<script src="central_cloud.js?v=10.6.5-rc1"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),ALL=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -85,9 +85,9 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
    $('status').textContent='Consultando...';$('sourceNote').classList.remove('show');
    try{
      const r=await CentralCloud.jsonp('p3-query',params,{timeout:45000}),items=r.items||[],a=actor();
-     $('tableArea').innerHTML=items.length?renderMatrix(items,companies):'<div class="empty">Nenhum registro de produtividade para os filtros selecionados.</div>';
+     $('tableArea').innerHTML=items.length?renderMatrix(items,companies):'<div class="empty">Nenhum dado de produtividade foi encontrado para o período, batalhão e companhias selecionados. Confira os filtros e tente novamente.</div>';
      const src=r.sourceStats||{};$('sourceNote').classList.toggle('show',Number(src.historico||0)>0);
-     $('status').textContent=[(r.rawRows??0)+' registro(s)-base consolidados',companies.length+' companhia(s)',a?.matricula?'Sessão: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
+     $('status').textContent=[(r.rawRows??0)+' registro(s) encontrados e consolidados',companies.length+' companhia(s) incluída(s) na tabela',a?.matricula?'Responsável pela consulta: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
      endProgress(true,'Tabela atualizada.');
    }catch(e){if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tableArea').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.';endProgress(false,'Falha na consulta.')}
  }
