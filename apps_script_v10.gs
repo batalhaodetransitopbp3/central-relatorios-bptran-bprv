@@ -8,13 +8,14 @@
  *      CENTRAL_TOKEN = chave operacional dos módulos
  *      COORD_TOKEN   = chave exclusiva de CPU/Coordenação
  *      P3_TOKEN      = chave exclusiva da Gestão P3/Oficial
+ *      MASTER_ADMIN_TOKEN = chave exclusiva do Controle Geral do Serviço
  * 4. Implantar > Aplicativo da Web > Executar como proprietário > acesso conforme política institucional.
  * 5. Substitua CENTRAL_CLOUD_ENDPOINT, no front-end, pela URL /exec da implantação.
  *
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.5-rc1';
+var CENTRAL_V10_VERSION = '10.6.6-rc1';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
 var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
@@ -92,6 +93,12 @@ function doGet(e) {
     } else if (action === 'checklist-list') {
       assertToken_(p.token, 'p3');
       out = checklistList_(p);
+    } else if (action === 'master-overview') {
+      assertToken_(p.token, 'master');
+      out = masterOverview_(p);
+    } else if (action === 'master-cadastros') {
+      assertToken_(p.token, 'master');
+      out = cadastroSearch_(p);
     } else {
       throw new Error('Ação GET não reconhecida: ' + action);
     }
@@ -194,6 +201,33 @@ function doPost(e) {
     } else if (action === 'rco-upsert') {
       assertToken_(token, 'p3');
       out = rcoSupplementalUpsert_(payload);
+    } else if (action === 'master-rsd-create') {
+      assertToken_(token, 'master');
+      out = masterRsdCreate_(payload);
+    } else if (action === 'master-rsd-unlock') {
+      assertToken_(token, 'master');
+      out = masterRsdUnlock_(payload);
+    } else if (action === 'master-rsd-cancel') {
+      assertToken_(token, 'master');
+      out = masterRsdCancel_(payload);
+    } else if (action === 'master-rsd-reassign') {
+      assertToken_(token, 'master');
+      out = masterRsdReassign_(payload);
+    } else if (action === 'master-rco-unlock') {
+      assertToken_(token, 'master');
+      out = masterRcoUnlock_(payload);
+    } else if (action === 'master-rco-cancel') {
+      assertToken_(token, 'master');
+      out = masterRcoCancel_(payload);
+    } else if (action === 'master-rco-reassign') {
+      assertToken_(token, 'master');
+      out = masterRcoReassign_(payload);
+    } else if (action === 'master-passagem-cancel') {
+      assertToken_(token, 'master');
+      out = masterPassagemCancel_(payload);
+    } else if (action === 'master-passagem-anular') {
+      assertToken_(token, 'master');
+      out = masterPassagemAnular_(payload);
     } else {
       throw new Error('Ação POST não reconhecida: ' + action);
     }
@@ -213,7 +247,13 @@ function assertToken_(token, kind) {
   var central = String(props.getProperty('CENTRAL_TOKEN') || '');
   var p3 = String(props.getProperty('P3_TOKEN') || '');
   var coord = String(props.getProperty('COORD_TOKEN') || '');
+  var master = String(props.getProperty('MASTER_ADMIN_TOKEN') || '');
   token = String(token || '');
+  if (kind === 'master') {
+    if (!master) throw new Error('Controle Geral não configurado: defina MASTER_ADMIN_TOKEN nas Propriedades do script.');
+    if (token !== master) throw new Error('Senha do Controle Geral inválida.');
+    return true;
+  }
   if (kind === 'coord') {
     if (!coord) throw new Error('Backend não configurado: defina COORD_TOKEN nas Propriedades do script.');
     if (token !== coord && (!p3 || token !== p3)) throw new Error('Chave de Coordenação inválida.');
