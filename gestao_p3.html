@@ -100,7 +100,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return}
    if(!senha){alert('Informe a senha administrativa P3/Oficial.');return}
    try{
-     const r=await CentralCloud.submitForm('rco-responsavel-validar',{perfil,matricula:mat},senha,{popup:false}),m=r.militar||{};
+     const r=await CentralCloud.submitForm('rco-responsavel-validar',{perfil,matricula:mat},senha,{popup:false,tokenKind:'p3'}),m=r.militar||{};
      CentralCloud.setToken(senha,'p3');saveActor({perfil,matricula:m.matricula||mat,nome:m.nome||'',postoGrad:m.postoGrad||'',batalhao:m.batalhao||'',companhia:m.companhia||''});
      $('p3ActorSenha').value='';
      const ret=new URLSearchParams(location.search).get('return');
@@ -123,7 +123,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
- async function load(){try{const t=await ensure();if(main==='painel')return loadPanel(t);if(main==='historico')return loadHistory(t);if(main==='rco')return loadRco(t);if(main==='powerbi')return loadBi(t)}catch(e){showError(e.message)}}
+ async function load(){try{const t=await ensure();if(main==='painel')return loadPanel(t);if(main==='historico')return loadHistory(t);if(main==='rco')return loadRco(t);if(main==='powerbi')return loadBi(t)}catch(e){if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}showError(e.message)}}
  function showError(msg){const target=main==='historico'?$('historyBody'):main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
  async function loadPanel(t){
    $('chart').innerHTML='';$('analysisControls').innerHTML='';
