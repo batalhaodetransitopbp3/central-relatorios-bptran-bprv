@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.8';
+var CENTRAL_V10_VERSION = '10.6.9';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -32,19 +32,19 @@ function doGet(e) {
     if (action === 'version') {
       out = {ok:true, version:CENTRAL_V10_VERSION, schema:'central-v10'};
     } else if (action === 'cadastros') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = cadastroSearch_(p);
     } else if (action === 'guarnicao-next') {
       assertToken_(p.token, 'central');
       out = guarnicaoNext_(p);
     } else if (action === 'rsd-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, items:rsdList_(p)};
     } else if (action === 'rsd-active') {
       assertToken_(p.token, 'central');
       out = {ok:true, items:rsdActive_(p)};
     } else if (action === 'rsd-get') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, rsd:rsdGet_(p.reportId)};
     } else if (action === 'passagens-pendentes') {
       assertToken_(p.token, 'central');
@@ -53,16 +53,16 @@ function doGet(e) {
       assertToken_(p.token, 'central');
       out = {ok:true, items:operationList_(p)};
     } else if (action === 'rco-draft-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, items:rcoDraftList_(p)};
     } else if (action === 'rco-draft-get') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, rco:rcoDraftGet_(p.reportId)};
     } else if (action === 'reboque-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, items:reboqueList_(p)};
     } else if (action === 'reboque-get') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, 'rco');
       out = {ok:true, reboque:reboqueGet_(p.reportId)};
     } else if (action === 'cirvc-list') {
       assertToken_(p.token, 'central');
@@ -191,10 +191,10 @@ function doPost(e) {
       assertToken_(token, 'p3');
       out = p3ConfigSet_(payload);
     } else if (action === 'rco-draft-upsert') {
-      assertToken_(token, 'central');
+      assertToken_(token, 'rco');
       out = rcoDraftUpsert_(payload);
     } else if (action === 'rco-draft-claim') {
-      assertToken_(token, 'central');
+      assertToken_(token, 'rco');
       out = rcoDraftClaim_(payload);
     } else if (action === 'rco-retification-open') {
       assertToken_(token, 'p3');
@@ -269,6 +269,11 @@ function assertToken_(token, kind) {
   if (kind === 'coord') {
     if (!coord) throw new Error('Backend não configurado: defina COORD_TOKEN nas Propriedades do script.');
     if (token !== coord && (!p3 || token !== p3)) throw new Error('Chave de Coordenação inválida.');
+    return true;
+  }
+  if (kind === 'rco') {
+    if ((!central)&&(!coord)&&(!p3)) throw new Error('Backend do RCO sem credenciais configuradas.');
+    if (token !== central && token !== coord && token !== p3) throw new Error('Credencial do RCO inválida.');
     return true;
   }
   if (kind === 'p3') {
