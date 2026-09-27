@@ -20,6 +20,7 @@ function css(){
 .central-access-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.central-access-toolbar button{padding:9px 12px;border-radius:8px;border:1px solid #bdcbd6;background:#fff;color:#29485f;font-weight:700;cursor:pointer}
 .central-access-loading,.central-access-empty{padding:16px;text-align:center;color:#66798a;background:#f7f9fb;border-radius:10px}
 .central-access-error{padding:12px;color:#7a2d2d;background:#fff1f1;border:1px solid #e3b8b8;border-radius:10px}
+.central-setup-nav{position:sticky;top:0;z-index:19000;background:#17375e;padding:8px 12px;box-shadow:0 3px 10px #0002}.central-setup-nav button{border:1px solid #ffffff55;background:#fff;color:#17375e;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer}
 body.central-service-setup main.page>section{display:none!important}body.central-service-setup .toolbar{display:none!important}
 body.central-service-setup .service-state-bar{display:none!important}body.central-service-setup header.doc-head{display:block!important}
 body.central-service-setup.rco-setup #rcoResponsavelCard{display:block!important}
@@ -65,7 +66,8 @@ function startScreen(type){
  q('[data-home]',el).onclick=()=>location.href='index.html';
 }
 function enterSetup(type){
- clearLayer();document.body.classList.add('central-service-setup',type==='rco'?'rco-setup':'rsd-setup');
+ clearLayer();q('#centralSetupNav')?.remove();document.body.classList.add('central-service-setup',type==='rco'?'rco-setup':'rsd-setup');
+ const nav=document.createElement('div');nav.id='centralSetupNav';nav.className='central-setup-nav no-print';nav.innerHTML='<button type="button">← Voltar às opções de acesso</button>';document.body.prepend(nav);nav.querySelector('button').onclick=()=>{exitSetup();startScreen(type)};
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
@@ -77,7 +79,7 @@ function enterSetup(type){
  }
 }
 function exitSetup(){
- document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
+ q('#centralSetupNav')?.remove();document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
  try{sessionStorage.removeItem(MODE)}catch(_){}
 }
 function guOptions(){
@@ -129,7 +131,7 @@ async function rcoContinue(){
 }
 async function rcoReceive(){
  clearLayer();
- if(typeof global.centralRcoReceivePassage==='function'){const ok=await global.centralRcoReceivePassage();if(ok)exitSetup();else startScreen('rco');return}
+ if(typeof global.centralRcoReceivePassage==='function'){const ok=await global.centralRcoReceivePassage();if(ok)enterSetup('rco');else startScreen('rco');return}
  startScreen('rco');
 }
 function init(){
