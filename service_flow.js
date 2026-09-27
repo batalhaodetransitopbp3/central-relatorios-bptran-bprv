@@ -132,7 +132,8 @@ function renderTimeline(events=[]){
  const sec=timelineCard(),box=$('#centralTimelineList',sec);if(!box)return;
  const c=ctx(),items=[...events];
  if(c.serviceId&&c.data)items.push({eventId:'inicio-'+c.serviceId,tipo:'INICIO',data:c.data,hora:'',titulo:'Serviço iniciado',resumo:[c.guarnicao,Array.isArray(c.vtrs)&&c.vtrs.length?'VTR '+c.vtrs.join(', '):''].filter(Boolean).join(' • '),criadoEm:''});
- $$('#vehicles .vehicle-entry').forEach(e=>{const d=entryData(e);items.push({eventId:'local-vr-'+(d.id||''),tipo:'VEICULO_RECUPERADO',data:c.data||today(),hora:'',titulo:'Veículo recuperado'+(d.placaUf?' — '+d.placaUf:''),resumo:[d.marcaModelo,d.situacao,d.local].filter(Boolean).join(' • '),localOnly:true})});
+ const syncedVehicleRefs=new Set(items.filter(x=>x.tipo==='VEICULO_RECUPERADO').map(x=>String(x.referenciaId||'')));
+ $('#vehicles .vehicle-entry').forEach(e=>{const d=entryData(e);if(d.id&&syncedVehicleRefs.has(String(d.id)))return;items.push({eventId:'local-vr-'+(d.id||''),tipo:'VEICULO_RECUPERADO',data:c.data||today(),hora:'',titulo:'Veículo recuperado'+(d.placaUf?' — '+d.placaUf:''),resumo:[d.marcaModelo,d.situacao,d.local].filter(Boolean).join(' • '),localOnly:true})});
  const uniq=new Map();items.forEach(x=>uniq.set(x.eventId||[x.tipo,x.referenciaId,x.titulo].join('|'),x));
  const arr=[...uniq.values()].sort((a,b)=>{const ak=[a.data||'',a.hora||'',a.criadoEm||''].join(' '),bk=[b.data||'',b.hora||'',b.criadoEm||''].join(' ');return ak.localeCompare(bk)});
  if(!arr.length){box.innerHTML='<div class="central-event-empty">Nenhum evento registrado neste serviço.</div>';return}
