@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Contingência Operacional — Central de Relatórios</title>
+<style>
+:root{--navy:#17375e;--blue:#315f93;--bg:#eef3f7;--card:#fff;--line:#cbd8e3;--text:#172333;--muted:#657789;--ok:#18745f;--warn:#9a6b18;--danger:#9a2745}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 Arial,sans-serif}.page{width:min(1100px,100%);margin:auto;padding:12px}
+.toolbar{position:sticky;top:0;z-index:30;display:flex;gap:8px;flex-wrap:wrap;padding:9px;background:#eef3f7ee;backdrop-filter:blur(8px);border-bottom:1px solid #d4dfe8}
+button,.btn{border:0;border-radius:9px;padding:9px 12px;background:var(--navy);color:#fff;font-weight:800;cursor:pointer;text-decoration:none}.secondary{background:#fff!important;color:#29485f!important;border:1px solid #bdcbd6!important}.danger{background:var(--danger)!important}.ok{background:var(--ok)!important}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 5px 18px #17375e12}.warning{border-color:#e4c57d;background:#fff9e9}.warning strong{color:#77520b}
+h1{font-size:22px;margin:4px 0;color:var(--navy)}h2{font-size:15px;margin:0 0 10px;color:var(--navy);border-left:5px solid var(--blue);padding-left:8px}.hint{font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px}.f{grid-column:span 3}.s2{grid-column:span 2}.s4{grid-column:span 4}.s6{grid-column:span 6}.s8{grid-column:span 8}.s12{grid-column:1/-1}
+label{display:block;font-size:10px;font-weight:900;text-transform:uppercase;color:#50657a;margin-bottom:3px}input,select,textarea{width:100%;min-height:38px;border:1px solid #b9c8d5;border-radius:8px;padding:7px 8px;background:#fff;font:inherit}textarea{min-height:70px;resize:vertical}
+.head{display:flex;justify-content:space-between;gap:8px;align-items:center}.list{display:grid;gap:8px}.entry{border:1px solid #d4dee7;border-radius:10px;padding:10px;background:#fbfcfd}.entry-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}.entry-head strong{color:var(--navy)}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric-group{border:1px solid #d8e1e8;border-radius:9px;overflow:hidden}.metric-group h3{font-size:11px;margin:0;padding:7px 8px;background:#f0f5f9;color:#29485f}.metric-row{display:grid;grid-template-columns:1fr 90px;gap:6px;align-items:center;padding:5px 8px;border-top:1px solid #edf1f4}.metric-row label{font-size:10px;text-transform:none;margin:0}.metric-row input{min-height:30px;padding:4px 6px}
+.status{font-size:12px;color:var(--muted);margin-left:auto}.hidden{display:none!important}
+@media(max-width:720px){.f,.s2,.s4,.s6,.s8{grid-column:1/-1}.metrics{grid-template-columns:1fr}.toolbar{position:static}.head{align-items:flex-start;flex-direction:column}.status{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="toolbar">
+<a class="btn secondary" href="index.html">← Central</a>
+<button class="ok" type="button" onclick="exportarContingencia()">Gerar JSON para o Coordenador</button>
+<button class="secondary" type="button" onclick="salvar()">Salvar neste aparelho</button>
+<button class="secondary" type="button" onclick="document.getElementById('loadFile').click()">Carregar JSON</button>
+<button class="danger" type="button" onclick="limpar()">Limpar</button>
+<input id="loadFile" type="file" accept=".json,application/json" hidden onchange="carregarArquivo(this.files[0]);this.value=''">
+<span id="status" class="status">Salvamento local automático ativo.</span>
+</div>
+<main class="page">
+<section class="card warning">
+<strong>⚠ Contingência operacional</strong>
+<div>Use este módulo somente quando a Central estiver indisponível ou sem conexão suficiente para o fluxo normal. O arquivo gerado é compatível com a importação manual do RCO.</div>
+</section>
+<section class="card">
+<h1>Registro de serviço em contingência</h1>
+<div class="grid">
+<div class="f"><label>Batalhão</label><select id="batalhao"><option>BPTran</option><option>BPRv</option></select></div>
+<div class="f"><label>Companhia</label><select id="companhiaNumero"></select></div>
+<div class="f"><label>Data do serviço</label><input id="data" type="date"></div>
+<div class="f"><label>Efetivo</label><input id="efetivo" placeholder="Ex.: 03 PMs"></div>
+<div class="f"><label>Tipo da guarnição</label><select id="guTipo"><option value="">Selecione</option><option>BST</option><option>BASE</option><option>GTTRAN</option><option>REBOQUE</option><option>TOR</option></select></div>
+<div class="f"><label>Número</label><select id="guNumero"></select></div>
+<div class="f"><label>VTR principal</label><input id="vtr" maxlength="8" placeholder="Ex.: 9296"></div>
+<div class="f"><label>Matrícula do comandante</label><input id="matricula" maxlength="9" placeholder="000.000-0"></div>
+<div class="s6"><label>Comandante — posto/graduação e nome</label><input id="comandante" placeholder="Ex.: 3º SGT FULANO"></div>
+<div class="s6"><label>Observações gerais</label><input id="observacoes" placeholder="Somente informação relevante não contemplada nos campos abaixo"></div>
+</div>
+</section>
+
+<section class="card">
+<div class="head"><h2>Produção operacional</h2><span class="hint">Preencha apenas o que ocorreu.</span></div>
+<div id="metrics" class="metrics"></div>
+</section>
+
+<section class="card">
+<div class="head"><h2>Ocorrências</h2><button type="button" onclick="addOc()">+ ocorrência</button></div>
+<div id="ocorrencias" class="list"></div>
+</section>
+<section class="card">
+<div class="head"><h2>Operações / POD</h2><button type="button" onclick="addOp()">+ operação</button></div>
+<div id="operacoes" class="list"></div>
+</section>
+<section class="card">
+<div class="head"><h2>Veículos recuperados</h2><button type="button" onclick="addVeic()">+ veículo</button></div>
+<div id="veiculos" class="list"></div>
+</section>
+<section class="card">
+<div class="head"><h2>CIRVC</h2><button type="button" onclick="addCirvc()">+ CIRVC</button></div>
+<div id="cirvcs" class="list"></div>
+</section>
+<section class="card">
+<h2>Alterações do serviço</h2>
+<div class="grid">
+<div class="s4"><label>Alterações na VTR</label><textarea id="altVtr"></textarea></div>
+<div class="s4"><label>Alterações no material</label><textarea id="altMaterial"></textarea></div>
+<div class="s4"><label>Alterações / POD</label><textarea id="altPod"></textarea></div>
+</div>
+</section>
+</main>
+<script>
+const KEY='pmpb-contingencia-operacional-v1';
+const METRICS=[
+ ['apreensoes-veiculos-recolhimentos','Apreensões de veículos / recolhimentos',[['motocicletas','Motocicletas'],['ciclomotores','Ciclomotores'],['automoveis','Automóveis'],['outros','Outros']]],
+ ['remocoes-sinistros','Remoções decorrentes de sinistros',[['motocicletas','Motocicletas'],['ciclomotores','Ciclomotores'],['automoveis','Automóveis'],['outros','Outros']]],
+ ['sinistros-sem-embriaguez','Sinistros sem embriaguez',[['c-vitimas','C/ vítimas'],['c-vitimas-s-cnh','C/ vítimas s/ CNH'],['s-vitimas-menores','S/ vítimas menores'],['s-vitimas-vtr-pmpb','S/ vítimas VTR PMPB'],['atropelamento','Atropelamento'],['outros','Outros']]],
+ ['sinistros-embriaguez','Sinistros por embriaguez',[['c-vitimas','C/ vítimas'],['s-vitimas','S/ vítimas'],['atropelamento','Atropelamento'],['outros','Outros']]],
+ ['acionamentos','Acionamentos',[['bsts','BSTs'],['apoio-outras-unidades','Apoio a outras unidades']]],
+ ['notificacoes','Notificações',[['art-165','Art. 165'],['art-165-a','Art. 165-A'],['art-230-xi','Art. 230 XI'],['demais-aits-com-abordagem','Demais AITs com abordagem'],['aits-sem-abordagem','AITs sem abordagem'],['total-aits','Total AITs']]],
+ ['cnh-etilometro','CNHs e etilômetro',[['cnhs-recolhidas','CNHs recolhidas'],['testes-etilometro','Testes de etilômetro']]],
+ ['apreensoes','Apreensões',[['armas','Armas'],['drogas','Drogas'],['menores','Menores infratores'],['siva-r','SIVA-R'],['sinais','Sinais']]],
+ ['prisoes','Prisões',[['embriaguez','Embriaguez no trânsito'],['sinistro','Sinistro de trânsito'],['armas','Porte/posse de armas'],['drogas','Porte/posse de drogas'],['mandado','Mandado de prisão'],['siva-r','SIVA-R'],['sinais','Sinais'],['tco-sasp','TCO - SASP'],['outros','Outros']]],
+ ['abordagens','Abordagens',[['pessoas','Pessoas'],['motocicletas','Motocicletas'],['ciclomotores','Ciclomotores'],['automoveis','Automóveis'],['outros','Outros'],['checkpoints','Check points / blitz']]]
+];
+const $=(s,r=document)=>r.querySelector(s),$all=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const uid=p=>p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const val=id=>String($('#'+id)?.value||'').trim();
+const num=v=>Number.parseInt(v||0,10)||0;
+function isoToday(){const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())}
+function companyOptions(){const t=val('batalhao')==='BPRv'?'CPRv':'CPTran',old=val('companhiaNumero')||'1';$('#companhiaNumero').innerHTML=[1,2,3,4,5].map(n=>'<option value="'+n+'">'+n+'ª '+t+'</option>').join('');$('#companhiaNumero').value=old}
+function numberOptions(){return '<option value="">Nº</option>'+Array.from({length:10},(_,i)=>'<option>'+String(i+1).padStart(2,'0')+'</option>').join('')}
+function formatMat(v){const d=String(v||'').replace(/\D/g,'').slice(0,7);return d.length<=3?d:d.length<=6?d.slice(0,3)+'.'+d.slice(3):d.slice(0,3)+'.'+d.slice(3,6)+'-'+d.slice(6)}
+function renderMetrics(){
+ $('#metrics').innerHTML=METRICS.map(([g,t,it])=>'<div class="metric-group"><h3>'+esc(t)+'</h3>'+it.map(([k,l])=>'<div class="metric-row"><label>'+esc(l)+'</label><input type="number" min="0" data-g="'+g+'" data-i="'+k+'" '+(k==='total-aits'?'readonly':'')+'></div>').join('')+'</div>').join('');
+ $all('[data-g="notificacoes"]').forEach(e=>e.addEventListener('input',calcAits));calcAits()
+}
+function calcAits(){const get=k=>num($('[data-g="notificacoes"][data-i="'+k+'"]')?.value),e=$('[data-g="notificacoes"][data-i="total-aits"]');if(e)e.value=get('art-165')+get('art-165-a')+get('art-230-xi')+get('demais-aits-com-abordagem')+get('aits-sem-abordagem')||''}
+function collectMetrics(){const p={};$all('[data-g]').forEach(e=>{p[e.dataset.g]??={};p[e.dataset.g][e.dataset.i]=num(e.value)});return p}
+function setMetrics(p={}){$all('[data-g]').forEach(e=>e.value=p?.[e.dataset.g]?.[e.dataset.i]||'');calcAits()}
+function field(label,k,type='text',span='s4',placeholder=''){return '<div class="'+span+'"><label>'+label+'</label><input data-k="'+k+'" type="'+type+'" placeholder="'+placeholder+'"></div>'}
+function entry(container,title,body,data={}){
+ const el=document.createElement('div');el.className='entry';el.dataset.id=data.id||uid('rec');el.innerHTML='<div class="entry-head"><strong>'+title+'</strong><button class="danger" type="button">Remover</button></div><div class="grid">'+body+'</div>';
+ $('#'+container).appendChild(el);el.querySelector('button').onclick=()=>{el.remove();salvar(true)};$all('[data-k]',el).forEach(i=>{if(data[i.dataset.k]!=null)i.value=data[i.dataset.k]});return el
+}
+function addOc(d={}){const el=entry('ocorrencias','Ocorrência',field('Data','data','date','s2')+field('Hora','hora','time','s2')+'<div class="s2"><label>Tipo</label><select data-k="tipo"><option>BST</option><option>TCO</option><option>BO</option><option>Outro</option></select></div>'+field('Número','numero','text','s2','PM20XXXXXXXX')+field('Natureza / tipificação','naturezaPrincipal','text','s4')+'<div class="s12"><label>Descrição</label><textarea data-k="descricao"></textarea></div>',d);if(!d.data)el.querySelector('[data-k="data"]').value=val('data')||isoToday()}
+function addOp(d={}){entry('operacoes','Operação / POD',field('Operação','nome','text','s4')+field('Turno','turno','text','s2')+field('Local','local','text','s4')+field('AITs','totalAits','number','s2')+field('Veículos apreendidos','apreensoesVeiculos','number','s2')+field('Prisões','prisoes','number','s2')+'<div class="s4"><label>Cumprimento do POD</label><select data-k="statusCumprimento"><option>Não informado</option><option>Executado conforme previsto</option><option>Executado em local diverso</option><option>Executado parcialmente</option><option>Não executado</option></select></div>'+field('Motivo da alteração','motivoAlteracao','text','s4'),d)}
+function addVeic(d={}){entry('veiculos','Veículo recuperado',field('Placa/UF','placaUf','text','s2')+field('Marca/Modelo','marcaModelo','text','s4')+'<div class="s2"><label>Situação</label><select data-k="situacao"><option>SIVA-R</option><option>CLONE (ROUBADO)</option><option>ADULTERAÇÃO</option></select></div>'+field('Local','local','text','s4')+field('Conduzidos','quantidadeConduzidos','number','s2'),d)}
+function addCirvc(d={}){const el=entry('cirvcs','CIRVC',field('Data','data','date','s2')+field('Hora','hora','time','s2')+field('Nº do termo','numeroTermo','text','s2')+field('Placa','placa','text','s2')+field('Marca/Modelo','marcaModelo','text','s4')+field('Local / destino','local','text','s4')+field('Motivo','motivo','text','s4'),d);if(!d.data)el.querySelector('[data-k="data"]').value=val('data')||isoToday()}
+function records(id){return $all('#'+id+' .entry').map(e=>{const o={id:e.dataset.id};$all('[data-k]',e).forEach(x=>o[x.dataset.k]=x.value);return o})}
+function unit(){const b=val('batalhao'),n=Number(val('companhiaNumero'))||1,t=b==='BPRv'?'CPRv':'CPTran';return {batalhao:b,batalhaoSigla:b,companhiaNumero:n,companhiaTipo:t,companhia:n+'ª '+t}}
+function payload(){
+ const gu=[val('guTipo'),val('guNumero')].filter(Boolean).join(' '),oc=records('ocorrencias'),tcos=oc.filter(x=>x.tipo==='TCO').map(x=>({id:x.id,numero:x.numero||'',numeroTco:x.numero||'',tipificacao:x.naturezaPrincipal||'',descricao:x.descricao||'',hora:x.hora||'',tcoSasp:'Sim'}));
+ return {schema:'pmpb-transito-servico-diario-v2',schemaVersion:2,reportId:state.reportId||uid('cont'),generatedAt:new Date().toISOString(),tipoRelatorio:'servico-diario-guarnicao-contingencia',origem:'CONTINGENCIA_OPERACIONAL',
+  unidade:unit(),servico:{data:val('data')||isoToday(),diaSemana:''},guarnicao:{nome:gu,viatura:val('vtr').toUpperCase(),responsavel:val('comandante'),matricula:val('matricula'),efetivo:val('efetivo')},
+  producao:collectMetrics(),alteracoes:{viatura:val('altVtr'),servico:'',materialCarga:val('altMaterial'),planoOperacionalDiario:val('altPod')},observacoes:val('observacoes'),
+  ocorrencias:oc,operacoes:records('operacoes').map(x=>({...x,incluirNoCpu:true})),veiculosRecuperados:records('veiculos'),tcos,arvc:records('cirvcs'),cirvc:records('cirvcs')};
+}
+let state={reportId:uid('cont')};
+function salvar(silent=false){try{localStorage.setItem(KEY,JSON.stringify(payload()));$('#status').textContent='Salvo neste aparelho às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});if(!silent)alert('Contingência salva neste aparelho.');return true}catch(e){if(!silent)alert('Não foi possível salvar neste aparelho.');return false}}
+function exportarContingencia(){const p=payload();if(!p.guarnicao.nome||!p.guarnicao.viatura||!p.guarnicao.matricula||!p.guarnicao.responsavel){alert('Preencha guarnição, VTR, matrícula e comandante antes de gerar o arquivo.');return}salvar(true);const b=new Blob([JSON.stringify(p,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a'),d=(p.servico.data||'').split('-').reverse().join('.');a.href=URL.createObjectURL(b);a.download='CONTINGENCIA - '+p.guarnicao.nome+' - '+d+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function apply(p){if(!p)return;state.reportId=p.reportId||state.reportId;$('#batalhao').value=p.unidade?.batalhao||'BPTran';companyOptions();$('#companhiaNumero').value=String(p.unidade?.companhiaNumero||1);$('#data').value=p.servico?.data||isoToday();const m=String(p.guarnicao?.nome||'').match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s+(\d{2})$/i);$('#guTipo').value=m?.[1]?.toUpperCase()||'';$('#guNumero').value=m?.[2]||'';$('#vtr').value=p.guarnicao?.viatura||'';$('#matricula').value=p.guarnicao?.matricula||'';$('#comandante').value=p.guarnicao?.responsavel||'';$('#efetivo').value=p.guarnicao?.efetivo||'';$('#observacoes').value=p.observacoes||'';$('#altVtr').value=p.alteracoes?.viatura||'';$('#altMaterial').value=p.alteracoes?.materialCarga||'';$('#altPod').value=p.alteracoes?.planoOperacionalDiario||'';setMetrics(p.producao||{});for(const id of ['ocorrencias','operacoes','veiculos','cirvcs'])$('#'+id).innerHTML='';(p.ocorrencias||[]).forEach(addOc);(p.operacoes||[]).forEach(addOp);(p.veiculosRecuperados||[]).forEach(addVeic);(p.cirvc||p.arvc||[]).forEach(addCirvc)}
+async function carregarArquivo(f){if(!f)return;try{const p=JSON.parse(await f.text());if(p.schema!=='pmpb-transito-servico-diario-v2'){alert('O arquivo não é um RSD/contingência compatível.');return}apply(p);salvar(true)}catch(e){alert('Arquivo inválido.')}}
+function limpar(){if(!confirm('Apagar a contingência salva neste aparelho e limpar a tela?'))return;localStorage.removeItem(KEY);state={reportId:uid('cont')};location.reload()}
+function init(){renderMetrics();$('#guNumero').innerHTML=numberOptions();$('#batalhao').onchange=companyOptions;companyOptions();$('#data').value=isoToday();$('#matricula').oninput=e=>e.target.value=formatMat(e.target.value);document.addEventListener('input',()=>{clearTimeout(window.__ct);window.__ct=setTimeout(()=>salvar(true),500)});document.addEventListener('change',()=>{clearTimeout(window.__ct);window.__ct=setTimeout(()=>salvar(true),180)});try{const raw=localStorage.getItem(KEY);if(raw)apply(JSON.parse(raw))}catch(_){}}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

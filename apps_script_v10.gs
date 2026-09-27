@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.7.0';
+var CENTRAL_V10_VERSION = '10.8.0';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -52,6 +52,9 @@ function doGet(e) {
     } else if (action === 'operation-list') {
       assertToken_(p.token, 'central');
       out = {ok:true, items:operationList_(p)};
+    } else if (action === 'service-event-list') {
+      assertToken_(p.token, 'central');
+      out = {ok:true, items:serviceEventList_(p)};
     } else if (action === 'rco-draft-list') {
       assertToken_(p.token, 'rco');
       out = {ok:true, items:rcoDraftList_(p)};
@@ -125,6 +128,9 @@ function doPost(e) {
     if (action === 'operation-upsert') {
       assertToken_(token, 'central');
       out = operationUpsert_(payload);
+    } else if (action === 'service-event-upsert') {
+      assertToken_(token, 'central');
+      out = serviceEventUpsert_(payload.event||payload);
     } else if (action === 'rsd-start') {
       assertToken_(token, 'central');
       out = rsdStart_(payload);
@@ -490,6 +496,58 @@ function cadastroUpsert_(payload) {
 
 
 /* =========================
+   Eventos cronológicos do serviço
+   ========================= */
+function serviceEventSheet_(){
+  return sheetOrCreate_(P3_SHEET_ID,'SERVICE_EVENTOS',[
+    'EVENT_ID','SERVICE_ID','RSD_REPORT_ID','SEGMENTO','TIPO','SUBTIPO','DATA_EVENTO','HORA_EVENTO',
+    'TITULO','RESUMO','REFERENCIA_ID','NUMERO_DOCUMENTO','BATALHAO','COMPANHIA','GUARNICAO',
+    'VTR','COMANDANTE_MATRICULA','STATUS','CRIADO_EM','ATUALIZADO_EM','PAYLOAD_JSON'
+  ]);
+}
+function serviceEventUpsert_(event){
+  var e=event||{},sid=String(e.serviceId||''),rid=String(e.rsdReportId||''),tipo=String(e.tipo||'').trim().toUpperCase();
+  if(!sid&&!rid)throw new Error('Evento sem vínculo com o serviço.');
+  if(!tipo)throw new Error('Informe o tipo do evento.');
+  var ref=String(e.referenciaId||e.referenceId||''),eid=String(e.eventId||'');
+  if(!eid)eid=[sid||rid,tipo,ref||uid_('evt')].filter(Boolean).join('::');
+  var s=serviceEventSheet_(),old=findOne_(s,'EVENT_ID',eid),now=nowIso_(),u=e.unidade||{};
+  var batt=normBattalion_(e.batalhao||u.batalhao||old&&old.BATALHAO||''),comp=e.companhia||u.companhia||old&&old.COMPANHIA||'';
+  var payload=e.payload||e.dados||{};
+  var row={
+    EVENT_ID:eid,SERVICE_ID:sid||old&&old.SERVICE_ID||'',RSD_REPORT_ID:rid||old&&old.RSD_REPORT_ID||'',
+    SEGMENTO:Number(e.segmento||old&&old.SEGMENTO||0)||'',TIPO:tipo,SUBTIPO:String(e.subtipo||old&&old.SUBTIPO||''),
+    DATA_EVENTO:dateText_(e.data||e.dataEvento||old&&old.DATA_EVENTO||new Date()),HORA_EVENTO:String(e.hora||e.horaEvento||old&&old.HORA_EVENTO||''),
+    TITULO:String(e.titulo||old&&old.TITULO||tipo),RESUMO:String(e.resumo||old&&old.RESUMO||''),REFERENCIA_ID:ref||old&&old.REFERENCIA_ID||'',
+    NUMERO_DOCUMENTO:String(e.numeroDocumento||e.numero||old&&old.NUMERO_DOCUMENTO||''),BATALHAO:batt,COMPANHIA:comp,
+    GUARNICAO:String(e.guarnicao||old&&old.GUARNICAO||''),VTR:String(e.vtr||old&&old.VTR||''),
+    COMANDANTE_MATRICULA:normMat_(e.comandanteMatricula||old&&old.COMANDANTE_MATRICULA||''),STATUS:String(e.status||old&&old.STATUS||'ATIVO'),
+    CRIADO_EM:old&&old.CRIADO_EM||now,ATUALIZADO_EM:now,PAYLOAD_JSON:JSON.stringify(payload||{})
+  };
+  upsert_(s,'EVENT_ID',eid,row);
+  return {ok:true,eventId:eid,message:old?'Evento do serviço atualizado.':'Evento do serviço registrado.',updatedAt:now};
+}
+function serviceEventList_(p){
+  var sid=String(p.serviceId||''),rid=String(p.rsdReportId||''),seg=Number(p.segmento||0)||0;
+  return objects_(serviceEventSheet_()).filter(function(x){
+    if(sid&&String(x.SERVICE_ID||'')!==sid)return false;
+    if(!sid&&rid&&String(x.RSD_REPORT_ID||'')!==rid)return false;
+    if(seg&&Number(x.SEGMENTO||0)!==seg)return false;
+    if(String(x.STATUS||'').toUpperCase()==='CANCELADO')return false;
+    return true;
+  }).map(function(x){
+    return {eventId:x.EVENT_ID||'',serviceId:x.SERVICE_ID||'',rsdReportId:x.RSD_REPORT_ID||'',segmento:Number(x.SEGMENTO||0)||'',
+      tipo:x.TIPO||'',subtipo:x.SUBTIPO||'',data:dateText_(x.DATA_EVENTO),hora:x.HORA_EVENTO||'',titulo:x.TITULO||'',resumo:x.RESUMO||'',
+      referenciaId:x.REFERENCIA_ID||'',numeroDocumento:x.NUMERO_DOCUMENTO||'',batalhao:x.BATALHAO||'',companhia:x.COMPANHIA||'',
+      guarnicao:x.GUARNICAO||'',vtr:x.VTR||'',comandanteMatricula:x.COMANDANTE_MATRICULA||'',criadoEm:x.CRIADO_EM||'',atualizadoEm:x.ATUALIZADO_EM||'',
+      payload:parseJson_(x.PAYLOAD_JSON,{})};
+  }).sort(function(a,b){
+    var ak=[a.data||'',a.hora||'',a.criadoEm||''].join(' '),bk=[b.data||'',b.hora||'',b.criadoEm||''].join(' ');
+    return ak.localeCompare(bk);
+  });
+}
+
+/* =========================
    Operações individualizadas
    ========================= */
 
@@ -531,6 +589,14 @@ function operationUpsert_(payload) {
     HOUVE_ALTERACAO:changed?'SIM':'NÃO',MOTIVO_ALTERACAO:pod.motivoAlteracao||'',ORIGEM_RELATORIO:'OPERACAO',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_()
   });
   audit_('OPERACAO',id,version,old?'RETIFICADA':'FINALIZADA','',op.responsavel||'',batt,comp,p);
+  if(row.SERVICE_ID||row.RSD_REPORT_ID){
+    var eventTotalAits=Number((p.resumoCpu||{}).totalAits||0)||Number(row.ART_165||0)+Number(row.ART_165_A||0)+Number(row.ART_230_XI||0)+Number(row.OUTROS_AITS_COM_ABORDAGEM||0)+Number(row.AITS_SEM_ABORDAGEM||0);
+    serviceEventUpsert_({eventId:(row.SERVICE_ID||row.RSD_REPORT_ID)+'::OPERACAO::'+id,serviceId:row.SERVICE_ID,rsdReportId:row.RSD_REPORT_ID,segmento:row.SEGMENTO,
+      tipo:'OPERACAO',subtipo:op.nome||'',data:op.data,hora:op.horaFim||op.horaInicio||'',titulo:op.nome||'Operação',
+      resumo:[loc.descricao||'',eventTotalAits?'AITs: '+eventTotalAits:''].filter(Boolean).join(' • '),referenciaId:id,batalhao:batt,companhia:comp,
+      guarnicao:op.guarnicoes||'',vtr:op.vtrs||'',comandanteMatricula:row.COMANDANTE_MATRICULA,
+      payload:{nome:op.nome||'',turno:op.turno||'',horaInicio:op.horaInicio||'',horaFim:op.horaFim||'',local:loc.descricao||'',resumoCpu:p.resumoCpu||{}}});
+  }
   return {ok:true,message:old?'Operação atualizada no banco estatístico.':'Operação registrada individualmente no banco estatístico.',registroId:id,version:version};
 }
 
@@ -579,7 +645,7 @@ function padGuarnicaoOrdem_(n) {
 function normalizeGuarnicaoNome_(nome,tipo) {
   var s=String(nome||'').trim().toUpperCase().replace(/\s+/g,' '),m=s.match(/^(BST|BASE|GTTRAN|TOR|REBOQUE)\s*0*(\d{1,2})$/);
   if(!m)return '';
-  var t=m[1],n=Number(m[2]),max={BST:10,BASE:4,GTTRAN:3,TOR:3,REBOQUE:3}[t]||0,expected=normGuarnicaoTipo_(tipo||t);
+  var t=m[1],n=Number(m[2]),max=10,expected=normGuarnicaoTipo_(tipo||t);
   if(n<1||n>max||!expected||t!==expected)return '';
   return t+' '+padGuarnicaoOrdem_(n);
 }
@@ -1160,6 +1226,13 @@ function cirvcRegister_(payload) {
       SERVICE_ID:c.serviceId||old&&old.SERVICE_ID||'',SEGMENTO:Number(c.segmento||old&&old.SEGMENTO||0)||'',SOURCE_REPORT_ID:c.sourceReportId||old&&old.SOURCE_REPORT_ID||'',
       LOCAL_APREENSAO:c.localApreensao||old&&old.LOCAL_APREENSAO||'',MOTIVO:c.motivo||old&&old.MOTIVO||''};
     upsert_(s,'CIRVC_ID',id,obj);count++;
+    if(obj.SERVICE_ID||obj.RSD_REPORT_ID){
+      serviceEventUpsert_({eventId:(obj.SERVICE_ID||obj.RSD_REPORT_ID)+'::CIRVC::'+id,serviceId:obj.SERVICE_ID,rsdReportId:obj.RSD_REPORT_ID,segmento:obj.SEGMENTO,
+        tipo:'CIRVC',subtipo:obj.MOTIVO||'',data:obj.DATA_CADASTRO,hora:obj.HORA_CADASTRO,titulo:'CIRVC — '+(obj.PLACA||obj.NUMERO_TERMO||'veículo'),
+        resumo:[obj.NUMERO_TERMO?'Termo '+obj.NUMERO_TERMO:'',obj.MARCA_MODELO||'',obj.LOCAL_CUSTODIA?'Destino: '+obj.LOCAL_CUSTODIA:''].filter(Boolean).join(' • '),
+        referenciaId:id,numeroDocumento:obj.NUMERO_TERMO||'',batalhao:obj.BATALHAO,companhia:obj.COMPANHIA,guarnicao:obj.GUARNICAO,vtr:obj.PREFIXO_ORIGEM,
+        comandanteMatricula:obj.CADASTRADO_POR_MATRICULA,payload:{placa:obj.PLACA||'',tipo:obj.TIPO||'',marcaModelo:obj.MARCA_MODELO||'',local:obj.LOCAL_CUSTODIA||'',localApreensao:obj.LOCAL_APREENSAO||'',motivo:obj.MOTIVO||''}});
+    }
   });
   return {ok:true,message:count+' CIRVC(s) disponibilizado(s) para continuidade da custódia.',quantidade:count};
 }
