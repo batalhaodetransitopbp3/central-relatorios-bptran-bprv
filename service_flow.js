@@ -201,40 +201,41 @@ function installRsd(){
  setTimeout(refreshRsd,350);addEventListener('pageshow',()=>setTimeout(refreshRsd,120));addEventListener('focus',()=>setTimeout(refreshRsd,120));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshRsd,120)});
 }
 function contextBanner(label){
- if(!fromRsd)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
+ if(!(fromRsd||fromRco))return;style();const c=fromRco?rcoCtx():ctx(),tb=$('.toolbar');if(!tb)return;
  let box=$('#centralModuleContext');if(!box){box=document.createElement('div');box.id='centralModuleContext';box.className='central-module-context no-print';tb.insertAdjacentElement('afterend',box)}
- box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
- if(!$('.central-module-return',tb)){const a=document.createElement('button');a.type='button';a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>returnToRsd('Voltando ao RSD sem vincular este módulo…');tb.prepend(a)}
+ if(fromRco)box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao RCO do responsável '+esc(c.responsavel||'')+'. Ao salvar, o lançamento retornará automaticamente ao RCO.';
+ else box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
+ if(!$('.central-module-return',tb)){const a=document.createElement('button');a.type='button';a.className='secondary central-module-return no-print';a.textContent=fromRco?'Voltar ao RCO sem vincular':'Voltar ao RSD sem vincular';a.onclick=()=>fromRco?returnToRco('Voltando ao RCO sem vincular este módulo…'):returnToRsd('Voltando ao RSD sem vincular este módulo…');tb.prepend(a)}
 }
-function goBack(){returnToRsd('Salvamento confirmado. Retornando ao RSD…')}
+function goBack(){if(fromRco)returnToRco('Salvamento confirmado. Retornando ao RCO…');else returnToRsd('Salvamento confirmado. Retornando ao RSD…')}
 function installOperation(){
- if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
- const c=ctx(),u=c.unidade||{};
+ if(!(fromRsd||fromRco))return;contextBanner(fromRco?'Relatório de Operação vinculado ao RCO':'Relatório de Operação vinculado ao RSD');
+ const c=fromRco?rcoCtx():ctx(),u=c.unidade||{};
  const applyLockedContext=()=>{
-   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
+   const map=fromRco?{batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data,responsavel:c.responsavel,guarnicoes:'CPU'}:{batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
    Object.entries(map).forEach(([id,v])=>{const el=$('#'+id);if(!el||v==null||v==='')return;el.value=String(v);el.dispatchEvent(new Event('change',{bubbles:true}));if(/batalhao|companhiaNumero/.test(id))el.disabled=true;else el.readOnly=true});
    global.syncUnitHeader?.();
  };
  applyLockedContext();setTimeout(applyLockedContext,80);
  const tryWrap=()=>{const fn=global.registrarOperacaoDoDiaCloud;if(typeof fn!=='function'||fn.__centralReturnWrapped)return false;
-   const w=async function(){progress('Salvando a operação na Central…');try{const r=await fn.apply(this,arguments);if(r===true){progressText('Operação salva. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
-   $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
+   const w=async function(){progress('Salvando a operação na Central…');try{const r=await fn.apply(this,arguments);if(r===true){progressText(fromRco?'Operação salva. Retornando ao RCO…':'Operação salva. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
+   $('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent=fromRco?'Salvar operação e voltar ao RCO':'Salvar operação e voltar ao RSD'});return true};
  if(!tryWrap())setTimeout(tryWrap,300);
 }
 function installCirvc(){
- if(!fromRsd)return;contextBanner('CIRVC vinculado ao RSD');
- const c=ctx(),u=c.unidade||{},serviceVtr=Array.isArray(c.vtrs)?c.vtrs.join(', '):'',guVtr=[c.guarnicao,serviceVtr&&('VTR '+serviceVtr)].filter(Boolean).join(' / ');
+ if(!(fromRsd||fromRco))return;contextBanner(fromRco?'CIRVC vinculado ao RCO':'CIRVC vinculado ao RSD');
+ const c=fromRco?rcoCtx():ctx(),u=c.unidade||{},serviceVtr=Array.isArray(c.vtrs)?c.vtrs.join(', '):'',guVtr=fromRco?'CPU':[c.guarnicao,serviceVtr&&('VTR '+serviceVtr)].filter(Boolean).join(' / ');
  const lockContext=()=>{
    const b=$('#globalBatalhao'),co=$('#globalCompanhia');if(b&&u.batalhao){b.value=u.batalhao;b.disabled=true}if(co&&u.companhiaNumero){co.value=String(u.companhiaNumero);co.disabled=true}
    $$('.auto-card').forEach(card=>{
      const data=card.querySelector('[data-name="dataEntrega"]'),gv=card.querySelector('[data-name="guarnicaoVtr"]'),mr=card.querySelector('[data-name="militarResponsavel"]');
-     if(data&&!data.value&&c.data)data.value=c.data;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}if(mr&&c.comandante){mr.value=c.comandante;mr.readOnly=true}
-     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=c.guarnicao||card.dataset.guarnicao||'';
+     if(data&&!data.value&&c.data)data.value=c.data;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}const responsavel=fromRco?c.responsavel:c.comandante;if(mr&&responsavel){mr.value=responsavel;mr.readOnly=true}
+     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.rcoReportId=c.rcoReportId||card.dataset.rcoReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=(fromRco?'CPU':c.guarnicao)||card.dataset.guarnicao||'';
    });
  };
  lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
  let done=false,tries=0;
- const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();progress('Salvando o CIRVC na Central…');try{const r=await old?.call(b);if(r===true){progressText('CIRVC salvo. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};return true};
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent=fromRco?'Salvar CIRVC e voltar ao RCO':'Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();progress('Salvando o CIRVC na Central…');try{const r=await old?.call(b);if(r===true){progressText(fromRco?'CIRVC salvo. Retornando ao RCO…':'CIRVC salvo. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};return true};
  const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
  window.addEventListener('central-v10-ready',()=>setTimeout(()=>{lockContext();tryWrap()},30),{once:true});
 }
