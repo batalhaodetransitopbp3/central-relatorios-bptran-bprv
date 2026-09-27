@@ -21,8 +21,13 @@ function css(){
 .central-access-loading,.central-access-empty{padding:16px;text-align:center;color:#66798a;background:#f7f9fb;border-radius:10px}
 .central-access-error{padding:12px;color:#7a2d2d;background:#fff1f1;border:1px solid #e3b8b8;border-radius:10px}
 .central-setup-nav{position:sticky;top:0;z-index:19000;background:#17375e;padding:8px 12px;box-shadow:0 3px 10px #0002}.central-setup-nav button{border:1px solid #ffffff55;background:#fff;color:#17375e;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer}
-body.central-service-setup main.page>section{display:none!important}body.central-service-setup .toolbar{display:none!important}
-body.central-service-setup .service-state-bar{display:none!important}body.central-service-setup header.doc-head{display:block!important}
+body.central-service-setup.rsd-setup main.page>*:not(header.doc-head){display:none!important}
+body.central-service-setup .toolbar{display:none!important}
+body.central-service-setup .service-state-bar{display:none!important}
+body.central-service-setup header.doc-head{display:block!important}
+body.central-service-setup.rsd-setup header.doc-head{margin-bottom:18px!important}
+.central-enter-report{margin-left:auto}
+.central-registered-note{font-weight:700;color:#17633d}
 body.central-service-setup.rco-setup #rcoResponsavelCard{display:block!important}
 body.central-service-setup.rco-setup header.doc-head{display:block!important}
 .rsd-gu-choice{width:100%;min-height:38px}
@@ -71,7 +76,7 @@ function enterSetup(type){
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
-   const gs=q('#guarnicaoEscolha'),go=q('#guarnicao'),gt=q('#guarnicaoTipo');if(gs)gs.value='';if(go)go.value='';if(gt)gt.value='';
+   installRsdEnterButton();
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
    const st=q('#rsdRegisterStatus');if(st)st.textContent='Preencha a identificação do serviço. A guarnição deve ser escolhida na lista; depois registre o serviço na Central.';
  }else{
@@ -92,11 +97,36 @@ function installRsdGuarnicaoChoice(){
  const s=document.createElement('select');s.id='guarnicaoEscolha';s.className='rsd-gu-choice no-print';s.innerHTML=guOptions();
  const normalize=v=>{const m=String(v||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s*0*(\d{1,2})$/);return m?m[1]+' '+String(Number(m[2])).padStart(2,'0'):''};
  const current=normalize(original.value);if(current)s.value=current;
- original.style.display='none';tipo.style.display='none';const tf=tipo.closest('.field');if(tf)tf.style.display='none';original.parentElement?.appendChild(s);
- const label=original.closest('.field')?.querySelector('label');if(label)label.textContent='Guarnição';
+ original.style.display='none';tipo.style.display='none';const holder=original.closest('.rsd-team-ident')||original.parentElement;holder?.appendChild(s);
+ const field=original.closest('.field'),label=field?.querySelector('label');if(label)label.textContent='Guarnição';if(field)field.style.display='block';
  s.onchange=()=>{original.value=s.value;tipo.value=(s.value.match(/^[A-Z]+/)||[''])[0];original.dispatchEvent(new Event('input',{bubbles:true}));tipo.dispatchEvent(new Event('change',{bubbles:true}));};
  const obs=new MutationObserver(()=>{const v=normalize(original.value);if(v&&s.value!==v)s.value=v;s.disabled=!!tipo.disabled});obs.observe(original,{attributes:true,attributeFilter:['value']});obs.observe(tipo,{attributes:true,attributeFilter:['disabled']});
  setInterval(()=>{const v=normalize(original.value);if(v&&s.value!==v)s.value=v;s.disabled=!!tipo.disabled},1200);
+}
+function lockRsdHeader(){
+ ['batalhao','companhiaNumero'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
+ ['data','diaSemana','guarnicaoEscolha','guarnicaoTipo'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
+ ['viatura','efetivo','responsavel','matriculaResponsavel'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
+ q('#buscarMilitarBtn')?.setAttribute('disabled','disabled');
+ q('#rsdChangeKeyBtn')?.setAttribute('hidden','hidden');
+ q('#rsdRegisterServiceBtn')?.setAttribute('hidden','hidden');
+ q('.rsd-add-vtr')?.setAttribute('disabled','disabled');
+ q('#rsdVtrExtras')?.querySelectorAll('input,button').forEach(el=>{el.disabled=true});
+}
+function installRsdEnterButton(){
+ const row=q('.rsd-register-row');if(!row)return null;
+ let btn=q('#centralEnterReportBtn');
+ if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterReportBtn';btn.className='ok central-enter-report';btn.textContent='Entrar no relatório';btn.hidden=true;row.appendChild(btn)}
+ btn.onclick=()=>{lockRsdHeader();exitSetup();window.scrollTo({top:0,behavior:'smooth'})};
+ if(q('#guarnicaoTipo')?.disabled||q('#viatura')?.readOnly)markRsdRegisteredSetup();
+ return btn;
+}
+function markRsdRegisteredSetup(){
+ const btn=installRsdEnterButton(),reg=q('#rsdRegisterServiceBtn'),st=q('#rsdRegisterStatus');
+ lockRsdHeader();
+ if(reg)reg.hidden=true;
+ if(btn){btn.hidden=false;btn.disabled=false}
+ if(st){st.classList.add('central-registered-note');st.textContent='Guarnição registrada e salva na Central. Clique em “Entrar no relatório” para iniciar os lançamentos do serviço.'}
 }
 async function ensureCentralToken(message){
  if(!global.CentralCloud)return '';
@@ -117,7 +147,7 @@ async function loadRsdActive(el){
    const r=await CentralCloud.jsonp('rsd-active',{matricula:mat,token},{timeout:15000}),items=r.items||[];
    if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum serviço em andamento foi localizado para esta matrícula. Se você está assumindo outra guarnição, use “Receber serviço em andamento”.</div>';return}
    box.innerHTML=items.map((x,i)=>`<div class="central-access-item"><strong>${esc(x.guarnicao||'Guarnição')} — VTR ${esc(x.vtrPrincipal||x.viatura||'—')}</strong><div class="central-access-meta">${esc([x.batalhao,x.companhia].filter(Boolean).join(' / ')||'Unidade não informada')} • ${fmtDate(x.data)}<br>Comandante: ${esc(x.responsavel||'—')} ${esc(x.matricula||'')} • ${esc(String(x.status||'').replaceAll('_',' '))}</div><button data-pick="${i}">Continuar este serviço</button></div>`).join('');
-   q('[data-list]',el).querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.pick)];b.disabled=true;if(typeof global.centralRsdClaimCloudItem!=='function'){b.disabled=false;alert('Atualize a página e tente novamente.');return}const ok=await global.centralRsdClaimCloudItem(x,false);if(ok){clearLayer();exitSetup()}else b.disabled=false});
+   q('[data-list]',el).querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.pick)];b.disabled=true;if(typeof global.centralRsdClaimCloudItem!=='function'){b.disabled=false;alert('Atualize a página e tente novamente.');return}const ok=await global.centralRsdClaimCloudItem(x,false);if(ok){lockRsdHeader();clearLayer();exitSetup()}else b.disabled=false});
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
 async function rsdReceive(){
@@ -139,7 +169,7 @@ async function rcoReceive(){
 function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd')installRsdGuarnicaoChoice();
- global.addEventListener('central-rsd-registered',()=>exitSetup());
+ global.addEventListener('central-rsd-registered',ev=>{if(ev?.detail?.continued){lockRsdHeader();exitSetup();return}if(document.body.classList.contains('rsd-setup'))markRsdRegisteredSetup();else lockRsdHeader()});
  global.addEventListener('central-rco-responsavel-registrado',()=>{exitSetup();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
  if(next===type+'-setup'||mode===type+'-setup'){enterSetup(type);return}
