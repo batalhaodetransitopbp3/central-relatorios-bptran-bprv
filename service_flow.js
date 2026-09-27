@@ -247,17 +247,48 @@ async function saveBoLink(){
    titulo:'BO — '+num,resumo:$('#naturezaOcorrencia')?.value||'',numeroDocumento:num,referenciaId:num,unidade:c.unidade||{},guarnicao:c.guarnicao||'',vtr:Array.isArray(c.vtrs)?c.vtrs.join(', '):'',comandanteMatricula:c.comandanteMatricula||'',
    payload:{id:num,tipo:'BO',numero:num,data,hora:$('#horaOcorrencia')?.value||'',descricao:$('#naturezaOcorrencia')?.value||'',naturezaPrincipal:$('#naturezaOcorrencia')?.value||''}};
  progress('Vinculando o BO ao RSD…');
- try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);progressText('BO vinculado. Retornando ao RSD…');setTimeout(goBack,120)}catch(e){progressDone();alert('Não foi possível vincular o BO ao RSD: '+e.message)}
+ try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});try{global.saveDraft?.(true)}catch(_){}progressText('BO vinculado. Retornando ao RSD…');setTimeout(goBack,120)}catch(e){progressDone();alert('Não foi possível vincular o BO ao RSD: '+e.message)}
+}
+function rcoOccurrenceFlow(){
+ style();$('#centralOccurrenceModal')?.remove();
+ const m=document.createElement('div');m.id='centralOccurrenceModal';m.className='central-occurrence-modal no-print';
+ m.innerHTML='<div class="central-occurrence-card"><h3>Adicionar ocorrência do CPU</h3><p>Qual tipo de ocorrência deseja registrar?</p><div class="central-occurrence-actions"><button type="button" data-t="BST">BST</button><button type="button" data-t="TCO">TCO</button><button type="button" data-t="BO">BO</button></div><div style="margin-top:9px;text-align:right"><button type="button" class="secondary" data-cancel>Cancelar</button></div></div>';
+ document.body.appendChild(m);$('[data-cancel]',m).onclick=()=>m.remove();
+ $('[data-t]',m).forEach(b=>b.onclick=()=>{const type=b.dataset.t;m.remove();if(type==='BO'&&confirm('Você deseja prosseguir com o preenchimento do BO online?\n\nOK: abrir o Boletim de Ocorrência online.\nCancelar: registrar somente os dados no RCO.')){openRcoModule('bo');return}global.addOccurrenceToGuarnicao?.('cpu',{tipo:type,data:rcoCtx().data||today(),hora:nowTime()});global.renderGuarnicoes?.();global.centralAutosave?.()});
+}
+async function saveBoLinkRco(){
+ const c=rcoCtx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
+ const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),data=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):c.data||today();
+ const result={kind:'BO',rcoReportId:c.rcoReportId||'',occurrence:{id:num,tipo:'BO',numero:num,data,hora:$('#horaOcorrencia')?.value||nowTime(),descricao:$('#naturezaOcorrencia')?.value||'',tipificacao:''}};
+ progress('Vinculando o BO ao RCO…');try{try{global.saveDraft?.(true)}catch(_){}localStorage.setItem(RCO_RESULT_KEY,JSON.stringify(result));progressText('BO vinculado. Retornando ao RCO…');setTimeout(()=>returnToRco('BO vinculado. Retornando ao RCO…'),100)}catch(e){progressDone();alert('Não foi possível preparar o retorno do BO ao RCO: '+e.message)}
+}
+function consumeRcoModuleResult(){
+ let x=null;try{x=JSON.parse(localStorage.getItem(RCO_RESULT_KEY)||'null')}catch(_){}if(!x)return;
+ const rc=saveRcoContext();if(x.rcoReportId&&rc.rcoReportId&&String(x.rcoReportId)!==String(rc.rcoReportId))return;
+ try{if(x.kind==='BO'&&x.occurrence){global.addOccurrenceToGuarnicao?.('cpu',x.occurrence);global.renderGuarnicoes?.();global.centralAutosave?.()}localStorage.removeItem(RCO_RESULT_KEY)}catch(_){}
 }
 function installBo(){
- if(!fromRsd)return;contextBanner('Boletim de Ocorrência vinculado ao RSD');const c=ctx();
+ if(!(fromRsd||fromRco))return;contextBanner(fromRco?'Boletim de Ocorrência vinculado ao RCO':'Boletim de Ocorrência vinculado ao RSD');const c=fromRco?rcoCtx():ctx();
  setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}if(c.data&&$('#dataOcorrencia')){const p=c.data.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):c.data}global.syncInstitutionSpecific?.()}catch(_){}},100);
- const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao RSD';b.onclick=saveBoLink;tb.prepend(b)}
+ const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent=fromRco?'Vincular BO e voltar ao RCO':'Vincular BO e voltar ao RSD';b.onclick=fromRco?saveBoLinkRco:saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
- const hideLegacy=()=>{$$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
- const run=()=>{hideLegacy();try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
- hideLegacy();setTimeout(run,350);addEventListener('focus',()=>setTimeout(run,150));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
+ const hideLegacy=()=>{$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
+ const bindButtons=()=>{
+   saveRcoContext();
+   const pod=$('#cpuOperations').length?$('#cpuOperations')?.closest('.stats-block'):null,podBtn=pod?.querySelector('.stats-title button');if(podBtn){podBtn.removeAttribute('onclick');podBtn.onclick=()=>openRcoModule('operation');podBtn.textContent='+ operação / ROP'}
+   const cir=$('#cpuArvcs')?.closest('section.card'),cirBtn=cir?.querySelector('.entry-head button');if(cirBtn){cirBtn.removeAttribute('onclick');cirBtn.onclick=()=>openRcoModule('cirvc');cirBtn.textContent='+ CIRVC'}
+   $('button').forEach(b=>{const oc=b.getAttribute('onclick')||'';if(oc.includes("addOccurrenceToGuarnicao('cpu'")){b.removeAttribute('onclick');b.onclick=rcoOccurrenceFlow;b.textContent='+ ocorrência'}});
+ };
+ async function syncLinked(){
+   const rc=saveRcoContext(),token=sessionStorage.getItem('pmpb-rco-role-token-v1')||'';if(!rc.rcoReportId||!token||!global.CentralCloud)return;
+   try{const r=await CentralCloud.jsonp('operation-list',{rcoReportId:rc.rcoReportId,token},{timeout:15000});(r.items||[]).forEach(p=>{if(document.querySelector('#cpuOperations .entry[data-id="'+CSS.escape(p.reportId||'')+'"]'))return;global.importOperationV2?.(p)})}catch(_){}
+   try{const r=await CentralCloud.jsonp('cirvc-list',{rcoReportId:rc.rcoReportId,token},{timeout:15000});(r.items||[]).forEach(x=>{if(!x.id||document.querySelector('#cpuArvcs .entry[data-id="'+CSS.escape(x.id)+'"]'))return;global.addCpuArvc?.({...x,guarnicao:'CPU'})})}catch(_){}
+   global.renderGuarnicoes?.();global.renderMatrix?.();try{global.salvarRascunho?.(true)}catch(_){}
+ }
+ const run=()=>{hideLegacy();bindButtons();consumeRcoModuleResult();syncLinked();try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
+ const mo=new MutationObserver(()=>bindButtons());const root=$('main.page')||document.body;mo.observe(root,{childList:true,subtree:true});
+ hideLegacy();setTimeout(run,350);addEventListener('focus',()=>setTimeout(run,150));addEventListener('pageshow',()=>setTimeout(run,120));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
 }
 function init(){
  style();
