@@ -262,8 +262,13 @@ function clearResumeIntent(){
 }
 async function resumeRsd(){
  const rc=resumeContext();
- const el=shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Carregando o serviço vinculado…</div>`);
+ shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Carregando o serviço vinculado…</div>`);
  try{
+   let local=null;
+   try{local=JSON.parse(localStorage.getItem('pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
+   if(local&&(!rc.reportId||String(local.reportId||'')===String(rc.reportId))&&typeof global.applyPayload==='function'){
+     global.applyPayload(local);lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true;
+   }
    if(rc.reportId&&typeof global.centralRsdClaimCloudItem==='function'){
      const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento},false);
      if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
