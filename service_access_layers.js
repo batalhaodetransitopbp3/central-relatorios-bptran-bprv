@@ -46,8 +46,9 @@ function shell(title,subtitle,body){
 }
 function clearLayer(){q('#centralAccessLayer')?.remove()}
 function newService(type){
+ if(!confirm('Iniciar um novo serviço?\\n\\nEsta ação limpa somente os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return;
  try{sessionStorage.setItem(NEXT,type+'-setup')}catch(_){}
- if(typeof global.centralStartService==='function')global.centralStartService();
+ if(typeof global.centralStartService==='function')global.centralStartService(true);
 }
 function startScreen(type){
  const label=type==='rsd'?'Relatório de Serviço Diário':'Relatório do Coordenador';
@@ -121,6 +122,7 @@ async function rsdReceive(){
 }
 async function rcoContinue(){
  clearLayer();
+ if(typeof global.centralRcoContinueCloud==='function'){const ok=await global.centralRcoContinueCloud();if(ok)exitSetup();else startScreen('rco');return}
  if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok)exitSetup();else startScreen('rco');return}
  startScreen('rco');
 }
