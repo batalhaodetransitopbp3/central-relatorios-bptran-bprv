@@ -164,17 +164,34 @@ function contextBanner(label){
 function goBack(){location.href=returnTo()}
 function installOperation(){
  if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
+ const c=ctx(),u=c.unidade||{};
+ const applyLockedContext=()=>{
+   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
+   Object.entries(map).forEach(([id,v])=>{const el=$('#'+id);if(!el||v==null||v==='')return;el.value=String(v);el.dispatchEvent(new Event('change',{bubbles:true}));if(/batalhao|companhiaNumero/.test(id))el.disabled=true;else el.readOnly=true});
+   global.syncUnitHeader?.();
+ };
+ applyLockedContext();setTimeout(applyLockedContext,80);
  const tryWrap=()=>{const fn=global.registrarOperacaoDoDiaCloud;if(typeof fn!=='function'||fn.__centralReturnWrapped)return false;
    const w=async function(){const r=await fn.apply(this,arguments);if(r===true){setTimeout(goBack,220)}return r};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
-   $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
+   $('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
  if(!tryWrap())setTimeout(tryWrap,300);
 }
 function installCirvc(){
  if(!fromRsd)return;contextBanner('CIRVC vinculado ao RSD');
+ const c=ctx(),u=c.unidade||{},serviceVtr=Array.isArray(c.vtrs)?c.vtrs.join(', '):'',guVtr=[c.guarnicao,serviceVtr&&('VTR '+serviceVtr)].filter(Boolean).join(' / ');
+ const lockContext=()=>{
+   const b=$('#globalBatalhao'),co=$('#globalCompanhia');if(b&&u.batalhao){b.value=u.batalhao;b.disabled=true}if(co&&u.companhiaNumero){co.value=String(u.companhiaNumero);co.disabled=true}
+   $('.auto-card').forEach(card=>{
+     const data=card.querySelector('[data-name="dataEntrega"]'),gv=card.querySelector('[data-name="guarnicaoVtr"]'),mr=card.querySelector('[data-name="militarResponsavel"]');
+     if(data&&!data.value&&c.data)data.value=c.data;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}if(mr&&c.comandante){mr.value=c.comandante;mr.readOnly=true}
+     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=c.guarnicao||card.dataset.guarnicao||'';
+   });
+ };
+ lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
  let done=false,tries=0;
- const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
  const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
- window.addEventListener('central-v10-ready',()=>setTimeout(tryWrap,30),{once:true});
+ window.addEventListener('central-v10-ready',()=>setTimeout(()=>{lockContext();tryWrap()},30),{once:true});
 }
 async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
@@ -187,7 +204,7 @@ async function saveBoLink(){
 }
 function installBo(){
  if(!fromRsd)return;contextBanner('Boletim de Ocorrência vinculado ao RSD');const c=ctx();
- setTimeout(()=>{try{const u=c.unidade||{};if(u.batalhao)$('#globalBatalhao').value=u.batalhao;if(u.companhiaNumero)$('#globalCompanhia').value=String(u.companhiaNumero);if(c.data&&$('#dataOcorrencia')){const p=c.data.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):c.data}global.syncInstitutionSpecific?.()}catch(_){}},100);
+ setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}if(c.data&&$('#dataOcorrencia')){const p=c.data.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):c.data}global.syncInstitutionSpecific?.()}catch(_){}},100);
  const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao RSD';b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
