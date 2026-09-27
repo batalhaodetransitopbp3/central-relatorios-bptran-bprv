@@ -161,8 +161,8 @@ function installRsd(){
  const occBtn=$('#normalExtras section:nth-of-type(1) .entry-head button');if(occBtn){occBtn.removeAttribute('onclick');occBtn.onclick=occurrenceFlow;occBtn.textContent='+ ocorrência'}
  const opSec=$$('#normalExtras section').find(s=>(s.querySelector('.sec-title')?.textContent||'').includes('Operações'));const opBtn=opSec?.querySelector('.entry-head button');if(opBtn){opBtn.removeAttribute('onclick');opBtn.onclick=()=>openModule('operation');opBtn.textContent='+ operação'}
  const cirSec=$$('#normalExtras section').find(s=>(s.querySelector('.sec-title')?.textContent||'').includes('CIRVC'));const cirBtn=cirSec?.querySelector('.entry-head button');if(cirBtn){cirBtn.removeAttribute('onclick');cirBtn.onclick=()=>openModule('cirvc');cirBtn.textContent='+ CIRVC'}
- $('.toolbar button').forEach(b=>{const t=(b.textContent||'').trim();if(t==='Carregar operações do dia'||t==='Carregar remoções do dia')b.style.display='none'});
- const obs=new MutationObserver(()=>{$$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$('#vehicles .vehicle-entry').forEach(augmentVehicle)});obs.observe($('#normalExtras')||document.body,{childList:true,subtree:true});
+ $$('.toolbar button').forEach(b=>{const t=(b.textContent||'').trim();if(t==='Carregar operações do dia'||t==='Carregar remoções do dia')b.style.display='none'});
+ const obs=new MutationObserver(()=>{$$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$$('#vehicles .vehicle-entry').forEach(augmentVehicle)});obs.observe($('#normalExtras')||document.body,{childList:true,subtree:true});
  setTimeout(refreshRsd,350);addEventListener('pageshow',()=>setTimeout(refreshRsd,120));addEventListener('focus',()=>setTimeout(refreshRsd,120));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshRsd,120)});
 }
 function contextBanner(label){
@@ -207,9 +207,9 @@ async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
  const token=centralToken(true);if(!token)return;
  const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),date=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):c.data||today();
- const ev={eventId:c.serviceId+'::BO::'+num,serviceId:c.serviceId,rsdReportId:c.rsdReportId||'',segmento:c.segmento||1,tipo:'BO',subtipo:'BO',data,hora:$('#horaOcorrencia')?.value||nowTime(),
+ const ev={eventId:c.serviceId+'::BO::'+num,serviceId:c.serviceId,rsdReportId:c.rsdReportId||'',segmento:c.segmento||1,tipo:'BO',subtipo:'BO',data:date,hora:$('#horaOcorrencia')?.value||nowTime(),
    titulo:'BO — '+num,resumo:$('#naturezaOcorrencia')?.value||'',numeroDocumento:num,referenciaId:num,unidade:c.unidade||{},guarnicao:c.guarnicao||'',vtr:Array.isArray(c.vtrs)?c.vtrs.join(', '):'',comandanteMatricula:c.comandanteMatricula||'',
-   payload:{id:num,tipo:'BO',numero:num,data,hora:$('#horaOcorrencia')?.value||'',descricao:$('#naturezaOcorrencia')?.value||'',naturezaPrincipal:$('#naturezaOcorrencia')?.value||''}};
+   payload:{id:num,tipo:'BO',numero:num,data:date,hora:$('#horaOcorrencia')?.value||'',descricao:$('#naturezaOcorrencia')?.value||'',naturezaPrincipal:$('#naturezaOcorrencia')?.value||''}};
  try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);alert('BO vinculado ao serviço. O número e o resumo ficarão disponíveis automaticamente no RSD.');goBack()}catch(e){alert('Não foi possível vincular o BO ao RSD: '+e.message)}
 }
 function installBo(){

@@ -17,6 +17,7 @@ function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
 function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
+  const showProgress=action!=='version';if(showProgress)beginProgress('Consultando a Central…');
   const callback='__central_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
   let done=false,timer;
   function cleanup(){clearTimeout(timer);try{delete global[callback]}catch(_){global[callback]=undefined}script.remove()}
