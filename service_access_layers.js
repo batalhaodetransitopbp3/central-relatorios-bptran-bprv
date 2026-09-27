@@ -118,7 +118,7 @@ function installRsdEnterButton(){
  const row=q('.rsd-register-row');if(!row)return null;
  let btn=q('#centralEnterReportBtn');
  if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterReportBtn';btn.className='ok central-enter-report';btn.textContent='Entrar no relatório';btn.hidden=true;row.appendChild(btn)}
- btn.onclick=()=>{lockRsdHeader();exitSetup();window.scrollTo({top:0,behavior:'smooth'})};
+ btn.onclick=()=>{btn.hidden=true;lockRsdHeader();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}exitSetup();window.scrollTo({top:0,behavior:'smooth'})};
  return btn;
 }
 function markRsdRegisteredSetup(){
