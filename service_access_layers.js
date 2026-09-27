@@ -152,20 +152,6 @@ function lockRsdHeader(){
  document.querySelectorAll('.rsd-add-vtr').forEach(el=>{el.disabled=true});
  q('#rsdVtrExtras')?.querySelectorAll('input,button').forEach(el=>{el.disabled=true});
 }
-function installRsdEnterButton(){
- const row=q('.rsd-register-row');if(!row)return null;
- let btn=q('#centralEnterReportBtn');
- if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterReportBtn';btn.className='ok central-enter-report';btn.textContent='Entrar no relatório';btn.hidden=true;row.appendChild(btn)}
- btn.onclick=()=>{btn.hidden=true;lockRsdHeader();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}exitSetup();window.scrollTo({top:0,behavior:'smooth'})};
- return btn;
-}
-function markRsdRegisteredSetup(){
- const btn=installRsdEnterButton(),reg=q('#rsdRegisterServiceBtn'),st=q('#rsdRegisterStatus');
- lockRsdHeader();
- if(reg)reg.hidden=true;
- if(btn){btn.hidden=false;btn.disabled=false}
- if(st){st.classList.add('central-registered-note');st.textContent='Guarnição registrada e salva na Central. Clique em “Entrar no relatório” para iniciar os lançamentos do serviço.'}
-}
 function lockRcoServiceIdentity(){
  ['batalhao','companhiaNumero','dataInicio','dataTermino'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['diaSemanaCpu','horarioServico'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
