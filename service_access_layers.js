@@ -285,13 +285,20 @@ async function resumeRsd(){
 }
 function resumeRcoRequested(){const p=new URLSearchParams(location.search);if(p.get('resumeRco')==='1')return true;try{return !!sessionStorage.getItem(RCO_RETURN_KEY)}catch(_){return false}}
 function clearRcoResumeIntent(){try{sessionStorage.removeItem(RCO_RETURN_KEY)}catch(_){}try{history.replaceState({},'',location.pathname)}catch(_){}}
+function restoreRcoIdentityFromActive(){
+ let a={};try{a=JSON.parse(localStorage.getItem('pmpb-active-rco-v1')||'{}')||{}}catch(_){}
+ const set=(id,v)=>{const el=q('#'+id);if(el&&v!=null)el.value=v};
+ set('rcoResponsavelPerfil',a.perfil||'CPU');set('rcoResponsavelMatricula',a.matricula||'');set('rcoResponsavelTurno',a.turno||'');set('rcoResponsavelNome',a.responsavel||'');
+ const out=q('#rcoResponsavelResultado');if(out&&a.responsavel)out.innerHTML='<strong>'+esc(a.responsavel)+'</strong><br>Matrícula: '+esc(a.matricula||'');
+ const badge=q('#rcoResponsavelBadge');if(badge&&a.responsavel){badge.textContent=(a.perfil==='CPU'?'CPU / Coordenador':(a.perfil||'Responsável'))+' registrado';badge.classList.add('ok')}
+}
 async function resumeRco(){
  shell('Retornando ao RCO','Reabrindo o relatório que estava em preenchimento.',`<div class="central-access-loading">Carregando o RCO vinculado…</div>`);
  global.CentralCloud?.showProgress('Reabrindo o RCO em andamento…');
  try{
    let local=null;try{local=JSON.parse(localStorage.getItem('pmpb-transito-cpu-v2-draft')||'null')}catch(_){}
-   if(local&&typeof global.applyCpu==='function'){global.applyCpu(local);lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}
-   if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok){lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}}
+   if(local&&typeof global.applyCpu==='function'){global.applyCpu(local);restoreRcoIdentityFromActive();lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}
+   if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok){restoreRcoIdentityFromActive();lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}}
  }catch(_){}
  global.CentralCloud?.hideProgress();clearLayer();clearRcoResumeIntent();startScreen('rco');return false;
 }
