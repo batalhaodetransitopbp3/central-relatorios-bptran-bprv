@@ -7,7 +7,16 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const ctx=()=>{try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}};
 const qs=new URLSearchParams(location.search);
 const fromRsd=qs.get('from')==='rsd';
+const RETURN_KEY='central-rsd-return-v1';
 const returnTo=()=>{const raw=qs.get('returnTo')||'relatorio_servico_diario.html';const name=String(raw).split('/').pop();return /^relatorio_servico_diario(?:_ios)?\.html$/i.test(name)?name:'relatorio_servico_diario.html'};
+function returnUrl(){
+ const c=ctx(),p=new URLSearchParams({resumeRsd:'1'});
+ if(c.serviceId)p.set('serviceId',c.serviceId);if(c.rsdReportId)p.set('rsdReportId',c.rsdReportId);if(c.segmento)p.set('segmento',String(c.segmento));
+ return returnTo()+'?'+p.toString();
+}
+function markReturnIntent(){
+ try{sessionStorage.setItem(RETURN_KEY,JSON.stringify({...ctx(),returnTo:returnTo(),em:new Date().toISOString()}))}catch(_){}
+}
 const nowTime=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:false});
 const today=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())};
 function centralToken(promptIfMissing=false){
@@ -160,9 +169,9 @@ function contextBanner(label){
  if(!fromRsd)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
  let box=$('#centralModuleContext');if(!box){box=document.createElement('div');box.id='centralModuleContext';box.className='central-module-context no-print';tb.insertAdjacentElement('afterend',box)}
  box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
- if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnTo();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD';tb.prepend(a)}
+ if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>markReturnIntent();tb.prepend(a)}
 }
-function goBack(){location.href=returnTo()}
+function goBack(){markReturnIntent();location.href=returnUrl()}
 function installOperation(){
  if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
  const c=ctx(),u=c.unidade||{};
