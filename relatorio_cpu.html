@@ -897,6 +897,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       if(removed)alert(removed+' RSD(s) cancelado(s) foi(ram) retirado(s) automaticamente desta consolidação. Os registros permanecem disponíveis em “Mostrar cancelados” para auditoria.');
     }catch(e){alert('Não foi possível consultar os RSDs: '+e.message)}
   }
+  window.centralRcoRefreshCloud=loadCloud;
   async function addAll(){for(const x of cloudItems.filter(x=>['DEFERIDO','DEFERIDO_COM_RESSALVAS'].includes(String(x.status||'').toUpperCase())))await addCloud(x)}
   function renderCloud(){
     const box=document.getElementById('rcoCloudList');if(!box)return;
