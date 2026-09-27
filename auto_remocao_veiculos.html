@@ -1546,15 +1546,15 @@ function prepareAndPrint() {
  async function publicarCirvcs(imprimir){
     salvarRascunho(true);salvarCirvcsParaConsolidacao();
     const regs=cloudRecords();
-    if(!regs.length){if(imprimir)prepareAndPrint();return}
-    let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+    if(!regs.length){if(imprimir)prepareAndPrint();return false}
+    let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
     try{
       const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});
       setStatus(r.message||'CIRVCs registrados na Central.');
-      if(imprimir)setTimeout(()=>prepareAndPrint(),180);
-      else alert(r.message||'CIRVCs registrados na Central e disponíveis para o RSD e para a continuidade da custódia.');
+      if(imprimir){setTimeout(()=>prepareAndPrint(),180);return true}
+      alert(r.message||'CIRVCs registrados na Central e disponíveis para o RSD e para a continuidade da custódia.');return true;
     }catch(e){
-      alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.');
+      alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.');return false;
     }
   }
   function publicarEImprimir(){return publicarCirvcs(true)}
@@ -1583,5 +1583,6 @@ function prepareAndPrint() {
 })();
 </script>
 
+<script src="service_flow.js"></script>
 </body>
 </html>
