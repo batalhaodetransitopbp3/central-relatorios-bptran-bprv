@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.0';
+var CENTRAL_V10_VERSION = '10.8.1';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -50,7 +50,7 @@ function doGet(e) {
       assertToken_(p.token, 'central');
       out = {ok:true, items:passagensPendentes_(p)};
     } else if (action === 'operation-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId?'rco':'central');
       out = {ok:true, items:operationList_(p)};
     } else if (action === 'service-event-list') {
       assertToken_(p.token, 'central');
@@ -68,7 +68,7 @@ function doGet(e) {
       assertToken_(p.token, 'rco');
       out = {ok:true, reboque:reboqueGet_(p.reportId)};
     } else if (action === 'cirvc-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId?'rco':'central');
       out = {ok:true, items:cirvcList_(p)};
     } else if (action === 'cirvc-pending') {
       assertToken_(p.token, 'central');
@@ -126,7 +126,8 @@ function doPost(e) {
 
     var out;
     if (action === 'operation-upsert') {
-      assertToken_(token, 'central');
+      var opAuthPayload=payload.operacaoPayload||payload.operacaoCompleta||payload||{};
+      assertToken_(token, opAuthPayload.rcoReportId||(opAuthPayload.contextoRco||{}).rcoReportId?'rco':'central');
       out = operationUpsert_(payload);
     } else if (action === 'service-event-upsert') {
       assertToken_(token, 'central');
@@ -179,7 +180,8 @@ function doPost(e) {
       assertToken_(token, 'central');
       out = reboqueUpsert_(payload, true);
     } else if (action === 'cirvc-register') {
-      assertToken_(token, 'central');
+      var cirvcForAuth=(payload.cirvcs||[]),cirvcRco=cirvcForAuth.some(function(x){return !!(x&&x.rcoReportId);});
+      assertToken_(token, cirvcRco?'rco':'central');
       out = cirvcRegister_(payload);
     } else if (action === 'cirvc-transport-create') {
       assertToken_(token, 'central');
@@ -561,7 +563,7 @@ function operationUpsert_(payload) {
   var id=String(p.reportId||''); if(!id) throw new Error('Operação sem REGISTRO_ID.');
   var u=p.unidade||{}, op=p.operacao||{}, pod=p.pod||{}, loc=p.local||{}, res=p.resultados||{}, ab=res.abordagens||{}, nt=res.notificacoes||{}, rem=res.remocoes||{}, cr=res.criminal||{};
   var batt=normBattalion_(u.batalhao||u.batalhaoSigla), comp=u.companhia||normCompany_(batt,u.companhiaNumero);
-  var coord=splitCoords_(loc.coordenadas), prev=splitCoords_(pod.coordenadasPrevistas);
+  var coord=splitCoords_(loc.coordenadas);
   var old=findOne_(sheet_(P3_SHEET_ID,'OPERACOES'),'REGISTRO_ID',id), version=old?Number(old.VERSAO_ORIGEM||1)+1:1;
   var row={
     REGISTRO_ID:id,REPORT_ID:id,DATA:dateText_(op.data),TURNO:op.turno||'',BATALHAO:batt,COMPANHIA:comp,GUARNICAO_RESPONSAVEL:op.guarnicoes||'',
@@ -575,7 +577,7 @@ function operationUpsert_(payload) {
     MANDADOS_PRISAO:Number(cr.mandados||0),VEICULOS_RECUPERADOS:Number(cr.veiculosRecuperados||0),VEICULOS_ADULTERADOS:Number(cr.veiculosAdulterados||0),TCOS:Number(cr.tcos||0),
     RESPONSAVEL:op.responsavel||'',DESCRICAO_APOIO:p.descricaoApoio||'',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_(),
     RSD_REPORT_ID:p.rsdReportId||(p.contextoServico||{}).rsdReportId||(old&&old.RSD_REPORT_ID)||'',
-    RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',STATUS_REGISTRO:'OPERACAO_FINALIZADA',VERSAO_ORIGEM:version,
+    RCO_REPORT_ID:p.rcoReportId||(p.contextoRco||{}).rcoReportId||(old&&old.RCO_REPORT_ID)||'',STATUS_REGISTRO:'OPERACAO_FINALIZADA',VERSAO_ORIGEM:version,
     SERVICE_ID:p.serviceId||(p.contextoServico||{}).serviceId||(old&&old.SERVICE_ID)||'',
     SEGMENTO:Number(p.segmento||(p.contextoServico||{}).segmento||(old&&old.SEGMENTO)||0)||'',
     COMANDANTE_MATRICULA:normMat_(p.comandanteMatricula||(p.contextoServico||{}).comandanteMatricula||'')
@@ -584,7 +586,7 @@ function operationUpsert_(payload) {
   var changed=['Executado em local diverso','Executado parcialmente','Não executado'].indexOf(String(pod.statusCumprimento||''))>=0;
   upsert_(sheet_(P3_SHEET_ID,'POD_EXECUCAO'),'REGISTRO_ID',id,{
     REGISTRO_ID:id,REPORT_ID:id,DATA:dateText_(op.data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:op.guarnicoes||'',OPERACAO:op.nome||'',TURNO:op.turno||'',
-    STATUS_CUMPRIMENTO:pod.statusCumprimento||'',LOCAL_PREVISTO:pod.localPrevisto||'',COORDENADAS_PREVISTAS:pod.coordenadasPrevistas||'',
+    STATUS_CUMPRIMENTO:pod.statusCumprimento||'',LOCAL_PREVISTO:pod.localPrevisto||'',
     LOCAL_EXECUTADO:loc.descricao||'',COORDENADAS_EXECUTADAS:loc.coordenadas||'',HORA_INICIO:op.horaInicio||'',HORA_FIM:op.horaFim||'',
     HOUVE_ALTERACAO:changed?'SIM':'NÃO',MOTIVO_ALTERACAO:pod.motivoAlteracao||'',ORIGEM_RELATORIO:'OPERACAO',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_()
   });
@@ -605,16 +607,17 @@ function operationList_(p) {
   pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});
   return list.filter(function(x){
     if(p.rsdReportId && String(x.RSD_REPORT_ID)!==String(p.rsdReportId))return false;
+    if(p.rcoReportId && String(x.RCO_REPORT_ID)!==String(p.rcoReportId))return false;
     if(p.serviceId && String(x.SERVICE_ID)!==String(p.serviceId))return false;
     if(p.data && dateText_(x.DATA)!==dateText_(p.data))return false;
     return String(x.STATUS_REGISTRO||'')!=='INATIVO';
   }).map(function(x){
     var d=pm[String(x.REGISTRO_ID||'')]||{};
     return {schema:'pmpb-transito-operacao-v2',schemaVersion:2,reportId:x.REGISTRO_ID,
-      serviceId:x.SERVICE_ID||'',rsdReportId:x.RSD_REPORT_ID||'',segmento:Number(x.SEGMENTO||0)||'',
+      serviceId:x.SERVICE_ID||'',rsdReportId:x.RSD_REPORT_ID||'',rcoReportId:x.RCO_REPORT_ID||'',segmento:Number(x.SEGMENTO||0)||'',
       comandanteMatricula:x.COMANDANTE_MATRICULA||'',unidade:{batalhao:x.BATALHAO,companhia:x.COMPANHIA,companhiaNumero:Number(String(x.COMPANHIA||'').match(/\d+/)?.[0]||1)},
       operacao:{nome:x.OPERACAO||'',data:dateText_(x.DATA),turno:x.TURNO||'',modalidade:x.MODALIDADE||'',guarnicoes:x.GUARNICAO_RESPONSAVEL||'',vtrs:x.VTRS||'',qtdPms:Number(x.EFETIVO||0),responsavel:x.RESPONSAVEL||''},
-      pod:{statusCumprimento:d.STATUS_CUMPRIMENTO||'',localPrevisto:d.LOCAL_PREVISTO||'',coordenadasPrevistas:d.COORDENADAS_PREVISTAS||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''},
+      pod:{statusCumprimento:d.STATUS_CUMPRIMENTO||'',localPrevisto:d.LOCAL_PREVISTO||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''},
       local:{descricao:d.LOCAL_EXECUTADO||x.LOCAL||'',coordenadas:d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', '),latitude:x.LATITUDE||'',longitude:x.LONGITUDE||''},
       resultados:{abordagens:{pessoas:Number(x.PESSOAS_ABORDADAS||0),motocicletas:Number(x.MOTOCICLETAS_ABORDADAS||0),ciclomotores:Number(x.CICLOMOTORES_ABORDADOS||0),automoveis:Number(x.AUTOMOVEIS_ABORDADOS||0),checkpoints:Number(x.CHECKPOINTS||0)},
         notificacoes:{testesEtilometro:Number(x.TESTES_ETILOMETRO||0),art165:Number(x.ART_165||0),art165a:Number(x.ART_165_A||0),art230xi:Number(x.ART_230_XI||0),aitsComAbordagem:Number(x.OUTROS_AITS_COM_ABORDAGEM||0),aitsSemAbordagem:Number(x.AITS_SEM_ABORDAGEM||0)},
@@ -623,7 +626,7 @@ function operationList_(p) {
       resumoCpu:{nome:x.OPERACAO||'',local:d.LOCAL_EXECUTADO||x.LOCAL||'',turno:x.TURNO||'',
         apreensoesVeiculos:Number(x.REMOCOES_MOTOCICLETAS||0)+Number(x.REMOCOES_CICLOMOTORES||0)+Number(x.REMOCOES_AUTOMOVEIS||0),
         totalAits:Number(x.ART_165||0)+Number(x.ART_165_A||0)+Number(x.ART_230_XI||0)+Number(x.OUTROS_AITS_COM_ABORDAGEM||0)+Number(x.AITS_SEM_ABORDAGEM||0),
-        prisoes:Number(x.PRISOES||0),statusCumprimento:d.STATUS_CUMPRIMENTO||'Não informado',localPrevisto:d.LOCAL_PREVISTO||'',coordenadasPrevistas:d.COORDENADAS_PREVISTAS||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''}};
+        prisoes:Number(x.PRISOES||0),statusCumprimento:d.STATUS_CUMPRIMENTO||'Não informado',localPrevisto:d.LOCAL_PREVISTO||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''}};
   });
 }
 
@@ -952,7 +955,7 @@ function syncRsdOperations_(r, reportId, batt, comp, version) {
     upsert_(pod,'REGISTRO_ID',id,Object.assign({},po,{
       REGISTRO_ID:id,REPORT_ID:po.REPORT_ID||id,DATA:po.DATA||dateText_((r.servico||{}).data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:po.GUARNICAO||gu,
       OPERACAO:po.OPERACAO||o.nome||'',TURNO:po.TURNO||o.turno||'',STATUS_CUMPRIMENTO:o.statusCumprimento||po.STATUS_CUMPRIMENTO||'Não informado',
-      LOCAL_PREVISTO:o.localPrevisto||po.LOCAL_PREVISTO||'',COORDENADAS_PREVISTAS:o.coordenadasPrevistas||po.COORDENADAS_PREVISTAS||'',
+      LOCAL_PREVISTO:o.localPrevisto||po.LOCAL_PREVISTO||'',
       LOCAL_EXECUTADO:o.local||po.LOCAL_EXECUTADO||'',COORDENADAS_EXECUTADAS:o.coordenadas||po.COORDENADAS_EXECUTADAS||'',
       HOUVE_ALTERACAO:['Executado em local diverso','Executado parcialmente','Não executado'].indexOf(o.statusCumprimento)>=0?'SIM':(po.HOUVE_ALTERACAO||'NÃO'),
       MOTIVO_ALTERACAO:o.motivoAlteracao||po.MOTIVO_ALTERACAO||'',ORIGEM_RELATORIO:'RSD',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_()
@@ -1237,12 +1240,13 @@ function cirvcRegister_(payload) {
   return {ok:true,message:count+' CIRVC(s) disponibilizado(s) para continuidade da custódia.',quantidade:count};
 }
 function cirvcList_(p) {
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',rid=String(p.rsdReportId||p.reportId||''),sid=String(p.serviceId||''),seg=Number(p.segmento||0)||0;
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',rid=String(p.rsdReportId||p.reportId||''),rcoid=String(p.rcoReportId||''),sid=String(p.serviceId||''),seg=Number(p.segmento||0)||0;
   var data=dateText_(p.data||''),gu=String(p.guarnicao||'').toLowerCase().trim();
   return objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){
     if(rid && String(x.RSD_REPORT_ID||'')!==rid)return false;
-    if(!rid && sid && String(x.SERVICE_ID||'')!==sid)return false;
-    if(!rid && sid && seg && Number(x.SEGMENTO||0)!==seg)return false;
+    if(rcoid && String(x.RCO_REPORT_ID||'')!==rcoid)return false;
+    if(!rid && !rcoid && sid && String(x.SERVICE_ID||'')!==sid)return false;
+    if(!rid && !rcoid && sid && seg && Number(x.SEGMENTO||0)!==seg)return false;
     if(batt&&String(x.BATALHAO)!==batt)return false;
     if(comp&&String(x.COMPANHIA)!==String(comp))return false;
     if(data&&dateText_(x.DATA_CADASTRO)!==data)return false;
@@ -1781,7 +1785,7 @@ function p3Query_(p) {
   }
   else if(view==='operacoes'){
     var ops=p3FastObjects_('OPERACOES',p,2000,['DATA']),pods=p3FastObjects_('POD_EXECUCAO',p,4000,['DATA']),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});
-    list=ops.map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.COORDENADAS_PREVISTAS=d.COORDENADAS_PREVISTAS||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});
+    list=ops.map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});
   }
   else if(view==='pod')list=p3FastObjects_('POD_EXECUCAO',p,2000,['DATA']);
   else if(view==='ocorrencias')list=p3FastObjects_('OCORRENCIAS',p,2000,['DATA']);
@@ -2185,7 +2189,7 @@ function rcoSupplementalUpsert_(payload) {
         DATA:dateText_(x.data||x.DATA||obj.DATA_SERVICO),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:x.guarnicao||x.GUARNICAO||oldPod.GUARNICAO||'',
         OPERACAO:x.operacao||x.OPERACAO||oldPod.OPERACAO||'',TURNO:x.turno||x.TURNO||oldPod.TURNO||'',
         STATUS_CUMPRIMENTO:x.statusCumprimento||x.STATUS_CUMPRIMENTO||oldPod.STATUS_CUMPRIMENTO||'',
-        LOCAL_PREVISTO:x.localPrevisto||x.LOCAL_PREVISTO||oldPod.LOCAL_PREVISTO||'',COORDENADAS_PREVISTAS:x.coordenadasPrevistas||x.COORDENADAS_PREVISTAS||oldPod.COORDENADAS_PREVISTAS||'',
+        LOCAL_PREVISTO:x.localPrevisto||x.LOCAL_PREVISTO||oldPod.LOCAL_PREVISTO||'',
         LOCAL_EXECUTADO:x.localExecutado||x.LOCAL_EXECUTADO||oldPod.LOCAL_EXECUTADO||'',COORDENADAS_EXECUTADAS:x.coordenadasExecutadas||x.COORDENADAS_EXECUTADAS||oldPod.COORDENADAS_EXECUTADAS||'',
         HORA_INICIO:x.horaInicio||x.HORA_INICIO||oldPod.HORA_INICIO||'',HORA_FIM:x.horaFim||x.HORA_FIM||oldPod.HORA_FIM||'',
         HOUVE_ALTERACAO:(x.houveAlteracao===true||String(x.houveAlteracao||x.HOUVE_ALTERACAO||'').toUpperCase()==='SIM')?'SIM':'NÃO',

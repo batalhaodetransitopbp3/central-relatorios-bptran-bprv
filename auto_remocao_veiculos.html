@@ -924,6 +924,7 @@
       section.dataset.autoId = id;
       const svcCtx=activeServiceContextCirvc();
       section.dataset.rsdReportId=data.rsdReportId||svcCtx.rsdReportId||'';
+      section.dataset.rcoReportId=data.rcoReportId||svcCtx.rcoReportId||'';
       section.dataset.serviceId=data.serviceId||svcCtx.serviceId||'';
       section.dataset.segmento=String(data.segmento||svcCtx.segmento||1);
       section.dataset.guarnicao=data.guarnicao||svcCtx.guarnicao||'';
@@ -1279,20 +1280,20 @@
     function arvcDataFile(v){if(!v)return 'SEM DATA';const p=v.split('-');return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:v.replaceAll('/','.')}
 function safeArvcName(v,f='CIRVC'){return String(v||f).trim().replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').slice(0,80)}
 function stableArvcToken(v){let h=2166136261;const s=String(v||'');for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
-function activeServiceContextCirvc(){try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
+function activeServiceContextCirvc(){try{const from=new URLSearchParams(location.search).get('from');return JSON.parse(localStorage.getItem(from==='rco'?'pmpb-active-rco-v1':'pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
 function arvcPayloadCpu(){
   const autos=coletarTodos(),inst=window.getInstitution?getInstitution():{},ctx=activeServiceContextCirvc(),ctxUnit=ctx.unidade||{};
   const registros=autos.map((a,i)=>{
     const core=[cirvcReportId,a.dataEntrega||'',a.horaEntrega||'',String(a.placa||'').toUpperCase(),a.guarnicaoVtr||'',a.numeroTermo||'',i+1].join('|');
     return {id:'cirvc-'+stableArvcToken(core),sourceReportId:cirvcReportId,numeroTermo:a.numeroTermo||'',data:a.dataEntrega||'',hora:a.horaEntrega||'',
       placa:a.placa||'',guarnicao:a.guarnicao||ctx.guarnicao||a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||ctx.comandante||'',local:a.localDestino||'',
-      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
+      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',rcoReportId:a.rcoReportId||ctx.rcoReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
       matriculaResponsavel:a.matriculaResponsavel||ctx.comandanteMatricula||'',vtr:a.guarnicaoVtr||(Array.isArray(ctx.vtrs)?ctx.vtrs[0]||'':''),
       localApreensao:a.localApreensao||'',motivo:a.motivo||'',tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),
       unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null}};
   }).filter(r=>r.placa||r.militarResponsavelAit||r.local);
   return {schema:'pmpb-transito-cirvc-v1',schemaVersion:2,reportId:cirvcReportId,generatedAt:new Date().toISOString(),
-    serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',segmento:Number(ctx.segmento||1)||1,
+    serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',rcoReportId:ctx.rcoReportId||'',segmento:Number(ctx.segmento||1)||1,
     unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null},registros};
 }
 function downloadArvcJson(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
@@ -1321,6 +1322,7 @@ function prepareAndPrint() {
       dados.assinaturaRecebedor = assinaturaRecebedor ? (assinaturaRecebedor.dataset.signatureData || '') : '';
       dados.fotos = getFotos(section);
       dados.rsdReportId=section.dataset.rsdReportId||'';
+      dados.rcoReportId=section.dataset.rcoReportId||'';
       dados.serviceId=section.dataset.serviceId||'';
       dados.segmento=Number(section.dataset.segmento||1)||1;
       dados.guarnicao=section.dataset.guarnicao||'';
@@ -1547,13 +1549,17 @@ function prepareAndPrint() {
     salvarRascunho(true);salvarCirvcsParaConsolidacao();
     const regs=cloudRecords();
     if(!regs.length){if(imprimir)prepareAndPrint();return false}
-    let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;
+    const from=new URLSearchParams(location.search).get('from'),linked=from==='rsd'||from==='rco';
+    let token=from==='rco'?(sessionStorage.getItem('pmpb-rco-role-token-v1')||''):CentralCloud.getToken('central');if(!token)token=CentralCloud.askToken('central');if(!token)return false;
+    if(!linked)CentralCloud.showProgress?.('Salvando os CIRVCs na Central…');
     try{
       const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});
       setStatus(r.message||'CIRVCs registrados na Central.');
+      if(!linked)CentralCloud.hideProgress?.();
       if(imprimir){setTimeout(()=>prepareAndPrint(),180);return true}
-      alert(r.message||'CIRVCs registrados na Central e disponíveis para o RSD e para a continuidade da custódia.');return true;
+      if(!linked)alert(r.message||'CIRVCs registrados na Central e disponíveis para continuidade da custódia.');return true;
     }catch(e){
+      if(!linked)CentralCloud.hideProgress?.();
       alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.');return false;
     }
   }
