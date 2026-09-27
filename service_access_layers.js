@@ -136,7 +136,7 @@ function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd')installRsdGuarnicaoChoice();
  global.addEventListener('central-rsd-registered',()=>exitSetup());
- global.addEventListener('central-rco-responsavel-registrado',()=>exitSetup());
+ global.addEventListener('central-rco-responsavel-registrado',()=>{exitSetup();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
  if(next===type+'-setup'||mode===type+'-setup'){enterSetup(type);return}
  startScreen(type);
