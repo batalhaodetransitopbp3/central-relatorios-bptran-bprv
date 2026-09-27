@@ -77,6 +77,7 @@ function enterSetup(type){
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
    installRsdEnterButton();
+   setTimeout(()=>{if(q('#guarnicaoTipo')?.disabled||q('#viatura')?.readOnly)markRsdRegisteredSetup()},80);
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
    const st=q('#rsdRegisterStatus');if(st)st.textContent='Preencha a identificação do serviço. A guarnição deve ser escolhida na lista; depois registre o serviço na Central.';
  }else{
@@ -110,7 +111,7 @@ function lockRsdHeader(){
  q('#buscarMilitarBtn')?.setAttribute('disabled','disabled');
  q('#rsdChangeKeyBtn')?.setAttribute('hidden','hidden');
  q('#rsdRegisterServiceBtn')?.setAttribute('hidden','hidden');
- q('.rsd-add-vtr')?.setAttribute('disabled','disabled');
+ document.querySelectorAll('.rsd-add-vtr').forEach(el=>{el.disabled=true});
  q('#rsdVtrExtras')?.querySelectorAll('input,button').forEach(el=>{el.disabled=true});
 }
 function installRsdEnterButton(){
@@ -118,7 +119,6 @@ function installRsdEnterButton(){
  let btn=q('#centralEnterReportBtn');
  if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterReportBtn';btn.className='ok central-enter-report';btn.textContent='Entrar no relatório';btn.hidden=true;row.appendChild(btn)}
  btn.onclick=()=>{lockRsdHeader();exitSetup();window.scrollTo({top:0,behavior:'smooth'})};
- if(q('#guarnicaoTipo')?.disabled||q('#viatura')?.readOnly)markRsdRegisteredSetup();
  return btn;
 }
 function markRsdRegisteredSetup(){
