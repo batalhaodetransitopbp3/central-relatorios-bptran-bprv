@@ -50,7 +50,7 @@ function doGet(e) {
       assertToken_(p.token, 'central');
       out = {ok:true, items:passagensPendentes_(p)};
     } else if (action === 'operation-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId?'rco':'central');
       out = {ok:true, items:operationList_(p)};
     } else if (action === 'service-event-list') {
       assertToken_(p.token, 'central');
@@ -68,7 +68,7 @@ function doGet(e) {
       assertToken_(p.token, 'rco');
       out = {ok:true, reboque:reboqueGet_(p.reportId)};
     } else if (action === 'cirvc-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId?'rco':'central');
       out = {ok:true, items:cirvcList_(p)};
     } else if (action === 'cirvc-pending') {
       assertToken_(p.token, 'central');
@@ -126,7 +126,8 @@ function doPost(e) {
 
     var out;
     if (action === 'operation-upsert') {
-      assertToken_(token, 'central');
+      var opAuthPayload=payload.operacaoPayload||payload.operacaoCompleta||payload||{};
+      assertToken_(token, opAuthPayload.rcoReportId||(opAuthPayload.contextoRco||{}).rcoReportId?'rco':'central');
       out = operationUpsert_(payload);
     } else if (action === 'service-event-upsert') {
       assertToken_(token, 'central');
@@ -179,7 +180,8 @@ function doPost(e) {
       assertToken_(token, 'central');
       out = reboqueUpsert_(payload, true);
     } else if (action === 'cirvc-register') {
-      assertToken_(token, 'central');
+      var cirvcForAuth=(payload.cirvcs||[]),cirvcRco=cirvcForAuth.some(function(x){return !!(x&&x.rcoReportId);});
+      assertToken_(token, cirvcRco?'rco':'central');
       out = cirvcRegister_(payload);
     } else if (action === 'cirvc-transport-create') {
       assertToken_(token, 'central');
@@ -575,7 +577,7 @@ function operationUpsert_(payload) {
     MANDADOS_PRISAO:Number(cr.mandados||0),VEICULOS_RECUPERADOS:Number(cr.veiculosRecuperados||0),VEICULOS_ADULTERADOS:Number(cr.veiculosAdulterados||0),TCOS:Number(cr.tcos||0),
     RESPONSAVEL:op.responsavel||'',DESCRICAO_APOIO:p.descricaoApoio||'',ORIGEM_REGISTRO_ID:id,ENVIADO_EM:nowIso_(),
     RSD_REPORT_ID:p.rsdReportId||(p.contextoServico||{}).rsdReportId||(old&&old.RSD_REPORT_ID)||'',
-    RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',STATUS_REGISTRO:'OPERACAO_FINALIZADA',VERSAO_ORIGEM:version,
+    RCO_REPORT_ID:p.rcoReportId||(p.contextoRco||{}).rcoReportId||(old&&old.RCO_REPORT_ID)||'',STATUS_REGISTRO:'OPERACAO_FINALIZADA',VERSAO_ORIGEM:version,
     SERVICE_ID:p.serviceId||(p.contextoServico||{}).serviceId||(old&&old.SERVICE_ID)||'',
     SEGMENTO:Number(p.segmento||(p.contextoServico||{}).segmento||(old&&old.SEGMENTO)||0)||'',
     COMANDANTE_MATRICULA:normMat_(p.comandanteMatricula||(p.contextoServico||{}).comandanteMatricula||'')
@@ -605,13 +607,14 @@ function operationList_(p) {
   pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});
   return list.filter(function(x){
     if(p.rsdReportId && String(x.RSD_REPORT_ID)!==String(p.rsdReportId))return false;
+    if(p.rcoReportId && String(x.RCO_REPORT_ID)!==String(p.rcoReportId))return false;
     if(p.serviceId && String(x.SERVICE_ID)!==String(p.serviceId))return false;
     if(p.data && dateText_(x.DATA)!==dateText_(p.data))return false;
     return String(x.STATUS_REGISTRO||'')!=='INATIVO';
   }).map(function(x){
     var d=pm[String(x.REGISTRO_ID||'')]||{};
     return {schema:'pmpb-transito-operacao-v2',schemaVersion:2,reportId:x.REGISTRO_ID,
-      serviceId:x.SERVICE_ID||'',rsdReportId:x.RSD_REPORT_ID||'',segmento:Number(x.SEGMENTO||0)||'',
+      serviceId:x.SERVICE_ID||'',rsdReportId:x.RSD_REPORT_ID||'',rcoReportId:x.RCO_REPORT_ID||'',segmento:Number(x.SEGMENTO||0)||'',
       comandanteMatricula:x.COMANDANTE_MATRICULA||'',unidade:{batalhao:x.BATALHAO,companhia:x.COMPANHIA,companhiaNumero:Number(String(x.COMPANHIA||'').match(/\d+/)?.[0]||1)},
       operacao:{nome:x.OPERACAO||'',data:dateText_(x.DATA),turno:x.TURNO||'',modalidade:x.MODALIDADE||'',guarnicoes:x.GUARNICAO_RESPONSAVEL||'',vtrs:x.VTRS||'',qtdPms:Number(x.EFETIVO||0),responsavel:x.RESPONSAVEL||''},
       pod:{statusCumprimento:d.STATUS_CUMPRIMENTO||'',localPrevisto:d.LOCAL_PREVISTO||'',motivoAlteracao:d.MOTIVO_ALTERACAO||''},
@@ -1237,12 +1240,13 @@ function cirvcRegister_(payload) {
   return {ok:true,message:count+' CIRVC(s) disponibilizado(s) para continuidade da custódia.',quantidade:count};
 }
 function cirvcList_(p) {
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',rid=String(p.rsdReportId||p.reportId||''),sid=String(p.serviceId||''),seg=Number(p.segmento||0)||0;
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',rid=String(p.rsdReportId||p.reportId||''),rcoid=String(p.rcoReportId||''),sid=String(p.serviceId||''),seg=Number(p.segmento||0)||0;
   var data=dateText_(p.data||''),gu=String(p.guarnicao||'').toLowerCase().trim();
   return objects_(sheet_(P3_SHEET_ID,'CIRVC_CUSTODIA')).filter(function(x){
     if(rid && String(x.RSD_REPORT_ID||'')!==rid)return false;
-    if(!rid && sid && String(x.SERVICE_ID||'')!==sid)return false;
-    if(!rid && sid && seg && Number(x.SEGMENTO||0)!==seg)return false;
+    if(rcoid && String(x.RCO_REPORT_ID||'')!==rcoid)return false;
+    if(!rid && !rcoid && sid && String(x.SERVICE_ID||'')!==sid)return false;
+    if(!rid && !rcoid && sid && seg && Number(x.SEGMENTO||0)!==seg)return false;
     if(batt&&String(x.BATALHAO)!==batt)return false;
     if(comp&&String(x.COMPANHIA)!==String(comp))return false;
     if(data&&dateText_(x.DATA_CADASTRO)!==data)return false;
