@@ -123,7 +123,10 @@ function installRsdGuarnicaoChoice(){
  holder.classList.add('central-split-gu');holder.innerHTML='';tipo.style.display='block';tipo.value=currentType;typeWrap.appendChild(tipo);numWrap.appendChild(numero);holder.append(typeWrap,numWrap,original);
  original.style.display='none';if(label)label.textContent='Guarnição';if(field)field.style.display='block';
  tipo.onchange=()=>{syncRsdGuarnicaoParts();tipo.dispatchEvent(new Event('input',{bubbles:true}))};numero.onchange=syncRsdGuarnicaoParts;
- if(currentType&&currentNum)syncRsdGuarnicaoParts();
+ const syncFromName=()=>{const mm=String(original.value||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s*0*(\d{1,2})$/);if(!mm)return;const tt=mm[1],nn=String(Number(mm[2])).padStart(2,'0');if(tipo.value!==tt)tipo.value=tt;if(numero.value!==nn)numero.value=nn};
+ global.centralSyncRsdGuarnicaoControls=syncFromName;
+ if(currentType&&currentNum)syncRsdGuarnicaoParts();else syncFromName();
+ setInterval(syncFromName,900);
 }
 function installRsdCommanderFlow(){
  const row=q('.rsd-person-row'),name=q('#responsavel'),mat=q('#matriculaResponsavel'),search=q('#buscarMilitarBtn');if(!row||!name||!mat)return;
