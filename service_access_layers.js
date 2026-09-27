@@ -2,6 +2,7 @@
 'use strict';
 const NEXT='central-layer-next-v1';
 const MODE='central-layer-mode-v1';
+const RETURN_KEY='central-rsd-return-v1';
 const q=(s,r=document)=>r.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const fmtDate=v=>{if(!v)return '—';const p=String(v).slice(0,10).split('-');return p.length===3?p.reverse().join('/'):v};
@@ -244,9 +245,47 @@ async function rcoReceive(){
  if(typeof global.centralRcoReceivePassage==='function'){const ok=await global.centralRcoReceivePassage();if(ok)enterSetup('rco','receive');else startScreen('rco');return}
  startScreen('rco');
 }
+function resumeRequested(){
+ const p=new URLSearchParams(location.search);
+ if(p.get('resumeRsd')==='1')return true;
+ try{return !!sessionStorage.getItem(RETURN_KEY)}catch(_){return false}
+}
+function resumeContext(){
+ const p=new URLSearchParams(location.search);let saved={};
+ try{saved=JSON.parse(sessionStorage.getItem(RETURN_KEY)||'{}')||{}}catch(_){}
+ let active={};try{active=JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){}
+ return {reportId:p.get('rsdReportId')||saved.rsdReportId||active.rsdReportId||'',serviceId:p.get('serviceId')||saved.serviceId||active.serviceId||'',segmento:Number(p.get('segmento')||saved.segmento||active.segmento||1)||1};
+}
+function clearResumeIntent(){
+ try{sessionStorage.removeItem(RETURN_KEY)}catch(_){}
+ try{history.replaceState({},'',location.pathname)}catch(_){}
+}
+async function resumeRsd(){
+ const rc=resumeContext();
+ shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Carregando o serviço vinculado…</div>`);
+ try{
+   let local=null;
+   try{local=JSON.parse(localStorage.getItem('pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
+   if(local&&(!rc.reportId||String(local.reportId||'')===String(rc.reportId))&&typeof global.applyPayload==='function'){
+     global.applyPayload(local);lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true;
+   }
+   if(rc.reportId&&typeof global.centralRsdClaimCloudItem==='function'){
+     const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento},false);
+     if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
+   }
+   if(typeof global.centralContinueService==='function'){
+     const ok=await global.centralContinueService();
+     if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
+   }
+ }catch(e){}
+ clearLayer();clearResumeIntent();
+ alert('Não foi possível reabrir automaticamente o RSD anterior. O sistema manterá o fluxo de acesso para que o serviço possa ser localizado sem apagar dados.');
+ startScreen('rsd');return false;
+}
 function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd'){installRsdGuarnicaoChoice();installRsdCommanderFlow()}
+ if(type==='rsd'&&resumeRequested()){resumeRsd();return}
  global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
  global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
