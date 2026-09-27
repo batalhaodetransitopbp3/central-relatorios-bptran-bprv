@@ -151,7 +151,7 @@ function renderTimeline(events=[]){
 async function refreshRsd(){
  if(!/relatorio_servico_diario/i.test(PATH))return;
  await Promise.all([syncOperations(),syncCirvcs()]);const events=await fetchEvents();syncEventOccurrences(events);
- $$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$$$('#vehicles .vehicle-entry').forEach(augmentVehicle);
+ $$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$$('#vehicles .vehicle-entry').forEach(augmentVehicle);
  renderTimeline(events);global.centralAutosave?.();
 }
 global.centralRefreshServiceModules=refreshRsd;
@@ -161,17 +161,17 @@ function installRsd(){
  const occBtn=$('#normalExtras section:nth-of-type(1) .entry-head button');if(occBtn){occBtn.removeAttribute('onclick');occBtn.onclick=occurrenceFlow;occBtn.textContent='+ ocorrência'}
  const opSec=$$('#normalExtras section').find(s=>(s.querySelector('.sec-title')?.textContent||'').includes('Operações'));const opBtn=opSec?.querySelector('.entry-head button');if(opBtn){opBtn.removeAttribute('onclick');opBtn.onclick=()=>openModule('operation');opBtn.textContent='+ operação'}
  const cirSec=$$('#normalExtras section').find(s=>(s.querySelector('.sec-title')?.textContent||'').includes('CIRVC'));const cirBtn=cirSec?.querySelector('.entry-head button');if(cirBtn){cirBtn.removeAttribute('onclick');cirBtn.onclick=()=>openModule('cirvc');cirBtn.textContent='+ CIRVC'}
- $$$('.toolbar button').forEach(b=>{const t=(b.textContent||'').trim();if(t==='Carregar operações do dia'||t==='Carregar remoções do dia')b.style.display='none'});
- const obs=new MutationObserver(()=>{$$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$$$('#vehicles .vehicle-entry').forEach(augmentVehicle)});obs.observe($('#normalExtras')||document.body,{childList:true,subtree:true});
+ $('.toolbar button').forEach(b=>{const t=(b.textContent||'').trim();if(t==='Carregar operações do dia'||t==='Carregar remoções do dia')b.style.display='none'});
+ const obs=new MutationObserver(()=>{$$('#occurrences .occurrence-entry').forEach(augmentOccurrence);$('#vehicles .vehicle-entry').forEach(augmentVehicle)});obs.observe($('#normalExtras')||document.body,{childList:true,subtree:true});
  setTimeout(refreshRsd,350);addEventListener('pageshow',()=>setTimeout(refreshRsd,120));addEventListener('focus',()=>setTimeout(refreshRsd,120));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshRsd,120)});
 }
 function contextBanner(label){
  if(!fromRsd)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
  let box=$('#centralModuleContext');if(!box){box=document.createElement('div');box.id='centralModuleContext';box.className='central-module-context no-print';tb.insertAdjacentElement('afterend',box)}
  box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
- if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>markReturnIntent();tb.prepend(a)}
+ if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>{markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}};tb.prepend(a)}
 }
-function goBack(){markReturnIntent();location.href=returnUrl()}
+function goBack(){markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}try{global.CentralCloud?.beginProgress?.('Retornando ao RSD…')}catch(_){}const target=new URL(returnUrl(),location.href).href;location.assign(target)}
 function installOperation(){
  if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
  const c=ctx(),u=c.unidade||{};
@@ -182,7 +182,7 @@ function installOperation(){
  };
  applyLockedContext();setTimeout(applyLockedContext,80);
  const tryWrap=()=>{const fn=global.registrarOperacaoDoDiaCloud;if(typeof fn!=='function'||fn.__centralReturnWrapped)return false;
-   const w=async function(){const r=await fn.apply(this,arguments);if(r===true){setTimeout(goBack,220)}return r};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
+   const w=async function(){const r=await fn.apply(this,arguments);if(r===true)goBack();return r};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
    $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
  if(!tryWrap())setTimeout(tryWrap,300);
 }
@@ -199,7 +199,7 @@ function installCirvc(){
  };
  lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
  let done=false,tries=0;
- const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();b.disabled=true;try{const r=await Promise.resolve(old?.call(b));if(r===true){goBack();return true}return r}finally{if(document.body.contains(b))b.disabled=false}};return true};
  const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
  window.addEventListener('central-v10-ready',()=>setTimeout(()=>{lockContext();tryWrap()},30),{once:true});
 }

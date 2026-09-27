@@ -161,7 +161,7 @@ function lockRcoServiceIdentity(){
 function lockRcoHeader(){
  lockRcoServiceIdentity();
  ['rcoResponsavelPerfil'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
- ['rcoResponsavelMatricula','rcoResponsavelTurno','rcoExternoPosto','rcoExternoNome','rcoExternoUnidade'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
+ ['rcoResponsavelMatricula','rcoExternoPosto','rcoExternoNome','rcoExternoUnidade'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});const turno=q('#rcoResponsavelTurno');if(turno)turno.disabled=true;
  const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=true}
  q('#rcoResponsavelRegistrarBtn')?.setAttribute('hidden','hidden');
 }
@@ -202,9 +202,9 @@ async function loadRcoSetupStatus(){
 }
 function markRcoRegisteredSetup(){
  lockRcoHeader();
- const btn=installRcoEnterButton(),res=q('#rcoResponsavelResultado');
+ const btn=installRcoEnterButton(),status=q('#rcoResponsavelProgresso');
  if(btn){btn.hidden=false;btn.disabled=false}
- if(res){res.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.'}
+ if(status){status.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.'}
  loadRcoSetupStatus();
 }
 async function ensureCentralToken(message){

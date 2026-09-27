@@ -1503,6 +1503,7 @@ function prepareAndPrint() {
   }
   window.centralAutosave=function(){saveGeneric();saveSpecific()};
   window.centralMarkSaved=function(){centralDirty=false;saveGeneric();saveSpecific()};
+window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExit=true;saveGeneric();saveSpecific()};
   window.centralStartService=function(){
     if(!confirm('Você tem certeza que deseja apagar todos os dados registrados e dar início a um novo serviço?'))return;
     centralSuppressExit=true;
