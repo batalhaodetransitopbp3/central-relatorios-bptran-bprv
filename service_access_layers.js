@@ -3,6 +3,7 @@
 const NEXT='central-layer-next-v1';
 const MODE='central-layer-mode-v1';
 const RETURN_KEY='central-rsd-return-v1';
+const RCO_RETURN_KEY='central-rco-return-v1';
 const q=(s,r=document)=>r.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const fmtDate=v=>{if(!v)return '—';const p=String(v).slice(0,10).split('-');return p.length===3?p.reverse().join('/'):v};
@@ -282,10 +283,23 @@ async function resumeRsd(){
  alert('Não foi possível reabrir automaticamente o RSD anterior. O sistema manterá o fluxo de acesso para que o serviço possa ser localizado sem apagar dados.');
  startScreen('rsd');return false;
 }
+function resumeRcoRequested(){const p=new URLSearchParams(location.search);if(p.get('resumeRco')==='1')return true;try{return !!sessionStorage.getItem(RCO_RETURN_KEY)}catch(_){return false}}
+function clearRcoResumeIntent(){try{sessionStorage.removeItem(RCO_RETURN_KEY)}catch(_){}try{history.replaceState({},'',location.pathname)}catch(_){}}
+async function resumeRco(){
+ shell('Retornando ao RCO','Reabrindo o relatório que estava em preenchimento.',`<div class="central-access-loading">Carregando o RCO vinculado…</div>`);
+ global.CentralCloud?.showProgress('Reabrindo o RCO em andamento…');
+ try{
+   let local=null;try{local=JSON.parse(localStorage.getItem('pmpb-transito-cpu-v2-draft')||'null')}catch(_){}
+   if(local&&typeof global.applyCpu==='function'){global.applyCpu(local);lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}
+   if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok){lockRcoHeader();clearLayer();exitSetup();clearRcoResumeIntent();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);return true}}
+ }catch(_){}
+ global.CentralCloud?.hideProgress();clearLayer();clearRcoResumeIntent();startScreen('rco');return false;
+}
 function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd'){installRsdGuarnicaoChoice();installRsdCommanderFlow()}
  if(type==='rsd'&&resumeRequested()){resumeRsd();return}
+ if(type==='rco'&&resumeRcoRequested()){resumeRco();return}
  global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
  global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
