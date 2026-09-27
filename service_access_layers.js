@@ -15,7 +15,7 @@ function css(){
 .central-access-head{text-align:center;margin-bottom:18px}.central-access-head h1{font-size:22px;margin:0 0 6px;color:#17375e}.central-access-head p{margin:0;color:#657789;font-size:13px}
 .central-access-actions{display:grid;gap:10px}.central-access-action{display:block;width:100%;text-align:left;padding:16px;border:1px solid #c9d6e0;border-radius:13px;background:#f9fbfd;color:#17375e;cursor:pointer;box-shadow:none}
 .central-access-action:hover{background:#f0f6fb;border-color:#9fb9cf}.central-access-action strong{display:block;font-size:15px;margin-bottom:4px}.central-access-action span{display:block;color:#657789;font-size:12px;font-weight:400}
-.central-access-unit{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.central-access-unit label{font-size:11px;font-weight:700;color:#52697e}.central-access-unit select{width:100%;margin-top:4px;padding:10px;border:1px solid #cbd7e1;border-radius:9px;background:#fff}
+.central-access-unit{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.central-access-unit label{font-size:11px;font-weight:700;color:#52697e}.central-access-unit select,.central-access-unit input{width:100%;margin-top:4px;padding:10px;border:1px solid #cbd7e1;border-radius:9px;background:#fff;box-sizing:border-box}
 .central-access-list{display:grid;gap:8px;margin-top:12px}.central-access-item{border:1px solid #cbd7e1;border-radius:11px;padding:11px;background:#fff}.central-access-item strong{color:#17375e}.central-access-meta{font-size:11px;color:#647789;margin:4px 0 8px;line-height:1.45}.central-access-item button{padding:8px 11px;border:0;border-radius:8px;background:#17375e;color:#fff;font-weight:700;cursor:pointer}
 .central-access-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.central-access-toolbar button{padding:9px 12px;border-radius:8px;border:1px solid #bdcbd6;background:#fff;color:#29485f;font-weight:700;cursor:pointer}
 .central-access-loading,.central-access-empty{padding:16px;text-align:center;color:#66798a;background:#f7f9fb;border-radius:10px}
@@ -48,7 +48,7 @@ function shell(title,subtitle,body){
 function clearLayer(){q('#centralAccessLayer')?.remove()}
 function newService(type){
  if(!confirm('Iniciar um novo serviço?\n\nEsta ação limpa somente os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return;
- try{sessionStorage.setItem(NEXT,type+'-setup')}catch(_){}
+ try{if(type==='rco')sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.setItem(NEXT,type+'-setup')}catch(_){}
  if(typeof global.centralStartService==='function')global.centralStartService(true);
 }
 function startScreen(type){
@@ -103,18 +103,20 @@ async function ensureCentralToken(message){
  let t=CentralCloud.getToken('central');if(!t)t=CentralCloud.askToken('central',message||'Informe a chave operacional da Central:');return t||'';
 }
 async function rsdContinueScreen(){
- const el=shell('Continuar serviço em andamento','Selecione a unidade para ver somente os serviços disponíveis para continuidade.',unitFields()+`<div class="central-access-toolbar"><button data-load>Carregar serviços</button><button data-back>Voltar</button></div><div class="central-access-list" data-list></div>`);
- syncLayerUnit(el);q('[data-back]',el).onclick=()=>startScreen('rsd');q('[data-load]',el).onclick=()=>loadRsdActive(el);await loadRsdActive(el);
+ const el=shell('Continuar serviço em andamento','Informe a matrícula do comandante atual. Somente os serviços registrados em seu nome serão exibidos.',`<div class="central-access-unit"><label>Matrícula do comandante<input data-layer-mat inputmode="numeric" maxlength="9" placeholder="000.000-0" autocomplete="off"></label></div><div class="central-access-toolbar"><button data-load>Localizar meus serviços</button><button data-back>Voltar</button></div><div class="central-access-list" data-list><div class="central-access-empty">Informe a matrícula para localizar o serviço em andamento.</div></div>`);
+ const mat=q('[data-layer-mat]',el);if(mat)mat.oninput=()=>{mat.value=global.CentralCloud?CentralCloud.formatMatricula(mat.value):mat.value};
+ q('[data-back]',el).onclick=()=>startScreen('rsd');q('[data-load]',el).onclick=()=>loadRsdActive(el);mat?.focus();
 }
 async function loadRsdActive(el){
- const box=q('[data-list]',el);box.innerHTML='<div class="central-access-loading">Consultando a Central…</div>';
+ const box=q('[data-list]',el),matEl=q('[data-layer-mat]',el),mat=global.CentralCloud?CentralCloud.formatMatricula(matEl?.value||''):String(matEl?.value||'').trim();
+ if(matEl)matEl.value=mat;
+ if(!/^\d{3}\.\d{3}-\d$/.test(mat)){box.innerHTML='<div class="central-access-error">Informe uma matrícula válida no padrão 000.000-0.</div>';matEl?.focus();return}
+ box.innerHTML='<div class="central-access-loading">Consultando a Central…</div>';
  const token=await ensureCentralToken();if(!token){box.innerHTML='<div class="central-access-empty">Consulta cancelada.</div>';return}
- const u=unit();
  try{
-   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),token},{timeout:15000});
-   const items=(r.items||[]).filter(x=>['EM_SERVICO','RETIFICACAO_SOLICITADA'].includes(String(x.status||x.STATUS||'').toUpperCase()));
-   if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum serviço em andamento nesta unidade.</div>';return}
-   box.innerHTML=items.map((x,i)=>`<div class="central-access-item"><strong>${esc(x.guarnicao||'Guarnição')} — VTR ${esc(x.vtrPrincipal||x.viatura||'—')}</strong><div class="central-access-meta">${esc(x.companhia||u.companhia)} • ${fmtDate(x.data)}<br>Comandante: ${esc(x.responsavel||'—')} ${esc(x.matricula||'')} • ${esc(String(x.status||'').replaceAll('_',' '))}</div><button data-pick="${i}">Continuar este serviço</button></div>`).join('');
+   const r=await CentralCloud.jsonp('rsd-active',{matricula:mat,token},{timeout:15000}),items=r.items||[];
+   if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum serviço em andamento foi localizado para esta matrícula. Se você está assumindo outra guarnição, use “Receber serviço em andamento”.</div>';return}
+   box.innerHTML=items.map((x,i)=>`<div class="central-access-item"><strong>${esc(x.guarnicao||'Guarnição')} — VTR ${esc(x.vtrPrincipal||x.viatura||'—')}</strong><div class="central-access-meta">${esc([x.batalhao,x.companhia].filter(Boolean).join(' / ')||'Unidade não informada')} • ${fmtDate(x.data)}<br>Comandante: ${esc(x.responsavel||'—')} ${esc(x.matricula||'')} • ${esc(String(x.status||'').replaceAll('_',' '))}</div><button data-pick="${i}">Continuar este serviço</button></div>`).join('');
    q('[data-list]',el).querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.pick)];b.disabled=true;if(typeof global.centralRsdClaimCloudItem!=='function'){b.disabled=false;alert('Atualize a página e tente novamente.');return}const ok=await global.centralRsdClaimCloudItem(x,false);if(ok){clearLayer();exitSetup()}else b.disabled=false});
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
