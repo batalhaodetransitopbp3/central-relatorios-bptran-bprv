@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
       if(!window.validar())return;
       const p=enrichOperation(window.payload());
       try{ if(typeof old==='function') old(); registrarOperacaoPayload(p,true); }catch(_){}
-      const token=CentralCloud.askToken('central');
+      const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');
       if(!token){ alert('Operação salva localmente. A chave operacional é necessária para sincronizar com a Central.'); return; }
       try{const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
       if(r.queued){alert('Operação salva neste aparelho. A sincronização com a Central ficou pendente; permaneça neste módulo ou use a contingência se necessário.');return false}
