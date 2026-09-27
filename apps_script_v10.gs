@@ -138,7 +138,7 @@ function doPost(e) {
       assertToken_(token, 'central');
       out = rsdUpsert_(payload);
     } else if (action === 'rsd-mark-included') {
-      assertToken_(token, 'central');
+      assertToken_(token, 'rco');
       out = rsdMarkIncluded_(payload);
     } else if (action === 'passagem-publicar') {
       assertToken_(token, 'central');
