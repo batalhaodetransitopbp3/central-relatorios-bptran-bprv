@@ -28,8 +28,17 @@ body.central-service-setup header.doc-head{display:block!important}
 body.central-service-setup.rsd-setup header.doc-head{margin-bottom:18px!important}
 .central-enter-report{margin-left:auto}
 .central-registered-note{font-weight:700;color:#17633d}
-body.central-service-setup.rco-setup #rcoResponsavelCard{display:block!important}
-body.central-service-setup.rco-setup header.doc-head{display:block!important}
+body.central-service-setup.rco-setup main.page>*{display:none!important}
+body.central-service-setup.rco-setup header.doc-head,
+body.central-service-setup.rco-setup #rcoConsolidacaoMode,
+body.central-service-setup.rco-setup #rcoResponsavelCard,
+body.central-service-setup.rco-setup #centralRcoSetupStatus{display:block!important}
+body.central-service-setup.rco-setup #centralRcoSetupStatus[hidden]{display:none!important}
+.central-rco-setup-status{margin-top:12px}
+.central-rco-status-row{display:grid;grid-template-columns:1.2fr .8fr .9fr;gap:8px;align-items:center;padding:9px 0;border-top:1px solid #dce5ec;font-size:12px}
+.central-rco-status-row:first-child{border-top:0}
+.central-rco-status-row strong{color:#17375e}.central-rco-status-row span:last-child{text-align:right;font-weight:700}
+@media(max-width:620px){.central-rco-status-row{grid-template-columns:1fr}.central-rco-status-row span:last-child{text-align:left}}
 .rsd-gu-choice{width:100%;min-height:38px}
 @media(max-width:620px){.central-access-layer{padding:8px}.central-access-card{margin:8px auto;padding:14px;border-radius:14px}.central-access-unit{grid-template-columns:1fr}.central-access-head h1{font-size:19px}}
 @media print{.central-access-layer{display:none!important}}
@@ -81,11 +90,14 @@ function enterSetup(type){
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
    const st=q('#rsdRegisterStatus');if(st)st.textContent='Preencha a identificação do serviço. A guarnição deve ser escolhida na lista; depois registre o serviço na Central.';
  }else{
+   installRcoSetupStatus();
+   installRcoEnterButton();
+   q('#centralRcoSetupStatus')?.removeAttribute('hidden');
    q('#rcoResponsavelCard')?.scrollIntoView({block:'start'});
  }
 }
 function exitSetup(){
- q('#centralSetupNav')?.remove();document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
+ q('#centralSetupNav')?.remove();q('#centralRcoSetupStatus')?.setAttribute('hidden','hidden');document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
  try{sessionStorage.removeItem(MODE)}catch(_){}
 }
 function guOptions(){
@@ -128,6 +140,57 @@ function markRsdRegisteredSetup(){
  if(btn){btn.hidden=false;btn.disabled=false}
  if(st){st.classList.add('central-registered-note');st.textContent='Guarnição registrada e salva na Central. Clique em “Entrar no relatório” para iniciar os lançamentos do serviço.'}
 }
+function lockRcoHeader(){
+ ['batalhao','companhiaNumero','dataInicio','dataTermino'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
+ ['diaSemanaCpu','horarioServico'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
+ const mode=q('#rcoSemCpu');if(mode)mode.disabled=true;
+ ['rcoResponsavelPerfil'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
+ ['rcoResponsavelMatricula','rcoResponsavelTurno','rcoExternoPosto','rcoExternoNome','rcoExternoUnidade'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
+ const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=true}
+ q('#rcoResponsavelRegistrarBtn')?.setAttribute('hidden','hidden');
+}
+function installRcoSetupStatus(){
+ const card=q('#rcoResponsavelCard');if(!card)return null;
+ let box=q('#centralRcoSetupStatus');
+ if(!box){
+   box=document.createElement('section');box.id='centralRcoSetupStatus';box.className='card no-print central-rco-setup-status';
+   box.innerHTML='<div class="entry-head"><h2 class="sec-title" style="margin:0">Guarnições / VTRs da unidade</h2><button type="button" class="small secondary" id="centralRcoSetupRefresh">Atualizar status</button></div><div class="hint">Após identificar o responsável, a Central exibirá os RSDs da unidade. Serviços ainda em andamento também aparecem e poderão ser adicionados ao RCO.</div><div id="centralRcoSetupList" class="central-access-list"><div class="central-access-empty">Identifique e registre o responsável pelo RCO para consultar as guarnições.</div></div>';
+   card.insertAdjacentElement('afterend',box);
+   q('#centralRcoSetupRefresh',box).onclick=loadRcoSetupStatus;
+ }
+ return box;
+}
+function installRcoEnterButton(){
+ const actions=q('#rcoResponsavelCard .actions');if(!actions)return null;
+ let btn=q('#centralEnterRcoBtn');
+ if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterRcoBtn';btn.className='ok small central-enter-report';btn.textContent='Entrar no RCO';btn.hidden=true;actions.appendChild(btn)}
+ btn.onclick=()=>{btn.hidden=true;lockRcoHeader();exitSetup();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);window.scrollTo({top:0,behavior:'smooth'})};
+ return btn;
+}
+async function loadRcoSetupStatus(){
+ const box=q('#centralRcoSetupList');if(!box)return;
+ let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+ const data=q('#dataInicio')?.value||'';
+ if(!token){box.innerHTML='<div class="central-access-empty">Identifique e registre o responsável pelo RCO para consultar as guarnições.</div>';return}
+ if(!data){box.innerHTML='<div class="central-access-error">Informe a data de início do serviço.</div>';return}
+ box.innerHTML='<div class="central-access-loading">Atualizando status das guarnições…</div>';
+ try{
+   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data,token},{timeout:15000});
+   const items=(r.items||[]).filter(x=>String(x.status||'').toUpperCase()!=='CANCELADO');
+   if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum RSD registrado para esta unidade e data.</div>';return}
+   box.innerHTML=items.map(x=>{
+     const vs=(x.viaturas||[]).map(v=>v?.prefixo||v).filter(Boolean),vtr=vs.join(', ')||x.vtrPrincipal||x.viatura||'—',status=String(x.status||'').replaceAll('_',' ');
+     return '<div class="central-rco-status-row"><strong>'+esc(x.guarnicao||'Guarnição')+' — VTR '+esc(vtr)+'</strong><span>'+esc(x.responsavel||x.matricula||'Responsável não informado')+'</span><span>'+esc(status)+'</span></div>';
+   }).join('');
+ }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
+}
+function markRcoRegisteredSetup(){
+ lockRcoHeader();
+ const btn=installRcoEnterButton(),res=q('#rcoResponsavelResultado');
+ if(btn){btn.hidden=false;btn.disabled=false}
+ if(res){res.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.'}
+ loadRcoSetupStatus();
+}
 async function ensureCentralToken(message){
  if(!global.CentralCloud)return '';
  let t=CentralCloud.getToken('central');if(!t)t=CentralCloud.askToken('central',message||'Informe a chave operacional da Central:');return t||'';
@@ -157,8 +220,8 @@ async function rsdReceive(){
 }
 async function rcoContinue(){
  clearLayer();
- if(typeof global.centralRcoContinueCloud==='function'){const ok=await global.centralRcoContinueCloud();if(ok)exitSetup();else startScreen('rco');return}
- if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok)exitSetup();else startScreen('rco');return}
+ if(typeof global.centralRcoContinueCloud==='function'){const ok=await global.centralRcoContinueCloud();if(ok){lockRcoHeader();exitSetup()}else startScreen('rco');return}
+ if(typeof global.centralContinueService==='function'){const ok=await global.centralContinueService();if(ok){lockRcoHeader();exitSetup()}else startScreen('rco');return}
  startScreen('rco');
 }
 async function rcoReceive(){
@@ -170,7 +233,7 @@ function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd')installRsdGuarnicaoChoice();
  global.addEventListener('central-rsd-registered',ev=>{if(ev?.detail?.continued){lockRsdHeader();exitSetup();return}if(document.body.classList.contains('rsd-setup'))markRsdRegisteredSetup();else lockRsdHeader()});
- global.addEventListener('central-rco-responsavel-registrado',()=>{exitSetup();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
+ global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
  if(next===type+'-setup'||mode===type+'-setup'){enterSetup(type);return}
  startScreen(type);
