@@ -191,7 +191,9 @@ function installBo(){
  const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao RSD';b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
- const run=()=>{try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};addEventListener('focus',()=>setTimeout(run,150));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
+ const hideLegacy=()=>{$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
+ const run=()=>{hideLegacy();try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
+ hideLegacy();setTimeout(run,350);addEventListener('focus',()=>setTimeout(run,150));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
 }
 function init(){
  style();
