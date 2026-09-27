@@ -1562,13 +1562,17 @@ function prepareAndPrint() {
     salvarRascunho(true);salvarCirvcsParaConsolidacao();
     const regs=cloudRecords();
     if(!regs.length){if(imprimir)prepareAndPrint();return false}
-    const moduleCtx=activeServiceContextCirvc();let token=new URLSearchParams(location.search).get('from')==='rco'?(sessionStorage.getItem('pmpb-rco-role-token-v1')||''):CentralCloud.getToken('central');if(!token)token=CentralCloud.askToken('central');if(!token)return false;
+    const from=new URLSearchParams(location.search).get('from'),linked=from==='rsd'||from==='rco';
+    let token=from==='rco'?(sessionStorage.getItem('pmpb-rco-role-token-v1')||''):CentralCloud.getToken('central');if(!token)token=CentralCloud.askToken('central');if(!token)return false;
+    if(!linked)CentralCloud.showProgress?.('Salvando os CIRVCs na Central…');
     try{
       const r=await CentralCloud.submitForm('cirvc-register',{unidade:unit(),cirvcs:regs},token,{popup:true});
       setStatus(r.message||'CIRVCs registrados na Central.');
+      if(!linked)CentralCloud.hideProgress?.();
       if(imprimir){setTimeout(()=>prepareAndPrint(),180);return true}
-      alert(r.message||'CIRVCs registrados na Central e disponíveis para o RSD e para a continuidade da custódia.');return true;
+      if(!linked)alert(r.message||'CIRVCs registrados na Central e disponíveis para continuidade da custódia.');return true;
     }catch(e){
+      if(!linked)CentralCloud.hideProgress?.();
       alert('Não foi possível disponibilizar os CIRVCs: '+e.message+'\n\nOs registros permaneceram salvos neste aparelho.');return false;
     }
   }
