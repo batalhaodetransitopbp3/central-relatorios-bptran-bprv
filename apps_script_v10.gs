@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.6.6-rc2';
+var CENTRAL_V10_VERSION = '10.6.8';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -1023,11 +1023,71 @@ function passagemAnular_(payload){
 }
 
 function rcoResponsavelValidar_(payload,token){
-  var perfil=String(payload.perfil||'CPU').toUpperCase();assertToken_(token,perfil==='P3'||perfil==='OFICIAL'?'p3':'coord');
-  var mat=normMat_(payload.matricula||'');if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Matrícula inválida.');
-  var items=cadastroSearch_({tipo:'militar',q:mat}).items||[],m=null;for(var i=0;i<items.length;i++)if(normMat_(items[i].MATRICULA)===mat){m=items[i];break;}
-  if(!m)throw new Error('Militar não localizado no Cadastro Mestre.');
-  return {ok:true,message:'Responsável identificado e credencial validada.',perfil:perfil,militar:{matricula:mat,nome:m.NOME||'',postoGrad:m.POSTO_GRAD||'',batalhao:m.BATALHAO||'',companhia:m.COMPANHIA||''}};
+  var perfil=String(payload.perfil||'CPU').toUpperCase();
+  assertToken_(token,perfil==='P3'||perfil==='OFICIAL'?'p3':'coord');
+
+  var mat=normMat_(payload.matricula||'');
+  if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Matrícula inválida.');
+
+  var items=cadastroSearch_({tipo:'militar',q:mat}).items||[],m=null;
+  for(var i=0;i<items.length;i++){
+    if(normMat_(items[i].MATRICULA)===mat){m=items[i];break;}
+  }
+
+  var ext=payload.cadastroExterno||null;
+  if(!m){
+    if(!ext){
+      return {
+        ok:true,
+        message:'Militar não localizado no Cadastro Mestre. Complete os dados para cadastro externo validado.',
+        perfil:perfil,
+        matricula:mat,
+        needsCadastroExterno:true
+      };
+    }
+
+    var nome=String(ext.nome||'').trim();
+    var posto=String(ext.postoGrad||'').trim();
+    var origem=String(ext.unidadeOrigem||'').trim();
+    if(!posto)throw new Error('Informe o posto/graduação do militar externo.');
+    if(!nome)throw new Error('Informe o nome do militar externo.');
+    if(!origem)throw new Error('Informe a unidade de origem do militar externo.');
+
+    m={
+      MILITAR_ID:'mil-'+mat.replace(/\D/g,''),
+      MATRICULA:mat,
+      POSTO_GRAD:posto,
+      NOME:nome,
+      BATALHAO:'',
+      COMPANHIA:'',
+      SITUACAO:'ATIVO',
+      TIPO_CADASTRO:'EXTERNO_RCO_VALIDADO',
+      UNIDADE_ORIGEM:origem,
+      ATUALIZADO_EM:nowIso_()
+    };
+    upsert_(sheet_(P3_SHEET_ID,'MILITARES'),'MATRICULA',mat,m);
+    audit_('MILITAR',m.MILITAR_ID,1,'CADASTRO_EXTERNO_RCO',mat,nome,'','',{
+      perfilRco:perfil,
+      unidadeOrigem:origem,
+      tipoCadastro:m.TIPO_CADASTRO
+    });
+  }
+
+  return {
+    ok:true,
+    message:ext?'Militar externo cadastrado e responsável validado.':'Responsável identificado e credencial validada.',
+    perfil:perfil,
+    needsCadastroExterno:false,
+    militar:{
+      matricula:mat,
+      nome:m.NOME||'',
+      postoGrad:m.POSTO_GRAD||'',
+      batalhao:m.BATALHAO||'',
+      companhia:m.COMPANHIA||'',
+      unidadeOrigem:m.UNIDADE_ORIGEM||'',
+      tipoCadastro:m.TIPO_CADASTRO||''
+    }
+  };
 }
 
 /* =========================
