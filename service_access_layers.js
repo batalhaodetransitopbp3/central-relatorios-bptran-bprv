@@ -46,7 +46,7 @@ function shell(title,subtitle,body){
 }
 function clearLayer(){q('#centralAccessLayer')?.remove()}
 function newService(type){
- if(!confirm('Iniciar um novo serviço?\\n\\nEsta ação limpa somente os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return;
+ if(!confirm('Iniciar um novo serviço?\n\nEsta ação limpa somente os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return;
  try{sessionStorage.setItem(NEXT,type+'-setup')}catch(_){}
  if(typeof global.centralStartService==='function')global.centralStartService(true);
 }
@@ -69,6 +69,7 @@ function enterSetup(type){
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
+   const gs=q('#guarnicaoEscolha'),go=q('#guarnicao'),gt=q('#guarnicaoTipo');if(gs)gs.value='';if(go)go.value='';if(gt)gt.value='';
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
    const st=q('#rsdRegisterStatus');if(st)st.textContent='Preencha a identificação do serviço. A guarnição deve ser escolhida na lista; depois registre o serviço na Central.';
  }else{
@@ -89,7 +90,7 @@ function installRsdGuarnicaoChoice(){
  const s=document.createElement('select');s.id='guarnicaoEscolha';s.className='rsd-gu-choice no-print';s.innerHTML=guOptions();
  const normalize=v=>{const m=String(v||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s*0*(\d{1,2})$/);return m?m[1]+' '+String(Number(m[2])).padStart(2,'0'):''};
  const current=normalize(original.value);if(current)s.value=current;
- original.style.display='none';tipo.style.display='none';original.parentElement?.appendChild(s);
+ original.style.display='none';tipo.style.display='none';const tf=tipo.closest('.field');if(tf)tf.style.display='none';original.parentElement?.appendChild(s);
  const label=original.closest('.field')?.querySelector('label');if(label)label.textContent='Guarnição';
  s.onchange=()=>{original.value=s.value;tipo.value=(s.value.match(/^[A-Z]+/)||[''])[0];original.dispatchEvent(new Event('input',{bubbles:true}));tipo.dispatchEvent(new Event('change',{bubbles:true}));};
  const obs=new MutationObserver(()=>{const v=normalize(original.value);if(v&&s.value!==v)s.value=v;s.disabled=!!tipo.disabled});obs.observe(original,{attributes:true,attributeFilter:['value']});obs.observe(tipo,{attributes:true,attributeFilter:['disabled']});
