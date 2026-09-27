@@ -687,7 +687,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(silent)return '';
     return CentralCloud.askToken('central','Informe a credencial do serviço para acessar o RCO:');
   }
-  async function syncRcoDraft(silent=true){if(!navigator.onLine)return false;let token=rcoWorkflowToken(silent);if(!token)return false;let rco;try{rco=window.collectState()}catch(_){return false}try{await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false});rcoConflictNotified=false;window.centralMarkSaved?.();return true}catch(e){if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);return false}}
+  async function syncRcoDraft(silent=true){if(!navigator.onLine)return false;let token=rcoWorkflowToken(silent);if(!token)return false;let rco;try{rco=window.collectState()}catch(_){return false}if(!silent)CentralCloud.showProgress?.('Salvando o RCO na Central…');try{await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false});rcoConflictNotified=false;window.centralMarkSaved?.();if(!silent){CentralCloud.hideProgress?.();alert('RCO salvo na Central.')}return true}catch(e){if(!silent)CentralCloud.hideProgress?.();if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);return false}}
   function scheduleRcoSync(){clearTimeout(rcoSyncTimer);rcoSyncTimer=setTimeout(()=>syncRcoDraft(true),8000)}
   window.centralRcoSyncNow=syncRcoDraft;
   function renderRcoRetificationBanner(meta){
@@ -1000,6 +1000,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(!window.CentralCloud||!await CentralCloud.probe()){alert('A Central em nuvem não está disponível.');return null}
     const inp=e('rcoResponsavelMatricula'),mat=fmt(inp.value);inp.value=mat;if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return null}
     const perfil=e('rcoResponsavelPerfil').value,turno=e('rcoResponsavelTurno').value;
+    if(!['12h (dia)','12h (noite)','24h'].includes(turno)){alert('Selecione o turno: 12h (dia), 12h (noite) ou 24h.');e('rcoResponsavelTurno')?.focus();return null}
     let senha=String(e('rcoResponsavelSenha').value||'').trim();if(!senha){try{senha=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}}
     if(!senha){alert(perfil==='CPU'?'Informe a senha de Coordenação.':'Informe a senha administrativa P3/Oficial.');return null}
     const payload={perfil,matricula:mat};
