@@ -17,6 +17,18 @@ function returnUrl(){
 function markReturnIntent(){
  try{sessionStorage.setItem(RETURN_KEY,JSON.stringify({...ctx(),returnTo:returnTo(),em:new Date().toISOString()}))}catch(_){}
 }
+function progress(msg){try{global.CentralCloud?.showProgress(msg)}catch(_){}}
+function progressText(msg){try{global.CentralCloud?.updateProgress(msg)}catch(_){}}
+function progressDone(){try{global.CentralCloud?.hideProgress()}catch(_){}}
+function returnToRsd(message='Retornando ao RSD…'){
+ markReturnIntent();progress(message);
+ let left=false;
+ const onHide=()=>{if(document.hidden)left=true};document.addEventListener('visibilitychange',onHide,{once:true});
+ try{
+   if(history.length>1){history.back();setTimeout(()=>{if(!left){progressText('Reabrindo o RSD em andamento…');location.href=returnUrl()}},850);return}
+ }catch(_){}
+ location.href=returnUrl();
+}
 const nowTime=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:false});
 const today=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())};
 function centralToken(promptIfMissing=false){
@@ -169,9 +181,9 @@ function contextBanner(label){
  if(!fromRsd)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
  let box=$('#centralModuleContext');if(!box){box=document.createElement('div');box.id='centralModuleContext';box.className='central-module-context no-print';tb.insertAdjacentElement('afterend',box)}
  box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
- if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>markReturnIntent();tb.prepend(a)}
+ if(!$('.central-module-return',tb)){const a=document.createElement('button');a.type='button';a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>returnToRsd('Voltando ao RSD sem vincular este módulo…');tb.prepend(a)}
 }
-function goBack(){markReturnIntent();location.href=returnUrl()}
+function goBack(){returnToRsd('Salvamento confirmado. Retornando ao RSD…')}
 function installOperation(){
  if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
  const c=ctx(),u=c.unidade||{};
@@ -182,7 +194,7 @@ function installOperation(){
  };
  applyLockedContext();setTimeout(applyLockedContext,80);
  const tryWrap=()=>{const fn=global.registrarOperacaoDoDiaCloud;if(typeof fn!=='function'||fn.__centralReturnWrapped)return false;
-   const w=async function(){const r=await fn.apply(this,arguments);if(r===true){setTimeout(goBack,220)}return r};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
+   const w=async function(){progress('Salvando a operação na Central…');try{const r=await fn.apply(this,arguments);if(r===true){progressText('Operação salva. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
    $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
  if(!tryWrap())setTimeout(tryWrap,300);
 }
@@ -199,7 +211,7 @@ function installCirvc(){
  };
  lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
  let done=false,tries=0;
- const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();progress('Salvando o CIRVC na Central…');try{const r=await old?.call(b);if(r===true){progressText('CIRVC salvo. Retornando ao RSD…');setTimeout(goBack,120);return r}progressDone();return r}catch(e){progressDone();throw e}};return true};
  const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
  window.addEventListener('central-v10-ready',()=>setTimeout(()=>{lockContext();tryWrap()},30),{once:true});
 }
@@ -210,7 +222,8 @@ async function saveBoLink(){
  const ev={eventId:c.serviceId+'::BO::'+num,serviceId:c.serviceId,rsdReportId:c.rsdReportId||'',segmento:c.segmento||1,tipo:'BO',subtipo:'BO',data,hora:$('#horaOcorrencia')?.value||nowTime(),
    titulo:'BO — '+num,resumo:$('#naturezaOcorrencia')?.value||'',numeroDocumento:num,referenciaId:num,unidade:c.unidade||{},guarnicao:c.guarnicao||'',vtr:Array.isArray(c.vtrs)?c.vtrs.join(', '):'',comandanteMatricula:c.comandanteMatricula||'',
    payload:{id:num,tipo:'BO',numero:num,data,hora:$('#horaOcorrencia')?.value||'',descricao:$('#naturezaOcorrencia')?.value||'',naturezaPrincipal:$('#naturezaOcorrencia')?.value||''}};
- try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);alert('BO vinculado ao serviço. O número e o resumo ficarão disponíveis automaticamente no RSD.');goBack()}catch(e){alert('Não foi possível vincular o BO ao RSD: '+e.message)}
+ progress('Vinculando o BO ao RSD…');
+ try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);progressText('BO vinculado. Retornando ao RSD…');setTimeout(goBack,120)}catch(e){progressDone();alert('Não foi possível vincular o BO ao RSD: '+e.message)}
 }
 function installBo(){
  if(!fromRsd)return;contextBanner('Boletim de Ocorrência vinculado ao RSD');const c=ctx();
