@@ -702,8 +702,8 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
   }
   window.centralAutosave=function(){if(window.CENTRAL_READONLY_VIEWER)return;saveGeneric();saveSpecific()};
   window.centralMarkSaved=function(){centralDirty=false;saveGeneric();saveSpecific()};
-  window.centralStartService=function(){
-    if(!confirm('Iniciar um novo serviço?\n\nEsta ação limpará apenas o histórico e os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return;
+  window.centralStartService=function(force=false){
+    if(!force&&!confirm('Iniciar um novo serviço?\n\nEsta ação limpará apenas o histórico e os dados locais deste aparelho. Registros já salvos na Central não serão apagados.'))return false;
     centralSuppressExit=true;
     try{
       const prefixes=['central-autosave::','pmpb-transito-','pmpb-operacao-','pmpb-active-service-','bo_bptrans_','checklist_','arvc_','cirvc_','acoes_educativas_','fisco_'];
@@ -712,6 +712,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     }catch(_){}
     try{localStorage.setItem('pmpb-transito-servico-diario-v2-started-at',new Date().toISOString())}catch(_){}
     location.reload();
+    return true;
   };
   window.centralContinueService=function(){
     centralSuppressExit=true;
