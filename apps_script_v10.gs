@@ -128,6 +128,9 @@ function doPost(e) {
     } else if (action === 'rsd-start') {
       assertToken_(token, 'central');
       out = rsdStart_(payload);
+    } else if (action === 'rsd-militar-validar') {
+      assertToken_(token, 'central');
+      out = rsdMilitarValidar_(payload);
     } else if (action === 'rsd-draft-sync') {
       assertToken_(token, 'central');
       out = rsdDraftSync_(payload);
@@ -624,6 +627,22 @@ function guarnicaoNext_(p) {
   if(!tipo)throw new Error('Selecione BST, BASE, GTTRAN, TOR ou REBOQUE.');
   var ordem=guarnicaoNextOrder_(sheet_(P3_SHEET_ID,'RSD'),batt,comp,data,tipo);
   return {ok:true,tipo:tipo,ordem:ordem,nome:tipo+' '+padGuarnicaoOrdem_(ordem)};
+}
+
+function rsdMilitarValidar_(payload) {
+  var mat=normMat_(payload.matricula||'');
+  if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Matrícula inválida.');
+  var items=cadastroSearch_({tipo:'militar',q:mat}).items||[],m=null;
+  for(var i=0;i<items.length;i++){if(normMat_(items[i].MATRICULA)===mat){m=items[i];break;}}
+  if(!m){
+    var ext=payload.cadastroExterno||{},nome=String(ext.nome||'').trim(),posto=String(ext.postoGrad||'').trim(),origem=String(ext.unidadeOrigem||'').trim();
+    if(!nome||!posto||!origem)throw new Error('Complete posto/graduação, nome e unidade de origem para pré-cadastrar o militar.');
+    m={MILITAR_ID:'mil-'+mat.replace(/\D/g,''),MATRICULA:mat,POSTO_GRAD:posto,NOME:nome,BATALHAO:'',COMPANHIA:'',SITUACAO:'ATIVO',TIPO_CADASTRO:'EXTERNO_RSD_VALIDADO',UNIDADE_ORIGEM:origem,ATUALIZADO_EM:nowIso_()};
+    upsert_(sheet_(P3_SHEET_ID,'MILITARES'),'MATRICULA',mat,m);
+    audit_('MILITAR',m.MILITAR_ID,1,'CADASTRO_EXTERNO_RSD',mat,nome,'','',{unidadeOrigem:origem,tipoCadastro:m.TIPO_CADASTRO});
+    return {ok:true,message:'Militar pré-cadastrado e validado para o serviço.',militar:m,cadastrado:true};
+  }
+  return {ok:true,message:'Militar localizado no Cadastro Mestre.',militar:m,cadastrado:false};
 }
 
 /* =========================
