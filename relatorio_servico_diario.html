@@ -729,9 +729,9 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     saveActiveContext();const ios=/relatorio_servico_diario_ios\.html/i.test(location.pathname);
     location.href=ios?'relatorio_traslados_reboque_ios.html':'relatorio_traslados_reboque.html';
   }
-  function updateIdentityLock(){const t=document.getElementById('guarnicaoTipo'),v=document.getElementById('viatura');if(t)t.disabled=!!serviceRegistered;if(v){v.readOnly=!!serviceRegistered;v.title=serviceRegistered?'A VTR principal identifica este serviço. Para substituição, use VTR adicional e registre a alteração.':''}updateReboqueShortcut()}
+  function updateIdentityLock(){const t=document.getElementById('guarnicaoTipo'),g=document.getElementById('guarnicaoEscolha'),v=document.getElementById('viatura'),k=document.getElementById('rsdChangeKeyBtn');if(t)t.disabled=!!serviceRegistered;if(g)g.disabled=!!serviceRegistered;if(k)k.hidden=!!serviceRegistered;if(v){v.readOnly=!!serviceRegistered;v.title=serviceRegistered?'A VTR principal identifica este serviço. Para substituição, use VTR adicional e registre a alteração.':''}updateReboqueShortcut()}
   async function refreshTeamSuggestion(){
-    if(serviceRegistered)return;
+    if(serviceRegistered||document.getElementById('guarnicaoEscolha'))return;
     const tipo=val('guarnicaoTipo'),data=val('data'),field=document.getElementById('guarnicao');
     if(!tipo||!data){setTeamDisplay('');if(field)field.placeholder='Numeração automática';return}
     const token=CentralCloud.getToken('central');
@@ -778,7 +778,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   async function registerService(){
     const p=window.payloadV2(),mat=CentralCloud.formatMatricula(p.guarnicao?.matricula||'');
     if(!p.servico?.data){alert('Informe a data do serviço.');return false}
-    if(!p.guarnicao?.tipo){alert('Selecione o tipo da guarnição: BST, BASE, GTTRAN, TOR ou REBOQUE.');return false}
+    if(!p.guarnicao?.tipo||!p.guarnicao?.nome){alert('Selecione a guarnição na lista: BST, BASE, GTTRAN, REBOQUE ou TOR.');return false}
     if(!p.guarnicao?.vtrPrincipal){alert('Informe a VTR principal da guarnição.');return false}
     if(!p.guarnicao?.responsavel||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição e sua matrícula antes de registrar o serviço.');return false}
     p.guarnicao.matricula=mat;let token=CentralCloud.getToken('central')||promptOperationalKey(false);if(!token)return false;try{const vr=await CentralCloud.searchCadastro('viatura',p.guarnicao.vtrPrincipal,currentUnit(),token),items=vr.items||[],exact=items.find(x=>String(x.PREFIXO||'').trim().toUpperCase()===String(p.guarnicao.vtrPrincipal||'').trim().toUpperCase());token=CentralCloud.getToken('central')||token;if(!exact&&!confirm('A VTR '+p.guarnicao.vtrPrincipal+' não foi localizada no Cadastro Mestre desta unidade. Confira o prefixo.\n\nDeseja continuar mesmo assim?'))return false}catch(e){token=CentralCloud.getToken('central')||token;if(CentralCloud.isAuthError(e)){token=promptOperationalKey(true);if(!token)return false}else{/* cadastro mestre indisponível: a validação de duplicidade pela VTR continua no backend */}}
@@ -795,7 +795,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
         }
         if(st)st.textContent='A VTR já possui registro nesta unidade/data.';return false;
       }
-      serviceId=r.serviceId||serviceId;segmento=Number(r.segmento||segmento)||segmento;if(r.guarnicaoNome)setTeamDisplay(r.guarnicaoNome);if(r.guarnicaoTipo){const gt=document.getElementById('guarnicaoTipo');if(gt)gt.value=r.guarnicaoTipo}serviceRegistered=true;cloudConflictNotified=false;saveIdentity();saveActiveContext();updateIdentityLock();if(st)st.textContent=r.message||'Guarnição registrada em serviço.';try{salvarRascunhoGuarnicao(true)}catch(_){}renderReviewBanner({centralStatus:'EM_SERVICO'});return true;
+      serviceId=r.serviceId||serviceId;segmento=Number(r.segmento||segmento)||segmento;if(r.guarnicaoNome)setTeamDisplay(r.guarnicaoNome);if(r.guarnicaoTipo){const gt=document.getElementById('guarnicaoTipo');if(gt)gt.value=r.guarnicaoTipo}serviceRegistered=true;cloudConflictNotified=false;saveIdentity();saveActiveContext();updateIdentityLock();if(st)st.textContent=r.message||'Guarnição registrada em serviço.';try{salvarRascunhoGuarnicao(true)}catch(_){}renderReviewBanner({centralStatus:'EM_SERVICO'});window.dispatchEvent(new CustomEvent('central-rsd-registered',{detail:{reportId,serviceId,segmento,guarnicao:val('guarnicao')}}));return true;
     }catch(e){if(st)st.textContent='Falha no registro.';alert('Não foi possível registrar a guarnição: '+e.message);return false}
   }
   async function claimCloudItem(item,force=false){
@@ -803,6 +803,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force},token,{popup:false});serviceRegistered=true;cloudConflictNotified=false;window.applyPayload(r.rsd);renderReviewBanner(r.rsd||{});saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);alert(r.message||'Serviço carregado da nuvem neste aparelho.');return true}
     catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este serviço está aberto em outro aparelho. Deseja assumir a edição neste dispositivo? O aparelho anterior deixará de sincronizar.'))return claimCloudItem(item,true)}alert('Não foi possível continuar o serviço: '+e.message);return false}
   }
+  window.centralRsdClaimCloudItem=claimCloudItem;
   async function continueFromCloud(){
     const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return false;let mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));
     if(!/^\d{3}\.\d{3}-\d$/.test(mat))mat=CentralCloud.formatMatricula(prompt('Informe a matrícula do comandante para localizar seu serviço:')||'');if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Matrícula inválida.');return false}
@@ -972,4 +973,5 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
+<script src="service_access_layers.js"></script>
 </body></html>
