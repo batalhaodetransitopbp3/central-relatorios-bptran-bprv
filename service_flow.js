@@ -131,13 +131,13 @@ function timelineCard(){
 function renderTimeline(events=[]){
  const sec=timelineCard(),box=$('#centralTimelineList',sec);if(!box)return;
  const c=ctx(),items=[...events];
- if(c.serviceId&&c.data)items.push({eventId:'inicio-'+c.serviceId,tipo:'INICIO',data:c.data,hora:'',titulo:'Serviço iniciado',resumo:[c.guarnicao,Array.isArray(c.vtrs)&&c.vtrs.length?'VTR '+c.vtrs.join(', '):''].filter(Boolean).join(' • '),criadoEm:''});
+ if(c.serviceId&&c.data){let h='';try{if(c.iniciadoEm)h=new Date(c.iniciadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:false})}catch(_){}items.push({eventId:'inicio-'+c.serviceId,tipo:'INICIO',data:c.data,hora:h,titulo:'Serviço iniciado',resumo:[c.guarnicao,Array.isArray(c.vtrs)&&c.vtrs.length?'VTR '+c.vtrs.join(', '):''].filter(Boolean).join(' • '),criadoEm:c.iniciadoEm||''})}
  const syncedVehicleRefs=new Set(items.filter(x=>x.tipo==='VEICULO_RECUPERADO').map(x=>String(x.referenciaId||'')));
  $('#vehicles .vehicle-entry').forEach(e=>{const d=entryData(e);if(d.id&&syncedVehicleRefs.has(String(d.id)))return;items.push({eventId:'local-vr-'+(d.id||''),tipo:'VEICULO_RECUPERADO',data:c.data||today(),hora:'',titulo:'Veículo recuperado'+(d.placaUf?' — '+d.placaUf:''),resumo:[d.marcaModelo,d.situacao,d.local].filter(Boolean).join(' • '),localOnly:true})});
  const uniq=new Map();items.forEach(x=>uniq.set(x.eventId||[x.tipo,x.referenciaId,x.titulo].join('|'),x));
  const arr=[...uniq.values()].sort((a,b)=>{const ak=[a.data||'',a.hora||'',a.criadoEm||''].join(' '),bk=[b.data||'',b.hora||'',b.criadoEm||''].join(' ');return ak.localeCompare(bk)});
  if(!arr.length){box.innerHTML='<div class="central-event-empty">Nenhum evento registrado neste serviço.</div>';return}
- box.innerHTML=arr.map(x=>'<div class="central-event"><div class="central-event-time">'+esc(x.hora||'—:—')+'</div><div class="central-event-title">'+esc(x.titulo||x.tipo||'Evento')+'</div><div class="central-event-meta">'+esc(x.resumo||'')+(x.numeroDocumento?' • '+esc(x.numeroDocumento):'')+(x.localOnly?' • ainda não sincronizado':'')+'</div></div>').join('');
+ box.innerHTML=arr.map(x=>{let audit='';try{if(x.criadoEm&&x.tipo!=='INICIO')audit=' • registrado na Central '+new Date(x.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(_){}return '<div class="central-event"><div class="central-event-time">'+esc(x.hora||'—:—')+'</div><div class="central-event-title">'+esc(x.titulo||x.tipo||'Evento')+'</div><div class="central-event-meta">'+esc(x.resumo||'')+(x.numeroDocumento?' • '+esc(x.numeroDocumento):'')+(x.localOnly?' • ainda não sincronizado':audit)+'</div></div>'}).join('');
 }
 async function refreshRsd(){
  if(!/relatorio_servico_diario/i.test(PATH))return;
