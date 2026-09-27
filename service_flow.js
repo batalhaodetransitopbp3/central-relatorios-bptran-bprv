@@ -5,9 +5,10 @@ const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const ctx=()=>{try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}};
+const rcoCtx=()=>{try{return JSON.parse(localStorage.getItem('pmpb-active-rco-v1')||'{}')||{}}catch(_){return {}}};
 const qs=new URLSearchParams(location.search);
-const fromRsd=qs.get('from')==='rsd';
-const RETURN_KEY='central-rsd-return-v1';
+const fromRsd=qs.get('from')==='rsd',fromRco=qs.get('from')==='rco';
+const RETURN_KEY='central-rsd-return-v1',RCO_RETURN_KEY='central-rco-return-v1',RCO_RESULT_KEY='central-rco-module-result-v1';
 const returnTo=()=>{const raw=qs.get('returnTo')||'relatorio_servico_diario.html';const name=String(raw).split('/').pop();return /^relatorio_servico_diario(?:_ios)?\.html$/i.test(name)?name:'relatorio_servico_diario.html'};
 function returnUrl(){
  const c=ctx(),p=new URLSearchParams({resumeRsd:'1'});
@@ -29,6 +30,20 @@ function returnToRsd(message='Retornando ao RSD…'){
  }catch(_){}
  location.href=returnUrl();
 }
+function rcoReturnTo(){const raw=qs.get('returnTo')||'relatorio_cpu.html',name=String(raw).split('/').pop();return /^relatorio_cpu(?:_ios)?\.html$/i.test(name)?name:'relatorio_cpu.html'}
+function saveRcoContext(){
+ try{
+   const p=global.collectState?.()||{},a=global.rcoResponsibleData?.()||{},u=p.unidade||{},ctx={rcoReportId:p?.state?.reportId||p.reportId||'',unidade:u,data:p?.periodo?.inicio||'',horario:'07:00 às 07:00',responsavel:[a.postoGrad,a.nome].filter(Boolean).join(' '),matricula:a.matricula||'',perfil:a.perfil||'',turno:a.turno||''};
+   if(ctx.rcoReportId)localStorage.setItem('pmpb-active-rco-v1',JSON.stringify(ctx));return ctx;
+ }catch(_){return rcoCtx()}
+}
+function rcoReturnUrl(){const c=rcoCtx(),p=new URLSearchParams({resumeRco:'1'});if(c.rcoReportId)p.set('rcoReportId',c.rcoReportId);return rcoReturnTo()+'?'+p.toString()}
+function markRcoReturnIntent(){try{sessionStorage.setItem(RCO_RETURN_KEY,JSON.stringify({...rcoCtx(),returnTo:rcoReturnTo(),em:new Date().toISOString()}))}catch(_){}}
+function returnToRco(message='Retornando ao RCO…'){
+ markRcoReturnIntent();progress(message);let left=false;const onHide=()=>{if(document.hidden)left=true};document.addEventListener('visibilitychange',onHide,{once:true});
+ try{if(history.length>1){history.back();setTimeout(()=>{if(!left){progressText('Reabrindo o RCO em andamento…');location.href=rcoReturnUrl()}},850);return}}catch(_){}
+ location.href=rcoReturnUrl();
+}
 const nowTime=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:false});
 const today=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())};
 function centralToken(promptIfMissing=false){
@@ -42,6 +57,9 @@ function contextQuery(extra={}){
  if(c.serviceId)p.set('serviceId',c.serviceId);if(c.rsdReportId)p.set('rsdReportId',c.rsdReportId);if(c.segmento)p.set('segmento',String(c.segmento));
  return p.toString();
 }
+function rcoContextQuery(extra={}){
+ const c=saveRcoContext(),p=new URLSearchParams({from:'rco',returnTo:PATH,...extra});if(c.rcoReportId)p.set('rcoReportId',c.rcoReportId);return p.toString();
+}
 function openModule(kind){
  const map={operation:/iphone|ipad|ipod/i.test(navigator.userAgent)?'relatorio_operacao_ios.html':'relatorio_operacao.html',
    cirvc:/iphone|ipad|ipod/i.test(navigator.userAgent)?'auto_remocao_veiculos_ios.html':'auto_remocao_veiculos.html',
@@ -51,6 +69,11 @@ function openModule(kind){
  location.href=target+'?'+contextQuery({module:kind});
 }
 global.centralOpenServiceModule=openModule;
+function openRcoModule(kind){
+ const map={operation:/iphone|ipad|ipod/i.test(navigator.userAgent)?'relatorio_operacao_ios.html':'relatorio_operacao.html',cirvc:/iphone|ipad|ipod/i.test(navigator.userAgent)?'auto_remocao_veiculos_ios.html':'auto_remocao_veiculos.html',bo:/iphone|ipad|ipod/i.test(navigator.userAgent)?'boletim_ocorrencia_bptrans_1cprv_ios.html':'boletim_ocorrencia_bptrans_1cprv.html'};
+ const target=map[kind],rc=saveRcoContext();if(!target)return;if(!rc.rcoReportId){alert('Registre o responsável e entre no RCO antes de abrir este módulo.');return}try{global.salvarRascunho?.(true)}catch(_){}location.href=target+'?'+rcoContextQuery({module:kind});
+}
+global.centralOpenRcoModule=openRcoModule;
 
 function style(){
  if($('#centralFlowStyle'))return;
