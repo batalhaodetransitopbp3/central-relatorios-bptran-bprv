@@ -245,8 +245,9 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
       const token=CentralCloud.askToken('central');
       if(!token){ alert('Operação salva localmente. A chave operacional é necessária para sincronizar com a Central.'); return; }
       try{const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
-      alert(r.queued ? 'Operação salva. Sincronização pendente preservada neste aparelho.' : 'Operação salva e registrada individualmente na Central.');}
-      catch(e){alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+e.message)}
+      if(r.queued){alert('Operação salva neste aparelho. A sincronização com a Central ficou pendente; permaneça neste módulo ou use a contingência se necessário.');return false}
+      alert('Operação salva e registrada individualmente na Central.');return true;}
+      catch(e){alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+e.message);return false}
     };
     applyServiceContext();
     const oldNova=window.novaOperacao;if(typeof oldNova==='function'&&!oldNova.__serviceWrapped){const wrapped=function(){const r=oldNova.apply(this,arguments);setTimeout(applyServiceContext,20);return r};wrapped.__serviceWrapped=true;window.novaOperacao=wrapped}
@@ -261,4 +262,5 @@ document.addEventListener('DOMContentLoaded',()=>{init();atualizarStatusOperacoe
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
+<script src="service_flow.js"></script>
 </body></html>
