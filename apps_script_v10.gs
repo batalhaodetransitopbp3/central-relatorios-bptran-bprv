@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.7.0';
+var CENTRAL_V10_VERSION = '10.7.1';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -579,7 +579,7 @@ function padGuarnicaoOrdem_(n) {
 function normalizeGuarnicaoNome_(nome,tipo) {
   var s=String(nome||'').trim().toUpperCase().replace(/\s+/g,' '),m=s.match(/^(BST|BASE|GTTRAN|TOR|REBOQUE)\s*0*(\d{1,2})$/);
   if(!m)return '';
-  var t=m[1],n=Number(m[2]),max={BST:10,BASE:4,GTTRAN:3,TOR:3,REBOQUE:3}[t]||0,expected=normGuarnicaoTipo_(tipo||t);
+  var t=m[1],n=Number(m[2]),max=10,expected=normGuarnicaoTipo_(tipo||t);
   if(n<1||n>max||!expected||t!==expected)return '';
   return t+' '+padGuarnicaoOrdem_(n);
 }
