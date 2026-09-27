@@ -180,7 +180,7 @@ function installRcoEnterButton(){
  const actions=q('#rcoResponsavelCard .actions');if(!actions)return null;
  let btn=q('#centralEnterRcoBtn');
  if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterRcoBtn';btn.className='ok small central-enter-report';btn.textContent='Entrar no RCO';btn.hidden=true;actions.appendChild(btn)}
- btn.onclick=()=>{btn.hidden=true;lockRcoHeader();exitSetup();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);window.scrollTo({top:0,behavior:'smooth'})};
+ btn.onclick=()=>{global.CentralCloud?.showProgress('Abrindo o RCO…');btn.disabled=true;setTimeout(()=>{btn.hidden=true;lockRcoHeader();exitSetup();global.CentralCloud?.hideProgress();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);window.scrollTo({top:0,behavior:'smooth'})},40)};
  return btn;
 }
 async function loadRcoSetupStatus(){
@@ -201,12 +201,12 @@ async function loadRcoSetupStatus(){
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
 function markRcoRegisteredSetup(){
- lockRcoHeader();
  const btn=installRcoEnterButton(),res=q('#rcoResponsavelResultado');
  if(btn){btn.hidden=false;btn.disabled=false}
- if(res){res.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.'}
+ if(res&&!res.querySelector('strong'))res.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.';
  loadRcoSetupStatus();
 }
+global.centralRcoRegisteredReady=markRcoRegisteredSetup;
 async function ensureCentralToken(message){
  if(!global.CentralCloud)return '';
  let t=CentralCloud.getToken('central');if(!t)t=CentralCloud.askToken('central',message||'Informe a chave operacional da Central:');return t||'';
