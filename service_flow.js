@@ -107,13 +107,19 @@ async function fetchEvents(){
  const c=ctx(),token=centralToken(false);if(!c.serviceId||!token||!global.CentralCloud)return [];
  try{const r=await CentralCloud.jsonp('service-event-list',{serviceId:c.serviceId,token},{timeout:15000});return r.items||[]}catch(_){return []}
 }
+function lockLinkedEntry(entry,label){
+ if(!entry)return;entry.dataset.centralLinked='1';
+ entry.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.readOnly=true});
+ const danger=entry.querySelector('.entry-head button.danger');if(danger)danger.style.display='none';
+ markEntry(entry,label||'Vinculado à Central');
+}
 async function syncOperations(){
  const c=ctx(),token=centralToken(false);if(!c.serviceId||!token||!global.CentralCloud||typeof global.addOperationSummary!=='function')return;
- try{const r=await CentralCloud.jsonp('operation-list',{serviceId:c.serviceId,token},{timeout:15000});(r.items||[]).forEach(p=>{const id=p.reportId||p.registroId;if(!id||document.querySelector('#operations .entry[data-id="'+CSS.escape(id)+'"]'))return;const d=typeof global.operationToSummary==='function'?global.operationToSummary(p):{id,nome:p.operacao?.nome||'',local:p.local?.descricao||'',turno:p.operacao?.turno||'',totalAits:p.resumoCpu?.totalAits||0,prisoes:p.resumoCpu?.prisoes||0,apreensoesVeiculos:p.resumoCpu?.apreensoesVeiculos||0};global.addOperationSummary(d)})}catch(_){}
+ try{const r=await CentralCloud.jsonp('operation-list',{serviceId:c.serviceId,token},{timeout:15000});(r.items||[]).forEach(p=>{const id=p.reportId||p.registroId;if(!id)return;let entry=document.querySelector('#operations .entry[data-id="'+CSS.escape(id)+'"]');if(!entry){const d=typeof global.operationToSummary==='function'?global.operationToSummary(p):{id,nome:p.operacao?.nome||'',local:p.local?.descricao||'',turno:p.operacao?.turno||'',totalAits:p.resumoCpu?.totalAits||0,prisoes:p.resumoCpu?.prisoes||0,apreensoesVeiculos:p.resumoCpu?.apreensoesVeiculos||0};global.addOperationSummary(d);entry=document.querySelector('#operations .entry[data-id="'+CSS.escape(id)+'"]')}lockLinkedEntry(entry,'ROP salvo na Central')})}catch(_){}
 }
 async function syncCirvcs(){
  const c=ctx(),token=centralToken(false);if(!c.serviceId||!token||!global.CentralCloud||typeof global.addArvc!=='function')return;
- try{const r=await CentralCloud.jsonp('cirvc-list',{serviceId:c.serviceId,token},{timeout:15000});(r.items||[]).forEach(x=>{if(!x.id||document.querySelector('#arvcs .entry[data-id="'+CSS.escape(x.id)+'"]'))return;global.addArvc(x)})}catch(_){}
+ try{const r=await CentralCloud.jsonp('cirvc-list',{serviceId:c.serviceId,token},{timeout:15000});(r.items||[]).forEach(x=>{if(!x.id)return;let entry=document.querySelector('#arvcs .entry[data-id="'+CSS.escape(x.id)+'"]');if(!entry){global.addArvc(x);entry=document.querySelector('#arvcs .entry[data-id="'+CSS.escape(x.id)+'"]')}lockLinkedEntry(entry,'CIRVC salvo na Central')})}catch(_){}
 }
 function syncEventOccurrences(events){
  if(typeof global.addOccurrence!=='function')return;(events||[]).filter(e=>e.tipo==='OCORRENCIA'||e.tipo==='BO').forEach(e=>{const id=e.referenciaId||e.eventId;if(!id||document.querySelector('#occurrences .entry[data-id="'+CSS.escape(id)+'"]'))return;const d={...(e.payload||{}),id,tipo:e.subtipo||e.payload?.tipo||'BO',numero:e.numeroDocumento||e.payload?.numero||'',data:e.data||e.payload?.data||'',hora:e.hora||e.payload?.hora||''};global.addOccurrence(d);const entry=document.querySelector('#occurrences .entry[data-id="'+CSS.escape(id)+'"]');if(entry){augmentOccurrence(entry);markEntry(entry,'Salvo na Central')}})
@@ -165,8 +171,10 @@ function installOperation(){
 }
 function installCirvc(){
  if(!fromRsd)return;contextBanner('CIRVC vinculado ao RSD');
- const tryWrap=()=>{const b=$('[data-cirvc-cloud-save]');if(!b)return false;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
- if(!tryWrap())setTimeout(tryWrap,350);
+ let done=false,tries=0;
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{const r=await old?.call(b);if(r===true)setTimeout(goBack,220)};return true};
+ const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
+ window.addEventListener('central-v10-ready',()=>setTimeout(tryWrap,30),{once:true});
 }
 async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
