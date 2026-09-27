@@ -590,9 +590,10 @@ function operationUpsert_(payload) {
   });
   audit_('OPERACAO',id,version,old?'RETIFICADA':'FINALIZADA','',op.responsavel||'',batt,comp,p);
   if(row.SERVICE_ID||row.RSD_REPORT_ID){
+    var eventTotalAits=Number((p.resumoCpu||{}).totalAits||0)||Number(row.ART_165||0)+Number(row.ART_165_A||0)+Number(row.ART_230_XI||0)+Number(row.OUTROS_AITS_COM_ABORDAGEM||0)+Number(row.AITS_SEM_ABORDAGEM||0);
     serviceEventUpsert_({eventId:(row.SERVICE_ID||row.RSD_REPORT_ID)+'::OPERACAO::'+id,serviceId:row.SERVICE_ID,rsdReportId:row.RSD_REPORT_ID,segmento:row.SEGMENTO,
       tipo:'OPERACAO',subtipo:op.nome||'',data:op.data,hora:op.horaFim||op.horaInicio||'',titulo:op.nome||'Operação',
-      resumo:[loc.descricao||'',row.TOTAL_AITS?'AITs: '+row.TOTAL_AITS:''].filter(Boolean).join(' • '),referenciaId:id,batalhao:batt,companhia:comp,
+      resumo:[loc.descricao||'',eventTotalAits?'AITs: '+eventTotalAits:''].filter(Boolean).join(' • '),referenciaId:id,batalhao:batt,companhia:comp,
       guarnicao:op.guarnicoes||'',vtr:op.vtrs||'',comandanteMatricula:row.COMANDANTE_MATRICULA,
       payload:{nome:op.nome||'',turno:op.turno||'',horaInicio:op.horaInicio||'',horaFim:op.horaFim||'',local:loc.descricao||'',resumoCpu:p.resumoCpu||{}}});
   }
