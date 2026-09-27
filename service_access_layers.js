@@ -91,6 +91,7 @@ function enterSetup(type,context=''){
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
    installRsdCommanderFlow();
+   const reg=q('#rsdRegisterServiceBtn');if(reg)reg.textContent='Registrar guarnição e entrar no relatório';
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
    const st=q('#rsdRegisterStatus');if(st)st.textContent='Escolha tipo e número da guarnição, informe a VTR e confirme primeiro a matrícula do comandante. Ao registrar, o RSD será aberto automaticamente.';
  }else{
