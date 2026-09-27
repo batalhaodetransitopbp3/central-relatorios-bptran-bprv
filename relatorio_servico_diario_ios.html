@@ -900,7 +900,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   async function registerService(){
     const p=window.payloadV2(),mat=CentralCloud.formatMatricula(p.guarnicao?.matricula||'');
     if(!p.servico?.data){alert('Informe a data do serviço.');return false}
-    if(!p.guarnicao?.tipo||!p.guarnicao?.nome){alert('Selecione a guarnição na lista: BST, BASE, GTTRAN, REBOQUE ou TOR.');return false}
+    if(!p.guarnicao?.tipo||!p.guarnicao?.nome){alert('Selecione o tipo e o número da guarnição.');return false}
     if(!p.guarnicao?.vtrPrincipal){alert('Informe a VTR principal da guarnição.');return false}
     if(!p.guarnicao?.responsavel||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Confirme a matrícula do comandante antes de registrar o serviço.');return false}
     if(document.getElementById('responsavel')?.dataset.externalMode==='1'){alert('Finalize o pré-cadastro do comandante clicando em “Cadastrar comandante” antes de registrar a guarnição.');return false}
