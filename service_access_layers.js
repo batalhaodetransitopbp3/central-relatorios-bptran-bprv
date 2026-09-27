@@ -79,7 +79,7 @@ function startScreen(type){
  q('[data-receive]',el).onclick=()=>type==='rsd'?rsdReceive():rcoReceive();
  q('[data-home]',el).onclick=()=>location.href='index.html';
 }
-function enterSetup(type){
+function enterSetup(type,context=''){
  clearLayer();q('#centralSetupNav')?.remove();document.body.classList.add('central-service-setup',type==='rco'?'rco-setup':'rsd-setup');
  const nav=document.createElement('div');nav.id='centralSetupNav';nav.className='central-setup-nav no-print';nav.innerHTML='<button type="button">← Voltar às opções de acesso</button>';document.body.prepend(nav);nav.querySelector('button').onclick=()=>{exitSetup();startScreen(type)};
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
@@ -93,6 +93,7 @@ function enterSetup(type){
    installRcoSetupStatus();
    installRcoEnterButton();
    q('#centralRcoSetupStatus')?.removeAttribute('hidden');
+   if(context==='receive')lockRcoServiceIdentity();
    q('#rcoResponsavelCard')?.scrollIntoView({block:'start'});
  }
 }
@@ -140,10 +141,13 @@ function markRsdRegisteredSetup(){
  if(btn){btn.hidden=false;btn.disabled=false}
  if(st){st.classList.add('central-registered-note');st.textContent='Guarnição registrada e salva na Central. Clique em “Entrar no relatório” para iniciar os lançamentos do serviço.'}
 }
-function lockRcoHeader(){
+function lockRcoServiceIdentity(){
  ['batalhao','companhiaNumero','dataInicio','dataTermino'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['diaSemanaCpu','horarioServico'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
  const mode=q('#rcoSemCpu');if(mode)mode.disabled=true;
+}
+function lockRcoHeader(){
+ lockRcoServiceIdentity();
  ['rcoResponsavelPerfil'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['rcoResponsavelMatricula','rcoResponsavelTurno','rcoExternoPosto','rcoExternoNome','rcoExternoUnidade'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
  const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=true}
@@ -226,7 +230,7 @@ async function rcoContinue(){
 }
 async function rcoReceive(){
  clearLayer();
- if(typeof global.centralRcoReceivePassage==='function'){const ok=await global.centralRcoReceivePassage();if(ok)enterSetup('rco');else startScreen('rco');return}
+ if(typeof global.centralRcoReceivePassage==='function'){const ok=await global.centralRcoReceivePassage();if(ok)enterSetup('rco','receive');else startScreen('rco');return}
  startScreen('rco');
 }
 function init(){
