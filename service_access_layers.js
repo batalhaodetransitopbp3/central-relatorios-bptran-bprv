@@ -39,7 +39,12 @@ body.central-service-setup.rco-setup #centralRcoSetupStatus[hidden]{display:none
 .central-rco-status-row:first-child{border-top:0}
 .central-rco-status-row strong{color:#17375e}.central-rco-status-row span:last-child{text-align:right;font-weight:700}
 @media(max-width:620px){.central-rco-status-row{grid-template-columns:1fr}.central-rco-status-row span:last-child{text-align:left}}
-.rsd-gu-choice{width:100%;min-height:38px}
+.rsd-team-ident.central-split-gu{display:grid!important;grid-template-columns:1.35fr .65fr;gap:8px;align-items:end}
+.rsd-gu-part label{font-size:9.5px;margin-bottom:3px}.rsd-gu-number{width:100%;min-height:38px}
+.rsd-external-commander{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:8px;padding:9px;border:1px dashed #c6d3de;border-radius:9px;background:#f8fafc}
+.rsd-external-commander[hidden]{display:none!important}
+.rsd-external-commander .hint{grid-column:1/-1;margin:0 0 2px}
+#responsavel[readonly]{background:#f4f7f9;color:#31465a}
 @media(max-width:620px){.central-access-layer{padding:8px}.central-access-card{margin:8px auto;padding:14px;border-radius:14px}.central-access-unit{grid-template-columns:1fr}.central-access-head h1{font-size:19px}}
 @media print{.central-access-layer{display:none!important}}
 `;document.head.appendChild(s);
@@ -85,10 +90,9 @@ function enterSetup(type,context=''){
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
  if(type==='rsd'){
    installRsdGuarnicaoChoice();
-   installRsdEnterButton();
-   setTimeout(()=>{if(q('#guarnicaoTipo')?.disabled||q('#viatura')?.readOnly)markRsdRegisteredSetup()},80);
+   installRsdCommanderFlow();
    const h=q('header.doc-head');h?.scrollIntoView({block:'start'});
-   const st=q('#rsdRegisterStatus');if(st)st.textContent='Preencha a identificação do serviço. A guarnição deve ser escolhida na lista; depois registre o serviço na Central.';
+   const st=q('#rsdRegisterStatus');if(st)st.textContent='Escolha tipo e número da guarnição, informe a VTR e confirme primeiro a matrícula do comandante. Ao registrar, o RSD será aberto automaticamente.';
  }else{
    installRcoSetupStatus();
    installRcoEnterButton();
@@ -101,25 +105,42 @@ function exitSetup(){
  q('#centralSetupNav')?.remove();q('#centralRcoSetupStatus')?.setAttribute('hidden','hidden');document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
  try{sessionStorage.removeItem(MODE)}catch(_){}
 }
-function guOptions(){
- const out=['<option value="">Selecione a guarnição</option>'];
- [['BST',10],['BASE',4],['GTTRAN',3],['REBOQUE',3],['TOR',3]].forEach(([t,n])=>{for(let i=1;i<=n;i++)out.push(`<option value="${t} ${String(i).padStart(2,'0')}">${t} ${String(i).padStart(2,'0')}</option>`)});
- return out.join('');
+function numberOptions(){
+ return '<option value="">Nº</option>'+Array.from({length:10},(_,i)=>'<option value="'+String(i+1).padStart(2,'0')+'">'+String(i+1).padStart(2,'0')+'</option>').join('');
+}
+function syncRsdGuarnicaoParts(){
+ const original=q('#guarnicao'),tipo=q('#guarnicaoTipo'),numero=q('#guarnicaoNumero');if(!original||!tipo||!numero)return;
+ original.value=tipo.value&&numero.value?(tipo.value+' '+numero.value):'';
+ original.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function installRsdGuarnicaoChoice(){
- const original=q('#guarnicao'),tipo=q('#guarnicaoTipo');if(!original||q('#guarnicaoEscolha'))return;
- const s=document.createElement('select');s.id='guarnicaoEscolha';s.className='rsd-gu-choice no-print';s.innerHTML=guOptions();
- const normalize=v=>{const m=String(v||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s*0*(\d{1,2})$/);return m?m[1]+' '+String(Number(m[2])).padStart(2,'0'):''};
- const current=normalize(original.value);if(current)s.value=current;
- original.style.display='none';tipo.style.display='none';const holder=original.closest('.rsd-team-ident')||original.parentElement;holder?.appendChild(s);
- const field=original.closest('.field'),label=field?.querySelector('label');if(label)label.textContent='Guarnição';if(field)field.style.display='block';
- s.onchange=()=>{original.value=s.value;tipo.value=(s.value.match(/^[A-Z]+/)||[''])[0];original.dispatchEvent(new Event('input',{bubbles:true}));tipo.dispatchEvent(new Event('change',{bubbles:true}));};
- const obs=new MutationObserver(()=>{const v=normalize(original.value);if(v&&s.value!==v)s.value=v;s.disabled=!!tipo.disabled});obs.observe(original,{attributes:true,attributeFilter:['value']});obs.observe(tipo,{attributes:true,attributeFilter:['disabled']});
- setInterval(()=>{const v=normalize(original.value);if(v&&s.value!==v)s.value=v;s.disabled=!!tipo.disabled},1200);
+ const original=q('#guarnicao'),tipo=q('#guarnicaoTipo');if(!original||!tipo||q('#guarnicaoNumero'))return;
+ const holder=original.closest('.rsd-team-ident')||original.parentElement,field=original.closest('.field'),label=field?.querySelector(':scope > label');
+ const m=String(original.value||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|REBOQUE|TOR)\s*0*(\d{1,2})$/),currentType=m?.[1]||tipo.value||'',currentNum=m?String(Number(m[2])).padStart(2,'0'):'';
+ const numero=document.createElement('select');numero.id='guarnicaoNumero';numero.className='rsd-gu-number no-print';numero.innerHTML=numberOptions();numero.value=currentNum;
+ const typeWrap=document.createElement('div');typeWrap.className='rsd-gu-part';typeWrap.innerHTML='<label>Tipo</label>';
+ const numWrap=document.createElement('div');numWrap.className='rsd-gu-part';numWrap.innerHTML='<label>Número</label>';
+ holder.classList.add('central-split-gu');holder.innerHTML='';tipo.style.display='block';tipo.value=currentType;typeWrap.appendChild(tipo);numWrap.appendChild(numero);holder.append(typeWrap,numWrap,original);
+ original.style.display='none';if(label)label.textContent='Guarnição';if(field)field.style.display='block';
+ tipo.onchange=()=>{syncRsdGuarnicaoParts();tipo.dispatchEvent(new Event('input',{bubbles:true}))};numero.onchange=syncRsdGuarnicaoParts;
+ if(currentType&&currentNum)syncRsdGuarnicaoParts();
+}
+function installRsdCommanderFlow(){
+ const row=q('.rsd-person-row'),name=q('#responsavel'),mat=q('#matriculaResponsavel'),search=q('#buscarMilitarBtn');if(!row||!name||!mat)return;
+ const nameField=name.closest('.field'),matField=mat.closest('.field');if(matField&&nameField&&row.firstElementChild!==matField)row.insertBefore(matField,nameField);
+ if(matField)matField.className='field span4';if(nameField)nameField.className='field span8';
+ name.readOnly=true;name.placeholder='Preenchido automaticamente após confirmar a matrícula';
+ if(search)search.textContent='Confirmar matrícula';
+ let ext=q('#rsdExternalCommander');
+ if(!ext){ext=document.createElement('div');ext.id='rsdExternalCommander';ext.className='rsd-external-commander no-print';ext.hidden=true;ext.innerHTML='<div class="hint">Matrícula não localizada. Informe os dados abaixo para o pré-cadastro.</div><div class="field"><label>Posto/graduação</label><input id="rsdExternalPosto" placeholder="Ex.: CB"></div><div class="field"><label>Unidade de origem</label><input id="rsdExternalUnidade" placeholder="Ex.: 5º BPM / PMPB"></div>';row.appendChild(ext)}
+ mat.addEventListener('input',()=>{if(!name.dataset.externalMode){name.value='';name.readOnly=true;name.placeholder='Preenchido automaticamente após confirmar a matrícula'}ext.hidden=true;delete name.dataset.externalMode});
+ global.centralRsdEnableExternalCommander=function(){name.readOnly=false;name.value='';name.dataset.externalMode='1';name.placeholder='Digite o nome/QRA do comandante';ext.hidden=false;name.focus();if(search)search.textContent='Cadastrar comandante'};
+ global.centralRsdExternalCommanderState=function(){return {nome:String(name.value||'').trim(),postoGrad:String(q('#rsdExternalPosto')?.value||'').trim(),unidadeOrigem:String(q('#rsdExternalUnidade')?.value||'').trim(),external:name.dataset.externalMode==='1'}};
+ global.centralRsdCommanderFound=function(){name.readOnly=true;delete name.dataset.externalMode;ext.hidden=true;if(search)search.textContent='Confirmar matrícula'};
 }
 function lockRsdHeader(){
  ['batalhao','companhiaNumero'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
- ['data','diaSemana','guarnicaoEscolha','guarnicaoTipo'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
+ ['data','diaSemana','guarnicaoTipo','guarnicaoNumero'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['viatura','efetivo','responsavel','matriculaResponsavel'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
  q('#buscarMilitarBtn')?.setAttribute('disabled','disabled');
  q('#rsdChangeKeyBtn')?.setAttribute('hidden','hidden');
@@ -235,8 +256,8 @@ async function rcoReceive(){
 }
 function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
- if(type==='rsd')installRsdGuarnicaoChoice();
- global.addEventListener('central-rsd-registered',ev=>{if(ev?.detail?.continued){lockRsdHeader();exitSetup();return}if(document.body.classList.contains('rsd-setup'))markRsdRegisteredSetup();else lockRsdHeader()});
+ if(type==='rsd'){installRsdGuarnicaoChoice();installRsdCommanderFlow()}
+ global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
  global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
  if(next===type+'-setup'||mode===type+'-setup'){enterSetup(type);return}
