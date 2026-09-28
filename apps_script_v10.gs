@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.3';
+var CENTRAL_V10_VERSION = '10.8.4';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -846,12 +846,25 @@ function rsdDraftSync_(payload){
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   return {ok:true,message:'Rascunho sincronizado.',reportId:reportId,serviceId:obj.SERVICE_ID,segmento:obj.SEGMENTO,draftRevision:obj.DRAFT_REVISION,status:obj.STATUS};
 }
+function rsdOwnerMat_(row){
+  if(!row)return '';
+  var direct=normMat_(row.RESPONSAVEL_MATRICULA||'');if(direct)return direct;
+  try{
+    var p=loadJsonPayload_(row)||{},g=p.guarnicao||{};
+    return normMat_(g.matricula||p.matriculaResponsavel||'');
+  }catch(_){return ''}
+}
 function rsdClaim_(payload){
   var reportId=String(payload.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId||!deviceId)throw new Error('Identificação de continuidade incompleta.');
   var s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',reportId);if(!row)throw new Error('RSD em andamento não localizado.');
   if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(row.STATUS))<0)throw new Error('Este RSD não está disponível para continuidade.');
+  var autorMat=normMat_(payload.autorMatricula||'');
+  if(autorMat){
+    var ownerMat=rsdOwnerMat_(row);
+    if(!ownerMat||ownerMat!==autorMat)throw new Error('Este serviço está vinculado a outro comandante. Confira a matrícula ou utilize a passagem de serviço.');
+  }
   assertLease_(row,deviceId,!!payload.forceTakeover);row.EDIT_DEVICE_ID=deviceId;row.EDIT_LEASE_UNTIL=isoAfterMinutes_(3);row.SINCRONIZADO_EM=nowIso_();upsert_(s,'REPORT_ID',reportId,row);
-  audit_('RSD',reportId,Number(row.VERSAO||1),'ACESSO_CONTINUIDADE',row.RESPONSAVEL_MATRICULA||'',row.RESPONSAVEL_NOME||'',row.BATALHAO,row.COMPANHIA,{deviceId:deviceId,forceTakeover:!!payload.forceTakeover});
+  audit_('RSD',reportId,Number(row.VERSAO||1),'ACESSO_CONTINUIDADE',row.RESPONSAVEL_MATRICULA||autorMat,row.RESPONSAVEL_NOME||'',row.BATALHAO,row.COMPANHIA,{deviceId:deviceId,forceTakeover:!!payload.forceTakeover,autorMatricula:autorMat});
   var p=rsdGet_(reportId);p.versao=Number(row.VERSAO||1);p.serviceId=row.SERVICE_ID||p.serviceId||'';p.segmento=Number(row.SEGMENTO||p.segmento||1);
   return {ok:true,message:String(row.STATUS)==='RETIFICACAO_SOLICITADA'?'Relatório devolvido carregado para retificação.':'Serviço assumido neste aparelho.',rsd:p,meta:{reportId:reportId,serviceId:row.SERVICE_ID||'',segmento:Number(row.SEGMENTO||1),draftRevision:Number(row.DRAFT_REVISION||0)}};
 }
@@ -917,8 +930,28 @@ function rsdList_(p) {
   });
 }
 function rsdActive_(p) {
-  var mat=normMat_(p.matricula||''),gu=String(p.guarnicao||'').toLowerCase(),items=rsdList_(p);
-  return items.filter(function(x){if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(x.status))<0)return false;if(mat&&normMat_(x.matricula)!==mat)return false;if(gu&&String(x.guarnicao||'').toLowerCase()!==gu)return false;return true;}).sort(function(a,b){return String(b.ultimoRascunhoEm||b.iniciadoEm||'').localeCompare(String(a.ultimoRascunhoEm||a.iniciadoEm||''));});
+  p=p||{};
+  var mat=normMat_(p.matricula||'');if(!mat)return [];
+  var reportHint=String(p.reportId||''),serviceHint=String(p.serviceId||''),vtrHint=normVtrPrefix_(p.vtrPrincipal||p.vtr||''),guHint=String(p.guarnicao||'').trim().toLowerCase();
+  var q=Object.assign({},p);q.matricula='';q.batalhao='';q.companhia='';q.data='';q.guarnicao='';
+  var items=rsdList_(q),rs=sheet_(P3_SHEET_ID,'RSD'),rows=objects_(rs),rowMap={};
+  rows.forEach(function(r){rowMap[String(r.REPORT_ID||'')]=r});
+  var active=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'],out=[];
+  items.forEach(function(x){
+    if(active.indexOf(String(x.status||''))<0)return;
+    var row=rowMap[String(x.reportId||'')]||null,owner=rsdOwnerMat_(row);
+    if(owner!==mat)return;
+    var score=100;
+    if(reportHint&&String(x.reportId||'')===reportHint)score+=100;
+    if(serviceHint&&String(x.serviceId||'')===serviceHint)score+=80;
+    if(vtrHint&&normVtrPrefix_(x.vtrPrincipal||'')===vtrHint)score+=50;
+    if(guHint&&String(x.guarnicao||'').trim().toLowerCase()===guHint)score+=20;
+    x.ownerVerified=true;x.matchScore=score;out.push(x);
+  });
+  return out.sort(function(a,b){
+    if(Number(b.matchScore||0)!==Number(a.matchScore||0))return Number(b.matchScore||0)-Number(a.matchScore||0);
+    return String(b.ultimoRascunhoEm||b.iniciadoEm||'').localeCompare(String(a.ultimoRascunhoEm||a.iniciadoEm||''));
+  });
 }
 function rsdGet_(reportId) {
   var row=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
@@ -1105,16 +1138,22 @@ function rsdReview_(payload){
 function rsdCancel_(payload){
   var reportId=String(payload.reportId||''),s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
   if(String(row.STATUS)==='CANCELADO')return {ok:true,message:'RSD já se encontra cancelado.',status:'CANCELADO'};
+  var perfil=String(payload.perfil||'').toUpperCase(),autorMat=normMat_(payload.autorMatricula||'');
+  if(perfil==='GUARNICAO'){
+    if(!/^\d{3}\.\d{3}-\d$/.test(autorMat))throw new Error('Informe a matrícula do comandante para excluir/cancelar o próprio relatório.');
+    var ownerMat=rsdOwnerMat_(row);
+    if(!ownerMat||ownerMat!==autorMat)throw new Error('Este relatório pertence a outro comandante. Somente o próprio responsável pode excluí-lo; em caso de necessidade, solicite ao Coordenador.');
+  }
   if(String(row.STATUS)==='PASSAGEM_DISPONIVEL')throw new Error('Há uma passagem de serviço aguardando recebimento. Cancele primeiro a passagem e, se necessário, cancele depois o registro.');
   if(String(row.STATUS)==='INCLUIDO_RCO'){
-    if(String(payload.perfil||'').toUpperCase()==='GUARNICAO')throw new Error('Este RSD já foi incorporado ao RCO e não pode ser cancelado pela guarnição.');
+    if(perfil==='GUARNICAO')throw new Error('Este RSD já foi incorporado ao RCO e não pode ser cancelado pela guarnição.');
     if(!linkedRcoInRetification_(row))throw new Error('Este RSD já foi incorporado a um RCO consolidado. O P3 deve reabrir formalmente o RCO para retificação antes do cancelamento.');
   }
   if(!String(payload.motivo||'').trim())throw new Error('Informe o motivo do cancelamento.');
   ensureHeaders_(s,['CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL']);
-  row.STATUS='CANCELADO';row.CANCELADO_EM=nowIso_();row.CANCELADO_MOTIVO=String(payload.motivo||'');row.CANCELADO_POR_MATRICULA=normMat_(payload.autorMatricula||'');row.CANCELADO_POR_NOME=String(payload.autorNome||'');row.CANCELADO_POR_PERFIL=String(payload.perfil||'');row.EDIT_LEASE_UNTIL='';row.SINCRONIZADO_EM=nowIso_();
+  row.STATUS='CANCELADO';row.CANCELADO_EM=nowIso_();row.CANCELADO_MOTIVO=String(payload.motivo||'');row.CANCELADO_POR_MATRICULA=autorMat;row.CANCELADO_POR_NOME=String(payload.autorNome||'');row.CANCELADO_POR_PERFIL=String(payload.perfil||'');row.EDIT_LEASE_UNTIL='';row.EDIT_DEVICE_ID='';row.SINCRONIZADO_EM=nowIso_();
   upsert_(s,'REPORT_ID',reportId,row);audit_('RSD',reportId,Number(row.VERSAO||1),'CANCELADO',row.CANCELADO_POR_MATRICULA,row.CANCELADO_POR_NOME,row.BATALHAO,row.COMPANHIA,payload);
-  return {ok:true,message:'Registro cancelado e preservado para auditoria.',status:'CANCELADO'};
+  return {ok:true,message:'Relatório excluído do serviço ativo e preservado apenas para auditoria.',status:'CANCELADO'};
 }
 
 function restoreRsdAfterPassage_(rs, src){
