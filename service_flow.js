@@ -218,8 +218,12 @@ function installBo(){
  const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao RSD';b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
- const hideLegacy=()=>{$$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
- const run=()=>{hideLegacy();try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
+ const hideLegacy=()=>{$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
+ const canRefresh=()=>{
+  if(document.getElementById('centralAccessLayer')||document.getElementById('centralAccessKeyOverlay')||document.body.classList.contains('central-service-setup'))return false;
+  try{return !!sessionStorage.getItem('pmpb-rco-role-token-v1')}catch(_){return false}
+ };
+ const run=()=>{hideLegacy();if(!canRefresh())return;try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
  hideLegacy();setTimeout(run,350);addEventListener('focus',()=>setTimeout(run,150));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
 }
 function init(){
