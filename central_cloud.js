@@ -8,7 +8,8 @@ function formatMatricula(v){const d=String(v||'').replace(/\D/g,'').slice(0,7);r
 function getDeviceId(){try{let d=localStorage.getItem(DEVICE_KEY)||'';if(!d){d=uid('dev');localStorage.setItem(DEVICE_KEY,d)}return d}catch(_){return uid('dev')}}
 function getToken(kind='central'){try{return localStorage.getItem(kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY)||''}catch(_){return ''}}
 function setToken(v,kind='central'){try{const k=kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY;if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(_){}}
-function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;t=prompt(message||(kind==='p3'?'Informe a Chave P3:':'Informe a chave operacional da Central:'))||'';t=t.trim();if(t)setToken(t,kind);return t}
+function moduleAuthLocked(kind='central'){try{return kind==='central'&&sessionStorage.getItem('central-module-auth-rsd-v1')==='1'}catch(_){return false}}
+function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;if(moduleAuthLocked(kind))return '';t=prompt(message||(kind==='p3'?'Informe a Chave P3:':'Informe a chave operacional da Central:'))||'';t=t.trim();if(t)setToken(t,kind);return t}
 const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
 function tokenKindForAction(action){return P3_ACTIONS.has(String(action||''))?'p3':'central'}
 function isAuthError(err){return err?.code==='AUTH_INVALID'||/(chave|credencial)[^\n]{0,80}inválid/i.test(String(err?.message||err||''))}
