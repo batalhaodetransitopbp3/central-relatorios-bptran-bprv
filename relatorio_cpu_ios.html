@@ -594,15 +594,28 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     setTimeout(()=>{p3Submitting=false;if(sendBtn)sendBtn.disabled=false},1800);
     setTimeout(()=>p3SetStatus(''),12000);
   }
-  window.abrirConsolidacaoP3=function(){
+  window.abrirConsolidacaoP3=async function(){
     const resp=window.rcoResponsibleData?.()||{};
     if(!resp.matricula){alert('Registre primeiro o CPU ou o P3/oficial responsável pelo RCO.');return}
     const semCpu=!!document.getElementById('rcoSemCpu')?.checked;
     if(semCpu&&!['P3','OFICIAL'].includes(String(resp.perfil||'').toUpperCase())){alert('No modo de consolidação sem CPU, identifique e registre um responsável com perfil P3 ou Oficial.');return}
     if(window.centralRcoHasOpenRsd?.()){alert('Há pendências de RSDs no RCO (serviço em andamento, passagem aguardando recebimento, análise pendente, retificação, indeferimento ou possível duplicidade). Resolva-as antes de consolidar para o P3.');return}
-    const m=p3EnsureModal(),input=m.querySelector('#p3TokenInput');input.value=p3GetSavedToken();
-    try{const p=p3BuildPackage(),s=p.estatisticaP3||{};const el=m.querySelector('#p3Preview');if(el)el.textContent=`Prévia: ${(s.producao||[]).length} indicadores de produção • ${(s.veiculos||[]).length} veículo(s) detalhado(s) • ${(s.cirvcs||[]).length} CIRVC(s) • ${(s.podExecucao||[]).length} registro(s) de POD.`}catch(err){const el=m.querySelector('#p3Preview');if(el)el.textContent=err.message||String(err)}
-    m.querySelector('#p3Remember').checked=true;m.classList.remove('hidden');setTimeout(()=>input.focus(),40);
+    let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+    if(!token){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente no RCO. Nenhuma nova chave será solicitada dentro do módulo.');return}
+    let pkg,s;try{pkg=p3BuildPackage();s=pkg.estatisticaP3||{}}catch(err){alert(err.message||String(err));return}
+    const resumo='Indicadores: '+(s.producao||[]).length+' • Veículos: '+(s.veiculos||[]).length+' • CIRVC: '+(s.cirvcs||[]).length+' • POD: '+(s.podExecucao||[]).length;
+    if(!confirm('Consolidar este RCO para o P3?\n\n'+resumo+'\n\nSerá utilizada a credencial já validada no ingresso do RCO.'))return;
+    try{
+      if(typeof salvarRascunho==='function')salvarRascunho(true);
+      p3SetStatus('Consolidando o RCO na Central…');
+      const rr=await CentralCloud.submitForm('rco-upsert',pkg,token,{popup:false,timeout:60000});
+      p3SetStatus(rr.message||'RCO consolidado com sucesso.');
+      alert(rr.message||'RCO consolidado com sucesso.');
+    }catch(err){
+      if(CentralCloud.isAuthError?.(err)){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}alert('A credencial da sessão não foi aceita. Volte às opções de acesso e entre novamente no RCO.');}
+      else alert('Não foi possível consolidar o RCO: '+(err.message||err));
+      p3SetStatus('Falha na consolidação.');
+    }
   };
 })();
 </script>
