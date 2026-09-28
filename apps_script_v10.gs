@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.3';
+var CENTRAL_V10_VERSION = '10.8.4';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -81,16 +81,16 @@ function doGet(e) {
       out = {ok:true, transporte:cirvcTransportGet_(p.transporteId)};
     } else if (action === 'p3-query') {
       assertToken_(p.token, 'p3');
-      out = p3Query_(p);
+      out = p3CachedRead_(action,p,function(){return p3Query_(p)});
     } else if (action === 'p3-analysis') {
       assertToken_(p.token, 'p3');
-      out = p3Analysis_(p);
+      out = p3CachedRead_(action,p,function(){return p3Analysis_(p)});
     } else if (action === 'p3-analysis-compare') {
       assertToken_(p.token, 'p3');
-      out = p3AnalysisCompare_(p);
+      out = p3CachedRead_(action,p,function(){return p3AnalysisCompare_(p)});
     } else if (action === 'p3-config') {
       assertToken_(p.token, 'p3');
-      out = p3Config_();
+      out = p3CachedRead_(action,p,function(){return p3Config_()});
     } else if (action === 'motomecanizacao-list') {
       assertToken_(p.token, 'p3');
       out = motomecanizacaoList_(p);
@@ -118,6 +118,7 @@ function doGet(e) {
 
 function doPost(e) {
   var action = '';
+  P3_DATA_DIRTY_ = false;
   try {
     var p = (e && e.parameter) || {};
     action = String(p.action || 'rco-upsert');
@@ -254,6 +255,9 @@ function doPost(e) {
   } catch (err) {
     var ep=(e&&e.parameter)||{};
     return postMessagePage_(action, {ok:false, message:String(err && err.message || err)}, String(ep.requestId||''));
+  } finally {
+    // Inclusive em falha parcial: uma gravação já realizada torna a consulta anterior obsoleta.
+    if(P3_DATA_DIRTY_)p3InvalidateCache_();
   }
 }
 
@@ -299,6 +303,7 @@ function assertToken_(token, kind) {
 }
 
 var SPREADSHEET_EXEC_CACHE_ = {};
+var P3_DATA_DIRTY_ = false;
 function ss_(id) {
   id=String(id||'');
   if(!SPREADSHEET_EXEC_CACHE_[id])SPREADSHEET_EXEC_CACHE_[id]=SpreadsheetApp.openById(id);
@@ -359,18 +364,20 @@ function upsert_(s, keyField, keyValue, obj) {
     for (var i=0;i<vals.length;i++) if (String(vals[i][0]) === String(keyValue)) { row=i+2; break; }
   }
   if (!row) row = last + 1;
+  P3_DATA_DIRTY_ = true;
   s.getRange(row,1,1,h.length).setValues([rowFor_(h,obj)]);
   return row;
 }
 function append_(s, obj) {
   var h = headers_(s);
+  P3_DATA_DIRTY_ = true;
   s.getRange(s.getLastRow()+1,1,1,h.length).setValues([rowFor_(h,obj)]);
 }
 function deleteWhere_(s, field, value) {
   var h = headers_(s), idx = h.indexOf(field);
   if (idx < 0 || s.getLastRow() < 2) return;
   var vals=s.getRange(2,idx+1,s.getLastRow()-1,1).getDisplayValues();
-  for (var i=vals.length-1;i>=0;i--) if (String(vals[i][0]) === String(value)) s.deleteRow(i+2);
+  for (var i=vals.length-1;i>=0;i--) if (String(vals[i][0]) === String(value)) {P3_DATA_DIRTY_ = true;s.deleteRow(i+2);}
 }
 function findOne_(s, field, value) {
   var list=objects_(s);
@@ -1535,18 +1542,19 @@ function p3Companies_(p){
 function p3IndicatorLeaf_(v){
   var s=String(v||'').trim(),a=s.split('.');return a[a.length-1]||s;
 }
-function p3RowChunks_(rows){
+function p3RowChunks_(rows,width){
   rows=(rows||[]).slice().sort(function(a,b){return a-b});var out=[],cur=null;
+  var maxRows=Math.max(250,Math.min(5000,Math.floor(25000/Math.max(1,width||1))));
   rows.forEach(function(r){
-    if(!cur){cur={start:r,end:r};return;}
-    if(r-cur.end<=6&&r-cur.start<250){cur.end=r;return;}
-    out.push(cur);cur={start:r,end:r};
+    if(!cur){cur={start:r,end:r,count:1};return;}
+    if(r-cur.end<=32&&r-cur.start<maxRows&&r-cur.start<=4*(cur.count+1)+32){cur.end=r;cur.count++;return;}
+    out.push(cur);cur={start:r,end:r,count:1};
   });
   if(cur)out.push(cur);return out;
 }
 function p3ValuesForRows_(s,rows,startCol,numCols){
   var map={},want={};(rows||[]).forEach(function(r){want[String(r)]=1});
-  p3RowChunks_(rows).forEach(function(ch){
+  p3RowChunks_(rows,numCols).forEach(function(ch){
     var vals=s.getRange(ch.start,startCol,ch.end-ch.start+1,numCols).getValues();
     for(var i=0;i<vals.length;i++){var row=ch.start+i;if(want[String(row)])map[String(row)]=vals[i];}
   });
@@ -1562,25 +1570,38 @@ function p3ObjectsForRows_(s,h,rows,limit){
   });
   return out;
 }
-function p3IndexedRows_(s,p,dateCandidates){
-  var last=s.getLastRow(),n=Math.max(0,last-1),h=headers_(s);if(!n)return {headers:h,rows:[]};
+// Agrupa colunas pequenas sem atravessar payloads, fotografias ou assinaturas.
+function p3ColumnGroups_(h,cols){
+  var groups=[],g=null;
+  cols.slice().sort(function(a,b){return a-b}).forEach(function(i){
+    var blocked=false;if(g)for(var j=g.end+1;j<i;j++)if(/JSON|PAYLOAD|SNAPSHOT|FOTO|PHOTO|ASSINATURA|SIGNATURE|BASE64/i.test(h[j]||''))blocked=true;
+    if(!g||blocked||i-g.end>4||i-g.start>=32){g={start:i,end:i};groups.push(g)}else g.end=i;
+  });return groups;
+}
+function p3Filter_(h,p,dateCandidates){
   var dateIdx=p3FirstField_(h,dateCandidates||['DATA_SERVICO','DATA','DATA_HORA','ABERTA_EM','DATA_CADASTRO']),
       battIdx=p3FirstField_(h,['BATALHAO']),compIdx=p3FirstField_(h,['COMPANHIA']),
       turnoIdx=p3FirstField_(h,['TURNO','HORARIO_SERVICO']),guIdx=p3FirstField_(h,['GUARNICAO','GUARNICAO_RESPONSAVEL']),
-      indexes=[dateIdx,battIdx,compIdx,turnoIdx,guIdx].filter(function(x){return x>=0}),blockStart=indexes.length?Math.min.apply(null,indexes):0,
-      blockEnd=indexes.length?Math.max.apply(null,indexes):0,iv=s.getRange(2,blockStart+1,n,blockEnd-blockStart+1).getValues();
-  function valueAt(row,idx){return idx>=0?row[idx-blockStart]:''}
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
-      turno=String(p.turno||'').toLowerCase(),gu=String(p.guarnicao||'').toLowerCase(),rows=[];
-  for(var i=0;i<n;i++){
-    var row=iv[i],d=dateIdx>=0?dateText_(valueAt(row,dateIdx)):'',co=compIdx>=0?String(valueAt(row,compIdx)||''):'';
-    if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;
-    if(batt&&(battIdx<0||String(valueAt(row,battIdx)||'')!==batt))continue;
-    if(comps.length&&(compIdx<0||comps.indexOf(co)<0))continue;
-    if(turno&&(turnoIdx<0||String(valueAt(row,turnoIdx)||'').toLowerCase()!==turno))continue;
-    if(gu&&(guIdx<0||String(valueAt(row,guIdx)||'').toLowerCase().indexOf(gu)<0))continue;
-    rows.push(i+2);
-  }
+      batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=p3DateText_(p.dataInicio||p.inicio||''),df=p3DateText_(p.dataFim||p.fim||''),
+      turno=String(p.turno||'').toLowerCase(),gu=String(p.guarnicao||'').toLowerCase(),cols=[];
+  [[di||df,dateIdx],[batt,battIdx],[comps.length,compIdx],[turno,turnoIdx],[gu,guIdx]].forEach(function(x){if(x[0]&&x[1]>=0)cols.push(x[1])});
+  return {cols:cols,matches:function(row){
+    function at(i){return i>=0?row[h[i]]:''}
+    var d=di||df?p3DateText_(at(dateIdx)):'';
+    if(di&&(!d||d<di))return false;if(df&&(!d||d>df))return false;
+    if(batt&&String(at(battIdx)||'')!==batt)return false;
+    if(comps.length&&comps.indexOf(String(at(compIdx)||''))<0)return false;
+    if(turno&&String(at(turnoIdx)||'').toLowerCase()!==turno)return false;
+    if(gu&&String(at(guIdx)||'').toLowerCase().indexOf(gu)<0)return false;
+    return true;
+  }};
+}
+function p3IndexedRows_(s,p,dateCandidates,h){
+  var n=Math.max(0,s.getLastRow()-1);h=h||headers_(s);if(!n)return {headers:h,rows:[]};
+  var filter=p3Filter_(h,p,dateCandidates),rows=[],all=[];
+  for(var i=0;i<n;i++)all.push(i+2);
+  if(!filter.cols.length){return {headers:h,rows:filter.matches({})?all:[]}}
+  p3ObjectsForRowsFields_(s,h,all,0,filter.cols.map(function(i){return h[i]})).forEach(function(row){if(filter.matches(row))rows.push(row._row)});
   return {headers:h,rows:rows};
 }
 function p3FastObjects_(sheetName,p,limit,dateCandidates){
@@ -1592,12 +1613,11 @@ function p3ObjectsForRowsFields_(s,h,rows,limit,fields){
   if(limit&&chosen.length>limit)chosen=chosen.slice(chosen.length-limit);
   var wanted={},cols=[];(fields||[]).forEach(function(k){var i=h.indexOf(k);if(i>=0&&!wanted[k]){wanted[k]=1;cols.push(i)}});
   if(!chosen.length||!cols.length)return [];
-  cols.sort(function(a,b){return a-b});var groups=[],g=null;
-  cols.forEach(function(i){if(!g||i-g.end>2||i-g.start>24){g={start:i,end:i};groups.push(g)}else g.end=i});
-  var byRow={};chosen.forEach(function(r){byRow[String(r)]={_row:r}});
-  p3RowChunks_(chosen).forEach(function(ch){
-    groups.forEach(function(gr){
-      var vals=s.getRange(ch.start,gr.start+1,ch.end-ch.start+1,gr.end-gr.start+1).getValues();
+  var groups=p3ColumnGroups_(h,cols),byRow={};chosen.forEach(function(r){byRow[String(r)]={_row:r}});
+  groups.forEach(function(gr){
+    var width=gr.end-gr.start+1;
+    p3RowChunks_(chosen,width).forEach(function(ch){
+      var vals=s.getRange(ch.start,gr.start+1,ch.end-ch.start+1,width).getValues();
       for(var ri=0;ri<vals.length;ri++){
         var rowNo=ch.start+ri,o=byRow[String(rowNo)];if(!o)continue;
         for(var ci=gr.start;ci<=gr.end;ci++){var k=h[ci];if(k&&wanted[k])o[k]=vals[ri][ci-gr.start]}
@@ -1608,7 +1628,26 @@ function p3ObjectsForRowsFields_(s,h,rows,limit,fields){
 }
 function p3FastFields_(sheetName,p,limit,dateCandidates,fields){
   var s=ss_(P3_SHEET_ID).getSheetByName(sheetName);if(!s)return [];
-  var idx=p3IndexedRows_(s,p||{},dateCandidates);return p3ObjectsForRowsFields_(s,idx.headers,idx.rows,limit,fields);
+  p=p||{};var h=headers_(s),n=Math.max(0,s.getLastRow()-1),filter=p3Filter_(h,p,dateCandidates),allFields=(fields||[]).slice();
+  filter.cols.forEach(function(i){if(allFields.indexOf(h[i])<0)allFields.push(h[i])});
+  // Bases pequenas: filtro e projeção na mesma leitura. Bases maiores: índice antes dos detalhes.
+  if(n<=2500&&n*allFields.length<=25000){
+    var rows=[];for(var i=0;i<n;i++)rows.push(i+2);
+    var data=p3ObjectsForRowsFields_(s,h,rows,0,allFields).filter(filter.matches);
+    if(limit&&data.length>limit)data=data.slice(-limit);
+    return data.map(function(x){var out={_row:x._row};(fields||[]).forEach(function(k){if(Object.prototype.hasOwnProperty.call(x,k))out[k]=x[k]});return out});
+  }
+  var idx=p3IndexedRows_(s,p,dateCandidates,h);return p3ObjectsForRowsFields_(s,h,idx.rows,limit,fields);
+}
+var P3_DATE_CACHE_={},P3_TIMEZONE_='';
+function p3DateText_(v){
+  if(Object.prototype.toString.call(v)!=='[object Date]')return dateText_(v);
+  var k=String(v.getTime());
+  if(!Object.prototype.hasOwnProperty.call(P3_DATE_CACHE_,k)){
+    if(!P3_TIMEZONE_)P3_TIMEZONE_=Session.getScriptTimeZone()||'America/Fortaleza';
+    P3_DATE_CACHE_[k]=Utilities.formatDate(v,P3_TIMEZONE_,'yyyy-MM-dd');
+  }
+  return P3_DATE_CACHE_[k];
 }
 function p3HistoricalOrigin_(v){return /histor|importa|legado|migr/.test(String(v||'').toLowerCase());}
 function p3ProductionScan_(p){
@@ -1618,11 +1657,11 @@ function p3ProductionScan_(p){
   var indexCols=[dateIdx,battIdx,compIdx,guIdx],indexStart=Math.min.apply(null,indexCols),indexEnd=Math.max.apply(null,indexCols),
       iv=s.getRange(2,indexStart+1,n,indexEnd-indexStart+1).getValues(),ov=s.getRange(2,origIdx+1,n,1).getDisplayValues();
   function ix(row,col){return row[col-indexStart];}
-  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||''),
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),di=p3DateText_(p.dataInicio||p.inicio||''),df=p3DateText_(p.dataFim||p.fim||''),
       gu=String(p.guarnicao||'').toLowerCase(),matched=[],digitalKeys={};
   if(p.turno)return {sheet:s,headers:h,matched:[],effective:[],sourceStats:{digital:0,historico:0,historicoSuprimido:0}};
   for(var i=0;i<n;i++){
-    var row=iv[i],d=dateText_(ix(row,dateIdx)),b=String(ix(row,battIdx)||''),co=String(ix(row,compIdx)||''),g=String(ix(row,guIdx)||''),o=String(ov[i][0]||'');
+    var row=iv[i],d=p3DateText_(ix(row,dateIdx)),b=String(ix(row,battIdx)||''),co=String(ix(row,compIdx)||''),g=String(ix(row,guIdx)||''),o=String(ov[i][0]||'');
     if(di&&(!d||d<di))continue;if(df&&(!d||d>df))continue;if(batt&&b!==batt)continue;if(comps.length&&comps.indexOf(co)<0)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
     var hist=p3HistoricalOrigin_(o),key=[d,b,co].join('|'),m={row:i+2,data:d,batalhao:b,companhia:co,guarnicao:g,origem:o,historico:hist,key:key};
     matched.push(m);if(!hist)digitalKeys[key]=1;
@@ -1663,9 +1702,9 @@ function p3ProductionFastEffective_(p,di,df){
   var first=Math.min.apply(null,cols),lastCol=Math.max.apply(null,cols),vals=s.getRange(2,first+1,n,lastCol-first+1).getValues();
   function at(row,i){return row[i-first]}
   var batt=p.batalhao?normBattalion_(p.batalhao):'',comps=p3Companies_(p),gu=String(p.guarnicao||'').toLowerCase(),
-      start=dateText_(di||p.dataInicio||p.inicio||''),end=dateText_(df||p.dataFim||p.fim||''),matched=[],digitalKeys={};
+      start=p3DateText_(di||p.dataInicio||p.inicio||''),end=p3DateText_(df||p.dataFim||p.fim||''),matched=[],digitalKeys={};
   for(var i=0;i<vals.length;i++){
-    var row=vals[i],d=dateText_(at(row,idx.d)),b=String(at(row,idx.b)||''),co=String(at(row,idx.c)||''),g=String(at(row,idx.g)||'');
+    var row=vals[i],d=p3DateText_(at(row,idx.d)),b=String(at(row,idx.b)||''),co=String(at(row,idx.c)||''),g=String(at(row,idx.g)||'');
     if(start&&(!d||d<start))continue;if(end&&(!d||d>end))continue;if(batt&&b!==batt)continue;if(comps.length&&comps.indexOf(co)<0)continue;if(gu&&g.toLowerCase().indexOf(gu)<0)continue;
     var o=String(at(row,idx.o)||''),hist=p3HistoricalOrigin_(o),key=[d,b,co].join('|');
     var m={DATA_SERVICO:d,BATALHAO:b,COMPANHIA:co,GUARNICAO:g,GRUPO_CODIGO:at(row,idx.gc),GRUPO_NOME:at(row,idx.gn),
@@ -1681,7 +1720,7 @@ function p3ProductionFastEffective_(p,di,df){
   return {items:items,matched:matched,sourceStats:{digital:digital,historico:historico,historicoSuprimido:suppressed}};
 }
 function p3PeriodStatsFast_(scan,start,end){
-  start=dateText_(start||'');end=dateText_(end||'');var digital=0,historico=0,suppressed=0,rows=0;
+  start=p3DateText_(start||'');end=p3DateText_(end||'');var digital=0,historico=0,suppressed=0,rows=0;
   (scan.matched||[]).forEach(function(m){
     var d=m.DATA_SERVICO;if(start&&d<start)return;if(end&&d>end)return;
     if(m.suppressed){suppressed++;return}rows++;if(m.historico)historico++;else digital++;
@@ -1692,10 +1731,45 @@ function p3CacheKey_(prefix,obj){
   try{return prefix+Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,JSON.stringify(obj))).replace(/=+$/,'')}
   catch(_){return prefix+String(new Date().getTime())}
 }
+function p3InvalidateCache_(){
+  try{
+    SpreadsheetApp.flush();
+    PropertiesService.getScriptProperties().setProperty('P3_DATA_REVISION',Utilities.getUuid());
+  }catch(_){/* Se o cache estiver indisponível, o prazo máximo continua sendo 20 segundos. */}
+}
+function p3CachedRead_(action,p,read){
+  // Chamado somente DEPOIS de assertToken_: o cache nunca substitui a autenticação.
+  var started=new Date().getTime(),ttl=20,cache=null,key='',params={},cached=null;
+  Object.keys(p||{}).sort().forEach(function(k){
+    if(['token','callback','requestId','transport','_','fresh','action'].indexOf(k)<0)params[k]=p[k];
+  });
+  try{
+    var revision=PropertiesService.getScriptProperties().getProperty('P3_DATA_REVISION')||'0';
+    key=p3CacheKey_('p3v1084:',{action:action,params:params,revision:revision});
+    cache=CacheService.getScriptCache();
+    if(String(p.fresh||'')!=='1'){
+      var raw=cache.get(key);
+      if(raw){
+        if(raw.charAt(0)==='z')raw=Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(raw.slice(1)))).getDataAsString();
+        else raw=raw.slice(1);
+        cached=JSON.parse(raw);
+        var age=Math.max(0,started-Date.parse(cached.dataGeneratedAt));
+        if(cached.ok&&isFinite(age)&&age<ttl*1000){cached.cacheHit=true;cached.cacheAgeMs=age;cached.queryMs=new Date().getTime()-started;return cached;}
+      }
+    }
+  }catch(_){cache=null}
+  var out=read();
+  out.dataGeneratedAt=new Date().toISOString();out.cacheHit=false;out.cacheAgeMs=0;
+  if(out.ok&&cache){try{
+    var value=JSON.stringify(out);
+    value=value.length>4000?'z'+Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(value,'application/json')).getBytes()):'j'+value;
+    // ASCII comprimido ou JSON pequeno: sempre abaixo de 100 KB, inclusive com acentos.
+    if(value.length<90000)cache.put(key,value,ttl);
+  }catch(_){}}
+  out.queryMs=new Date().getTime()-started;
+  return out;
+}
 function p3ProductivityMatrixFast_(p){
-  var keyObj={di:p.dataInicio||'',df:p.dataFim||'',b:p.batalhao||'',c:p3Companies_(p),g:p.guarnicao||'',t:p.turno||''},
-      ck=p3CacheKey_('p3mx65:',keyObj),cache=CacheService.getScriptCache(),cached=cache.get(ck);
-  if(cached){try{return JSON.parse(cached)}catch(_){}}
   var scan=p3ProductionFastEffective_(p,p.dataInicio||p.inicio||'',p.dataFim||p.fim||''),map={},companies={};
   scan.items.forEach(function(x){
     var ic=p3IndicatorLeaf_(x.INDICADOR_CODIGO),co=String(x.COMPANHIA||'Não informada'),gc=String(x.GRUPO_CODIGO||'');
@@ -1706,7 +1780,6 @@ function p3ProductivityMatrixFast_(p){
   var items=Object.keys(map).map(function(k){return map[k]}).sort(function(a,b){
     return String(a.GRUPO_CODIGO+'|'+a.INDICADOR_CODIGO+'|'+a.COMPANHIA).localeCompare(String(b.GRUPO_CODIGO+'|'+b.INDICADOR_CODIGO+'|'+b.COMPANHIA));
   }),out={ok:true,items:items,companies:Object.keys(companies).sort(),rawRows:scan.items.length,sourceStats:scan.sourceStats,fast:true};
-  try{cache.put(ck,JSON.stringify(out),60)}catch(_){}
   return out;
 }
 function p3ProductivityMatrix_(p){return p3ProductivityMatrixFast_(p)}
@@ -1751,7 +1824,7 @@ function p3Analysis_(p) {
   var facts=p3ProductionFacts_(p,'effective',0),list=facts.items,byCompany={},byDate={},total=0;
   list.forEach(function(x){
     var q=p3MetricContribution_(x,code);if(!q)return;
-    var co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||'');
+    var co=String(x.COMPANHIA||'Não informada'),d=p3DateText_(x.DATA_SERVICO||'');
     total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
   });
   return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
@@ -1761,14 +1834,11 @@ function p3Analysis_(p) {
 
 
 function p3AnalysisCompare_(p){
-  p=p||{};var curStart=dateText_(p.dataInicio||p.inicio||''),curEnd=dateText_(p.dataFim||p.fim||''),
-      refStart=dateText_(p.refInicio||p.referenciaInicio||''),refEnd=dateText_(p.refFim||p.referenciaFim||'');
+  p=p||{};var curStart=p3DateText_(p.dataInicio||p.inicio||''),curEnd=p3DateText_(p.dataFim||p.fim||''),
+      refStart=p3DateText_(p.refInicio||p.referenciaInicio||''),refEnd=p3DateText_(p.refFim||p.referenciaFim||'');
   if(!curStart||!curEnd)throw new Error('Informe o período analisado.');
   if(!refStart||!refEnd)throw new Error('Informe a janela de referência.');
-  var unionStart=curStart<refStart?curStart:refStart,unionEnd=curEnd>refEnd?curEnd:refEnd,
-      keyObj={cs:curStart,ce:curEnd,rs:refStart,re:refEnd,b:p.batalhao||'',c:p3Companies_(p),g:p.guarnicao||'',t:p.turno||''},
-      ck=p3CacheKey_('p3cmp65:',keyObj),cache=CacheService.getScriptCache(),cached=cache.get(ck);
-  if(cached){try{return JSON.parse(cached)}catch(_){}}
+  var unionStart=curStart<refStart?curStart:refStart,unionEnd=curEnd>refEnd?curEnd:refEnd;
   var scan=p3ProductionFastEffective_(p,unionStart,unionEnd),catalog=p3IntegratedCatalog_(),metrics={};
   catalog.forEach(function(m){metrics[m.codigo]={codigo:m.codigo,nome:m.nome,descricao:m.descricao,totalPeriodo:0,totalReferencia:0,periodoComp:{},periodoData:{},referenciaComp:{},referenciaData:{}}});
   scan.items.forEach(function(x){
@@ -1787,7 +1857,6 @@ function p3AnalysisCompare_(p){
   }});
   var out={ok:true,catalogo:catalog,metricas:outMetrics,periodo:{inicio:curStart,fim:curEnd,sourceStats:p3PeriodStatsFast_(scan,curStart,curEnd)},
     referencia:{inicio:refStart,fim:refEnd,sourceStats:p3PeriodStatsFast_(scan,refStart,refEnd)},fast:true};
-  try{cache.put(ck,JSON.stringify(out),60)}catch(_){}
   return out;
 }
 

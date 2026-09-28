@@ -46,7 +46,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <button data-main="powerbi"><strong>Painel de Indicadores</strong><small>Gráficos para briefing, reunião e apresentação</small></button>
  </nav>
  <div class="toolbar"><a class="btn secondary" href="index.html">Central</a><a class="btn secondary" href="cadastros_admin.html">Cadastros</a><a class="btn secondary" href="motomecanizacao.html">Motomecanização</a></div>
- <details class="helpbox"><summary>Como usar a Gestão P3?</summary><p><strong>1.</strong> Escolha acima o que deseja consultar. <strong>2.</strong> Defina o período e, se quiser, restrinja por batalhão, companhia, turno ou guarnição. <strong>3.</strong> Clique em <strong>Consultar dados</strong>. <strong>4.</strong> Os cartões e tabelas mostrarão apenas o que corresponde aos filtros escolhidos. <strong>5.</strong> Quando precisar apresentar os resultados em reunião ou briefing, use <strong>Painel de Indicadores</strong> para visualizar os mesmos dados em gráficos.</p></details>
+ <details class="helpbox"><summary>Como usar a Gestão P3?</summary><p><strong>1.</strong> Escolha acima o que deseja consultar. <strong>2.</strong> Defina o período e, se quiser, restrinja por batalhão, companhia, turno ou guarnição. <strong>3.</strong> Clique em <strong>Consultar dados</strong> para atualizar diretamente do banco. <strong>4.</strong> Os cartões e tabelas mostrarão apenas o que corresponde aos filtros escolhidos. <strong>5.</strong> Quando precisar apresentar os resultados em reunião ou briefing, use <strong>Painel de Indicadores</strong> para visualizar os mesmos dados em gráficos.</p></details>
 </section>
 
 <div class="subnav card" id="panelSubnav">
@@ -62,6 +62,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="filter-guarn"><label>Guarnição específica (opcional)</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Consultar dados</button>
  </div>
  <div class="plain-note">Deixe os filtros opcionais em branco para considerar todos os registros do período. Marque somente as companhias que deseja incluir na consulta.</div><div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
+ <div id="queryState" class="plain-note" role="status" aria-live="polite"></div>
  <div id="sourceNote" class="source-note">ℹ Parte dos dados deste período foi registrada antes da implantação da Central atual. Esses registros foram incorporados à consulta para manter a continuidade histórica, sem duplicar informações já substituídas por RCO digital.</div>
 </section>
 
@@ -79,7 +80,9 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <section class="card"><div class="section-head"><div><h2>Painel de Indicadores</h2><div class="note">Área destinada à apresentação visual dos indicadores operacionais para oficiais, comando, reuniões e briefings. A Gestão P3 é a fonte de consulta e conferência; o painel transforma esses mesmos dados em gráficos de leitura rápida.</div></div></div><div class="analysis-explain"><strong>Para que serve?</strong> Depois de consultar um indicador na Gestão P3, use este painel para apresentá-lo de forma visual: evolução por período, comparação entre companhias, distribuição dos resultados e outros gráficos gerenciais.</div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Verificando se há um painel institucional configurado...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir apresentação dos indicadores</button><button class="secondary" id="biConfigure">Configurar painel</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel de Indicadores"></iframe><div class="powerbi-frame-note">Se o painel não puder ser exibido dentro desta página, utilize “Abrir apresentação dos indicadores”.</div></div></section>
 </section>
 </main>
-<script src="central_cloud.js?v=10.6.5-rc1"></script>
+<script>window.CENTRAL_SKIP_VERSION_PROBE=true;</script>
+<script src="central_cloud.js?v=10.8.4"></script>
+<script src="p3_queries.js?v=10.8.4"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -97,7 +100,6 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    }
  }
  async function registerActor(){
-   if(!await CentralCloud.probe()){alert('Não foi possível conectar ao backend v10.');return}
    const perfil=$('p3ActorPerfil').value,mat=CentralCloud.formatMatricula($('p3ActorMatricula').value),senha=String($('p3ActorSenha').value||'').trim();$('p3ActorMatricula').value=mat;
    if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return}
    if(!senha){alert('Informe a senha administrativa P3/Oficial.');return}
@@ -115,9 +117,9 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function renderCompanyPicker(selectAll=true){const vis=visibleCompanies(),prev=new Set([...document.querySelectorAll('#companyGrid input:checked')].map(x=>x.value));$('companyGrid').innerHTML=vis.map(co=>'<label class="company-chip"><input type="checkbox" value="'+esc(co)+'" '+((selectAll||prev.has(co))?'checked':'')+'>'+esc(co)+'</label>').join('');$('companyGrid').querySelectorAll('input').forEach(x=>x.onchange=updateCompanyCount);updateCompanyCount()}
  function selectedCompanies(){return [...document.querySelectorAll('#companyGrid input:checked')].map(x=>x.value)}
  function updateCompanyCount(){$('companyCount').textContent=selectedCompanies().length+' selecionada(s)'}
- function beginProgress(msg){clearInterval(progressTimer);progressValue=7;$('progressBox').classList.add('show');$('progressBar').style.width=progressValue+'%';$('progressText').textContent=msg||'Consultando a Central...';progressTimer=setInterval(()=>{progressValue=Math.min(92,progressValue+(progressValue<50?8:progressValue<75?4:2));$('progressBar').style.width=progressValue+'%'},450)}
+ function beginProgress(msg){clearTimeout(progressHideTimer);clearInterval(progressTimer);progressValue=7;$('progressBox').classList.add('show');$('progressBar').style.width=progressValue+'%';$('progressText').textContent=msg||'Consultando a Central...';progressTimer=setInterval(()=>{progressValue=Math.min(92,progressValue+(progressValue<50?8:progressValue<75?4:2));$('progressBar').style.width=progressValue+'%'},450)}
  function progressStep(value,msg){progressValue=Math.max(progressValue,Math.min(95,Number(value)||0));$('progressBar').style.width=progressValue+'%';if(msg)$('progressText').textContent=msg}
- function endProgress(ok,msg){clearInterval(progressTimer);progressValue=100;$('progressBar').style.width='100%';$('progressText').textContent=msg||(ok?'Consulta concluída.':'Consulta interrompida.');setTimeout(()=>{$('progressBox').classList.remove('show');$('progressBar').style.width='0'},650)}
+ function endProgress(ok,msg){clearTimeout(progressHideTimer);clearInterval(progressTimer);progressValue=100;$('progressBar').style.width='100%';$('progressText').textContent=msg||(ok?'Consulta concluída.':'Consulta interrompida.');progressHideTimer=setTimeout(()=>{$('progressBox').classList.remove('show');$('progressBar').style.width='0'},650)}
  function setSourceNote(stats){$('sourceNote').classList.toggle('show',!!(stats&&Number(stats.historico||0)>0))}
  function isoDate(d){return d.toISOString().slice(0,10)}
  function shiftMonths(iso,delta){const a=String(iso||'').split('-').map(Number);if(a.length<3)return '';const d=new Date(a[0],a[1]-1+delta,1,12),last=new Date(d.getFullYear(),d.getMonth()+1,0,12).getDate();d.setDate(Math.min(a[2],last));return isoDate(d)}
@@ -126,7 +128,6 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
  function token(){return CentralCloud.getToken('p3')||''}
  async function ensure(){
-   if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');
    if(!p3Actor?.matricula)throw new Error('Identifique primeiro o P3/Oficial responsável na Sessão administrativa.');
    const t=token();if(!t)throw new Error('A credencial administrativa expirou. Encerre a sessão e identifique novamente o responsável.');
    return t
@@ -136,26 +137,33 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE'||k==='VALOR_FIPE_ESTATISTICO')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
- const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:60000});
- async function load(){
-   const show=main!=='powerbi';let ok=false;if(show)beginProgress('Consultando a Central e aplicando os filtros...');setSourceNote(null);
+ let requestSequence=0,progressHideTimer=null;
+ const p3Get=(action,params,ctx)=>P3Queries.get(action,params,{fresh:ctx?.fresh});
+ function current(ctx){return ctx.id===requestSequence}
+ function recordQuery(r){$('queryState').textContent=P3Queries.describe(r)}
+ async function load(fresh=false){
+   const ctx={id:++requestSequence,main,sub,fresh:fresh===true,params:p(token(),sub),ref:referenceWindow()};
+   const show=ctx.main!=='powerbi';let ok=false;if(show)beginProgress('Consultando a Central e aplicando os filtros...');setSourceNote(null);$('queryState').textContent='Consultando...';
    try{
-     const t=await ensure();
-     if(main==='painel')await loadPanel(t);else if(main==='rco')await loadRco(t);else if(main==='powerbi')await loadBi(t);
+     const t=await ensure();if(!current(ctx))return;ctx.params.token=t;
+     if(ctx.main!=='powerbi'&&!ctx.params.companhias)throw new Error('Selecione ao menos uma companhia.');
+     if(ctx.main==='painel')await loadPanel(t,ctx);else if(ctx.main==='rco')await loadRco(t,ctx);else if(ctx.main==='powerbi')await loadBi(t,ctx);
      ok=true;
    }catch(e){
-     if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}
+     if(!current(ctx))return;
+     $('queryState').textContent='Consulta não atualizada.';
+     if(CentralCloud.isAuthError?.(e)){P3Queries.clear();CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}
      showError(e.message);
-   }finally{if(show)endProgress(ok,ok?'Consulta atualizada.':'Falha na consulta.')}
+   }finally{if(current(ctx)){if(show)endProgress(ok,ok?'Consulta atualizada.':'Falha na consulta.');else{clearInterval(progressTimer);clearTimeout(progressHideTimer);$('progressBox').classList.remove('show')}}}
  }
  function showError(msg){if(main==='painel'&&sub==='analise'){$('chart').innerHTML='<div class="empty">'+esc(msg)+'</div>';return}const target=main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
- async function loadPanel(t){
+ async function loadPanel(t,ctx){
    $('chart').innerHTML='';$('analysisControls').innerHTML='';
-   if(sub==='analise')return loadAnalysis(t);
+   if(ctx.sub==='analise')return loadAnalysis(t,ctx);
    progressStep(32,'Buscando registros do módulo selecionado...');
-   const r=await p3Get('p3-query',p(t,sub));progressStep(78,'Organizando os resultados...');
-   if(sub==='controle-diario')return renderControl(r);
-   const items=r.items||[];renderList(sub,items);
+   const r=await p3Get('p3-query',ctx.params,ctx);if(!current(ctx))return;recordQuery(r);progressStep(78,'Organizando os resultados...');
+   if(ctx.sub==='controle-diario')return renderControl(r);
+   const items=r.items||[];renderList(ctx.sub,items);
  }
  function renderControl(r){
    const rsd=r.rsd||[],rco=r.rco||[],pending=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'];
@@ -245,10 +253,10 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
      ['Companhias envolvidas',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size,'Companhias presentes na auditoria']
    ]);
  }
- async function loadAnalysis(t){
-   const ref=referenceWindow(),base={...p(t,'produtividade'),refInicio:ref.start,refFim:ref.end};delete base.view;
+ async function loadAnalysis(t,ctx){
+   const ref=ctx.ref,base={...ctx.params,refInicio:ref.start,refFim:ref.end};delete base.view;
    progressStep(24,'Lendo os dados do período e da referência em uma única consulta...');
-   analysisBundle=await p3Get('p3-analysis-compare',base);progressStep(86,'Montando a comparação...');
+   const result=await p3Get('p3-analysis-compare',base,ctx);if(!current(ctx))return;analysisBundle=result;recordQuery(result);progressStep(86,'Montando a comparação...');
    const catalog=Array.isArray(analysisBundle.catalogo)?analysisBundle.catalogo:[];
    if(!analysisIndicator&&catalog.length)analysisIndicator=String(catalog[0].codigo||'');
    renderAnalysisBundle();
@@ -289,8 +297,8 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    $('chart').innerHTML=porComp.length?porComp.map(x=>'<div class="barrow"><strong>'+esc(x.nome)+'</strong><div class="bartrack"><div class="barfill" style="width:'+Math.max(1,Number(x.valor||0)/max*100)+'%"></div></div><span>'+esc(x.valor)+'</span></div>').join(''):'<div class="empty">'+(Number(pstats.rows||0)>0?'Há dados registrados no período selecionado, porém este indicador específico ficou em zero.':'Nenhum dado foi encontrado para o período e os filtros selecionados. Confira as datas, o batalhão e as companhias escolhidas.')+'</div>';
    $('thead').innerHTML='';$('tbody').innerHTML='';
  }
- async function loadRco(t){
-   const r=await p3Get('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
+ async function loadRco(t,ctx){
+   const r=await p3Get('p3-query',{...ctx.params,view:'rco'},ctx);if(!current(ctx))return;recordQuery(r);const items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
    $('rcoStats').innerHTML=cards([['RCOs',items.length],['Retificados',ret.length],['Com CPU',items.filter(x=>x.MODO_CONSOLIDACAO==='CPU').length],['P3/Oficial',items.filter(x=>x.MODO_CONSOLIDACAO==='SEM_CPU').length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_GUARNICOES)||0),0)]]);
    const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['VERSAO','Versão'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];
    $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th>Ação</th></tr>';
@@ -301,22 +309,22 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
      if(!p3Actor?.matricula){alert('A sessão administrativa não está identificada.');return}
      const autor=[p3Actor.postoGrad,p3Actor.nome,p3Actor.matricula].filter(Boolean).join(' ');
      if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nAutorizado por: '+autor+'\n\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
-     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autorMatricula:p3Actor.matricula,autorPerfil:p3Actor.perfil},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');await loadRco(t)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
+     try{const rr=await CentralCloud.submitForm('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autorMatricula:p3Actor.matricula,autorPerfil:p3Actor.perfil},t,{popup:false});alert(rr.message||'RCO reaberto para retificação.');P3Queries.clear();await load(true)}catch(e){alert('Não foi possível reabrir o RCO: '+e.message)}
    });
  }
- async function loadBi(t){
-   const r=await CentralCloud.jsonp('p3-config',{token:t}),cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel de Indicadores configurado e pronto para apresentação.':'Ainda não há um Painel de Indicadores configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
+ async function loadBi(t,ctx){
+   const r=await p3Get('p3-config',{token:t},ctx);if(!current(ctx))return;const cfg=r.config||{};biUrl=String(cfg.POWERBI_URL||'');$('biState').textContent=biUrl?'Painel de Indicadores configurado e pronto para apresentação.':'Ainda não há um Painel de Indicadores configurado.';$('biUrl').textContent=biUrl||'Nenhuma URL institucional cadastrada.';
    const wrap=$('biFrameWrap'),frame=$('biFrame');wrap.classList.toggle('hidden',!biUrl);if(biUrl&&frame.src!==biUrl)frame.src=biUrl;if(!biUrl)frame.removeAttribute('src');
  }
  function table(cols,items,head,body){head.innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr>';body.innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum registro para os filtros selecionados.</td></tr>'}
  function switchMain(v){main=v;document.querySelectorAll('[data-main]').forEach(b=>b.classList.toggle('active',b.dataset.main===v));$('painelView').classList.toggle('hidden',v!=='painel');$('rcoView').classList.toggle('hidden',v!=='rco');$('powerbiView').classList.toggle('hidden',v!=='powerbi');$('panelSubnav').classList.toggle('hidden',v!=='painel');$('filterCard').classList.toggle('hidden',v==='powerbi');load()}
  document.querySelectorAll('[data-main]').forEach(b=>b.onclick=()=>switchMain(b.dataset.main));document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{sub=b.dataset.sub;document.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('active',x.dataset.sub===sub));load()});
- $('apply').onclick=load;$('bat').onchange=()=>renderCompanyPicker(true);$('allCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=true);updateCompanyCount()};$('clearCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=false);updateCompanyCount()};
+ $('apply').onclick=()=>load(true);$('bat').onchange=()=>renderCompanyPicker(true);$('allCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=true);updateCompanyCount()};$('clearCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=false);updateCompanyCount()};
  $('p3ActorMatricula').addEventListener('input',e=>e.target.value=CentralCloud.formatMatricula(e.target.value));
  $('p3ActorLogin').onclick=registerActor;
- $('p3ActorLogout').onclick=()=>{saveActor(null);CentralCloud.clearToken('p3');location.reload()};
+ $('p3ActorLogout').onclick=()=>{P3Queries.clear();saveActor(null);CentralCloud.clearToken('p3');location.reload()};
  $('biOpen').onclick=()=>{if(!biUrl){alert('Ainda não há um Painel de Indicadores configurado.');return}window.open(biUrl,'_blank','noopener')};
- $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL do painel visual que será usado para apresentar os indicadores aos oficiais:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();await loadBi(t);alert('Painel de Indicadores atualizado.')}catch(e){alert(e.message)}};
+ $('biConfigure').onclick=async()=>{try{const t=await ensure(),url=prompt('Cole a URL do painel visual que será usado para apresentar os indicadores aos oficiais:',biUrl||'')||'';if(!url.trim())return;await CentralCloud.submitForm('p3-config-set',{chave:'POWERBI_URL',valor:url.trim(),autorMatricula:p3Actor?.matricula||'',autorPerfil:p3Actor?.perfil||''},t,{popup:false});biUrl=url.trim();P3Queries.clear();await load(true);alert('Painel de Indicadores atualizado.')}catch(e){alert(e.message)}};
  renderCompanyPicker(true);
  p3Actor=readActor();
  if(p3Actor?.matricula&&!token()){try{sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}p3Actor=null}
