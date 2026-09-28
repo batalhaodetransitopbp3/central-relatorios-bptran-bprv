@@ -839,6 +839,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   }
   window.centralRsdClaimCloudItem=claimCloudItem;
   async function continueFromCloud(matOverride=''){
+    if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rsd','continue');return true}
     const token=CentralCloud.getToken('central')||promptOperationalKey(false);if(!token)return null;let mat=CentralCloud.formatMatricula(matOverride||val('matriculaResponsavel'));
     if(!/^\d{3}\.\d{3}-\d$/.test(mat))mat=CentralCloud.formatMatricula(prompt('Informe a matrícula do comandante para localizar seu serviço:')||'');if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Matrícula inválida.');return true}
     try{
