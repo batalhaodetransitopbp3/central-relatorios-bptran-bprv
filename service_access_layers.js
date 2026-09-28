@@ -74,6 +74,8 @@ async function newService(type){
  if(typeof global.centralStartService==='function')global.centralStartService(true);
 }
 function startScreen(type){
+ try{sessionStorage.removeItem(NEXT);sessionStorage.removeItem(MODE)}catch(_){}
+ q('#centralSetupNav')?.remove();document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
  const label=type==='rsd'?'Relatório de Serviço Diário':'Relatório do Coordenador';
  const el=shell(label,'Escolha como deseja acessar o serviço. A chave será solicitada apenas no momento de entrar no módulo.',`
  <div class="central-access-actions">
@@ -220,6 +222,12 @@ function clearIngressKey(type){
  if(type==='rsd'){CentralCloud.clearToken('central');try{sessionStorage.removeItem(ACCESS_AUTH_RSD)}catch(_){}}
  else{try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem(ACCESS_AUTH_RCO)}catch(_){}}
 }
+global.centralReturnToAccess=function(type){
+ type=type==='rsd'?'rsd':'rco';
+ clearIngressKey(type);
+ try{sessionStorage.removeItem(NEXT);sessionStorage.removeItem(MODE)}catch(_){}
+ exitSetup();startScreen(type);
+};
 function requestIngressKey(type){
  return new Promise(resolve=>{
    if(!global.CentralCloud){alert('O módulo de conexão da Central não foi carregado. Atualize a página.');resolve('');return}
@@ -344,7 +352,13 @@ function init(){
  global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
  global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
- if(next===type+'-setup'||mode===type+'-setup'){enterSetup(type);return}
+ if(next===type+'-setup'||mode===type+'-setup'){
+   let hasIngress=false;
+   if(type==='rco'){try{hasIngress=!!sessionStorage.getItem('pmpb-rco-role-token-v1')}catch(_){}}
+   else{try{hasIngress=!!CentralCloud.getToken('central')}catch(_){}}
+   if(hasIngress){enterSetup(type);return}
+   try{sessionStorage.removeItem(NEXT);sessionStorage.removeItem(MODE);sessionStorage.removeItem(type==='rco'?ACCESS_AUTH_RCO:ACCESS_AUTH_RSD)}catch(_){}
+ }
  startScreen(type);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,180));else setTimeout(init,180);
