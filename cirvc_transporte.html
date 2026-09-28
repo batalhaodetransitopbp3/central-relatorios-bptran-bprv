@@ -46,8 +46,8 @@
  <div class="toolbar no-print"><button class="ok" id="finishBtn">Registrar entrega final e baixar veículos</button><button class="secondary" onclick="window.print()">Gerar relatório / PDF</button></div>
 </section>
 </div>
-<script src="central_cloud.js?v=10.8.9-auth"></script>
-<script src="module_access_gate.js?v=10.8.9"></script>
+<script src="central_cloud.js?v=10.8.12-auth"></script>
+<script src="module_access_gate.js?v=10.8.12"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id);let current=null,selectedTransportIds=[],sigDrawn={T:false,R:false};
@@ -111,7 +111,10 @@
  }
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
  $('loadBtn').onclick=loadPending;$('startBtn').onclick=start;$('activeBtn').onclick=listActive;$('finishBtn').onclick=finish;
- window.addEventListener('central-v10-ready',()=>{const id=localStorage.getItem('cirvc-current-transport');if(id)openTransport(id);else loadPending()});
- setTimeout(()=>CentralCloud.probe().then(ok=>{if(ok){const id=localStorage.getItem('cirvc-current-transport');id?openTransport(id):loadPending()}}),300);
+ let initialAccessLoadDone=false;
+ function loadAfterAccess(){if(initialAccessLoadDone||window.CENTRAL_MODULE_ACCESS_READY!==true)return;initialAccessLoadDone=true;const id=localStorage.getItem('cirvc-current-transport');if(id)openTransport(id);else loadPending()}
+ window.addEventListener('central-module-access-ready',()=>setTimeout(loadAfterAccess,30));
+ window.addEventListener('central-v10-ready',()=>setTimeout(loadAfterAccess,30));
+ setTimeout(()=>CentralCloud.probe().then(()=>loadAfterAccess()),300);
 })();
 </script></body></html>
