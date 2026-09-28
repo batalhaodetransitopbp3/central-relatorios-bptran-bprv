@@ -600,12 +600,6 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     const semCpu=!!document.getElementById('rcoSemCpu')?.checked;
     if(semCpu&&!['P3','OFICIAL'].includes(String(resp.perfil||'').toUpperCase())){alert('No modo de consolidação sem CPU, identifique e registre um responsável com perfil P3 ou Oficial.');return}
     if(window.centralRcoHasOpenRsd?.()){alert('Há pendências de RSDs no RCO (serviço em andamento, passagem aguardando recebimento, análise pendente, retificação, indeferimento ou possível duplicidade). Resolva-as antes de consolidar para o P3.');return}
-    let backendReady=false;try{const vr=await CentralCloud.jsonp('version',{}, {progress:false,timeout:8000});const a=String(vr.version||'0').split('.').map(Number),b=[10,8,6];backendReady=(a[0]>b[0])||(a[0]===b[0]&&a[1]>b[1])||(a[0]===b[0]&&a[1]===b[1]&&a[2]>=b[2])}catch(_){}
-    if(!backendReady){
-      const m=p3EnsureModal(),input=m.querySelector('#p3TokenInput');input.value=p3GetSavedToken();
-      try{const p=p3BuildPackage(),s=p.estatisticaP3||{},el=m.querySelector('#p3Preview');if(el)el.textContent='Compatibilidade temporária enquanto o backend termina de atualizar. Prévia: '+(s.producao||[]).length+' indicadores • '+(s.veiculos||[]).length+' veículo(s) • '+(s.cirvcs||[]).length+' CIRVC(s) • '+(s.podExecucao||[]).length+' POD.'}catch(err){const el=m.querySelector('#p3Preview');if(el)el.textContent=err.message||String(err)}
-      m.querySelector('#p3Remember').checked=true;m.classList.remove('hidden');setTimeout(()=>input.focus(),40);return
-    }
     let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
     if(!token){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente no RCO. Nenhuma nova chave será solicitada dentro do módulo.');return}
     let pkg,s;try{pkg=p3BuildPackage();s=pkg.estatisticaP3||{}}catch(err){alert(err.message||String(err));return}
