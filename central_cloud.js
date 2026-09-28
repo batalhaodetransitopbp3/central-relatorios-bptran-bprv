@@ -17,12 +17,13 @@ function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
 function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
-  const showProgress=action!=='version';if(showProgress)beginProgress('Consultando a Central…');
+  const showProgress=action!=='version'&&opts.progress!==false;if(showProgress)beginProgress(progressMessageForAction(action,'start'));
   const callback='__central_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
   let done=false,timer;
   function cleanup(){clearTimeout(timer);try{delete global[callback]}catch(_){global[callback]=undefined}script.remove()}
-  function finish(err,data){if(done)return;done=true;cleanup();if(showProgress)endProgress();err?reject(err):resolve(data)}
+  function finish(err,data){if(done)return;done=true;if(showProgress)updateProgress(progressMessageForAction(action,err?'error':'finish'),err?96:92);cleanup();if(showProgress)endProgress(err?'Falha na operação.':'Concluído.');err?reject(err):resolve(data)}
   global[callback]=function(data){
+    if(showProgress)updateProgress(progressMessageForAction(action,'response'),86);
     if(data&&data.ok===false)finish(authError(action,data.message||'Consulta rejeitada.',params.token));
     else finish(null,data||{ok:false,message:'Resposta vazia da Central.'});
   };
@@ -30,9 +31,10 @@ function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
   script.onerror=()=>finish(new Error('Falha de comunicação com a Central.'));
   script.src=ENDPOINT+'?'+qs({...params,action,callback,_:Date.now()});
   (document.head||document.documentElement).appendChild(script);
+  if(showProgress)updateProgress(progressMessageForAction(action,'wait'),34);
   timer=setTimeout(()=>finish(new Error('Tempo esgotado ao consultar a Central.')),opts.timeout||20000);
 })}
-function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);let win=null,iframe=null,target=name;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}beginProgress('Salvando na Central…');const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;cleanup();d.ok?resolve(d):reject(authError(action,d.message||'Operação rejeitada.',token,opts.tokenKind))};function cleanup(){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400);endProgress()}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();timer=setTimeout(()=>{cleanup();reject(new Error('Tempo esgotado ao comunicar com a Central.'))},opts.timeout||20000)})}
+function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2),showProgress=opts.progress!==false;let win=null,iframe=null,target=name;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}if(showProgress)beginProgress(progressMessageForAction(action,'start'));const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;if(showProgress)updateProgress(progressMessageForAction(action,'response'),88);cleanup(d.ok);d.ok?resolve(d):reject(authError(action,d.message||'Operação rejeitada.',token,opts.tokenKind))};function cleanup(ok){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400);if(showProgress)endProgress(ok===false?'Falha na operação.':'Concluído.')}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();if(showProgress)updateProgress(progressMessageForAction(action,'wait'),38);timer=setTimeout(()=>{cleanup(false);reject(new Error('Tempo esgotado ao comunicar com a Central.'))},opts.timeout||20000)})}
 function readQueue(){try{const x=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
 function writeQueue(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-100)))}catch(_){}}
 function enqueue(action,payload,unit,token){const q=readQueue();q.push({id:uid('sync'),action,payload,unit,token:token||'',tokenKind:tokenKindForAction(action),createdAt:new Date().toISOString(),tries:0});writeQueue(q);return q.length}
@@ -41,14 +43,69 @@ async function retryQueue(){if(!navigator.onLine)return {sent:0,pending:readQueu
 function queueCount(){return readQueue().length}
 async function compressImage(file,{maxSide=1600,quality=.78,type='image/jpeg'}={}){if(!file)return null;const img=await new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);res(im)};im.onerror=e=>{URL.revokeObjectURL(u);rej(e)};im.src=u});let w=img.naturalWidth,h=img.naturalHeight,s=Math.min(1,maxSide/Math.max(w,h));w=Math.max(1,Math.round(w*s));h=Math.max(1,Math.round(h*s));const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);const dataUrl=canvas.toDataURL(type,quality);return {dataUrl,mimeType:type,largura:w,altura:h,tamanhoBytes:Math.round((dataUrl.length-dataUrl.indexOf(',')-1)*.75)}}
 async function searchCadastro(tipo,q,u,token){const isMilitar=String(tipo||'').toLowerCase().indexOf('militar')===0,up=isMilitar?{}:unitParams(u);let t=token||getToken('central')||askToken('central','Informe a chave operacional da Central para consultar o Cadastro Mestre:');if(!t)throw new Error('Consulta cancelada: chave operacional não informada.');try{return await jsonp('cadastros',{...up,tipo,q,token:t})}catch(err){if(!isAuthError(err))throw err;t=askToken('central','A chave informada é inválida. Digite novamente a chave operacional da Central:',true);if(!t)throw new Error('Consulta cancelada: chave operacional não informada.');return await jsonp('cadastros',{...up,tipo,q,token:t})}}
-let progressDepth=0,progressEl=null;
-function ensureProgressStatus(){if(progressEl&&document.body?.contains(progressEl))return progressEl;if(!document.body)return null;progressEl=document.createElement('div');progressEl.id='centralProgressStatus';progressEl.className='no-print';progressEl.setAttribute('role','status');progressEl.setAttribute('aria-live','polite');Object.assign(progressEl.style,{position:'fixed',left:'50%',top:'10px',transform:'translateX(-50%)',zIndex:9997,pointerEvents:'none',padding:'8px 13px',borderRadius:'16px',background:'rgba(255,255,255,.90)',border:'1px solid rgba(36,66,95,.18)',boxShadow:'0 4px 16px rgba(0,0,0,.10)',font:'700 11px Arial',color:'#24425f',maxWidth:'88vw',textAlign:'center',opacity:'0',transition:'opacity .18s ease'});document.body.appendChild(progressEl);return progressEl}
-function beginProgress(message='Processando…'){progressDepth++;const el=ensureProgressStatus();if(el){el.textContent=message;el.style.opacity='1'}return progressDepth}
-function updateProgress(message='Processando…'){const el=ensureProgressStatus();if(el&&progressDepth>0){el.textContent=message;el.style.opacity='1'}}
-function endProgress(){progressDepth=Math.max(0,progressDepth-1);const el=ensureProgressStatus();if(el&&progressDepth===0){el.textContent='Concluído';setTimeout(()=>{if(progressDepth===0)el.style.opacity='0'},450)}}
-function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('div');b.id='centralSyncBadge';b.className='no-print';b.setAttribute('role','status');b.setAttribute('aria-live','polite');Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:500,border:'0',borderRadius:'14px',padding:'5px 8px',background:'rgba(255,255,255,.46)',color:'#24425f',font:'700 10px Arial',boxShadow:'none',opacity:'.48',pointerEvents:'none',userSelect:'none'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{beginProgress('Sincronizando envios pendentes…');try{await retryQueue();refresh()}finally{endProgress()}},800))}
+let progressDepth=0,progressEl=null,progressBarEl=null,progressTextEl=null,progressTimer=null,progressValue=0;
+function progressMessageForAction(action,phase='start'){
+  const a=String(action||'').toLowerCase(),finish=phase==='finish'||phase==='response',wait=phase==='wait';
+  if(a==='cadastros'||a.includes('militar-validar'))return finish?'Cadastro localizado.':wait?'Consultando o Cadastro Mestre…':'Consultando o Cadastro Mestre…';
+  if(a==='guarnicao-next')return 'Definindo a identificação da guarnição…';
+  if(a==='rsd-start')return finish?'Guarnição registrada.':wait?'Registrando a guarnição na Central…':'Registrando a guarnição no serviço…';
+  if(a==='rsd-draft-sync')return finish?'Rascunho sincronizado.':'Sincronizando o RSD na nuvem…';
+  if(a==='rsd-upsert')return finish?'RSD enviado.':'Finalizando e enviando o RSD…';
+  if(a==='rsd-force-finalize')return finish?'Finalização excepcional registrada.':'Finalizando o RSD por determinação do Coordenador…';
+  if(a.startsWith('rsd-'))return finish?'RSD atualizado.':'Processando o RSD na Central…';
+  if(a.startsWith('passagem-'))return finish?'Passagem de serviço atualizada.':'Processando a passagem de serviço…';
+  if(a.startsWith('operation-')||a.startsWith('service-event-'))return finish?'Operação sincronizada.':'Salvando dados da operação…';
+  if(a.startsWith('cirvc-'))return finish?'CIRVC atualizado.':'Processando o CIRVC…';
+  if(a.startsWith('reboque-'))return finish?'Relatório de traslado atualizado.':'Processando o relatório de traslado…';
+  if(a.startsWith('checklist-'))return finish?'Checklist atualizado.':'Processando o checklist da viatura…';
+  if(a.startsWith('motomecanizacao-'))return finish?'Motomecanização atualizada.':'Consultando/atualizando a motomecanização…';
+  if(a.startsWith('rco-'))return finish?'RCO atualizado.':'Processando dados do RCO…';
+  if(a.startsWith('p3-'))return finish?'Consulta da Gestão P3 concluída.':'Consultando a Gestão P3…';
+  if(a.startsWith('master-'))return finish?'Controle Geral atualizado.':'Processando no Controle Geral…';
+  if(a.includes('cadastro-upsert'))return finish?'Cadastro atualizado.':'Salvando cadastro…';
+  return finish?'Operação concluída.':wait?'Aguardando resposta da Central…':'Processando na Central…';
+}
+function dedicatedProgressVisible(){
+  const h=document.getElementById('backendProgressHost');if(h&&!h.hidden)return true;
+  return !!document.querySelector('.progress-box.show:not(#centralProgressStatus)');
+}
+function ensureProgressStatus(){
+  if(progressEl&&document.body?.contains(progressEl))return progressEl;if(!document.body)return null;
+  progressEl=document.createElement('div');progressEl.id='centralProgressStatus';progressEl.className='no-print';progressEl.setAttribute('role','status');progressEl.setAttribute('aria-live','polite');progressEl.setAttribute('aria-busy','false');
+  const track=document.createElement('div'),bar=document.createElement('div'),txt=document.createElement('div');progressBarEl=bar;progressTextEl=txt;
+  Object.assign(progressEl.style,{position:'fixed',left:'50%',top:'10px',transform:'translateX(-50%)',zIndex:9997,pointerEvents:'none',width:'min(560px,90vw)',padding:'9px 12px 10px',borderRadius:'12px',background:'rgba(255,255,255,.96)',border:'1px solid rgba(36,66,95,.20)',boxShadow:'0 5px 18px rgba(0,0,0,.14)',font:'700 11px Arial',color:'#24425f',opacity:'0',transition:'opacity .18s ease'});
+  Object.assign(track.style,{height:'6px',background:'#dfe7ee',borderRadius:'999px',overflow:'hidden'});
+  Object.assign(bar.style,{height:'100%',width:'0%',background:'linear-gradient(90deg,#315f93,#17375e)',borderRadius:'999px',transition:'width .25s ease'});
+  Object.assign(txt.style,{marginTop:'6px',textAlign:'center',lineHeight:'1.25'});
+  track.appendChild(bar);progressEl.appendChild(track);progressEl.appendChild(txt);document.body.appendChild(progressEl);return progressEl
+}
+function setProgressValue(v){progressValue=Math.max(progressValue,Math.min(100,Number(v)||0));if(progressBarEl)progressBarEl.style.width=progressValue+'%'}
+function beginProgress(message='Processando…'){
+  progressDepth++;const el=ensureProgressStatus();if(!el)return progressDepth;
+  if(progressDepth===1){clearInterval(progressTimer);progressValue=8;setProgressValue(8);progressTimer=setInterval(()=>setProgressValue(progressValue<55?progressValue+6:progressValue<78?progressValue+3:progressValue<91?progressValue+1:progressValue),420)}
+  if(progressTextEl)progressTextEl.textContent=message;el.setAttribute('aria-busy','true');
+  if(!dedicatedProgressVisible())el.style.opacity='1';return progressDepth
+}
+function updateProgress(message='Processando…',value){
+  const el=ensureProgressStatus();if(el&&progressDepth>0){if(message&&progressTextEl)progressTextEl.textContent=message;if(value!=null)setProgressValue(value);if(!dedicatedProgressVisible())el.style.opacity='1'}
+}
+function endProgress(finalMessage='Concluído.'){
+  progressDepth=Math.max(0,progressDepth-1);const el=ensureProgressStatus();
+  if(el&&progressDepth===0){clearInterval(progressTimer);setProgressValue(100);if(progressTextEl)progressTextEl.textContent=finalMessage;el.setAttribute('aria-busy','false');if(!dedicatedProgressVisible())el.style.opacity='1';setTimeout(()=>{if(progressDepth===0){el.style.opacity='0';progressValue=0;if(progressBarEl)progressBarEl.style.width='0%'}},650)}
+}
+function installPassiveProgress(){
+  if(global.__centralPassiveProgressInstalled)return;global.__centralPassiveProgressInstalled=true;
+  document.addEventListener('click',e=>{
+    const a=e.target?.closest?.('a[href]');if(!a)return;
+    const href=String(a.getAttribute('href')||'');if(!href||href.startsWith('#')||/^javascript:/i.test(href)||a.target==='_blank'||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+    try{const u=new URL(a.href,location.href);if(u.origin===location.origin){beginProgress('Abrindo a próxima etapa…');updateProgress('Carregando a página solicitada…',42)}}catch(_){}
+  },true);
+  global.addEventListener('beforeprint',()=>{beginProgress('Preparando impressão / PDF…');updateProgress('Organizando o documento para impressão…',72)});
+  global.addEventListener('afterprint',()=>endProgress('Documento preparado.'));
+}
+function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('div');b.id='centralSyncBadge';b.className='no-print';b.setAttribute('role','status');b.setAttribute('aria-live','polite');Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:500,border:'0',borderRadius:'14px',padding:'5px 8px',background:'rgba(255,255,255,.46)',color:'#24425f',font:'700 10px Arial',boxShadow:'none',opacity:'.48',pointerEvents:'none',userSelect:'none'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{beginProgress('Sincronizando envios pendentes…');try{await retryQueue();refresh()}finally{endProgress('Sincronização concluída.')}},800));installPassiveProgress()}
 
 async function probe(){if(v10Enabled)return true;try{const r=await jsonp('version',{}, {timeout:10000});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}}
-global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress};
+global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress,progressMessageForAction,installPassiveProgress};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();setTimeout(probe,150)});else{installStatusBadge();setTimeout(probe,150)}
 })(window);
