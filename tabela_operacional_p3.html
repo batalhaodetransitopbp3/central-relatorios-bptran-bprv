@@ -38,7 +38,9 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
 </section>
 <section class="card"><div class="legend"><strong>Como ler esta tabela:</strong> cada coluna mostra uma companhia selecionada. A coluna <strong>TOTAL</strong> soma somente as companhias que estão aparecendo na tela. A divisão por guarnição continua guardada no sistema para consultas detalhadas e auditoria, mas não aparece aqui para facilitar a leitura.</div><div id="tableArea"></div></section>
 </main>
-<script src="central_cloud.js?v=10.6.5-rc1"></script>
+<script>window.CENTRAL_SKIP_VERSION_PROBE=true;</script>
+<script src="central_cloud.js?v=10.8.4"></script>
+<script src="p3_queries.js?v=10.8.4"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),ALL=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -54,7 +56,7 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
   ['prisoes','PRISÕES',[['embriaguez','EMBRIAGUEZ NO TRÂNSITO'],['sinistro','SINISTRO DE TRÂNSITO'],['armas','PORTE/POSSE ARMAS'],['drogas','PORTE/POSSE DROGAS'],['mandado','MANDADO DE PRISÃO'],['siva-r','SIVA-R'],['sinais','SINAIS'],['tco-sasp','TCO - SASP'],['outros','OUTROS']]],
   ['abordagens','ABORDAGENS',[['pessoas','PESSOAS'],['motocicletas','MOTOCICLETAS'],['ciclomotores','CICLOMOTORES'],['automoveis','AUTOMÓVEIS'],['outros','OUTROS'],['checkpoints','CHECK POINTS / BLITZ']]]
  ];
- let progressTimer=null,progress=0;
+ let progressTimer=null,progressHideTimer=null,progress=0,requestSequence=0;
  const today=new Date().toISOString().slice(0,10);$('di').value=today;$('df').value=today;
  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
  function actor(){try{return JSON.parse(sessionStorage.getItem('pmpb-p3-actor-v1')||'null')}catch(_){return null}}
@@ -67,8 +69,8 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
  }
  function selectedCompanies(){return [...document.querySelectorAll('#companyGrid input:checked')].map(x=>x.value)}
  function updateCompanyCount(){$('companyCount').textContent=selectedCompanies().length+' selecionada(s)'}
- function beginProgress(msg){clearInterval(progressTimer);progress=8;$('progressBox').classList.add('show');$('progressBar').style.width=progress+'%';$('progressText').textContent=msg||'Consultando a Central...';progressTimer=setInterval(()=>{progress=Math.min(92,progress+(progress<55?8:progress<78?4:2));$('progressBar').style.width=progress+'%'},450)}
- function endProgress(ok,msg){clearInterval(progressTimer);progress=100;$('progressBar').style.width='100%';$('progressText').textContent=msg||(ok?'Consulta concluída.':'Consulta interrompida.');setTimeout(()=>{$('progressBox').classList.remove('show');$('progressBar').style.width='0'},650)}
+ function beginProgress(msg){clearTimeout(progressHideTimer);clearInterval(progressTimer);progress=8;$('progressBox').classList.add('show');$('progressBar').style.width=progress+'%';$('progressText').textContent=msg||'Consultando a Central...';progressTimer=setInterval(()=>{progress=Math.min(92,progress+(progress<55?8:progress<78?4:2));$('progressBar').style.width=progress+'%'},450)}
+ function endProgress(ok,msg){clearTimeout(progressHideTimer);clearInterval(progressTimer);progress=100;$('progressBar').style.width='100%';$('progressText').textContent=msg||(ok?'Consulta concluída.':'Consulta interrompida.');progressHideTimer=setTimeout(()=>{$('progressBox').classList.remove('show');$('progressBar').style.width='0'},650)}
  function key(g,i){return String(g||'')+'||'+String(i||'')}
  function renderMatrix(items,companies){
    const values=new Map();items.forEach(x=>{const k=key(x.GRUPO_CODIGO,x.INDICADOR_CODIGO);if(!values.has(k))values.set(k,{});const o=values.get(k),co=String(x.COMPANHIA||'Não informada');o[co]=(o[co]||0)+(Number(x.QUANTIDADE)||0)});
@@ -78,20 +80,20 @@ button,.btn{border:0;border-radius:8px;padding:9px 12px;font-weight:800;cursor:p
    const body=rows.map(r=>{const vals=values.get(key(r.gc,r.ic))||{},total=companies.reduce((a,c)=>a+(Number(vals[c])||0),0),show=r.gn!==lastGroup;lastGroup=r.gn;return '<tr class="'+(r.ic==='total-aits'?'total-ait':'')+'"><td class="group">'+(show?esc(r.gn||'—'):'')+'</td><td class="ind">'+esc(r.inn)+'</td>'+companies.map(c=>'<td>'+Number(vals[c]||0)+'</td>').join('')+'<td class="total">'+total+'</td></tr>'}).join('');
    return '<div class="table-wrap"><table class="matrix"><thead><tr><th>Grupo</th><th>Indicador</th>'+companies.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Total</th></tr></thead><tbody>'+body+'</tbody></table></div>';
  }
- async function load(){
-   const tk=token();if(!tk)return;const companies=selectedCompanies();if(!companies.length){$('tableArea').innerHTML='<div class="empty">Selecione ao menos uma companhia.</div>';return}
+ async function load(fresh=false){
+   const id=++requestSequence,tk=token();if(!tk)return;const companies=selectedCompanies();if(!companies.length){endProgress(false,'Selecione ao menos uma companhia.');$('status').textContent='Consulta não atualizada.';$('tableArea').innerHTML='<div class="empty">Selecione ao menos uma companhia.</div>';return}
    beginProgress('Consultando e consolidando as companhias selecionadas...');
    const params={token:tk,view:'produtividade-matriz',dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhias:companies.join('|')};
    $('status').textContent='Consultando...';$('sourceNote').classList.remove('show');
    try{
-     const r=await CentralCloud.jsonp('p3-query',params,{timeout:45000}),items=r.items||[],a=actor();
+     const r=await P3Queries.get('p3-query',params,{fresh:fresh===true});if(id!==requestSequence)return;const items=r.items||[],a=actor();
      $('tableArea').innerHTML=items.length?renderMatrix(items,companies):'<div class="empty">Nenhum dado de produtividade foi encontrado para o período, batalhão e companhias selecionados. Confira os filtros e tente novamente.</div>';
      const src=r.sourceStats||{};$('sourceNote').classList.toggle('show',Number(src.historico||0)>0);
-     $('status').textContent=[(r.rawRows??0)+' registro(s) encontrados e consolidados',companies.length+' companhia(s) incluída(s) na tabela',a?.matricula?'Responsável pela consulta: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
+     $('status').textContent=[P3Queries.describe(r),(r.rawRows??0)+' registro(s) encontrados e consolidados',companies.length+' companhia(s) incluída(s) na tabela',a?.matricula?'Responsável pela consulta: '+[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' '):''].filter(Boolean).join(' • ');
      endProgress(true,'Tabela atualizada.');
-   }catch(e){if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tableArea').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.';endProgress(false,'Falha na consulta.')}
+   }catch(e){if(id!==requestSequence)return;if(CentralCloud.isAuthError?.(e)){location.replace('gestao_p3.html?return=tabela_operacional_p3.html');return}$('tableArea').innerHTML='<div class="empty">'+esc(e.message)+'</div>';$('status').textContent='Falha na consulta.';endProgress(false,'Falha na consulta.')}
  }
- $('apply').onclick=load;$('bat').onchange=()=>renderCompanyPicker(true);$('allCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=true);updateCompanyCount()};$('clearCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=false);updateCompanyCount()};
+ $('apply').onclick=()=>load(true);$('bat').onchange=()=>renderCompanyPicker(true);$('allCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=true);updateCompanyCount()};$('clearCompanies').onclick=()=>{document.querySelectorAll('#companyGrid input').forEach(x=>x.checked=false);updateCompanyCount()};
  renderCompanyPicker(true);
  if(actor()?.matricula&&CentralCloud.getToken('p3'))setTimeout(load,350);else location.replace('gestao_p3.html?return=tabela_operacional_p3.html');
 })();

@@ -1,6 +1,7 @@
 (function(global){
 'use strict';
 const ENDPOINT=global.CENTRAL_CLOUD_ENDPOINT||'https://script.google.com/macros/s/AKfycbyxmDMgk-h2lTuf_6BvUngMLu-yMDvfenHNshQ3aa0V3lDPzh5kosUfiqm90IugmepPpw/exec';
+let probePending=null;
 let v10Enabled=global.CENTRAL_V10_ENABLED===true;
 const TOKEN_KEY='pmpb-central-token-v1',P3_TOKEN_KEY='pmpb-p3-token-v1',QUEUE_KEY='pmpb-central-sync-queue-v1',DEVICE_KEY='pmpb-device-id-v1';
 function uid(p='id'){try{return p+'-'+crypto.randomUUID()}catch(_){return p+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)}}
@@ -9,7 +10,7 @@ function getDeviceId(){try{let d=localStorage.getItem(DEVICE_KEY)||'';if(!d){d=u
 function getToken(kind='central'){try{return localStorage.getItem(kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY)||''}catch(_){return ''}}
 function setToken(v,kind='central'){try{const k=kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY;if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(_){}}
 function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;t=prompt(message||(kind==='p3'?'Informe a Chave P3:':'Informe a chave operacional da Central:'))||'';t=t.trim();if(t)setToken(t,kind);return t}
-const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
+const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-analysis-compare','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
 function tokenKindForAction(action){return P3_ACTIONS.has(String(action||''))?'p3':'central'}
 function isAuthError(err){return err?.code==='AUTH_INVALID'||/(chave|credencial)[^\n]{0,80}inválid/i.test(String(err?.message||err||''))}
 function authError(action,message,token,kindOverride){const e=new Error(message||'Chave inválida.');if(/(chave|credencial)[^\n]{0,80}inválid/i.test(e.message)){const kind=kindOverride||tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;if(kind==='central'||kind==='p3'){const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind)}}return e}
@@ -48,7 +49,12 @@ function updateProgress(message='Processando…'){const el=ensureProgressStatus(
 function endProgress(){progressDepth=Math.max(0,progressDepth-1);const el=ensureProgressStatus();if(el&&progressDepth===0){el.textContent='Concluído';setTimeout(()=>{if(progressDepth===0)el.style.opacity='0'},450)}}
 function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('div');b.id='centralSyncBadge';b.className='no-print';b.setAttribute('role','status');b.setAttribute('aria-live','polite');Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:500,border:'0',borderRadius:'14px',padding:'5px 8px',background:'rgba(255,255,255,.46)',color:'#24425f',font:'700 10px Arial',boxShadow:'none',opacity:'.48',pointerEvents:'none',userSelect:'none'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{beginProgress('Sincronizando envios pendentes…');try{await retryQueue();refresh()}finally{endProgress()}},800))}
 
-async function probe(){if(v10Enabled)return true;try{const r=await jsonp('version',{}, {timeout:10000});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}}
+async function probe(){
+  if(v10Enabled)return true;
+  if(probePending)return probePending;
+  probePending=(async()=>{try{const r=await jsonp('version',{}, {timeout:10000});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}})();
+  try{return await probePending}finally{probePending=null}
+}
 global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress};
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();setTimeout(probe,150)});else{installStatusBadge();setTimeout(probe,150)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();if(!global.CENTRAL_SKIP_VERSION_PROBE)setTimeout(probe,150)});else{installStatusBadge();if(!global.CENTRAL_SKIP_VERSION_PROBE)setTimeout(probe,150)}
 })(window);
