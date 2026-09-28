@@ -877,10 +877,12 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   function scheduleCloudSync(){if(READONLY_VIEWER||!serviceRegistered)return;saveActiveContext();clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncCloudDraft(true),8000)}
   function promptOperationalKey(force=false){
     if(!window.CentralCloud)return '';
+    const saved=CentralCloud.getToken('central');
     let locked=false;try{locked=sessionStorage.getItem('central-module-auth-rsd-v1')==='1'}catch(_){}
-    if(locked){
-      const saved=CentralCloud.getToken('central');if(saved&&!force)return saved;
-      if(force)alert('A credencial usada no ingresso do RSD não foi aceita. Volte às opções de acesso e entre novamente. A chave não será solicitada no meio do módulo.');
+    const layered=typeof window.centralOpenServicePicker==='function'||!!document.getElementById('centralAccessLayerStyle');
+    if(saved&&!force)return saved;
+    if(locked||layered){
+      if(force||!saved)alert('A credencial de ingresso do RSD não está disponível ou não foi aceita. Volte às opções de acesso e entre novamente. A chave não será solicitada no meio do módulo.');
       return '';
     }
     const t=CentralCloud.askToken('central',force?'A chave operacional salva não foi aceita. Informe novamente a chave operacional da Central:':'Informe a chave operacional da Central:',force);
@@ -1206,6 +1208,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.7"></script>
+<script src="service_access_layers.js?v=10.8.8"></script>
 <script src="service_flow.js"></script>
 </body></html>
