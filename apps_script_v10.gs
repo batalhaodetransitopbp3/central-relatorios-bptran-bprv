@@ -1261,7 +1261,8 @@ function passagemAnular_(payload){
 
 function rcoResponsavelValidar_(payload,token){
   var perfil=String(payload.perfil||'CPU').toUpperCase();
-  assertToken_(token,perfil==='P3'||perfil==='OFICIAL'?'p3':'coord');
+  // A credencial do RCO é validada uma única vez no ingresso. COORD_TOKEN e P3_TOKEN são aceitos por assertToken_('coord').
+  assertToken_(token,'coord');
 
   var mat=normMat_(payload.matricula||'');
   if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Matrícula inválida.');
