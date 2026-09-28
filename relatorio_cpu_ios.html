@@ -675,11 +675,8 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function rcoStoredRoleToken(){try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}}
   function rcoWorkflowToken(silent=false){
     const role=rcoStoredRoleToken();if(role)return role;
-    const a=window.rcoResponsibleData?.()||{};
-    if(a.matricula&&!silent){const t=rcoRoleToken();if(t)return t}
-    const central=CentralCloud.getToken('central');if(central)return central;
-    if(silent)return '';
-    return CentralCloud.askToken('central','Informe a credencial do serviço para acessar o RCO:');
+    if(!silent)alert('A credencial do RCO deve ser informada somente no ingresso. Volte às opções de acesso e entre novamente no serviço.');
+    return '';
   }
   async function syncRcoDraft(silent=true){if(!navigator.onLine)return false;let token=rcoWorkflowToken(silent);if(!token)return false;let rco;try{rco=window.collectState()}catch(_){return false}try{await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false});rcoConflictNotified=false;window.centralMarkSaved?.();return true}catch(e){if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);return false}}
   function scheduleRcoSync(){clearTimeout(rcoSyncTimer);rcoSyncTimer=setTimeout(()=>syncRcoDraft(true),8000)}
@@ -689,10 +686,11 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(String(meta?.status||'')!=='EM_RETIFICACAO'){el.hidden=true;return}
     el.hidden=false;el.innerHTML='<strong>⚠ RCO EM RETIFICAÇÃO</strong><div>Motivo: '+esc(meta.retificacaoMotivo||'Não informado')+'</div>'+(meta.retificacaoAbertaPor?'<div>Autorizado por: '+esc(meta.retificacaoAbertaPor)+'</div>':'')+(meta.retificacaoAbertaEm?'<div>Aberto em: '+esc(new Date(meta.retificacaoAbertaEm).toLocaleString('pt-BR'))+'</div>':'')+'<div style="margin-top:5px">Corrija este mesmo RCO. Ao consolidar novamente, o P3 registrará a versão como retificada, preservando o REPORT_ID.</div>';
   }
-  async function claimRcoDraft(item,force=false,receivePassage=false){const token=rcoWorkflowToken(false);if(!token)return false;try{const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force},token,{popup:false});window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){if(!window.centralRcoReceiveCloudPassage?.())return false;window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('Passagem recebida. Os dados do RCO foram carregados. Agora registre sua entrada como novo CPU/Coordenador.')}else if(String(r.status||'')==='EM_RETIFICACAO'){alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+'\n\nCorrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{alert('RCO carregado da nuvem neste aparelho.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
-  async function continueRcoCloud(){const token=rcoWorkflowToken(false);if(!token)return false;const u=currentUnit(),data=val('dataInicio');try{let r=await CentralCloud.jsonp('rco-draft-list',{...CentralCloud.unitParams(u),data,token},{timeout:15000}),items=(r.items||[]).filter(x=>!x.passagemPendente);if(!items.length&&data){r=await CentralCloud.jsonp('rco-draft-list',{...CentralCloud.unitParams(u),token},{timeout:15000});items=(r.items||[]).filter(x=>!x.passagemPendente)}if(!items.length){alert('Não há RCO disponível para continuidade normal. Se você está assumindo outro Coordenador, use “Receber passagem de serviço”.');return false}let item=items[0];if(items.length>1){const opts=items.slice(0,10).map((x,i)=>(i+1)+' - '+x.companhia+' — '+x.data+' — '+(x.responsavel||x.matricula||'Coordenador')+' — '+(x.status==='EM_RETIFICACAO'?'RETIFICAÇÃO — ':'')+'rev. '+x.revision+(x.retificacaoMotivo?' — '+x.retificacaoMotivo:'')).join('\n');const pick=Number(prompt('Selecione o RCO a continuar:\n\n'+opts)||0);if(!(pick>=1&&pick<=Math.min(10,items.length)))return false;item=items[pick-1]}return claimRcoDraft(item,false,false)}catch(e){alert('Não foi possível localizar o RCO em andamento: '+e.message);return false}}
+  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken=''){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force},token,{popup:false});window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.__rcoPendingReceiveAfterResponsible=true;window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+'\n\nCorrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{alert('RCO carregado da nuvem neste aparelho.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
+  async function continueRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false}
 
   window.centralRcoContinueCloud=continueRcoCloud;
+  window.centralRcoClaimCloudItem=claimRcoDraft;
 
   function rcoPassModal(items){
     return new Promise(resolve=>{
@@ -701,15 +699,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       const close=()=>{ov.remove();resolve(null)};ov.querySelector('#rcoPassClose').onclick=close;ov.addEventListener('click',e=>{if(e.target===ov)close()});ov.querySelectorAll('[data-rco-pass]').forEach(b=>b.onclick=()=>{const x=items[Number(b.dataset.rcoPass)]||null;ov.remove();resolve(x)});
     });
   }
-  async function receiveRcoCloud(){
-    const token=rcoWorkflowToken(false);if(!token)return false;
-    try{
-      let r=await CentralCloud.jsonp('rco-draft-list',{token},{timeout:15000}),items=(r.items||[]).filter(x=>x.passagemPendente);
-      if(!items.length){alert('Não há passagem de RCO aguardando recebimento.');return false}
-      const item=await rcoPassModal(items);if(!item)return false;
-      return claimRcoDraft(item,false,true);
-    }catch(e){alert('Não foi possível localizar as passagens de RCO: '+e.message);return false}
-  }
+  async function receiveRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','receive');return true}alert('Atualize a página para usar o painel de passagens disponíveis.');return false}
   window.centralRcoReceivePassage=receiveRcoCloud;
   function semCpu(){return !!document.getElementById('rcoSemCpu')?.checked}
   function consolidator(){return {semCpu:semCpu(),postoGrad:val('rcoConsolidadorPosto'),nome:val('rcoConsolidadorNome'),matricula:window.CentralCloud?CentralCloud.formatMatricula(val('rcoConsolidadorMatricula')):val('rcoConsolidadorMatricula'),turno:val('rcoConsolidadorTurno')}}
@@ -727,8 +717,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function rcoRoleActor(){const a=window.rcoResponsibleData?.()||{};return {perfil:String(a.perfil||'CPU').toUpperCase(),matricula:a.matricula||'',nome:a.nome||''}}
   function rcoRoleToken(){
     let t='';try{t=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
-    if(t)return t;const a=rcoRoleActor();if(!a.matricula){alert('Registre primeiro o CPU ou P3/oficial responsável pelo RCO.');return ''}
-    t=(prompt(a.perfil==='P3'||a.perfil==='OFICIAL'?'Informe a senha administrativa P3/Oficial:':'Informe a senha de Coordenação:')||'').trim();if(t)try{sessionStorage.setItem('pmpb-rco-role-token-v1',t)}catch(_){}return t
+    if(t)return t;alert('A credencial do RCO não está disponível nesta sessão. Volte às opções de acesso e entre novamente; a chave é solicitada apenas no ingresso.');return ''
   }
 
   function rcoDecisionDialog(cfg){
@@ -784,7 +773,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
         }
         return;
       }
-      try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}
+      // A credencial validada no ingresso permanece na sessão; não solicitar novamente durante o RCO.
       alert('Não foi possível forçar a finalização do RSD: '+msg)
     }
   }
@@ -1033,7 +1022,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const inp=e('rcoResponsavelMatricula'),mat=fmt(inp.value);inp.value=mat;if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return null}
     const perfil=e('rcoResponsavelPerfil').value,turno=e('rcoResponsavelTurno').value;
     let senha=String(e('rcoResponsavelSenha').value||'').trim();if(!senha){try{senha=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}}
-    if(!senha){alert(perfil==='CPU'?'Informe a senha de Coordenação.':'Informe a senha administrativa P3/Oficial.');return null}
+    if(!senha){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente.');return null}
     const payload={perfil,matricula:mat};
     const extBox=e('rcoCadastroExternoFields');if(extBox&&!extBox.classList.contains('hidden'))payload.cadastroExterno=externalResponsiblePayload();
     const r=await CentralCloud.submitForm('rco-responsavel-validar',payload,senha,{popup:false,tokenKind:'role'});
@@ -1080,7 +1069,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       if(!e('rcoResponsavelTurno').value){alert('Selecione o turno: 12h (dia), 12h (noite) ou 24h.');return}
       setResponsibleProgress('Validando matrícula e credencial…',true);const v=await validateResponsibleCredential();if(!v){setResponsibleProgress('',false);return}if(v.pending){setResponsibleProgress('Cadastro complementar necessário.',false);return}
       setResponsibleProgress('Registrando responsável…',true);const mm=v.r.militar||{},mat=fmt(mm.matricula||e('rcoResponsavelMatricula').value);applyResponsible({NOME:mm.nome||'',POSTO_GRAD:mm.postoGrad||'',MATRICULA:mat},v.perfil,v.turno,false);
-      try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);window.centralAutosave?.();window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Use “Entrar no RCO”.',false);
+      try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);if(window.__rcoPendingReceiveAfterResponsible){const recebido=window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Use “Entrar no RCO”.',false);
     }catch(err){setResponsibleLocked(false);setResponsibleProgress('Falha no registro.',false);try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}alert('Não foi possível registrar o responsável: '+err.message)}
   }
   function setSub(m){window.__rcoSubstituto=m?{matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||''}:null;const hidden=e('substitutoLegal'),print=document.querySelector('[data-print-for="substitutoLegal"]'),sel=e('rcoSubstitutoSelecionado');if(!m){hidden.value='';if(print)print.textContent='';if(sel){sel.hidden=true;sel.textContent=''}return}const a=window.__rcoSubstituto,text=[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' ');hidden.value=text;if(print)print.textContent=text;if(sel){sel.hidden=false;sel.innerHTML=esc(text)+' <button type="button" class="small secondary" onclick="rcoRemoverSubstituto()">Remover</button>'}window.centralAutosave?.()}
