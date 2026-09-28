@@ -5,7 +5,8 @@ const MODE='central-layer-mode-v1';
 const RETURN_KEY='central-rsd-return-v1';
 const q=(s,r=document)=>r.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const fmtDate=v=>{if(!v)return '—';const p=String(v).slice(0,10).split('-');return p.length===3?p.reverse().join('/'):v};
+const fmtDate=v=>{const s=String(v||'').trim(),m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:(s?'Data a conferir':'—')};
+const fmtDateTime=v=>{const s=String(v||'').trim();if(!s)return '';const d=new Date(s);if(Number.isNaN(d.getTime()))return '';return d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
 const pageType=()=>/relatorio_servico_diario/i.test(location.pathname)?'rsd':(/relatorio_cpu/i.test(location.pathname)?'rco':'');
 const unit=()=>{const b=q('#batalhao')?.value||'BPTran',n=Number(q('#companhiaNumero')?.value||1)||1,t=b==='BPRv'?'CPRv':'CPTran';return {batalhao:b,companhiaNumero:n,companhia:n+'ª '+t}};
 function css(){
@@ -261,9 +262,12 @@ async function loadOpenServices(el,type,mode){
    const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia},{timeout:20000}),rawItems=r.items||[],items=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
    if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
    box.innerHTML=items.map((x,i)=>{
-     const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' '),pass=!!x.passagemPendente;
+     const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
+     const stamp=fmtDateTime(mode==='receive'?(x.passagemEm||x.ultimoSyncEm):x.ultimoSyncEm);
+     const segment=type==='rsd'&&Number(x.segmento||1)>1?'Segmento '+Number(x.segmento):'';
+     const timing=stamp?((mode==='receive'?'Passagem disponibilizada: ':'Última atualização: ')+stamp):'';
      const title=type==='rsd'?((x.guarnicao||'Guarnição')+' — VTR '+(x.vtrPrincipal||'—')):('RCO — '+(x.companhia||p.companhia));
-     const meta=type==='rsd'?[x.companhia,'Data: '+date,status,x.responsavel&&('Responsável atual: '+x.responsavel)].filter(Boolean):[x.companhia,'Data: '+date,status,x.responsavel&&('Responsável atual: '+x.responsavel),x.retificacaoMotivo&&('Retificação: '+x.retificacaoMotivo)].filter(Boolean);
+     const meta=type==='rsd'?[x.companhia,'Data: '+date,segment,status,timing].filter(Boolean):[x.companhia,'Data: '+date,status,timing].filter(Boolean);
      const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
      return '<div class="central-access-item"><strong>'+esc(title)+'</strong><div class="central-access-meta">'+esc(meta.join(' • '))+'</div><button data-open="'+i+'">'+esc(action)+'</button></div>'
    }).join('');
