@@ -1017,13 +1017,14 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function fillFooter(m){
     const n=e('nomeAssinante'),p=e('patenteAssinante');if(n){n.value=m.NOME||'';n.readOnly=true;syncPrintValue(n)}if(p){p.value=m.POSTO_GRAD||'';p.disabled=true;syncPrintValue(p)}syncAll?.();
   }
+  function setResponsibleCpuRowLocked(row,locked){if(!row)return;row.classList.toggle('audit-locked-row',!!locked);row.querySelectorAll('input,select').forEach(el=>{const pv=el.parentElement?.querySelector('.print-value');if(locked&&pv)pv.textContent=el.options&&el.selectedIndex>=0?el.options[el.selectedIndex].text:el.value;el.disabled=!!locked;el.hidden=false});row.querySelectorAll('button').forEach(b=>b.style.display=locked?'none':'')}
   function setResponsibleLocked(locked){['rcoResponsavelPerfil','rcoResponsavelMatricula','rcoResponsavelTurno'].forEach(id=>{const x=e(id);if(x)x.disabled=!!locked});const reg=e('rcoResponsavelRegistrarBtn');if(reg)reg.classList.toggle('hidden',!!locked)}
   function setResponsibleProgress(msg='',busy=false){const out=e('rcoResponsavelProgresso');if(out)out.textContent=msg;const btn=e('rcoResponsavelRegistrarBtn');if(btn)btn.disabled=!!busy}
   function applyResponsible(m,perfil,turno,fromLoad=false){
     const data={perfil,matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||'',turno:turno||m.turno||''};window.__rcoResponsavel=data;e('rcoResponsavelPerfil').value=data.perfil;e('rcoResponsavelMatricula').value=data.matricula;e('rcoResponsavelTurno').value=data.turno;
     e('rcoResponsavelResultado').innerHTML='<strong>'+esc([data.postoGrad,data.nome].filter(Boolean).join(' '))+'</strong><br>Matrícula: '+esc(data.matricula)+'<br>Turno: '+esc(data.turno||'não informado');const badge=e('rcoResponsavelBadge');badge.textContent=(data.perfil==='CPU'?'CPU / Coordenador':data.perfil)+' registrado';badge.classList.add('ok');setResponsibleLocked(true);setResponsibleProgress('Responsável confirmado. O RCO está pronto para entrada.',false);
     fillFooter({NOME:data.nome,POSTO_GRAD:data.postoGrad});
-    if(data.perfil==='CPU'){if(!fromLoad)ensureCpuRow({NOME:data.nome,POSTO_GRAD:data.postoGrad,MATRICULA:data.matricula},data.turno);const tr=[...document.querySelectorAll('#cpuPeople tr')].find(r=>fmt(r.querySelector('[data-k="matricula"]')?.value||'')===data.matricula);if(tr)setRowLocked(tr,true)}
+    if(data.perfil==='CPU'){if(!fromLoad)ensureCpuRow({NOME:data.nome,POSTO_GRAD:data.postoGrad,MATRICULA:data.matricula},data.turno);const tr=[...document.querySelectorAll('#cpuPeople tr')].find(r=>fmt(r.querySelector('[data-k="matricula"]')?.value||'')===data.matricula);if(tr)setResponsibleCpuRowLocked(tr,true)}
     else{e('rcoSemCpu').checked=true;e('rcoConsolidadorPosto').value=data.postoGrad;e('rcoConsolidadorNome').value=data.nome;e('rcoConsolidadorMatricula').value=data.matricula;e('rcoConsolidadorTurno').value=data.turno;centralRcoToggleSemCpu?.()}
   }
   window.rcoPrepareIncomingResponsible=function(){
