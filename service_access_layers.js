@@ -220,13 +220,22 @@ async function loadRsdActive(el){
  const box=q('[data-list]',el),matEl=q('[data-layer-mat]',el),mat=global.CentralCloud?CentralCloud.formatMatricula(matEl?.value||''):String(matEl?.value||'').trim();
  if(matEl)matEl.value=mat;
  if(!/^\d{3}\.\d{3}-\d$/.test(mat)){box.innerHTML='<div class="central-access-error">Informe uma matrícula válida no padrão 000.000-0.</div>';matEl?.focus();return}
- box.innerHTML='<div class="central-access-loading">Consultando a Central…</div>';
+ box.innerHTML='<div class="central-access-loading">Consultando a Central e procurando o serviço em andamento…</div>';
  const token=await ensureCentralToken();if(!token){box.innerHTML='<div class="central-access-empty">Consulta cancelada.</div>';return}
+ let active={};try{active=JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){}
+ let local={};try{local=JSON.parse(localStorage.getItem('pmpb-transito-servico-diario-v2-draft')||'{}')||{}}catch(_){}
+ const localVtr=(local.viaturas||local.guarnicao?.viaturas||[])[0],vtr=typeof localVtr==='string'?localVtr:(localVtr?.prefixo||local.guarnicao?.vtrPrincipal||local.guarnicao?.viatura||'');
  try{
-   const r=await CentralCloud.jsonp('rsd-active',{matricula:mat,token},{timeout:15000}),items=r.items||[];
-   if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum serviço em andamento foi localizado para esta matrícula. Se você está assumindo outra guarnição, use “Receber serviço em andamento”.</div>';return}
-   box.innerHTML=items.map((x,i)=>`<div class="central-access-item"><strong>${esc(x.guarnicao||'Guarnição')} — VTR ${esc(x.vtrPrincipal||x.viatura||'—')}</strong><div class="central-access-meta">${esc([x.batalhao,x.companhia].filter(Boolean).join(' / ')||'Unidade não informada')} • ${fmtDate(x.data)}<br>Comandante: ${esc(x.responsavel||'—')} ${esc(x.matricula||'')} • ${esc(String(x.status||'').replaceAll('_',' '))}</div><button data-pick="${i}">Continuar este serviço</button></div>`).join('');
-   q('[data-list]',el).querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.pick)];b.disabled=true;if(typeof global.centralRsdClaimCloudItem!=='function'){b.disabled=false;alert('Atualize a página e tente novamente.');return}const ok=await global.centralRsdClaimCloudItem(x,false);if(ok){lockRsdHeader();clearLayer();exitSetup()}else b.disabled=false});
+   const params={matricula:mat,reportId:active.rsdReportId||local.reportId||'',serviceId:active.serviceId||local.serviceId||local.servico?.serviceId||'',vtrPrincipal:vtr||'',guarnicao:active.guarnicao||local.guarnicao?.nome||'',token};
+   const r=await CentralCloud.jsonp('rsd-active',params,{timeout:20000}),items=r.items||[];
+   if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum serviço em andamento foi localizado para esta matrícula na Central. Se você está assumindo outra guarnição, use “Receber serviço em andamento”. Se havia apenas um rascunho local antigo, ele não será usado para substituir silenciosamente a nuvem.</div>';return}
+   box.innerHTML=items.map((x,i)=>{
+     const status=String(x.status||''),editable=['EM_SERVICO','RETIFICACAO_SOLICITADA'].includes(status),pass=status==='PASSAGEM_DISPONIVEL';
+     const actions=editable?'<button data-pick="'+i+'">Continuar este serviço</button><button data-delete="'+i+'" style="margin-left:6px;background:#9a2b3e">Excluir meu relatório</button>':pass?'<span class="central-access-meta">Passagem aguardando recebimento. Cancele a passagem ou aguarde o novo comandante assumir.</span>':'';
+     return `<div class="central-access-item"><strong>${esc(x.guarnicao||'Guarnição')} — VTR ${esc(x.vtrPrincipal||x.viatura||'—')}</strong><div class="central-access-meta">${esc([x.batalhao,x.companhia].filter(Boolean).join(' / ')||'Unidade não informada')} • ${fmtDate(x.data)}<br>Comandante: ${esc(x.responsavel||'—')} ${esc(x.matricula||'')} • ${esc(status.replaceAll('_',' '))}</div>${actions}</div>`
+   }).join('');
+   q('[data-list]',el).querySelectorAll('[data-pick]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.pick)];b.disabled=true;if(typeof global.centralRsdClaimCloudItem!=='function'){b.disabled=false;alert('Atualize a página e tente novamente.');return}const ok=await global.centralRsdClaimCloudItem(x,false,mat);if(ok){lockRsdHeader();clearLayer();exitSetup()}else b.disabled=false});
+   q('[data-list]',el).querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const x=items[Number(b.dataset.delete)];if(typeof global.centralRsdCancelOwnedItem!=='function'){alert('Atualize a página e tente novamente.');return}b.disabled=true;const ok=await global.centralRsdCancelOwnedItem(x,mat);if(ok)await loadRsdActive(el);else b.disabled=false});
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
 async function rsdReceive(){
@@ -262,20 +271,23 @@ function clearResumeIntent(){
 }
 async function resumeRsd(){
  const rc=resumeContext();
- shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Carregando o serviço vinculado…</div>`);
+ shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Consultando primeiro o serviço salvo na Central…</div>`);
  try{
    let local=null;
    try{local=JSON.parse(localStorage.getItem('pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
-   if(local&&(!rc.reportId||String(local.reportId||'')===String(rc.reportId))&&typeof global.applyPayload==='function'){
-     global.applyPayload(local);lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true;
-   }
+   const localMat=global.CentralCloud?CentralCloud.formatMatricula(local?.guarnicao?.matricula||local?.matriculaResponsavel||''):(local?.guarnicao?.matricula||'');
    if(rc.reportId&&typeof global.centralRsdClaimCloudItem==='function'){
-     const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento},false);
+     const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento,matricula:localMat},false,localMat);
      if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
    }
    if(typeof global.centralContinueService==='function'){
      const ok=await global.centralContinueService();
      if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
+   }
+   if(local&&(!rc.reportId||String(local.reportId||'')===String(rc.reportId))&&typeof global.applyPayload==='function'){
+     if(confirm('A Central não conseguiu reabrir o serviço. Deseja carregar o rascunho local deste aparelho apenas como contingência?')){
+       global.applyPayload(local);clearLayer();exitSetup();clearResumeIntent();return true
+     }
    }
  }catch(e){}
  clearLayer();clearResumeIntent();
