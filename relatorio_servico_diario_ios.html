@@ -879,7 +879,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     if(!window.CentralCloud)return '';
     const t=CentralCloud.askToken('central',force?'A chave operacional salva não foi aceita. Informe novamente a chave operacional da Central:':'Informe a chave operacional da Central:',force);
     const st=document.getElementById('rsdRegisterStatus');
-    if(st&&t)st.textContent='Chave operacional informada. Você pode registrar a guarnição.';
+    if(st&&t)st.textContent='Chave operacional informada. O registro será confirmado automaticamente ao finalizar, ou você pode registrar a guarnição agora.';
     return t;
   }
   window.centralRsdChangeOperationalKey=function(){
@@ -1055,11 +1055,58 @@ async function publishPass(){
   }
   async function fetchCloudOperations(silent=false){if(!serviceRegistered)return 0;const token=CentralCloud.getToken('central');if(!token)return 0;try{const r=await CentralCloud.jsonp('operation-list',{rsdReportId:reportId,token},{timeout:15000}),items=r.items||[],arr=readStoredOperations(),map=new Map(arr.map(x=>[x.reportId,x]));items.forEach(x=>map.set(x.reportId,x));localStorage.setItem(OPERATIONS_STORE,JSON.stringify(Array.from(map.values())));return items.length}catch(e){if(!silent)alert('Não foi possível buscar as operações na nuvem: '+e.message);return 0}}
   const baseImportOperations=window.importarOperacoesDoDia;window.importarOperacoesDoDia=async function(){await fetchCloudOperations(true);return baseImportOperations?.()}
+  function updateFinalizeUi(status){
+    const b=document.querySelector('.toolbar button[onclick="finalizarServico()"]')||[...document.querySelectorAll('.toolbar button')].find(x=>/finalizar servi/i.test(x.textContent||''));
+    if(!b)return;
+    const s=String(status||'').toUpperCase(),locked=['AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','INDEFERIDO','CANCELADO','INCLUIDO_RCO'].includes(s);
+    b.disabled=locked;
+    b.textContent=s==='AGUARDANDO_ANALISE'?'RSD enviado — aguardando análise':locked?'RSD encerrado':'Finalizar serviço';
+  }
+  async function recoverRegisteredServiceFromCloud(token,notify=false){
+    if(serviceRegistered)return {active:true,token};
+    if(!reportId||!token)return {active:false,token};
+    try{
+      const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:12000}),rp=atual.rsd||{},st=String(rp.centralStatus||rp.status||'').toUpperCase();
+      if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].includes(st)){
+        serviceRegistered=true;cloudConflictNotified=false;
+        serviceId=rp.serviceId||rp.servico?.serviceId||serviceId;segmento=Number(rp.segmento||rp.servico?.segmento||segmento||1)||1;
+        saveIdentity();saveActiveContext();updateIdentityLock();updateFinalizeUi(st);
+        const el=document.getElementById('rsdRegisterStatus');if(el)el.textContent='Guarnição reconhecida na Central. Finalização liberada.';
+        return {active:true,token,rp};
+      }
+      if(st){
+        renderReviewBanner(rp);updateFinalizeUi(st);if(notify)alert(reviewMessage(rp));
+        return {active:false,closed:true,token,rp};
+      }
+      return {active:false,token};
+    }catch(error){return {active:false,token,error}}
+  }
+  async function ensureServiceRegisteredForFinalization(token){
+    if(serviceRegistered)return {ok:true,token};
+    const recovered=await recoverRegisteredServiceFromCloud(token,true);
+    if(recovered.active)return {ok:true,token:recovered.token||token};
+    if(recovered.closed)return {ok:false,token};
+    if(recovered.error){
+      if(CentralCloud.isAuthError?.(recovered.error)){
+        CentralCloud.clearToken('central');const novo=promptOperationalKey(true);if(!novo)return {ok:false,token:''};
+        return ensureServiceRegisteredForFinalization(novo);
+      }
+      const msg=String(recovered.error?.message||recovered.error||'');
+      if(!/não localizado|nao localizado|not found|indisponível|indisponivel/i.test(msg)){
+        alert('Não foi possível confirmar na Central se esta guarnição já está registrada. Nenhum dado foi apagado.\n\n'+msg);
+        return {ok:false,token};
+      }
+    }
+    try{window.centralAutosave?.()}catch(_){}
+    const el=document.getElementById('rsdRegisterStatus');if(el)el.textContent='Confirmando o registro da guarnição antes da finalização...';
+    const ok=await registerService();
+    return {ok:!!ok,token:CentralCloud.getToken('central')||token};
+  }
   async function finalizeCloud(){
-    if(!serviceRegistered){alert('Registre a guarnição no serviço antes de finalizar o RSD.');return}
     if(!validarFinalizacao())return;
     const mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));if(!val('responsavel')||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição antes de finalizar o RSD.');return}
     let token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+    const registration=await ensureServiceRegisteredForFinalization(token);if(!registration.ok)return;token=registration.token||token;
     try{
       if(reportId){
         try{
@@ -1070,7 +1117,7 @@ async function publishPass(){
       await fetchCloudOperations(true);await carregarRemocoesDoDia(true);if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();
       const p=window.payloadV2();p.guarnicao.matricula=mat;p.servico.iniciadoEm=serviceStartedAt;p.servico.finalizadoEm=new Date().toISOString();
       if(!confirm(summaryText(p)+'\n\nFinalizar e enviar este RSD para análise do Coordenador?'))return;
-      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'}});if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}setTimeout(()=>prepareAndPrint(),180)
+      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'}});updateFinalizeUi(r.status||'AGUARDANDO_ANALISE');if(r.message)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}setTimeout(()=>prepareAndPrint(),180)
     }catch(e){
       try{const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:10000});if(atual?.rsd){renderReviewBanner(atual.rsd);alert(reviewMessage(atual.rsd));return}}catch(_){}
       alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.')
@@ -1092,7 +1139,7 @@ async function publishPass(){
       syncAllPrint();atualizarAssinaturaPrint?.();
     }catch(e){alert('Não foi possível recuperar o RSD da Central: '+e.message)}
   }
-  function install(){if(READONLY_VIEWER){window.centralRsdReceiveCloud=()=>{};loadCloudViewer();return}window.centralRsdReceiveCloud=receivePass;const gt=document.getElementById('guarnicaoTipo');if(gt&&!gt.dataset.autoBound){gt.dataset.autoBound='1';gt.addEventListener('change',()=>{scheduleTeamSuggestion();updateReboqueShortcut()})}['data','batalhao','companhiaNumero'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.teamAutoBound){el.dataset.teamAutoBound='1';el.addEventListener('change',scheduleTeamSuggestion)}});try{renderOutgoingPassage(localStorage.getItem(OUTGOING_PASS_KEY)||'');renderReceivedPassage(passagemOrigemId)}catch(_){};const mainVtr=document.getElementById('viatura');if(mainVtr&&!mainVtr.dataset.vtrBound){mainVtr.dataset.vtrBound='1';mainVtr.addEventListener('input',()=>{mainVtr.value=String(mainVtr.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);syncVtrPrint()})}const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}const tow=document.getElementById('rsdOpenReboqueBtn');if(tow&&!tow.dataset.bound){tow.dataset.bound='1';tow.onclick=openReboqueFromRsd}syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';const cirvcBtn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Carregar remoções do dia');if(cirvcBtn)cirvcBtn.onclick=()=>carregarRemocoesDoDia(false);window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok&&serviceRegistered&&navigator.onLine){const item={reportId};await claimCloudItem(item,false)}return ok}return continueFromCloud()};updateIdentityLock();if(!serviceRegistered)scheduleTeamSuggestion();if(serviceRegistered){saveActiveContext();scheduleCloudSync()}}
+  function install(){if(READONLY_VIEWER){window.centralRsdReceiveCloud=()=>{};loadCloudViewer();return}window.centralRsdReceiveCloud=receivePass;const gt=document.getElementById('guarnicaoTipo');if(gt&&!gt.dataset.autoBound){gt.dataset.autoBound='1';gt.addEventListener('change',()=>{scheduleTeamSuggestion();updateReboqueShortcut()})}['data','batalhao','companhiaNumero'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.teamAutoBound){el.dataset.teamAutoBound='1';el.addEventListener('change',scheduleTeamSuggestion)}});try{renderOutgoingPassage(localStorage.getItem(OUTGOING_PASS_KEY)||'');renderReceivedPassage(passagemOrigemId)}catch(_){};const mainVtr=document.getElementById('viatura');if(mainVtr&&!mainVtr.dataset.vtrBound){mainVtr.dataset.vtrBound='1';mainVtr.addEventListener('input',()=>{mainVtr.value=String(mainVtr.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);syncVtrPrint()})}const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}const tow=document.getElementById('rsdOpenReboqueBtn');if(tow&&!tow.dataset.bound){tow.dataset.bound='1';tow.onclick=openReboqueFromRsd}syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';const cirvcBtn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Carregar remoções do dia');if(cirvcBtn)cirvcBtn.onclick=()=>carregarRemocoesDoDia(false);window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok&&serviceRegistered&&navigator.onLine){const item={reportId};await claimCloudItem(item,false)}return ok}return continueFromCloud()};updateIdentityLock();if(!serviceRegistered){const savedToken=CentralCloud.getToken('central');if(savedToken&&reportId)recoverRegisteredServiceFromCloud(savedToken,false).then(r=>{if(r?.active){scheduleCloudSync();return}if(!r?.closed)scheduleTeamSuggestion()}).catch(()=>scheduleTeamSuggestion());else scheduleTeamSuggestion()}if(serviceRegistered){saveActiveContext();scheduleCloudSync()}}
   document.getElementById('rsdChangeKeyBtn')?.addEventListener('click',window.centralRsdChangeOperationalKey);
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
