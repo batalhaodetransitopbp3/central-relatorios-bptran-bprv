@@ -69,5 +69,10 @@ async function init(){
   ov.querySelector('[data-enter]').onclick=enter;ov.querySelector('[data-key]').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();enter()}};
   if(saved)await validate(c,ov,saved);else showInput(ov,'')
 }
+global.addEventListener('central-module-auth-lost',e=>{
+  const c=config();if(!c)return;
+  const kind=e?.detail?.kind||'central';if((c.kind==='p3'?'p3':'central')!==kind)return;
+  global.CENTRAL_MODULE_ACCESS_READY=false;setTimeout(()=>init(),0);
+});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })(window);
