@@ -753,6 +753,41 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const token=rcoRoleToken();if(!token)return false;const a=rcoRoleActor();
     try{await CentralCloud.submitForm('rsd-review',{reportId:item.reportId,decision,motivo,observacao,autorMatricula:a.matricula,autorNome:a.nome,perfil:a.perfil},token,{popup:false});return true}catch(e){try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}alert('Não foi possível registrar a análise: '+e.message);return false}
   }
+  async function forceFinalizeRsd(item){
+    if(String(item?.status||'').toUpperCase()!=='EM_SERVICO'){alert('A finalização excepcional está disponível apenas para RSD que ainda esteja EM SERVIÇO.');return}
+    const options=['Guarnição sem condições de finalizar','Período de adaptação do sistema','Falha técnica/dispositivo','Encerramento determinado pelo Coordenador','Outro'].map(x=>({value:x,label:x}));
+    const ans=await rcoDecisionDialog({
+      title:'Forçar finalização do RSD',
+      intro:(item.guarnicao||'Guarnição')+' — será usado o último rascunho sincronizado na Central. A ação ficará registrada como finalização excepcional feita pelo Coordenador.',
+      choiceLabel:'Motivo',options,selected:'Guarnição sem condições de finalizar',
+      noteLabel:'Detalhamento',notePlaceholder:'Acrescente informação útil para auditoria. Obrigatório se selecionar “Outro”.',
+      requireNoteFor:['Outro'],requireMessage:'Especifique o motivo da finalização excepcional.',
+      confirmLabel:'Forçar finalização do RSD'
+    });if(!ans)return;
+    const motivo=composeReason(ans.choice,ans.note);
+    if(!confirm('Confirmar a finalização excepcional deste RSD?\n\nO sistema usará o último rascunho salvo na nuvem e registrará que a finalização foi feita pelo Coordenador.'))return;
+    const token=rcoRoleToken();if(!token)return;const a=rcoRoleActor();
+    try{
+      await CentralCloud.submitForm('rsd-force-finalize',{reportId:item.reportId,motivo,autorMatricula:a.matricula,autorNome:a.nome,perfil:a.perfil},token,{popup:false});
+      await loadCloud();
+      const atualizado=cloudItems.find(x=>x.reportId===item.reportId);
+      alert('RSD finalizado excepcionalmente pelo Coordenador. Agora registre a análise para incorporá-lo ao RCO.');
+      if(atualizado)await decideAndAdd(atualizado);
+    }catch(e){
+      const msg=String(e?.message||e||'');
+      if(/Ação POST não reconhecida:\s*rsd-force-finalize/i.test(msg)){
+        const ressalva='Finalização excepcional pelo Coordenador — '+motivo;
+        if(await reviewRsd(item,'DEFERIDO_COM_RESSALVAS',ressalva,ressalva)){
+          item.status='DEFERIDO_COM_RESSALVAS';item.reviewStatus='DEFERIDO_COM_RESSALVAS';
+          await addCloud(item);await loadCloud();
+          alert('RSD encerrado excepcionalmente pelo Coordenador e incorporado ao RCO com ressalva de auditoria.');
+        }
+        return;
+      }
+      try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}
+      alert('Não foi possível forçar a finalização do RSD: '+msg)
+    }
+  }
   function removeFromRco(item,silent=false){
     const o=origins.find(y=>y.rsdReportId===item.reportId);if(!o)return false;const name=o.guarnicao||item.guarnicao;clearCloudGuarnicao(name);origins=origins.filter(y=>y.rsdReportId!==item.reportId);delete cloudPayloads[item.reportId];rebuildCloudGuarnicao(name);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();if(!silent)alert('RSD removido desta consolidação. O registro original permanece na Central.');return true
   }
@@ -844,8 +879,9 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   async function viewRsd(item){
     const token=rcoWorkflowToken(false);if(!token)return;
     try{
-      const r=await CentralCloud.jsonp('rsd-get',{reportId:item.reportId,token}),p=r.rsd||{},rv=p.revisaoCoordenador||{},cn=p.cancelamento||{};
+      const r=await CentralCloud.jsonp('rsd-get',{reportId:item.reportId,token}),p=r.rsd||{},rv=p.revisaoCoordenador||{},cn=p.cancelamento||{},ff=p.finalizacaoCoordenador||{};
       const lines=[item.guarnicao||'Guarnição','Status: '+(item.status||p.centralStatus||'—'),'Comandante: '+(p.guarnicao?.responsavel||item.responsavel||'—'),'Matrícula: '+(p.guarnicao?.matricula||item.matricula||'—'),'Segmento: '+(p.segmento||item.segmento||1),'Service ID: '+(p.serviceId||item.serviceId||'—')];
+      if(ff.forcada){lines.push('Finalização excepcional pelo Coordenador: SIM');lines.push('Motivo: '+(ff.motivo||'—'));lines.push('Finalizado por: '+([ff.autorNome,ff.autorMatricula].filter(Boolean).join(' — ')||'—'));if(ff.em)lines.push('Finalizado em: '+new Date(ff.em).toLocaleString('pt-BR'))}
       if(item.duplicateJustification)lines.push('Justificativa para segundo serviço: '+item.duplicateJustification);
       if(rv.status)lines.push('Análise do Coordenador: '+rv.status.replaceAll('_',' ')+(rv.autorNome?' — '+rv.autorNome:'')+(rv.em?' — '+new Date(rv.em).toLocaleString('pt-BR'):''));
       if(rv.motivo)lines.push('Motivo/ressalva: '+rv.motivo);
@@ -913,16 +949,18 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     box.innerHTML=visible.map(x=>{
       const o=origins.find(y=>y.rsdReportId===x.reportId),newer=o&&Number(x.version)>Number(o.versao||0),status=String(x.status||'').toLowerCase(),statusUp=String(x.status||'').toUpperCase(),isCancelled=statusUp==='CANCELADO',vtr=(x.viaturas||[]).map(v=>v.prefixo).filter(Boolean).join(','),sub=[x.responsavel,x.matricula,'Segmento '+(x.segmento||1),vtr?'VTR '+vtr:''].filter(Boolean).join(' • '),blocked=['RETIFICACAO_SOLICITADA','INDEFERIDO','CANCELADO'].includes(statusUp);
       const duplicateNote=x.possibleDuplicate&&!isCancelled?'<div class="rco-origin-note" style="color:#9a6200;font-weight:800">⚠ POSSÍVEL DUPLICIDADE ('+Number(x.duplicateCount||2)+' serviços)</div>':'';
+      const forcedNote=x.forceFinalized&&!isCancelled?'<div class="rco-origin-note" style="color:#8a4f00;font-weight:800">⚠ Finalização excepcional pelo Coordenador'+(x.forceFinalizedReason?': '+esc(x.forceFinalizedReason):'')+(x.forceFinalizedByName?' • '+esc(x.forceFinalizedByName):'')+'</div>':'';
       const cancelNote=isCancelled?'<div class="rco-origin-note rco-cancel-note">Motivo: '+esc(x.canceladoMotivo||'Não informado')+(x.canceladoPorNome?' • Por: '+esc(x.canceladoPorNome):'')+(x.canceladoEm?' • '+esc(formatWhen(x.canceladoEm)):'')+'</div>':'';
       const actions=isCancelled
         ?'<div class="rco-item-actions"><button type="button" class="secondary small" data-act="view">Visualizar auditoria</button></div>'
-        :'<div class="rco-item-actions"><button type="button" class="small '+(newer?'ok':'secondary')+'" data-act="add" '+(blocked?'disabled':'')+'>'+esc(o?(newer?'Atualizar':'Adicionado'):'Adicionar')+'</button><button type="button" class="small secondary" data-act="pdf">PDF da guarnição</button>'+(/^REBOQUE\b/i.test(String(x.guarnicao||''))?'<button type="button" class="small secondary" data-act="towpdf">PDF de traslados</button>':'')+'<button type="button" class="small warn" data-act="return">Devolver para retificação</button><button type="button" class="small danger" data-act="cancel">Excluir</button>'+(x.possibleDuplicate?'<button type="button" class="small secondary" data-act="compare">Comparar registros</button><button type="button" class="small warn" data-act="dup-return">Solicitar conferência</button>':'')+'<details class="rco-cloud-more"><summary>⋮</summary><div><button type="button" class="secondary small" data-act="view">Visualizar RSD</button><button type="button" class="secondary small" data-act="deny">Indeferir</button>'+(o?'<button type="button" class="secondary small" data-act="remove">Remover do RCO</button>':'')+'</div></details></div>';
-      return '<div class="rco-cloud-item '+(x.possibleDuplicate&&!isCancelled?'duplicate ':'')+(isCancelled?'cancelled':'')+'" data-rsd-card="'+esc(x.reportId)+'"><div><strong>'+esc(x.guarnicao||'Guarnição')+'</strong><div class="rco-origin-note">'+esc(sub||'Sem detalhes adicionais')+'</div>'+duplicateNote+cancelNote+'</div><span class="rco-cloud-status '+status+'">'+esc(newer?'NOVA VERSÃO v'+x.version:(x.status||''))+'</span>'+actions+'</div>'
+        :'<div class="rco-item-actions"><button type="button" class="small '+(newer?'ok':'secondary')+'" data-act="add" '+(blocked?'disabled':'')+'>'+esc(o?(newer?'Atualizar':'Adicionado'):'Adicionar')+'</button>'+(statusUp==='EM_SERVICO'?'<button type="button" class="small warn" data-act="force-finalize">Forçar finalização do RSD</button>':'')+'<button type="button" class="small secondary" data-act="pdf">PDF da guarnição</button>'+(/^REBOQUE\b/i.test(String(x.guarnicao||''))?'<button type="button" class="small secondary" data-act="towpdf">PDF de traslados</button>':'')+'<button type="button" class="small warn" data-act="return">Devolver para retificação</button><button type="button" class="small danger" data-act="cancel">Excluir</button>'+(x.possibleDuplicate?'<button type="button" class="small secondary" data-act="compare">Comparar registros</button><button type="button" class="small warn" data-act="dup-return">Solicitar conferência</button>':'')+'<details class="rco-cloud-more"><summary>⋮</summary><div><button type="button" class="secondary small" data-act="view">Visualizar RSD</button><button type="button" class="secondary small" data-act="deny">Indeferir</button>'+(o?'<button type="button" class="secondary small" data-act="remove">Remover do RCO</button>':'')+'</div></details></div>';
+      return '<div class="rco-cloud-item '+(x.possibleDuplicate&&!isCancelled?'duplicate ':'')+(isCancelled?'cancelled':'')+'" data-rsd-card="'+esc(x.reportId)+'"><div><strong>'+esc(x.guarnicao||'Guarnição')+'</strong><div class="rco-origin-note">'+esc(sub||'Sem detalhes adicionais')+'</div>'+duplicateNote+forcedNote+cancelNote+'</div><span class="rco-cloud-status '+status+'">'+esc(newer?'NOVA VERSÃO v'+x.version:(x.status||''))+'</span>'+actions+'</div>'
     }).join('');
     box.querySelectorAll('[data-rsd-card]').forEach(card=>{
       const x=cloudItems.find(y=>y.reportId===card.dataset.rsdCard);if(!x)return;const o=origins.find(y=>y.rsdReportId===x.reportId),newer=o&&Number(x.version)>Number(o.versao||0);
       const add=card.querySelector('[data-act="add"]');if(add){add.disabled=add.disabled||(!!o&&!newer);add.onclick=()=>decideAndAdd(x)}
       const ret=card.querySelector('[data-act="return"]');if(ret)ret.onclick=()=>returnForCorrection(x);
+      const force=card.querySelector('[data-act="force-finalize"]');if(force)force.onclick=()=>forceFinalizeRsd(x);
       const cancel=card.querySelector('[data-act="cancel"]');if(cancel)cancel.onclick=()=>cancelRsdByCoordinator(x);
       const pdf=card.querySelector('[data-act="pdf"]');if(pdf)pdf.onclick=()=>openCloudRsdPdf(x);
       const towpdf=card.querySelector('[data-act="towpdf"]');if(towpdf)towpdf.onclick=()=>openCloudReboquePdf(x);
@@ -935,7 +973,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   }
   function installCloudBox(){
     const badge=document.getElementById('guarnicoesBadges');if(!badge||document.getElementById('rcoCloudBox'))return;const box=document.createElement('div');box.id='rcoCloudBox';box.className='rco-cloud-box no-print';
-    box.innerHTML='<strong>Guarnições / RSDs do serviço — nuvem</strong><div class="rco-origin-note">As guarnições registradas aparecem automaticamente. Os PDFs das guarnições e documentos vinculados são gerados diretamente da Central, sem necessidade de envio por WhatsApp ou e-mail. O Coordenador também pode adicionar, devolver para retificação, comparar possíveis duplicidades, indeferir ou excluir registros indevidos. Registros cancelados permanecem disponíveis apenas para auditoria.</div><div id="rcoCloudPending" class="rco-pending-summary" hidden></div><div class="rco-cloud-actions"><button type="button" class="small secondary" id="rcoCloudRefresh">Buscar guarnições / RSDs</button><button type="button" class="small ok" id="rcoCloudAddAll">Adicionar todos os deferidos</button><button type="button" class="small secondary" id="rcoShowCancelled" hidden>Mostrar cancelados</button></div><div id="rcoCloudList" class="rco-cloud-list"><div class="context-empty">Clique em “Buscar guarnições / RSDs”.</div></div>';
+    box.innerHTML='<strong>Guarnições / RSDs do serviço — nuvem</strong><div class="rco-origin-note">As guarnições registradas aparecem automaticamente. Os PDFs das guarnições e documentos vinculados são gerados diretamente da Central, sem necessidade de envio por WhatsApp ou e-mail. Se uma guarnição não puder finalizar o serviço, o Coordenador pode usar “Forçar finalização do RSD”; o último rascunho sincronizado será encerrado excepcionalmente, com motivo e autoria preservados para auditoria. O RSD ainda deverá ser analisado antes de integrar o RCO. Registros cancelados permanecem disponíveis apenas para auditoria.</div><div id="rcoCloudPending" class="rco-pending-summary" hidden></div><div class="rco-cloud-actions"><button type="button" class="small secondary" id="rcoCloudRefresh">Buscar guarnições / RSDs</button><button type="button" class="small ok" id="rcoCloudAddAll">Adicionar todos os deferidos</button><button type="button" class="small secondary" id="rcoShowCancelled" hidden>Mostrar cancelados</button></div><div id="rcoCloudList" class="rco-cloud-list"><div class="context-empty">Clique em “Buscar guarnições / RSDs”.</div></div>';
     badge.parentNode.insertBefore(box,badge);box.querySelector('#rcoCloudRefresh').onclick=loadCloud;box.querySelector('#rcoCloudAddAll').onclick=addAll;box.querySelector('#rcoShowCancelled').onclick=toggleCancelledRsd
   }
   async function lookupConsolidator(){if(!CentralCloud?.isEnabled())return;const e=document.getElementById('rcoConsolidadorMatricula'),mat=CentralCloud.formatMatricula(e.value);e.value=mat;const token=rcoWorkflowToken(true);if(!token||!/^\d{3}\.\d{3}-\d$/.test(mat))return;try{const r=await CentralCloud.jsonp('cadastros',{tipo:'militar',q:mat,token}),m=(r.items||[]).find(x=>x.MATRICULA===mat);if(m){document.getElementById('rcoConsolidadorNome').value=m.NOME||'';document.getElementById('rcoConsolidadorPosto').value=m.POSTO_GRAD||''}}catch(_){}}
