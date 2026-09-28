@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.2';
+var CENTRAL_V10_VERSION = '10.8.3';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -298,7 +298,12 @@ function assertToken_(token, kind) {
   return true;
 }
 
-function ss_(id) { return SpreadsheetApp.openById(id); }
+var SPREADSHEET_EXEC_CACHE_ = {};
+function ss_(id) {
+  id=String(id||'');
+  if(!SPREADSHEET_EXEC_CACHE_[id])SPREADSHEET_EXEC_CACHE_[id]=SpreadsheetApp.openById(id);
+  return SPREADSHEET_EXEC_CACHE_[id];
+}
 function sheet_(id, name) {
   var s = ss_(id).getSheetByName(name);
   if (!s) throw new Error('Aba ausente no banco: ' + name);
@@ -1582,6 +1587,29 @@ function p3FastObjects_(sheetName,p,limit,dateCandidates){
   var s=ss_(P3_SHEET_ID).getSheetByName(sheetName);if(!s)return [];
   var idx=p3IndexedRows_(s,p||{},dateCandidates);return p3ObjectsForRows_(s,idx.headers,idx.rows,limit);
 }
+function p3ObjectsForRowsFields_(s,h,rows,limit,fields){
+  var chosen=(rows||[]).slice().sort(function(a,b){return a-b});
+  if(limit&&chosen.length>limit)chosen=chosen.slice(chosen.length-limit);
+  var wanted={},cols=[];(fields||[]).forEach(function(k){var i=h.indexOf(k);if(i>=0&&!wanted[k]){wanted[k]=1;cols.push(i)}});
+  if(!chosen.length||!cols.length)return [];
+  cols.sort(function(a,b){return a-b});var groups=[],g=null;
+  cols.forEach(function(i){if(!g||i-g.end>2||i-g.start>24){g={start:i,end:i};groups.push(g)}else g.end=i});
+  var byRow={};chosen.forEach(function(r){byRow[String(r)]={_row:r}});
+  p3RowChunks_(chosen).forEach(function(ch){
+    groups.forEach(function(gr){
+      var vals=s.getRange(ch.start,gr.start+1,ch.end-ch.start+1,gr.end-gr.start+1).getValues();
+      for(var ri=0;ri<vals.length;ri++){
+        var rowNo=ch.start+ri,o=byRow[String(rowNo)];if(!o)continue;
+        for(var ci=gr.start;ci<=gr.end;ci++){var k=h[ci];if(k&&wanted[k])o[k]=vals[ri][ci-gr.start]}
+      }
+    });
+  });
+  return chosen.map(function(r){return byRow[String(r)]}).filter(Boolean);
+}
+function p3FastFields_(sheetName,p,limit,dateCandidates,fields){
+  var s=ss_(P3_SHEET_ID).getSheetByName(sheetName);if(!s)return [];
+  var idx=p3IndexedRows_(s,p||{},dateCandidates);return p3ObjectsForRowsFields_(s,idx.headers,idx.rows,limit,fields);
+}
 function p3HistoricalOrigin_(v){return /histor|importa|legado|migr/.test(String(v||'').toLowerCase());}
 function p3ProductionScan_(p){
   var s=sheet_(P3_SHEET_ID,'PRODUCAO'),h=headers_(s),last=s.getLastRow(),n=Math.max(0,last-1);
@@ -1783,23 +1811,28 @@ function p3MergeById_(a,b,fields){
   (a||[]).forEach(add);(b||[]).forEach(add);return out;
 }
 function p3Query_(p) {
+  var t0=new Date().getTime();
+  function done_(out){out=out||{};out.queryMs=new Date().getTime()-t0;out.fastQuery=true;return out}
   var view=String(p.view||'controle-diario'),list;
   if(view==='controle-diario'){
-    var rsd=p3FastObjects_('RSD',p,1000),rco=p3FastObjects_('RCO',p,500);
-    return {ok:true,rsd:rsd.reverse(),rco:rco.reverse()};
+    var rsdFields=['DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','STATUS','RESPONSAVEL_NOME','VERSAO','RCO_REPORT_ID'];
+    var rsd=p3FastFields_('RSD',p,1000,null,rsdFields),rco=p3FastFields_('RCO',p,500,null,['REPORT_ID']);
+    return done_({ok:true,rsd:rsd.reverse(),rco:rco.reverse()});
   }
-  if(view==='produtividade-matriz')return p3ProductivityMatrix_(p);
+  if(view==='produtividade-matriz')return done_(p3ProductivityMatrix_(p));
   if(view==='produtividade'){
     var prod=p3ProductionFacts_(p,'effective',5000);
-    return {ok:true,items:prod.items.reverse(),total:prod.total,sourceStats:prod.sourceStats};
+    return done_({ok:true,items:prod.items.reverse(),total:prod.total,sourceStats:prod.sourceStats});
   }
   if(view==='historico'){
     var hist=p3ProductionFacts_(p,'historico',5000);
-    return {ok:true,items:hist.items.reverse(),totalHistorico:hist.totalHistorico,totalDigital:hist.totalDigital,sourceStats:hist.sourceStats};
+    return done_({ok:true,items:hist.items.reverse(),totalHistorico:hist.totalHistorico,totalDigital:hist.totalDigital,sourceStats:hist.sourceStats});
   }
   if(view==='rco'){
-    var drafts=p3FastObjects_('RCO_RASCUNHOS',p,2000),draftMap={};drafts.forEach(function(d){draftMap[String(d.RCO_REPORT_ID||'')]=d});
-    list=p3FastObjects_('RCO',p,2000).map(function(x){
+    var draftFields=['RCO_REPORT_ID','STATUS','RETIFICACAO_MOTIVO','RETIFICACAO_ABERTA_EM','RETIFICACAO_ABERTA_POR'];
+    var rcoFields=['DATA_SERVICO','BATALHAO','COMPANHIA','VERSAO','STATUS','MODO_CONSOLIDACAO','CONSOLIDADOR_POSTO_GRAD','CONSOLIDADOR_NOME','CONSOLIDADOR_MATRICULA','QUANTIDADE_GUARNICOES','ENVIADO_EM','RETIFICADO_EM','REPORT_ID'];
+    var drafts=p3FastFields_('RCO_RASCUNHOS',p,2000,null,draftFields),draftMap={};drafts.forEach(function(d){draftMap[String(d.RCO_REPORT_ID||'')]=d});
+    list=p3FastFields_('RCO',p,2000,null,rcoFields).map(function(x){
       var d=draftMap[String(x.REPORT_ID||'')]||{};x.DRAFT_STATUS=d.STATUS||'';x.RETIFICACAO_MOTIVO=d.RETIFICACAO_MOTIVO||'';x.RETIFICACAO_ABERTA_EM=d.RETIFICACAO_ABERTA_EM||'';x.RETIFICACAO_ABERTA_POR=d.RETIFICACAO_ABERTA_POR||'';return x;
     });
   }
@@ -1807,31 +1840,35 @@ function p3Query_(p) {
     list=objects_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'));if(p.rcoReportId)list=list.filter(function(x){return String(x.RCO_REPORT_ID||'')===String(p.rcoReportId)});
   }
   else if(view==='operacoes'){
-    var ops=p3FastObjects_('OPERACOES',p,2000,['DATA']),pods=p3FastObjects_('POD_EXECUCAO',p,4000,['DATA']),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});
+    var opFields=['REGISTRO_ID','DATA','COMPANHIA','GUARNICAO_RESPONSAVEL','OPERACAO','TURNO','LOCAL','LATITUDE','LONGITUDE','PESSOAS_ABORDADAS','MOTOCICLETAS_ABORDADAS','AUTOMOVEIS_ABORDADOS','CICLOMOTORES_ABORDADOS','ART_165','ART_165_A','ART_230_XI','OUTROS_AITS_COM_ABORDAGEM','AITS_SEM_ABORDAGEM','PRISOES','STATUS_REGISTRO'];
+    var podFields=['REGISTRO_ID','STATUS_CUMPRIMENTO','LOCAL_PREVISTO','LOCAL_EXECUTADO','COORDENADAS_EXECUTADAS'];
+    var ops=p3FastFields_('OPERACOES',p,2000,['DATA'],opFields),pods=p3FastFields_('POD_EXECUCAO',p,4000,['DATA'],podFields),pm={};pods.forEach(function(x){pm[String(x.REGISTRO_ID||'')]=x});
     list=ops.map(function(x){var d=pm[String(x.REGISTRO_ID||'')]||{};x.POD_STATUS=d.STATUS_CUMPRIMENTO||'';x.LOCAL_PREVISTO=d.LOCAL_PREVISTO||'';x.LOCAL_EXECUTADO=d.LOCAL_EXECUTADO||x.LOCAL||'';x.COORDENADAS_EXECUTADAS=d.COORDENADAS_EXECUTADAS||[x.LATITUDE,x.LONGITUDE].filter(Boolean).join(', ');return x});
   }
   else if(view==='pod')list=p3FastObjects_('POD_EXECUCAO',p,2000,['DATA']);
   else if(view==='ocorrencias')list=p3FastObjects_('OCORRENCIAS',p,2000,['DATA']);
-  else if(view==='prisoes')list=p3FastObjects_('PRISOES',p,2000,['DATA','DATA_SERVICO']);
+  else if(view==='prisoes')list=p3FastFields_('PRISOES',p,2000,['DATA','DATA_SERVICO'],['DATA','DATA_SERVICO','COMPANHIA','GUARNICAO','SITUACAO','TIPIFICACAO_PRINCIPAL','TIPIFICACOES_RELACIONADAS','QUANTIDADE','OCORRENCIA_ID','ORIGEM_RELATORIO']);
   else if(view==='cirvc'){
-    var newer=p3FastObjects_('CIRVC_CUSTODIA',p,2000,['DATA_CADASTRO','DATA_SERVICO','DATA']),legacy=p3FastObjects_('CIRVC',p,2000,['DATA']).map(p3LegacyCirvcMap_);
+    var cirvcFields=['CIRVC_ID','REGISTRO_ID','DATA_CADASTRO','DATA_SERVICO','DATA','COMPANHIA','GUARNICAO','PLACA','TIPO','MARCA_MODELO','LOCAL_CUSTODIA','LOCAL_DEIXADO','STATUS_CUSTODIA','DESTINO_FINAL','BAIXADO_EM','ORIGEM'];
+    var newer=p3FastFields_('CIRVC_CUSTODIA',p,2000,['DATA_CADASTRO','DATA_SERVICO','DATA'],cirvcFields),legacy=p3FastFields_('CIRVC',p,2000,['DATA'],cirvcFields).map(p3LegacyCirvcMap_);
     list=p3MergeById_(newer,legacy,['CIRVC_ID','REGISTRO_ID']);
   }
-  else if(view==='auditoria')list=p3FastObjects_('AUDITORIA_VERSOES',p,2000,['DATA_HORA']);
-  else if(view==='fisco')list=p3FastObjects_('FISCO',p,2000,['DATA']);
+  else if(view==='auditoria')list=p3FastFields_('AUDITORIA_VERSOES',p,2000,['DATA_HORA'],['DATA_HORA','TIPO_ENTIDADE','ENTIDADE_ID','VERSAO','ACAO','RESPONSAVEL_MATRICULA','RESPONSAVEL_NOME','COMPANHIA','ORIGEM']);
+  else if(view==='fisco')list=p3FastFields_('FISCO',p,2000,['DATA'],['DATA','BATALHAO','COMPANHIA','GUARNICAO','EFETIVO','VIATURA','QUANTIDADE_OCORRENCIAS','ALTERACOES_EFETIVO','ALTERACOES_VIATURA','MATERIAL_CARGA','ORIGEM_RELATORIO']);
   else if(view==='nace-cicc'){
     var pn=Object.assign({},p);pn.batalhao='';pn.companhia='';pn.guarnicao='';pn.turno='';
-    list=p3FastObjects_('NACE_CICC',pn,2000,['DATA']);
+    list=p3FastFields_('NACE_CICC',pn,2000,['DATA'],['DATA','HORA','TIPO_OCORRENCIA','NATUREZA','COM_VITIMAS','QUANTIDADE_VITIMAS','OBITOS','MUNICIPIO','RODOVIA','KM','BAIRRO_LOCALIDADE','FONTE','NUMERO_CICC','OBSERVACOES']);
   }
   else if(view==='veiculos-operacionais'){
     var ss=ss_(P3_SHEET_ID),newSheet=ss.getSheetByName('VEICULOS_OPERACIONAIS'),oldSheet=ss.getSheetByName('VEICULOS_RECUPERADOS');
-    var newRows=newSheet?p3FastObjects_('VEICULOS_OPERACIONAIS',p,2000,['DATA']):[],oldRows=oldSheet?p3FastObjects_('VEICULOS_RECUPERADOS',p,2000,['DATA']):[];
+    var vehicleFields=['REGISTRO_ID','DATA','COMPANHIA','GUARNICAO','PLACA_UF','TIPO','MARCA_MODELO','SITUACAO','TIPO_RECUPERACAO_DETALHADA','CLASSIFICACAO_P3','CONTA_COMO_RECUPERADO','PLACA_ORIGINAL_IDENTIFICADA','PLACA_ORIGINAL_UF','RESTRICAO_ORIGINAL','LOCAL','QUANTIDADE_CONDUZIDOS','VALOR_FIPE'];
+    var newRows=newSheet?p3FastFields_('VEICULOS_OPERACIONAIS',p,2000,['DATA'],vehicleFields):[],oldRows=oldSheet?p3FastFields_('VEICULOS_RECUPERADOS',p,2000,['DATA'],vehicleFields):[];
     list=p3MergeById_(newRows,oldRows,['REGISTRO_ID']);
   }
   else if(view==='viaturas')list=objects_(sheet_(P3_SHEET_ID,'VIATURAS'));
   else if(view==='militares')list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));
   else throw new Error('Visão P3 desconhecida.');
-  return {ok:true,items:(list||[]).slice(-2000).reverse()};
+  return done_({ok:true,items:(list||[]).slice(-2000).reverse()});
 }
 
 
