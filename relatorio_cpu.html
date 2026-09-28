@@ -560,40 +560,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,estatisticaP3};
   }
   window.centralP3BuildPackage=p3BuildPackage;
-  function p3GetSavedToken(){try{return localStorage.getItem(P3_TOKEN_KEY)||''}catch(_){return ''}}
-  function p3SetSavedToken(v){try{if(v)localStorage.setItem(P3_TOKEN_KEY,v);else localStorage.removeItem(P3_TOKEN_KEY)}catch(_){}}
-  function p3EnsureModal(){
-    let m=document.getElementById('p3Modal');if(m)return m;
-    m=document.createElement('div');m.id='p3Modal';m.className='p3-modal hidden no-print';m.innerHTML=`<div class="p3-modal-card" role="dialog" aria-modal="true" aria-labelledby="p3ModalTitle"><h3 id="p3ModalTitle">Consolidar dados para o P3</h3><p>Envie os dados consolidados deste RCO para a base estatística em nuvem do Batalhão.</p><div class="p3-modal-note" id="p3Preview">A prévia estatística será calculada antes do envio.</div><label for="p3TokenInput">Chave P3</label><input id="p3TokenInput" type="password" autocomplete="off" placeholder="Informe a chave fornecida pelo P3"><div class="p3-save-row"><input id="p3Remember" type="checkbox" checked><span>Manter a chave salva somente neste aparelho</span></div><div class="p3-modal-note">O mesmo RCO pode ser enviado novamente para correção. O banco tratará o reenvio como retificação, sem duplicar os dados.</div><div class="p3-modal-actions"><button type="button" class="secondary" id="p3Cancel">Cancelar</button><button type="button" class="ok" id="p3Send">Enviar ao P3</button></div></div>`;
-    document.body.appendChild(m);
-    m.querySelector('#p3Cancel').addEventListener('click',()=>m.classList.add('hidden'));
-    m.addEventListener('click',e=>{if(e.target===m)m.classList.add('hidden')});
-    m.querySelector('#p3Send').addEventListener('click',p3Submit);
-    return m;
-  }
   function p3SetStatus(msg){const el=document.getElementById('p3Status');if(el)el.textContent=msg||''}
-  let p3Submitting=false;
-  function p3Submit(){
-    if(p3Submitting)return;
-    const m=p3EnsureModal(),input=m.querySelector('#p3TokenInput'),remember=m.querySelector('#p3Remember');
-    const token=String(input.value||'').trim();
-    if(!token){alert('Informe a Chave P3.');input.focus();return}
-    let pkg;try{pkg=p3BuildPackage()}catch(err){alert(err.message||String(err));return}
-    if(remember.checked)p3SetSavedToken(token);else p3SetSavedToken('');
-    try{if(typeof salvarRascunho==='function')salvarRascunho(true)}catch(_){}
-    p3Submitting=true;const sendBtn=m.querySelector('#p3Send');if(sendBtn)sendBtn.disabled=true;
-    const winName='p3Consolidacao_'+Date.now();
-    const w=window.open('about:blank',winName);
-    if(!w){p3Submitting=false;if(sendBtn)sendBtn.disabled=false;alert('O navegador bloqueou a janela de confirmação do P3. Permita pop-ups para esta página e tente novamente.');return}
-    const form=document.createElement('form');form.method='POST';form.action=P3_ENDPOINT;form.target=winName;form.style.display='none';
-    const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;form.appendChild(i)};
-    add('token',token);add('payload',JSON.stringify(pkg));document.body.appendChild(form);form.submit();form.remove();
-    window.__centralP3Accepted={pkg,token,acceptedAt:Date.now()};
-    document.dispatchEvent(new CustomEvent('central-p3-submit-accepted',{detail:{acceptedAt:window.__centralP3Accepted.acceptedAt}}));
-    m.classList.add('hidden');p3SetStatus('Envio aberto para confirmação.');
-    setTimeout(()=>{p3Submitting=false;if(sendBtn)sendBtn.disabled=false},1800);
-    setTimeout(()=>p3SetStatus(''),12000);
-  }
   window.abrirConsolidacaoP3=async function(){
     const resp=window.rcoResponsibleData?.()||{};
     if(!resp.matricula){alert('Registre primeiro o CPU ou o P3/oficial responsável pelo RCO.');return}
