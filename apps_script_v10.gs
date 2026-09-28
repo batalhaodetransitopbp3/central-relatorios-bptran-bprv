@@ -218,7 +218,8 @@ function doPost(e) {
       assertToken_(token, 'p3');
       out = rcoRetificationOpen_(payload);
     } else if (action === 'rco-upsert') {
-      assertToken_(token, 'p3');
+      // O RCO usa a credencial validada no ingresso; não pedir nova Chave P3 durante a consolidação.
+      assertToken_(token, 'coord');
       out = rcoSupplementalUpsert_(payload);
     } else if (action === 'master-login') {
       assertToken_(token, 'master-session');
