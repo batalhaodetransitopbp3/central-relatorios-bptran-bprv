@@ -165,7 +165,7 @@ function lockRcoHeader(){
  lockRcoServiceIdentity();
  ['rcoResponsavelPerfil'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['rcoResponsavelMatricula','rcoExternoPosto','rcoExternoNome','rcoExternoUnidade'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});const turno=q('#rcoResponsavelTurno');if(turno)turno.disabled=true;
- const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=true}
+ const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=true;const field=pw.closest('.field');if(field)field.hidden=true}
  q('#rcoResponsavelRegistrarBtn')?.setAttribute('hidden','hidden');
 }
 function installRcoSetupStatus(){
