@@ -61,7 +61,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="filter-turno"><label>Turno específico (opcional)</label><input id="turno" placeholder="Ex.: 07:00 às 19:00"></div>
   <div class="filter-guarn"><label>Guarnição específica (opcional)</label><input id="guarnicao" placeholder="Ex.: TOR, Base 01"></div><button id="apply">Consultar dados</button>
  </div>
- <div class="plain-note">Deixe os filtros opcionais em branco para considerar todos os registros do período. Marque somente as companhias que deseja incluir na consulta.</div><div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div>
+ <div class="plain-note">Deixe os filtros opcionais em branco para considerar todos os registros do período. Marque somente as companhias que deseja incluir na consulta.</div><div id="progressBox" class="progress-box"><div class="progress-line"><div id="progressBar" class="progress-bar"></div></div><div id="progressText" class="progress-text">Preparando consulta...</div></div><div id="queryTiming" class="plain-note"></div>
  <div id="sourceNote" class="source-note">ℹ Parte dos dados deste período foi registrada antes da implantação da Central atual. Esses registros foram incorporados à consulta para manter a continuidade histórica, sem duplicar informações já substituídas por RCO digital.</div>
 </section>
 
@@ -83,7 +83,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
- let main='painel',sub='controle-diario',analysisIndicator='',analysisReference='previous',customRefStart='',customRefEnd='',analysisBundle=null,biUrl='',p3Actor=null,progressTimer=null,progressValue=0;
+ let main='painel',sub='controle-diario',analysisIndicator='',analysisReference='previous',customRefStart='',customRefEnd='',analysisBundle=null,biUrl='',p3Actor=null,progressTimer=null,progressValue=0,lastQueryTiming=null;
  const P3_ACTOR_KEY='pmpb-p3-actor-v1';
  function readActor(){try{return JSON.parse(sessionStorage.getItem(P3_ACTOR_KEY)||'null')}catch(_){return null}}
  function saveActor(a){p3Actor=a||null;try{if(a)sessionStorage.setItem(P3_ACTOR_KEY,JSON.stringify(a));else sessionStorage.removeItem(P3_ACTOR_KEY)}catch(_){}renderActor()}
@@ -136,7 +136,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function statusPill(v){const s=String(v||'');let c=/DEFERID|INCLUID|ATIVO|CONSOLID|FINALIZ/.test(s)?'ok':/CANCEL|INDEFER/.test(s)?'danger':'warn';return '<span class="pill '+c+'">'+esc(s.replaceAll('_',' ')||'—')+'</span>'}
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE'||k==='VALOR_FIPE_ESTATISTICO')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
- const p3Get=(action,params)=>CentralCloud.jsonp(action,params,{timeout:60000});
+ const p3Get=async(action,params)=>{const t0=performance.now();const r=await CentralCloud.jsonp(action,params,{timeout:60000});const total=Math.round(performance.now()-t0),server=Number(r?.queryMs||0);lastQueryTiming={action,total,server};const el=$('queryTiming');if(el)el.textContent='Última consulta: '+(total/1000).toFixed(1)+' s'+(server?' • processamento na Central: '+(server/1000).toFixed(1)+' s':'');return r};
  async function load(){
    const show=main!=='powerbi';let ok=false;if(show)beginProgress('Consultando a Central e aplicando os filtros...');setSourceNote(null);
    try{
@@ -146,7 +146,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    }catch(e){
      if(CentralCloud.isAuthError?.(e)){CentralCloud.clearToken('p3');saveActor(null);showError('Sessão administrativa expirada ou credencial inválida. Identifique novamente o P3/Oficial responsável.');return}
      showError(e.message);
-   }finally{if(show)endProgress(ok,ok?'Consulta atualizada.':'Falha na consulta.')}
+   }finally{if(show){const tm=lastQueryTiming;endProgress(ok,ok?(tm?'Consulta atualizada em '+(tm.total/1000).toFixed(1)+' s.':'Consulta atualizada.'):'Falha na consulta.')}}
  }
  function showError(msg){if(main==='painel'&&sub==='analise'){$('chart').innerHTML='<div class="empty">'+esc(msg)+'</div>';return}const target=main==='rco'?$('rcoBody'):$('tbody');if(target)target.innerHTML='<tr><td class="empty">'+esc(msg)+'</td></tr>'}
  async function loadPanel(t){
