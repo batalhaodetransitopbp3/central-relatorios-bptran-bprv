@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.4';
+var CENTRAL_V10_VERSION = '10.8.5';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -31,6 +31,12 @@ function doGet(e) {
 
     if (action === 'version') {
       out = {ok:true, version:CENTRAL_V10_VERSION, schema:'central-v10'};
+    } else if (action === 'access-open-services') {
+      out = {ok:true, items:accessOpenServices_(p)};
+    } else if (action === 'access-check') {
+      var accessModule=String(p.module||'').toUpperCase();
+      if(accessModule==='RCO') assertToken_(p.token,'coord'); else if(accessModule==='RSD') assertToken_(p.token,'central'); else throw new Error('Módulo de acesso inválido.');
+      out = {ok:true,module:accessModule};
     } else if (action === 'cadastros') {
       assertToken_(p.token, 'rco');
       out = cadastroSearch_(p);
@@ -929,6 +935,43 @@ function rsdList_(p) {
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
   });
 }
+function accessRsdOpen_(p,mode){
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',stReceive=String(mode||'').toLowerCase()==='receive';
+  if(stReceive){
+    return passagensPendentes_({batalhao:batt,companhia:comp}).map(function(x){
+      var vs=parseJson_(x.VTRS_JSON,[]),v=vs.map(function(y){return typeof y==='string'?y:(y.prefixo||y.PREFIXO||'')}).filter(Boolean);
+      return {module:'RSD',mode:'receive',reportId:String(x.RSD_ORIGEM_ID||''),passagemId:String(x.PASSAGEM_ID||''),serviceId:String(x.SERVICE_ID||''),segmento:Number(x.SEGMENTO_ORIGEM||1)||1,
+        data:dateText_(x.DATA_SERVICO),batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||''),guarnicao:String(x.GUARNICAO||''),vtrPrincipal:String(v[0]||''),viaturas:v,
+        status:'PASSAGEM_DISPONIVEL',passagemPendente:true,passagemDe:String(x.ENTREGUE_POR_NOME||''),passagemEm:String(x.DISPONIBILIZADA_EM||'')};
+    });
+  }
+  var rows=objects_(sheet_(P3_SHEET_ID,'RSD')),allowed=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'];
+  return rows.filter(function(x){
+    if(allowed.indexOf(String(x.STATUS||''))<0)return false;
+    if(batt&&String(x.BATALHAO||'')!==batt)return false;
+    if(comp&&String(x.COMPANHIA||'')!==String(comp))return false;
+    return true;
+  }).map(function(x){return {module:'RSD',mode:'continue',reportId:String(x.REPORT_ID||''),serviceId:String(x.SERVICE_ID||''),segmento:Number(x.SEGMENTO||1)||1,
+    data:dateText_(x.DATA_SERVICO),batalhao:String(x.BATALHAO||''),companhia:String(x.COMPANHIA||''),guarnicao:String(x.GUARNICAO||''),vtrPrincipal:normVtrPrefix_(x.VTR_PRINCIPAL||''),
+    status:String(x.STATUS||''),responsavel:String(x.RESPONSAVEL_NOME||''),ultimoSyncEm:String(x.ULTIMO_RASCUNHO_EM||x.SINCRONIZADO_EM||x.INICIADO_EM||''),passagemPendente:String(x.STATUS||'')==='PASSAGEM_DISPONIVEL'};})
+    .sort(function(a,b){var d=String(b.data||'').localeCompare(String(a.data||''));return d||String(b.ultimoSyncEm||'').localeCompare(String(a.ultimoSyncEm||''));});
+}
+function accessRcoOpen_(p,mode){
+  var batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',receive=String(mode||'').toLowerCase()==='receive';
+  return rcoDraftList_({batalhao:batt,companhia:comp}).filter(function(x){return receive?!!x.passagemPendente:true}).map(function(x){
+    return {module:'RCO',mode:receive?'receive':'continue',reportId:String(x.reportId||''),data:dateText_(x.data),batalhao:String(x.batalhao||''),companhia:String(x.companhia||''),
+      status:String(x.status||''),responsavel:String(x.responsavel||''),revision:Number(x.revision||0),ultimoSyncEm:String(x.ultimoSyncEm||''),passagemPendente:!!x.passagemPendente,
+      passagemId:String(x.passagemId||''),passagemDe:String(x.passagemDe||''),passagemEm:String(x.passagemEm||''),passagemObservacao:String(x.passagemObservacao||''),retificacaoMotivo:String(x.retificacaoMotivo||'')};
+  }).sort(function(a,b){var d=String(b.data||'').localeCompare(String(a.data||''));return d||String(b.ultimoSyncEm||'').localeCompare(String(a.ultimoSyncEm||''));});
+}
+function accessOpenServices_(p){
+  var module=String(p.module||'RSD').toUpperCase(),mode=String(p.mode||'continue').toLowerCase();
+  if(['continue','receive'].indexOf(mode)<0)throw new Error('Modo de acesso inválido.');
+  if(module==='RSD')return accessRsdOpen_(p,mode);
+  if(module==='RCO')return accessRcoOpen_(p,mode);
+  throw new Error('Módulo de acesso inválido.');
+}
+
 function rsdActive_(p) {
   p=p||{};
   var mat=normMat_(p.matricula||'');if(!mat)return [];
