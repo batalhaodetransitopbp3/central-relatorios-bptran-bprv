@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.6';
+var CENTRAL_V10_VERSION = '10.8.7';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -954,7 +954,7 @@ function accessRsdOpen_(p,mode){
         status:'PASSAGEM_DISPONIVEL',passagemPendente:true,passagemEm:String(x.DISPONIBILIZADA_EM||'')};
     });
   }
-  var rows=objectsFields_(sheet_(P3_SHEET_ID,'RSD'),['REPORT_ID','SERVICE_ID','SEGMENTO','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','VTR_PRINCIPAL','STATUS','ULTIMO_RASCUNHO_EM','SINCRONIZADO_EM','INICIADO_EM']),allowed=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'];
+  var rows=objectsFields_(sheet_(P3_SHEET_ID,'RSD'),['REPORT_ID','SERVICE_ID','SEGMENTO','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','VTR_PRINCIPAL','STATUS','ULTIMO_RASCUNHO_EM','SINCRONIZADO_EM','INICIADO_EM']),allowed=['EM_SERVICO','RETIFICACAO_SOLICITADA'];
   return rows.filter(function(x){
     if(allowed.indexOf(String(x.STATUS||''))<0)return false;
     if(batt&&String(x.BATALHAO||'')!==batt)return false;
@@ -972,6 +972,7 @@ function accessRcoOpen_(p,mode){
   }else{
     list=objectsFields_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS','REVISAO','ULTIMO_SYNC_EM','PASSAGEM_PENDENTE','PASSAGEM_ID','PASSAGEM_EM']).filter(function(x){
       if(['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(x.STATUS||''))<0)return false;
+      if(String(x.PASSAGEM_PENDENTE||'').toUpperCase()==='SIM')return false;
       if(batt&&String(x.BATALHAO||'')!==batt)return false;if(comp&&String(x.COMPANHIA||'')!==String(comp))return false;return true;
     }).map(function(x){return {reportId:x.RCO_REPORT_ID,data:x.DATA_SERVICO,batalhao:x.BATALHAO,companhia:x.COMPANHIA,status:x.STATUS,revision:Number(x.REVISAO||0),ultimoSyncEm:x.ULTIMO_SYNC_EM||'',passagemPendente:String(x.PASSAGEM_PENDENTE||'').toUpperCase()==='SIM',passagemId:x.PASSAGEM_ID||'',passagemEm:x.PASSAGEM_EM||''};});
   }
