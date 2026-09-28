@@ -975,7 +975,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       }
     }catch(err){
       console.error('Falha na sincronização complementar v10 do RCO',err);
-      const el=document.getElementById('p3Status');if(el)el.textContent='Envio principal realizado. A sincronização complementar v10 não foi concluída; verifique a Chave P3/configuração da Central.';
+      const el=document.getElementById('p3Status');if(el)el.textContent='Envio principal realizado. A sincronização complementar v10 não foi concluída; verifique a configuração da Central.';
     }finally{busy=false}
   }
   document.addEventListener('central-p3-submit-accepted',()=>setTimeout(supplemental,80));
