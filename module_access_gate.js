@@ -1,17 +1,20 @@
 (function(global){
 'use strict';
-const FLAG='central-module-auth-operational-v1';
+const FLAG_OPERATIONAL='central-module-auth-operational-v1',FLAG_P3='central-module-auth-p3-v1';
 const MODULES=[
   {re:/^relatorio_operacao(?:_ios)?\.html$/i,module:'OPERACAO',title:'Relatório de Operações'},
   {re:/^auto_remocao_veiculos(?:_ios)?\.html$/i,module:'CIRVC',title:'CIRVC'},
   {re:/^relatorio_traslados_reboque(?:_ios)?\.html$/i,module:'REBOQUE',title:'Relatório de Traslado / Reboque'},
   {re:/^checklist_viatura(?:_ios)?\.html$/i,module:'CHECKLIST',title:'Checklist de Viatura'},
-  {re:/^cirvc_transporte\.html$/i,module:'CIRVC_TRANSPORTE',title:'CIRVC — Transporte'}
+  {re:/^cirvc_transporte\.html$/i,module:'CIRVC_TRANSPORTE',title:'CIRVC — Transporte'},
+  {re:/^cadastros_admin\.html$/i,module:'CADASTROS_ADMIN',title:'Cadastro Mestre — Administração',kind:'p3'},
+  {re:/^motomecanizacao\.html$/i,module:'MOTOMECANIZACAO',title:'Motomecanização',kind:'p3'}
 ];
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-function config(){const f=(location.pathname.split('/').pop()||'').toLowerCase();return MODULES.find(x=>x.re.test(f))||null}
-function lock(){try{sessionStorage.setItem(FLAG,(location.pathname.split('/').pop()||'').toLowerCase())}catch(_){}}
-function unlock(){try{sessionStorage.removeItem(FLAG)}catch(_){}}
+function config(){const f=(location.pathname.split('/').pop()||'').toLowerCase(),c=MODULES.find(x=>x.re.test(f))||null;if(c&&!c.kind)c.kind='central';return c}
+function flag(c){return c?.kind==='p3'?FLAG_P3:FLAG_OPERATIONAL}
+function lock(c){try{sessionStorage.setItem(flag(c),(location.pathname.split('/').pop()||'').toLowerCase())}catch(_){}}
+function unlock(c){try{sessionStorage.removeItem(flag(c))}catch(_){}}
 function style(){
   if(document.getElementById('centralOperationalGateStyle'))return;
   const s=document.createElement('style');s.id='centralOperationalGateStyle';
@@ -31,35 +34,38 @@ function style(){
 }
 function shell(c){
   style();document.getElementById('centralOperationalGate')?.remove();
-  const ov=document.createElement('div');ov.id='centralOperationalGate';ov.className='central-op-gate no-print';
-  ov.innerHTML='<div class="central-op-card"><h1>'+esc(c.title)+'</h1><p>A chave operacional é validada somente no ingresso. Depois disso, ela não será solicitada novamente dentro deste módulo.</p><div data-key-box hidden><label>CHAVE OPERACIONAL<input data-key type="password" autocomplete="off"></label></div><div class="central-op-status" data-status>Validando o acesso…</div><div class="central-op-actions"><button type="button" class="enter" data-enter hidden>Entrar no módulo</button><button type="button" data-back>Voltar</button></div></div>';
+  const ov=document.createElement('div');ov.id='centralOperationalGate';ov.className='central-op-gate no-print';ov.dataset.kind=c.kind||'central';
+  const keyName=c.kind==='p3'?'Chave P3':'chave operacional',keyLabel=c.kind==='p3'?'CHAVE P3':'CHAVE OPERACIONAL';
+  ov.innerHTML='<div class="central-op-card"><h1>'+esc(c.title)+'</h1><p>A '+esc(keyName)+' é validada somente no ingresso. Depois disso, ela não será solicitada novamente dentro deste módulo.</p><div data-key-box hidden><label>'+esc(keyLabel)+'<input data-key type="password" autocomplete="off"></label></div><div class="central-op-status" data-status>Validando o acesso…</div><div class="central-op-actions"><button type="button" class="enter" data-enter hidden>Entrar no módulo</button><button type="button" data-back>Voltar</button></div></div>';
   document.body.appendChild(ov);
-  ov.querySelector('[data-back]').onclick=()=>{unlock();if(history.length>1)history.back();else location.href='index.html'};
+  ov.querySelector('[data-back]').onclick=()=>{unlock(c);if(history.length>1)history.back();else location.href='index.html'};
   return ov
 }
+function cKind(ov){return ov?.dataset?.kind==='p3'?'p3':'central'}
 function showInput(ov,msg){
   const box=ov.querySelector('[data-key-box]'),inp=ov.querySelector('[data-key]'),btn=ov.querySelector('[data-enter]'),st=ov.querySelector('[data-status]');
-  box.hidden=false;btn.hidden=false;btn.disabled=false;st.className='central-op-status'+(msg?' error':'');st.textContent=msg||'Informe a chave operacional para entrar.';
+  box.hidden=false;btn.hidden=false;btn.disabled=false;st.className='central-op-status'+(msg?' error':'');st.textContent=msg||(cKind(ov)==='p3'?'Informe a Chave P3 para entrar.':'Informe a chave operacional para entrar.');
   setTimeout(()=>inp.focus(),30)
 }
 async function validate(c,ov,key){
   const st=ov.querySelector('[data-status]'),btn=ov.querySelector('[data-enter]');if(btn)btn.disabled=true;
   st.className='central-op-status';st.textContent='Validando a credencial de ingresso…';
   try{
-    await global.CentralCloud.jsonp('access-check',{module:'RSD',token:key},{timeout:15000,progress:false});
-    global.CentralCloud.setToken(key,'central');lock();st.className='central-op-status ok';st.textContent='Acesso validado.';
+    if(c.kind==='p3')await global.CentralCloud.jsonp('p3-config',{token:key},{timeout:15000,progress:false});
+    else await global.CentralCloud.jsonp('access-check',{module:'RSD',token:key},{timeout:15000,progress:false});
+    global.CentralCloud.setToken(key,c.kind);lock(c);st.className='central-op-status ok';st.textContent='Acesso validado.';
     global.dispatchEvent(new CustomEvent('central-module-access-ready',{detail:{module:c.module}}));
     setTimeout(()=>ov.remove(),120);return true
   }catch(e){
-    if(global.CentralCloud.isAuthError&&global.CentralCloud.isAuthError(e))global.CentralCloud.clearToken('central');
-    lock();showInput(ov,(e&&e.message)||'Não foi possível validar a chave.');return false
+    if(global.CentralCloud.isAuthError&&global.CentralCloud.isAuthError(e))global.CentralCloud.clearToken(c.kind);
+    lock(c);showInput(ov,(e&&e.message)||'Não foi possível validar a chave.');return false
   }
 }
 async function init(){
   const c=config();if(!c||!global.CentralCloud)return;
-  lock();
-  const ov=shell(c),saved=global.CentralCloud.getToken('central');
-  const enter=async()=>{const inp=ov.querySelector('[data-key]'),key=String(inp.value||'').trim();if(!key){showInput(ov,'Informe a chave operacional para continuar.');return}await validate(c,ov,key)};
+  lock(c);
+  const ov=shell(c),saved=global.CentralCloud.getToken(c.kind);
+  const enter=async()=>{const inp=ov.querySelector('[data-key]'),key=String(inp.value||'').trim();if(!key){showInput(ov,c.kind==='p3'?'Informe a Chave P3 para continuar.':'Informe a chave operacional para continuar.');return}await validate(c,ov,key)};
   ov.querySelector('[data-enter]').onclick=enter;ov.querySelector('[data-key]').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();enter()}};
   if(saved)await validate(c,ov,saved);else showInput(ov,'')
 }
