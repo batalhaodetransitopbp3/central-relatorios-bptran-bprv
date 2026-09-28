@@ -167,7 +167,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  async function ensure(){
    if(!await CentralCloud.probe())throw new Error('Não foi possível conectar ao backend v10.');
    if(!p3Actor?.matricula)throw new Error('Identifique primeiro o P3/Oficial responsável na Sessão administrativa.');
-   const t=token();if(!t)throw new Error('A credencial administrativa expirou. Encerre a sessão e identifique novamente o responsável.');
+   const t=token();if(!t){saveActor(null);throw new Error('A credencial administrativa expirou. Identifique novamente o P3/Oficial responsável.')}
    return t
  }
  function p(t,view){return {token:t,view,dataInicio:$('di').value,dataFim:$('df').value,batalhao:$('bat').value,companhias:selectedCompanies().join('|'),turno:$('turno').value,guarnicao:$('guarnicao').value}}
