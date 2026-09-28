@@ -10,7 +10,7 @@ const MODULES=[
 ];
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function config(){const f=(location.pathname.split('/').pop()||'').toLowerCase();return MODULES.find(x=>x.re.test(f))||null}
-function lock(){try{sessionStorage.setItem(FLAG,'1')}catch(_){}}
+function lock(){try{sessionStorage.setItem(FLAG,(location.pathname.split('/').pop()||'').toLowerCase())}catch(_){}}
 function unlock(){try{sessionStorage.removeItem(FLAG)}catch(_){}}
 function style(){
   if(document.getElementById('centralOperationalGateStyle'))return;
@@ -34,7 +34,7 @@ function shell(c){
   const ov=document.createElement('div');ov.id='centralOperationalGate';ov.className='central-op-gate no-print';
   ov.innerHTML='<div class="central-op-card"><h1>'+esc(c.title)+'</h1><p>A chave operacional é validada somente no ingresso. Depois disso, ela não será solicitada novamente dentro deste módulo.</p><div data-key-box hidden><label>CHAVE OPERACIONAL<input data-key type="password" autocomplete="off"></label></div><div class="central-op-status" data-status>Validando o acesso…</div><div class="central-op-actions"><button type="button" class="enter" data-enter hidden>Entrar no módulo</button><button type="button" data-back>Voltar</button></div></div>';
   document.body.appendChild(ov);
-  ov.querySelector('[data-back]').onclick=()=>{if(history.length>1)history.back();else location.href='index.html'};
+  ov.querySelector('[data-back]').onclick=()=>{unlock();if(history.length>1)history.back();else location.href='index.html'};
   return ov
 }
 function showInput(ov,msg){
@@ -52,11 +52,12 @@ async function validate(c,ov,key){
     setTimeout(()=>ov.remove(),120);return true
   }catch(e){
     if(global.CentralCloud.isAuthError&&global.CentralCloud.isAuthError(e))global.CentralCloud.clearToken('central');
-    unlock();showInput(ov,(e&&e.message)||'Não foi possível validar a chave.');return false
+    lock();showInput(ov,(e&&e.message)||'Não foi possível validar a chave.');return false
   }
 }
 async function init(){
   const c=config();if(!c||!global.CentralCloud)return;
+  lock();
   const ov=shell(c),saved=global.CentralCloud.getToken('central');
   const enter=async()=>{const inp=ov.querySelector('[data-key]'),key=String(inp.value||'').trim();if(!key){showInput(ov,'Informe a chave operacional para continuar.');return}await validate(c,ov,key)};
   ov.querySelector('[data-enter]').onclick=enter;ov.querySelector('[data-key]').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();enter()}};
