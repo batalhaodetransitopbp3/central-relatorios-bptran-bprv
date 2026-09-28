@@ -258,16 +258,16 @@ async function loadOpenServices(el,type,mode){
  const box=q('[data-list]',el);if(!box)return;const p=pickerParams(el);
  box.innerHTML='<div class="central-access-loading">Consultando os serviços da '+esc(p.companhia)+'…</div>';
  try{
-   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia},{timeout:20000}),items=r.items||[];
+   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia},{timeout:20000}),rawItems=r.items||[],items=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
    if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
    box.innerHTML=items.map((x,i)=>{
      const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' '),pass=!!x.passagemPendente;
      const title=type==='rsd'?((x.guarnicao||'Guarnição')+' — VTR '+(x.vtrPrincipal||'—')):('RCO — '+(x.companhia||p.companhia));
      const meta=type==='rsd'?[x.companhia,'Data: '+date,status,x.responsavel&&('Responsável atual: '+x.responsavel)].filter(Boolean):[x.companhia,'Data: '+date,status,x.responsavel&&('Responsável atual: '+x.responsavel),x.retificacaoMotivo&&('Retificação: '+x.retificacaoMotivo)].filter(Boolean);
-     const action=(mode==='receive'||pass)?'Receber este serviço':'Entrar neste serviço';
+     const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
      return '<div class="central-access-item"><strong>'+esc(title)+'</strong><div class="central-access-meta">'+esc(meta.join(' • '))+'</div><button data-open="'+i+'">'+esc(action)+'</button></div>'
    }).join('');
-   box.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{const item=items[Number(b.dataset.open)];b.disabled=true;try{await enterSelectedService(type,(mode==='receive'||item.passagemPendente)?'receive':'continue',item,el)}finally{if(document.body.contains(b))b.disabled=false}})
+   box.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{const item=items[Number(b.dataset.open)];b.disabled=true;try{await enterSelectedService(type,mode,item,el)}finally{if(document.body.contains(b))b.disabled=false}})
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
 async function enterSelectedService(type,mode,item,el){
