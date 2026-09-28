@@ -347,6 +347,14 @@ function objects_(s) {
     return o;
   });
 }
+function objectsFields_(s, fields) {
+  var lastRow=s.getLastRow(),lastCol=s.getLastColumn();if(lastRow<2||lastCol<1)return [];
+  var h=headers_(s),wanted=(fields||[]).filter(function(k){return h.indexOf(k)>=0}),cols=wanted.map(function(k){return h.indexOf(k)}).sort(function(a,b){return a-b});
+  var out=[];for(var r=0;r<lastRow-1;r++)out.push({_row:r+2});if(!cols.length)return out;
+  var groups=[],g=null;cols.forEach(function(i){if(!g||i!==g.end+1){g={start:i,end:i};groups.push(g)}else g.end=i;});
+  groups.forEach(function(gr){var vals=s.getRange(2,gr.start+1,lastRow-1,gr.end-gr.start+1).getValues();for(var ri=0;ri<vals.length;ri++){for(var ci=gr.start;ci<=gr.end;ci++){var k=h[ci];if(wanted.indexOf(k)>=0)out[ri][k]=vals[ri][ci-gr.start];}}});
+  return out;
+}
 function rowFor_(headers, obj) {
   return headers.map(function(k){
     var v = obj.hasOwnProperty(k) ? obj[k] : '';
@@ -945,7 +953,7 @@ function accessRsdOpen_(p,mode){
         status:'PASSAGEM_DISPONIVEL',passagemPendente:true,passagemDe:String(x.ENTREGUE_POR_NOME||''),passagemEm:String(x.DISPONIBILIZADA_EM||'')};
     });
   }
-  var rows=objects_(sheet_(P3_SHEET_ID,'RSD')),allowed=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'];
+  var rows=objectsFields_(sheet_(P3_SHEET_ID,'RSD'),['REPORT_ID','SERVICE_ID','SEGMENTO','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','VTR_PRINCIPAL','STATUS','RESPONSAVEL_NOME','ULTIMO_RASCUNHO_EM','SINCRONIZADO_EM','INICIADO_EM']),allowed=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'];
   return rows.filter(function(x){
     if(allowed.indexOf(String(x.STATUS||''))<0)return false;
     if(batt&&String(x.BATALHAO||'')!==batt)return false;
