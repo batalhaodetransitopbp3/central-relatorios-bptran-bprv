@@ -882,7 +882,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     const layered=typeof window.centralOpenServicePicker==='function'||!!document.getElementById('centralAccessLayerStyle');
     if(saved&&!force)return saved;
     if(locked||layered){
-      if(force||!saved)alert('A credencial de ingresso do RSD não está disponível ou não foi aceita. Volte às opções de acesso e entre novamente. A chave não será solicitada no meio do módulo.');
+      if(force||!saved)setTimeout(()=>{if(typeof window.centralReturnToAccess==='function')window.centralReturnToAccess('rsd')},0);
       return '';
     }
     const t=CentralCloud.askToken('central',force?'A chave operacional salva não foi aceita. Informe novamente a chave operacional da Central:':'Informe a chave operacional da Central:',force);
@@ -1210,5 +1210,5 @@ async function publishPass(){
 })();
 </script>
 <script src="service_access_layers.js?v=10.8.11"></script>
-<script src="service_flow.js"></script>
+<script src="service_flow.js?v=10.8.12"></script>
 </body></html>
