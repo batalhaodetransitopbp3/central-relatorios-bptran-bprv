@@ -1072,10 +1072,9 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     setResponsibleLocked(false);setResponsibleProgress('',false);const ids=['rcoResponsavelMatricula','rcoResponsavelTurno','rcoResponsavelSenha'];ids.forEach(id=>{const x=e(id);if(x)x.value=''});
     clearExternalResponsibleFields();setExternalResponsibleFields(false);
     const perfil=e('rcoResponsavelPerfil');if(perfil)perfil.value='CPU';
-    const out=e('rcoResponsavelResultado');if(out)out.textContent='Informe sua matrícula, a função e a credencial correspondente para registrar a entrada como novo CPU/Coordenador.';
+    const out=e('rcoResponsavelResultado');if(out)out.textContent='Informe sua matrícula e confirme a entrada como novo CPU/Coordenador. A chave já validada no ingresso será reutilizada automaticamente.';
     const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Aguardando novo responsável';badge.classList.remove('ok')}
     const n=e('nomeAssinante'),p=e('patenteAssinante');if(n){n.value='';syncPrintValue(n)}if(p){p.value='';syncPrintValue(p)}
-    try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}
   }
   window.rcoRegistrarResponsavel=async function(){
     try{
