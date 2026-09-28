@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.1';
+var CENTRAL_V10_VERSION = '10.8.2';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -146,6 +146,9 @@ function doPost(e) {
     } else if (action === 'rsd-upsert') {
       assertToken_(token, 'central');
       out = rsdUpsert_(payload);
+    } else if (action === 'rsd-force-finalize') {
+      assertToken_(token, 'coord');
+      out = rsdForceFinalize_(payload);
     } else if (action === 'rsd-mark-included') {
       assertToken_(token, 'rco');
       out = rsdMarkIncluded_(payload);
@@ -877,7 +880,7 @@ function rsdUpsert_(payload) {
 }
 function rsdList_(p) {
   var rs=sheet_(P3_SHEET_ID,'RSD');
-  ensureHeaders_(rs,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL']);
+  ensureHeaders_(rs,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL','FINALIZACAO_FORCADA','FINALIZACAO_FORCADA_MOTIVO','FINALIZACAO_FORCADA_POR_MATRICULA','FINALIZACAO_FORCADA_POR_NOME','FINALIZACAO_FORCADA_POR_PERFIL','FINALIZACAO_FORCADA_EM']);
   var list=objects_(rs),batt=p.batalhao?normBattalion_(p.batalhao):'',comp=p.companhia||'',data=dateText_(p.data||''),mat=normMat_(p.matricula||''),showCancelled=String(p.showCancelled||'')==='1',vtrs=objects_(sheet_(P3_SHEET_ID,'RSD_VIATURAS'));
   var allowed=['EM_SERVICO','PASSAGEM_DISPONIVEL','ENCERRADO_PASSAGEM','AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','RETIFICACAO_SOLICITADA','INDEFERIDO','FINALIZADO','INCLUIDO_RCO'];
   if(showCancelled)allowed.push('CANCELADO');
@@ -902,6 +905,7 @@ function rsdList_(p) {
       reviewStatus:x.REVIEW_STATUS||'',reviewMotivo:x.REVIEW_MOTIVO||'',reviewObservacao:x.REVIEW_OBSERVACAO||'',reviewAutorNome:x.REVIEW_AUTOR_NOME||'',reviewEm:x.REVIEW_EM||'',
       canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorPerfil:x.CANCELADO_POR_PERFIL||'',canceladoEm:x.CANCELADO_EM||'',
       duplicateJustification:x.DUPLICATE_OVERRIDE_JUSTIFICATIVA||'',
+      forceFinalized:String(x.FINALIZACAO_FORCADA||'').toUpperCase()==='SIM',forceFinalizedReason:x.FINALIZACAO_FORCADA_MOTIVO||'',forceFinalizedByName:x.FINALIZACAO_FORCADA_POR_NOME||'',forceFinalizedByMatricula:x.FINALIZACAO_FORCADA_POR_MATRICULA||'',forceFinalizedByPerfil:x.FINALIZACAO_FORCADA_POR_PERFIL||'',forceFinalizedAt:x.FINALIZACAO_FORCADA_EM||'',
       possibleDuplicate:(function(){var svc=servicesByKey[key]||{},ids=Object.keys(svc);if(ids.length<=1)return false;var justified=ids.filter(function(id){return !!svc[id].justified;}).length;return justified<ids.length-1;})(),
       duplicateCount:Math.max(1,Object.keys(servicesByKey[key]||{}).length),
       viaturas:rv.map(function(v){return {prefixo:v.PREFIXO,placa:v.PLACA,marcaModelo:v.MARCA_MODELO,tipo:v.TIPO};})};
@@ -917,6 +921,7 @@ function rsdGet_(reportId) {
   p.versao=Number(row.VERSAO||1);p.serviceId=row.SERVICE_ID||p.serviceId||'';p.segmento=Number(row.SEGMENTO||p.segmento||1);p.rsdAnteriorId=row.RSD_ANTERIOR_ID||p.rsdAnteriorId||'';p.passagemOrigemId=row.PASSAGEM_ORIGEM_ID||p.passagemOrigemId||'';
   p.centralStatus=String(row.STATUS||'');p.revisaoCoordenador={status:row.REVIEW_STATUS||'',motivo:row.REVIEW_MOTIVO||'',observacao:row.REVIEW_OBSERVACAO||'',autorNome:row.REVIEW_AUTOR_NOME||'',autorMatricula:row.REVIEW_AUTOR_MATRICULA||'',em:row.REVIEW_EM||''};
   p.cancelamento={motivo:row.CANCELADO_MOTIVO||'',autorNome:row.CANCELADO_POR_NOME||'',autorMatricula:row.CANCELADO_POR_MATRICULA||'',perfil:row.CANCELADO_POR_PERFIL||'',em:row.CANCELADO_EM||''};
+  p.finalizacaoCoordenador={forcada:String(row.FINALIZACAO_FORCADA||'').toUpperCase()==='SIM',motivo:row.FINALIZACAO_FORCADA_MOTIVO||'',autorNome:row.FINALIZACAO_FORCADA_POR_NOME||'',autorMatricula:row.FINALIZACAO_FORCADA_POR_MATRICULA||'',perfil:row.FINALIZACAO_FORCADA_POR_PERFIL||'',em:row.FINALIZACAO_FORCADA_EM||''};
   return p;
 }
 function rsdMarkIncluded_(payload) {
@@ -1050,6 +1055,28 @@ function linkedRcoInRetification_(rsdRow){
   var rid=String((rsdRow||{}).RCO_REPORT_ID||'');if(!rid)return false;
   var d=findOne_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),'RCO_REPORT_ID',rid);
   return !!(d&&String(d.STATUS)==='EM_RETIFICACAO');
+}
+
+function rsdForceFinalize_(payload){
+  var reportId=String(payload.reportId||''),motivo=String(payload.motivo||payload.observacao||'').trim(),s=sheet_(P3_SHEET_ID,'RSD'),row=findOne_(s,'REPORT_ID',reportId);
+  if(!row)throw new Error('RSD não localizado.');
+  if(String(row.STATUS)!=='EM_SERVICO')throw new Error('A finalização excepcional só pode ser aplicada a RSD que ainda esteja EM SERVIÇO. Situação atual: '+String(row.STATUS||'').replace(/_/g,' ')+'.');
+  if(!motivo)throw new Error('Informe o motivo da finalização excepcional.');
+  var p=loadJsonPayload_(row);if(!p||!Object.keys(p).length)throw new Error('O último rascunho do RSD está indisponível para finalização pelo Coordenador.');
+  var autorMatricula=normMat_(payload.autorMatricula||''),autorNome=String(payload.autorNome||''),perfil=String(payload.perfil||'CPU'),agora=nowIso_();
+  var version=Math.max(Number(row.VERSAO||1)+1,Number(p.versao||p.version||0)+1),batt=String(row.BATALHAO||''),comp=String(row.COMPANHIA||''),serviceId=String(row.SERVICE_ID||p.serviceId||(p.servico||{}).serviceId||''),seg=Number(row.SEGMENTO||p.segmento||(p.servico||{}).segmento||1)||1;
+  p.versao=version;p.version=version;p.centralStatus='AGUARDANDO_ANALISE';p.finalizadoEm=agora;
+  if(p.servico&&typeof p.servico==='object')p.servico.finalizadoEm=agora;
+  p.finalizacaoCoordenador={forcada:true,motivo:motivo,autorMatricula:autorMatricula,autorNome:autorNome,perfil:perfil,em:agora};
+  var json=JSON.stringify(p),saved=saveJsonPayload_(reportId,version,json);
+  ensureHeaders_(s,['FINALIZACAO_FORCADA','FINALIZACAO_FORCADA_MOTIVO','FINALIZACAO_FORCADA_POR_MATRICULA','FINALIZACAO_FORCADA_POR_NOME','FINALIZACAO_FORCADA_POR_PERFIL','FINALIZACAO_FORCADA_EM','REVIEW_STATUS']);
+  row.VERSAO=version;row.STATUS='AGUARDANDO_ANALISE';row.FINALIZADO_EM=agora;row.ULTIMO_RASCUNHO_EM=agora;row.SINCRONIZADO_EM=agora;row.EDIT_LEASE_UNTIL='';
+  row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);row.REVIEW_STATUS='AGUARDANDO_ANALISE';
+  row.FINALIZACAO_FORCADA='SIM';row.FINALIZACAO_FORCADA_MOTIVO=motivo;row.FINALIZACAO_FORCADA_POR_MATRICULA=autorMatricula;row.FINALIZACAO_FORCADA_POR_NOME=autorNome;row.FINALIZACAO_FORCADA_POR_PERFIL=perfil;row.FINALIZACAO_FORCADA_EM=agora;
+  upsert_(s,'REPORT_ID',reportId,row);
+  syncRsdVehicles_(p,reportId);syncRsdOperations_(p,reportId,batt,comp,version);syncRsdOccurrences_(p,reportId,batt,comp);syncRsdCirvcs_(p,reportId,batt,comp,serviceId,seg);
+  audit_('RSD',reportId,version,'FINALIZACAO_FORCADA_COORDENADOR',autorMatricula,autorNome,batt,comp,{motivo:motivo,perfil:perfil,statusAnterior:'EM_SERVICO',statusNovo:'AGUARDANDO_ANALISE'});
+  return {ok:true,message:'RSD finalizado excepcionalmente pelo Coordenador e encaminhado para análise.',reportId:reportId,version:version,status:'AGUARDANDO_ANALISE',forced:true};
 }
 
 function rsdReview_(payload){
