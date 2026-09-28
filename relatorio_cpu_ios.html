@@ -655,7 +655,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function rcoStoredRoleToken(){try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}}
   function rcoWorkflowToken(silent=false){
     const role=rcoStoredRoleToken();if(role)return role;
-    if(!silent)alert('A credencial do RCO deve ser informada somente no ingresso. Volte às opções de acesso e entre novamente no serviço.');
+    if(!silent)setTimeout(()=>{if(typeof window.centralReturnToAccess==='function')window.centralReturnToAccess('rco')},0);
     return '';
   }
   async function syncRcoDraft(silent=true){if(!navigator.onLine)return false;let token=rcoWorkflowToken(silent);if(!token)return false;let rco;try{rco=window.collectState()}catch(_){return false}try{await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false});rcoConflictNotified=false;window.centralMarkSaved?.();return true}catch(e){if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);return false}}
@@ -1067,6 +1067,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.8"></script>
+<script src="service_access_layers.js?v=10.8.11"></script>
 <script src="service_flow.js"></script>
 </body></html>
