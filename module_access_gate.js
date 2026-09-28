@@ -14,7 +14,7 @@ const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;'
 function config(){const f=(location.pathname.split('/').pop()||'').toLowerCase(),c=MODULES.find(x=>x.re.test(f))||null;if(c&&!c.kind)c.kind='central';return c}
 function flag(c){return c?.kind==='p3'?FLAG_P3:FLAG_OPERATIONAL}
 function lock(c){try{sessionStorage.setItem(flag(c),(location.pathname.split('/').pop()||'').toLowerCase())}catch(_){}}
-function unlock(c){try{sessionStorage.removeItem(flag(c))}catch(_){}}
+function unlock(c){try{sessionStorage.removeItem(flag(c))}catch(_){}global.CENTRAL_MODULE_ACCESS_READY=false}
 function style(){
   if(document.getElementById('centralOperationalGateStyle'))return;
   const s=document.createElement('style');s.id='centralOperationalGateStyle';
@@ -53,7 +53,7 @@ async function validate(c,ov,key){
   try{
     if(c.kind==='p3')await global.CentralCloud.jsonp('p3-config',{token:key},{timeout:15000,progress:false});
     else await global.CentralCloud.jsonp('access-check',{module:'RSD',token:key},{timeout:15000,progress:false});
-    global.CentralCloud.setToken(key,c.kind);lock(c);st.className='central-op-status ok';st.textContent='Acesso validado.';
+    global.CentralCloud.setToken(key,c.kind);lock(c);global.CENTRAL_MODULE_ACCESS_READY=true;st.className='central-op-status ok';st.textContent='Acesso validado.';
     global.dispatchEvent(new CustomEvent('central-module-access-ready',{detail:{module:c.module}}));
     setTimeout(()=>ov.remove(),120);return true
   }catch(e){
@@ -63,7 +63,7 @@ async function validate(c,ov,key){
 }
 async function init(){
   const c=config();if(!c||!global.CentralCloud)return;
-  lock(c);
+  global.CENTRAL_MODULE_ACCESS_READY=false;lock(c);
   const ov=shell(c),saved=global.CentralCloud.getToken(c.kind);
   const enter=async()=>{const inp=ov.querySelector('[data-key]'),key=String(inp.value||'').trim();if(!key){showInput(ov,c.kind==='p3'?'Informe a Chave P3 para continuar.':'Informe a chave operacional para continuar.');return}await validate(c,ov,key)};
   ov.querySelector('[data-enter]').onclick=enter;ov.querySelector('[data-key]').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();enter()}};
