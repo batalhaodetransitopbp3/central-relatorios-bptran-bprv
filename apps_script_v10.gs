@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.13';
+var CENTRAL_V10_VERSION = '10.8.14';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -113,6 +113,9 @@ function handleApiReadViaGet_(action, p) {
     } else if (action === 'sistema-feedback-list') {
       assertToken_(p.token, 'comando');
       out = sistemaFeedbackList_(p);
+    } else if (action === 'sistema-auth') {
+      assertToken_(p.token, 'comando');
+      out = sistemaAuth_(p);
     } else if (action === 'master-cadastros') {
       assertToken_(p.token, 'master-session');
       out = cadastroSearch_(p);
@@ -277,7 +280,7 @@ function doPost(e) {
     } else if (action === 'master-passagem-anular') {
       assertToken_(token, 'master-session');
       out = masterPassagemAnular_(payload);
-    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'version') {
+    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'sistema-auth' || action === 'version') {
       var q=Object.assign({},payload||{});
       q.token=token;
       out = handleApiReadViaGet_(action, q);
@@ -1111,6 +1114,36 @@ function comandoRsdPatch_(payload){
   upsert_(s,'REPORT_ID',reportId,row);
   syncRsdVehicles_(p,reportId);
   return {ok:true,message:'RSD atualizado pela Gestão de Sistema.',rsd:rsdGet_(reportId)};
+}
+function sistemaAuth_(p){
+  p=p||{};
+  var mat=normMat_(p.matricula||'');
+  if(!mat||mat.replace(/\D/g,'').length!==7)throw new Error('Informe a matrícula completa (000.000-0).');
+  var dig=mat.replace(/\D/g,''), mil=null, list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));
+  for(var i=0;i<list.length;i++){
+    var rowMat=normMat_(list[i].MATRICULA||list[i].matricula||'');
+    var rowDig=String(list[i].MATRICULA||list[i].matricula||'').replace(/\D/g,'');
+    if(rowMat===mat||rowDig===dig){mil=list[i];break;}
+  }
+  if(!mil)throw new Error('Matrícula '+mat+' não encontrada no Cadastro Mestre (aba MILITARES). Cadastre o militar ou confira a matrícula.');
+  return {
+    ok:true,
+    message:'Acesso autorizado.',
+    militar:{
+      matricula:normMat_(mil.MATRICULA||mat),
+      nome:String(mil.NOME||mil.nome||'').trim(),
+      postoGrad:String(mil.POSTO_GRAD||mil.postoGrad||'').trim(),
+      batalhao:String(mil.BATALHAO||''),
+      companhia:String(mil.COMPANHIA||'')
+    }
+  };
+}
+/** Uso interno via clasp run — não expor em doGet/doPost. */
+function adminSetSistemaToken(token){
+  token=String(token||'').trim();
+  if(!token)throw new Error('Informe a senha.');
+  PropertiesService.getScriptProperties().setProperty('SISTEMA_TOKEN',token);
+  return {ok:true,message:'SISTEMA_TOKEN atualizado.'};
 }
 function sistemaFeedbackSheet_(){
   return sheetOrCreate_(P3_SHEET_ID,'SISTEMA_FEEDBACK',['FEEDBACK_ID','CRIADO_EM','MATRICULA','NOME','TIPO','MENSAGEM','USER_AGENT','ORIGEM','STATUS','LIDO_EM','LIDO_POR_MATRICULA']);

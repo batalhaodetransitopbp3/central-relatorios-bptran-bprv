@@ -33,10 +33,10 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
 <main class="wrap">
   <section class="card" id="loginCard">
     <h2>Ingresso da Gestão de Sistema</h2>
-    <p class="note">Senha exclusiva da Gestão de Sistema (`SISTEMA_TOKEN`). Identifique o responsável com matrícula do Cadastro Mestre.</p>
+    <p class="note">Use a senha da Gestão de Sistema e a sua matrícula do Cadastro Mestre. O nome é preenchido automaticamente.</p>
     <div class="login">
-      <div><label>Matrícula</label><input id="mat" placeholder="000.000-0" maxlength="9"></div>
-      <div><label>Nome (auto)</label><input id="nome" placeholder="Preenchido pelo cadastro"></div>
+      <div><label>Matrícula</label><input id="mat" placeholder="000.000-0" maxlength="9" inputmode="numeric" autocomplete="off"></div>
+      <div><label>Nome (auto)</label><input id="nome" placeholder="Preenchido pelo cadastro" readonly></div>
       <div><label>Senha da Gestão de Sistema</label><input id="senha" type="password" autocomplete="off"></div>
       <button id="btnLogin" type="button">Entrar</button>
     </div>
@@ -104,7 +104,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="list" id="vList"></div>
 </div></div>
 
-<script src="central_cloud.js?v=10.8.19-sistema"></script>
+<script src="central_cloud.js?v=10.8.20-sistema"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -133,42 +133,50 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
     }
     const t=token()||$('senha').value.trim();
     if(!t){
-      if(!silent)$('sessionState').textContent='Informe a senha para consultar o Cadastro Mestre.';
+      if(!silent)$('sessionState').textContent='Informe a senha para validar a matrícula.';
       return null;
     }
     try{
-      const r=await CentralCloud.searchCadastro('militar',mat,{},t,{tokenKind:'comando',noRetry:true,progress:false,timeout:25000});
-      const items=r.items||[];
-      const exact=items.find(x=>CentralCloud.formatMatricula(x.MATRICULA||x.matricula||'')===mat)
-        ||items.find(x=>String(x.MATRICULA||'').replace(/\D/g,'')===mat.replace(/\D/g,''))
-        ||null;
-      if(exact){ $(nomeId).value=exact.NOME||exact.nome||''; return exact; }
-      if(!silent)alert('Matrícula '+mat+' não encontrada no Cadastro Mestre (aba MILITARES).');
-      return null;
+      const r=await CentralCloud.jsonp('sistema-auth',{token:t,matricula:mat},{timeout:25000,tokenKind:'comando',progress:false});
+      const mil=r.militar||{};
+      $(nomeId).value=mil.nome||'';
+      return mil;
     }catch(e){
-      if(!silent)alert(e.message||'Falha ao consultar o Cadastro Mestre.');
+      if(!silent)alert(e.message||'Falha ao validar matrícula/senha.');
       return null;
     }
   }
   $('bat').onchange=fillCia; fillCia();
-  $('data').value=new Date().toISOString().slice(0,10);
-  $('mat').addEventListener('blur',()=>lookupMat('mat','nome',{silent:true}));
+  $('data').value=(d=>{return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})(new Date());
+  $('mat').addEventListener('blur',()=>{ $('mat').value=CentralCloud.formatMatricula($('mat').value); if(($('senha').value||token())&&$('mat').value.replace(/\D/g,'').length===7)lookupMat('mat','nome',{silent:true}); });
+  $('mat').addEventListener('input',()=>{
+    const d=String($('mat').value||'').replace(/\D/g,'');
+    if(d.length===7)$('mat').value=CentralCloud.formatMatricula(d);
+  });
   $('btnLogin').onclick=async()=>{
-    const senha=$('senha').value.trim(); if(!senha){alert('Informe a senha da Gestão de Sistema.');return}
+    const senha=$('senha').value.trim();
+    const mat=CentralCloud.formatMatricula($('mat').value);
+    $('mat').value=mat;
+    if(!senha){alert('Informe a senha da Gestão de Sistema.');return}
+    if(mat.replace(/\D/g,'').length!==7){alert('Informe a matrícula completa (000.000-0).');return}
     CentralCloud.setToken(senha,'comando');
-    try{sessionStorage.setItem('central-module-auth-comando-v1',(location.pathname.split('/').pop()||'gestao_sistema.html').toLowerCase())}catch(_){}
     $('btnLogin').disabled=true;
     $('sessionState').textContent='Validando matrícula e senha…';
     try{
-      const mil=await lookupMat('mat','nome');
-      if(!$('mat').value||!$('nome').value){CentralCloud.clearToken('comando');return}
-      await CentralCloud.jsonp('rsd-list',{token:senha,batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value},{timeout:20000,tokenKind:'comando'});
-      saveSession({matricula:$('mat').value,nome:$('nome').value,postoGrad:mil?.POSTO_GRAD||mil?.postoGrad||''});
+      const r=await CentralCloud.jsonp('sistema-auth',{token:senha,matricula:mat},{timeout:25000,tokenKind:'comando'});
+      const mil=r.militar||{};
+      if(!mil.nome)throw new Error('Militar sem nome no Cadastro Mestre. Atualize a aba MILITARES.');
+      $('nome').value=mil.nome;
+      try{sessionStorage.setItem('central-module-auth-comando-v1',(location.pathname.split('/').pop()||'gestao_sistema.html').toLowerCase())}catch(_){}
+      saveSession({matricula:mil.matricula||mat,nome:mil.nome,postoGrad:mil.postoGrad||''});
       $('senha').value='';
       await load();
+      await loadFeedback();
     }catch(e){
       CentralCloud.clearToken('comando');
-      alert(e.message||'Falha no ingresso. Confira a senha da Gestão de Sistema.');
+      try{sessionStorage.removeItem('central-module-auth-comando-v1')}catch(_){}
+      $('sessionState').textContent='Sessão não iniciada.';
+      alert(e.message||'Falha no ingresso.');
       renderSession();
     }finally{$('btnLogin').disabled=false}
   };
