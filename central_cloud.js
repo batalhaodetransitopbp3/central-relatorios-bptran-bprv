@@ -40,12 +40,12 @@ function jsonpRaw(action,params={},opts={}){return new Promise((resolve,reject)=
 })}
 async function jsonp(action,params={},opts={}){
   const token=String(params?.token||'');
-  if(!token||action==='version')return jsonpRaw(action,params,opts);
+  if(!token||action==='version'||opts.forceJsonp)return jsonpRaw(action,params,opts);
   const payload={...params};delete payload.token;delete payload.callback;delete payload._;
   try{
     return await submitForm(action,payload,token,{popup:false,progress:opts.progress,timeout:opts.timeout||20000,tokenKind:opts.tokenKind||tokenKindForAction(action)});
   }catch(err){
-    if(/não reconhecida|POST não reconhecida/i.test(String(err?.message||err)))return jsonpRaw(action,params,opts);
+    if(/não reconhecida|POST não reconhecida|Tempo esgotado|Falha de comunicação/i.test(String(err?.message||err)))return jsonpRaw(action,params,opts);
     throw err;
   }
 }

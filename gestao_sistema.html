@@ -104,7 +104,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="list" id="vList"></div>
 </div></div>
 
-<script src="central_cloud.js?v=10.8.20-sistema"></script>
+<script src="central_cloud.js?v=10.8.21-sistema"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -137,7 +137,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
       return null;
     }
     try{
-      const r=await CentralCloud.jsonp('sistema-auth',{token:t,matricula:mat},{timeout:25000,tokenKind:'comando',progress:false});
+      const r=await CentralCloud.jsonp('sistema-auth',{token:t,matricula:mat},{timeout:25000,tokenKind:'comando',progress:false,forceJsonp:true});
       const mil=r.militar||{};
       $(nomeId).value=mil.nome||'';
       return mil;
@@ -163,7 +163,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
     $('btnLogin').disabled=true;
     $('sessionState').textContent='Validando matrícula e senha…';
     try{
-      const r=await CentralCloud.jsonp('sistema-auth',{token:senha,matricula:mat},{timeout:25000,tokenKind:'comando'});
+      const r=await CentralCloud.jsonp('sistema-auth',{token:senha,matricula:mat},{timeout:25000,tokenKind:'comando',forceJsonp:true});
       const mil=r.militar||{};
       if(!mil.nome)throw new Error('Militar sem nome no Cadastro Mestre. Atualize a aba MILITARES.');
       $('nome').value=mil.nome;
@@ -190,7 +190,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
     if(!token()){alert('Faça o ingresso com a senha da Gestão de Sistema.');return}
     $('loadNote').textContent='Consultando guarnições…';
     try{
-      const r=await CentralCloud.jsonp('rsd-list',{token:token(),batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value,showCancelled:'1'},{timeout:45000,tokenKind:'comando'});
+      const r=await CentralCloud.jsonp('rsd-list',{token:token(),batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value,showCancelled:'1'},{timeout:45000,tokenKind:'comando',forceJsonp:true});
       items=r.items||[];
       $('body').innerHTML=items.length?items.map((x,i)=>'<tr><td>'+statusPill(x.status)+'</td><td>'+esc(x.guarnicao||'—')+'</td><td>'+esc(x.vtrPrincipal||'—')+'</td><td>'+esc(x.responsavel||'—')+'</td><td>'+esc(x.matricula||'—')+'</td><td>'+esc(x.reviewStatus||x.revisao||'—')+'</td><td><button onclick="openRsd('+i+')">Abrir</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhum RSD nesta companhia/data.</td></tr>';
       window.__cmdItems=items;
@@ -248,7 +248,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   window.openRsd=async(i)=>{
     const base=(window.__cmdItems||[])[i]; if(!base)return;
     try{
-      const r=await CentralCloud.jsonp('rsd-get',{token:token(),reportId:base.reportId},{timeout:30000,tokenKind:'comando'});
+      const r=await CentralCloud.jsonp('rsd-get',{token:token(),reportId:base.reportId},{timeout:30000,tokenKind:'comando',forceJsonp:true});
       current=Object.assign({},base,r.rsd||{});
       const g=current.guarnicao||{};
       equipe=Array.isArray(g.equipe)?g.equipe.slice():[];
@@ -280,7 +280,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   async function loadFeedback(){
     if(!token())return;
     try{
-      const r=await CentralCloud.jsonp('sistema-feedback-list',{token:token()},{timeout:30000,tokenKind:'comando'});
+      const r=await CentralCloud.jsonp('sistema-feedback-list',{token:token()},{timeout:30000,tokenKind:'comando',forceJsonp:true});
       const rows=r.items||[];
       $('fbBody').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(String(x.CRIADO_EM||'').replace('T',' ').slice(0,19))+'</td><td>'+esc(x.TIPO||'')+'</td><td>'+esc(x.MATRICULA||'')+'</td><td>'+esc(x.NOME||'—')+'</td><td>'+esc(x.MENSAGEM||'')+'</td></tr>').join(''):'<tr><td colspan="5" class="empty">Nenhuma mensagem recebida.</td></tr>';
     }catch(e){$('fbBody').innerHTML='<tr><td colspan="5" class="empty">'+esc(e.message||e)+'</td></tr>'}
