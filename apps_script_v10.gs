@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.14';
+var CENTRAL_V10_VERSION = '10.8.15';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -457,9 +457,34 @@ function normVehicleTipo_(v){
   var t=String(v||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
   if(!t)return '';
   if(/MOTO|MOTONETA|CICLOMOTOR/.test(t))return 'MOTOCICLETA';
-  if(/REBOQUE|GUINCHO/.test(t))return 'REBOQUE';
-  if(/AUTO|CAMION|CAMINH|VTR|VIATURA|UTILIT/.test(t))return 'AUTOMOVEL';
+  if(/GUINCHO|REMOCAO|AGRALE|CAMINHAO_GUINCHO/.test(t))return 'GUINCHO';
+  if(/\bREBOQUE\b|SEMI[\s_-]?REBOQUE|TRAILER|CARRETA/.test(t)){
+    if(/GUINCHO|CAMINH|CAMION|AGRALE|REMOCAO/.test(t))return 'GUINCHO';
+    return 'REBOQUE';
+  }
+  if(/AUTO|CAMION|CAMINH|VTR|VIATURA|UTILIT|SUV|PICK/.test(t))return 'AUTOMOVEL';
+  if(t==='GUINCHO'||t==='CAMINHAO_GUINCHO')return 'GUINCHO';
+  if(t==='REBOQUE')return 'REBOQUE';
+  if(t==='MOTOCICLETA')return 'MOTOCICLETA';
+  if(t==='AUTOMOVEL')return 'AUTOMOVEL';
   return t;
+}
+/** Espelha checklist_profiles.js — material operacional não abre ALTERACAO. */
+function checklistItemGeraMotomec_(itemId){
+  var id=String(itemId||'');
+  var material={'radio':1,'coletes':1,'cones':1,'lombada':1,'bastao':1,'kit_primeiros_socorros':1,'limpeza_interna':1,'limpeza_externa':1};
+  if(material[id])return false;
+  return true;
+}
+function checklistShouldOpenAlteracao_(it){
+  var sit=String((it&&it.situacao)||'').toUpperCase();
+  if(['SIM','OK','NA','N/A'].indexOf(sit)>=0)return false;
+  var negatives=['NAO','DEFEITO','AVARIA','BAIXO','BAIXA','AUSENTE'];
+  if(negatives.indexOf(sit)<0)return false;
+  if(it&&(it.abrirAlteracaoMotomec===false||it.abrirAlteracaoMotomec==='false'||it.geraPendenciaMotomec===false||it.geraPendenciaMotomec==='false'))return false;
+  if(it&&(it.abrirAlteracaoMotomec===true||it.abrirAlteracaoMotomec==='true'))return true;
+  if(it&&it.geraPendenciaMotomec===true)return negatives.indexOf(sit)>=0;
+  return checklistItemGeraMotomec_(it&&it.itemId)&&negatives.indexOf(sit)>=0;
 }
 function lookupViaturaTipo_(prefixo){
   var p=normVtrPrefix_(prefixo);if(!p)return '';
@@ -1688,8 +1713,7 @@ function checklistUpsert_(payload) {
   var c=payload.checklist||payload||{}, id=c.checklistId||uid_('chk'), now=nowIso_();
   var batt=normBattalion_(c.batalhao),comp=c.companhia||normCompany_(batt,c.companhiaNumero),v=c.viatura||{};
   var items=c.itens||[];if(!Array.isArray(items))items=[];
-  var negatives=['NAO','DEFEITO','AVARIA','BAIXO','BAIXA','AUSENTE'];
-  var alter=items.filter(function(x){return negatives.indexOf(String(x.situacao||'').toUpperCase())>=0;});
+  var alter=items.filter(function(x){return checklistShouldOpenAlteracao_(x);});
   var dt=String(c.dataHora||now),parts=dt.split('T');
   var sig=saveDataUrl_(c.assinaturaDataUrl,'assinatura-checklist-'+id+'.png','CHECKLIST_PHOTO_FOLDER_ID','Central Checklist - Fotos');
   var obj={CHECKLIST_ID:id,DATA_SERVICO:dateText_(parts[0]),HORA_INICIO:(parts[1]||'').slice(0,5),BATALHAO:batt,COMPANHIA:comp,
@@ -1702,7 +1726,7 @@ function checklistUpsert_(payload) {
   deleteWhere_(sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_ITENS'),'CHECKLIST_ID',id);
   var si=sheet_(CHECKLIST_SHEET_ID,'CHECKLIST_ITENS'), sa=sheet_(CHECKLIST_SHEET_ID,'ALTERACOES');
   items.forEach(function(it){
-    var iid=it.itemId||uid_('item'), irregular=negatives.indexOf(String(it.situacao||'').toUpperCase())>=0, altId='';
+    var iid=it.itemId||uid_('item'), irregular=checklistShouldOpenAlteracao_(it), altId='';
     if(irregular){
       altId=it.pendenciaId||('alt-'+id+'-'+String(iid).replace(/[^A-Za-z0-9_-]/g,'-'));
       var old=findOne_(sa,'ALTERACAO_ID',altId);

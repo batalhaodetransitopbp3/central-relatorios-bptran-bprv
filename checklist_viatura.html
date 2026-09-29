@@ -610,9 +610,10 @@
               <select id="tipo_veiculo" name="tipo_veiculo" required>
                 <option value="AUTOMOVEL">Automóvel / utilitário</option>
                 <option value="MOTOCICLETA">Motocicleta</option>
-                <option value="REBOQUE">Reboque</option>
+                <option value="GUINCHO">Caminhão guincho / remoção</option>
+                <option value="REBOQUE">Reboque / semirreboque (sem motor)</option>
               </select>
-              <div class="helper">O checklist exibe só itens aplicáveis ao tipo — evita pendência impossível (ex.: estepe em moto).</div>
+              <div class="helper">O checklist exibe só itens do perfil do tipo. Guincho ≠ reboque: guincho tem motor; reboque verdadeiro não.</div>
             </div>
             <div class="field span-3" id="field_placa">
               <label class="field-label" for="placa">Placa *</label>
@@ -1608,6 +1609,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="checklist_profiles.js?v=10.8.15"></script>
   <script>
   (() => {
     'use strict';
@@ -1615,8 +1617,7 @@
     const STORAGE_KEY = 'checklist_viatura_1cprv_v3';
     const NEGATIVE_VALUES = new Set(['nao','defeito','baixo','baixa','avaria']);
     const DETAIL_REQUIRED_NEGATIVE = new Set(['defeito','baixo','baixa','avaria']);
-    const ITEM_CONFIG = {"crlv": {"label": "CRLV presente", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "doc-negative", "section": "Documentação"}, "cartao_abastecimento": {"label": "Cartão de abastecimento", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "doc-negative", "section": "Documentação"}, "estepe_obrigatorio": {"label": "Estepe", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Obrigatórios"}, "macaco": {"label": "Macaco", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Obrigatórios"}, "chave_roda": {"label": "Chave de roda", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Obrigatórios"}, "triangulo": {"label": "Triângulo", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Obrigatórios"}, "extintor": {"label": "Extintor (quando aplicável)", "choices": {"sim": "Sim", "nao": "Não", "na": "N/A"}, "detail_rule": "optional", "section": "Equipamentos Obrigatórios"}, "farois": {"label": "Faróis", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "lanternas": {"label": "Lanternas", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "luz_freio": {"label": "Luz de freio", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "setas": {"label": "Setas", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "giroflex": {"label": "Giroflex/sinalizador", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "sirene": {"label": "Sirene", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "buzina": {"label": "Buzina", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Sistema Elétrico"}, "freios": {"label": "Freios", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "direcao": {"label": "Direção", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "embreagem": {"label": "Embreagem", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "motor": {"label": "Motor", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "oleo_motor": {"label": "Óleo do motor", "choices": {"ok": "OK", "baixo": "Baixo"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "agua_radiador": {"label": "Água do radiador", "choices": {"ok": "OK", "baixa": "Baixa"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "bateria": {"label": "Bateria", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Condições Mecânicas"}, "pneu_dd": {"label": "Dianteiro direito", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Pneus"}, "pneu_de": {"label": "Dianteiro esquerdo", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Pneus"}, "pneu_td": {"label": "Traseiro direito", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Pneus"}, "pneu_te": {"label": "Traseiro esquerdo", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Pneus"}, "pneu_estepe": {"label": "Estepe", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Pneus"}, "lataria": {"label": "Lataria", "choices": {"ok": "OK", "avaria": "Avaria"}, "detail_rule": "negative", "section": "Conservação"}, "vidros": {"label": "Vidros", "choices": {"ok": "OK", "avaria": "Avaria"}, "detail_rule": "negative", "section": "Conservação"}, "retrovisores": {"label": "Retrovisores", "choices": {"ok": "OK", "avaria": "Avaria"}, "detail_rule": "negative", "section": "Conservação"}, "bancos": {"label": "Bancos", "choices": {"ok": "OK", "avaria": "Avaria"}, "detail_rule": "negative", "section": "Conservação"}, "limpeza_interna": {"label": "Limpeza interna", "choices": {"ok": "OK", "nao": "Não"}, "detail_rule": "cleaning", "section": "Conservação"}, "limpeza_externa": {"label": "Limpeza externa", "choices": {"ok": "OK", "nao": "Não"}, "detail_rule": "cleaning", "section": "Conservação"}, "radio": {"label": "Rádio comunicador", "choices": {"ok": "OK", "defeito": "Defeito"}, "detail_rule": "negative", "section": "Equipamentos Policiais"}, "coletes": {"label": "Coletes refletivos", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Policiais"}, "cones": {"label": "Cone de sinalização", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Policiais"}, "lombada": {"label": "Lombada portátil dobrável", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Policiais"}, "bastao": {"label": "Bastão luminoso", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Policiais"}, "kit_primeiros_socorros": {"label": "Kit de primeiros socorros", "choices": {"sim": "Sim", "nao": "Não"}, "detail_rule": "optional", "section": "Equipamentos Policiais"}};
-    const SECTION_CONFIG = {"Documentação": ["crlv", "cartao_abastecimento"], "Equipamentos Obrigatórios": ["estepe_obrigatorio", "macaco", "chave_roda", "triangulo", "extintor"], "Sistema Elétrico": ["farois", "lanternas", "luz_freio", "setas", "giroflex", "sirene", "buzina"], "Condições Mecânicas": ["freios", "direcao", "embreagem", "motor", "oleo_motor", "agua_radiador", "bateria"], "Pneus": ["pneu_dd", "pneu_de", "pneu_td", "pneu_te", "pneu_estepe"], "Conservação": ["lataria", "vidros", "retrovisores", "bancos", "limpeza_interna", "limpeza_externa"], "Equipamentos Policiais": ["radio", "coletes", "cones", "lombada", "bastao", "kit_primeiros_socorros"]};
+    // ITEM_CONFIG / SECTION_CONFIG carregados de checklist_profiles.js (abaixo).
 
     /*
       CADASTRO DE VIATURAS
@@ -1648,16 +1649,18 @@
       '0900': { displayPrefix:'0-900', placa:'USV-3D27', marcaModelo:'HONDA AFRICA TWIN', tipo:'MOTOCICLETA' },
       '0914': { displayPrefix:'0-914', placa:'USV-3H97', marcaModelo:'HONDA AFRICA TWIN', tipo:'MOTOCICLETA' },
       '0906': { displayPrefix:'0-906', placa:'USV-3D87', marcaModelo:'HONDA AFRICA TWIN', tipo:'MOTOCICLETA' },
-      '1697': { displayPrefix:'1697', placa:'TOZ-8D86', marcaModelo:'AGRALE/A8700 REBOQUE', tipo:'REBOQUE' }
+      '1697': { displayPrefix:'1697', placa:'TOZ-8D86', marcaModelo:'AGRALE/A8700 REBOQUE', tipo:'GUINCHO' }
     });
-    const CHECKLIST_ITEMS_BY_TIPO = {
-      AUTOMOVEL: null, // todos
-      MOTOCICLETA: new Set(['crlv','cartao_abastecimento','extintor','farois','lanternas','luz_freio','setas','giroflex','sirene','buzina','freios','direcao','motor','oleo_motor','bateria','pneu_dd','pneu_de','lataria','retrovisores','limpeza_externa','radio','coletes','cones','bastao','kit_primeiros_socorros']),
-      REBOQUE: new Set(['crlv','farois','lanternas','luz_freio','setas','buzina','freios','direcao','motor','oleo_motor','agua_radiador','bateria','pneu_dd','pneu_de','pneu_td','pneu_te','pneu_estepe','lataria','limpeza_externa','triangulo','extintor'])
-    };
+    let ITEM_CONFIG = Object.assign({}, window.ChecklistProfiles ? ChecklistProfiles.buildItemConfigMap() : {});
+    let SECTION_CONFIG = window.ChecklistProfiles ? ChecklistProfiles.buildSectionConfig('AUTOMOVEL') : {};
+    // Mantém compatibilidade se profiles não carregar
+    if (!Object.keys(ITEM_CONFIG).length) {
+      console.error('checklist_profiles.js não carregou — checklist por tipo indisponível.');
+    }
     const REQUIRED_FIELDS = Object.freeze([
       {id:'unidade', label:'Unidade/Batalhão'},
       {id:'prefixo', label:'Prefixo da viatura'},
+      {id:'tipo_veiculo', label:'Tipo de veículo'},
       {id:'placa', label:'Placa'},
       {id:'marca_modelo', label:'Marca/Modelo'},
       {id:'condutor', label:'Nome do condutor'},
@@ -1764,30 +1767,25 @@
     }
 
     function normalizeVehicleTipo(v) {
-      const t = String(v || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (/MOTO|MOTONETA|CICLOMOTOR/.test(t)) return 'MOTOCICLETA';
-      if (/REBOQUE|GUINCHO/.test(t)) return 'REBOQUE';
-      return 'AUTOMOVEL';
+      return window.ChecklistProfiles
+        ? ChecklistProfiles.normalizeVehicleTipo(v)
+        : (function(t){t=String(v||'').toUpperCase();if(/MOTO/.test(t))return 'MOTOCICLETA';if(/GUINCHO|AGRALE/.test(t))return 'GUINCHO';if(/REBOQUE/.test(t))return 'REBOQUE';return 'AUTOMOVEL';})();
     }
 
     function applyChecklistTipoFilter() {
-      const tipo = normalizeVehicleTipo(document.getElementById('tipo_veiculo')?.value || 'AUTOMOVEL');
+      const tipoRaw = document.getElementById('tipo_veiculo')?.value || 'AUTOMOVEL';
+      const tipo = window.ChecklistProfiles
+        ? ChecklistProfiles.applyTipoFilter(tipoRaw)
+        : normalizeVehicleTipo(tipoRaw);
       window.CENTRAL_CHECKLIST_VEHICLE_TIPO = tipo;
-      const allowed = CHECKLIST_ITEMS_BY_TIPO[tipo];
-      document.querySelectorAll('.check-item').forEach(item => {
-        const id = item.dataset.item;
-        const show = !allowed || allowed.has(id);
-        item.classList.toggle('tipo-hidden', !show);
-        if (!show) {
-          item.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
-          const ta = item.querySelector('textarea');
-          if (ta) ta.value = '';
-        }
-      });
-      document.querySelectorAll('.checklist-section').forEach(sec => {
-        const visible = [...sec.querySelectorAll('.check-item')].some(i => !i.classList.contains('tipo-hidden'));
-        sec.classList.toggle('tipo-empty', !visible);
-      });
+      if (window.ChecklistProfiles) {
+        ITEM_CONFIG = ChecklistProfiles.buildItemConfigMap();
+        SECTION_CONFIG = ChecklistProfiles.buildSectionConfig(tipo);
+        Object.keys(ITEM_CONFIG).forEach((id) => {
+          ITEM_CONFIG[id].label = ChecklistProfiles.labelFor(id, tipo);
+        });
+      }
+      if (typeof updatePendingCount === 'function') updatePendingCount();
     }
 
     document.getElementById('prefixo').addEventListener('input', applyVehicleAutofill);
@@ -1912,7 +1910,7 @@
       document.querySelectorAll('.check-item').forEach(item => {
         if (item.classList.contains('tipo-hidden')) return;
         const id = item.dataset.item;
-        const cfg = ITEM_CONFIG[id];
+        const cfg = ITEM_CONFIG[id] || { label: item.querySelector('.item-name')?.textContent?.trim() || id };
         const selected = item.querySelector('input[type="radio"]:checked');
         const detail = item.querySelector('textarea').value.trim();
         clearValidationMark(item);
@@ -1954,13 +1952,9 @@
 
     function getPendingTargets() {
       /*
-        Pendências representam somente informações que ainda impedem a
-        conclusão do checklist ou a geração do PDF.
-
-        Uma resposta “Não”, “Defeito”, “Avaria”, “Baixo” ou “Baixa” deixa
-        de ser pendência assim que o respectivo detalhamento obrigatório
-        estiver preenchido. A ocorrência continuará registrada normalmente
-        no resumo impresso.
+        Pendência de preenchimento = campos ainda necessários para finalizar o formulário/PDF.
+        NÃO confundir com alteração da viatura (Motomecanização), criada no backend apenas
+        quando geraPendenciaMotomec=true e a situação é irregularidade técnica aplicável.
       */
       return getBlockingIssues();
     }
@@ -2143,13 +2137,15 @@
         const rows = [];
         for (const itemId of itemIds) {
           const item = document.getElementById(`item_${itemId}`);
+          if (!item || item.classList.contains('tipo-hidden')) continue;
           const selected = item.querySelector('input[type="radio"]:checked');
           if (!selected) continue;
           const detail = item.querySelector('textarea').value.trim();
           const negative = NEGATIVE_VALUES.has(selected.value);
+          const label = (ITEM_CONFIG[itemId] && ITEM_CONFIG[itemId].label) || item.querySelector('.item-name')?.textContent?.trim() || itemId;
           rows.push(`
             <tr>
-              <td>${escapeHtml(ITEM_CONFIG[itemId].label)}</td>
+              <td>${escapeHtml(label)}</td>
               <td>
                 <span class="ps-response ${negative ? 'ps-negative' : ''}">${escapeHtml(valueLabel(itemId, selected.value))}</span>
                 ${detail ? `<span class="ps-detail">${escapeHtml(detail)}</span>` : ''}
@@ -2668,8 +2664,9 @@
 </script>
 
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.17-auth"></script>
+<script src="central_cloud.js?v=10.8.22-fix"></script>
 <script src="module_access_gate.js?v=10.8.17"></script>
-<script src="checklist_cloud.js?v=10.8.17"></script>
+<script src="checklist_profiles.js?v=10.8.15"></script>
+<script src="checklist_cloud.js?v=10.8.15"></script>
 </body>
 </html>

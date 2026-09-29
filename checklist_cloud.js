@@ -7,21 +7,34 @@ function numCompany(){return Number(val('globalCompanhia'))||1}
 function unit(){const b=String(val('globalBatalhao')||'BPTran').toUpperCase()==='BPRV'?'BPRv':'BPTran';const n=numCompany();return {batalhao:b,companhiaNumero:n,companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function checklistId(){let id='';try{id=localStorage.getItem(CHECKLIST_ID_KEY)||''}catch(_){}if(!id){id=global.CentralCloud?.uid('chk')||('chk-'+Date.now());try{localStorage.setItem(CHECKLIST_ID_KEY,id)}catch(_){}}return id}
 function selectedValue(item){return item.querySelector('input[type="radio"]:checked')?.value||''}
-function isIrregular(v){return ['nao','defeito','avaria','baixo','baixa','ausente'].includes(String(v||'').toLowerCase())}
+function isIrregular(v){return (global.ChecklistProfiles?.isIrregularSituacao||(x=>['nao','defeito','avaria','baixo','baixa','ausente'].includes(String(x||'').toLowerCase())))(v)}
 function currentVehicleTipo(){
-  const raw=String(el('tipo_veiculo')?.value||global.CENTRAL_CHECKLIST_VEHICLE_TIPO||'AUTOMOVEL').toUpperCase();
-  if(/MOTO/.test(raw))return 'MOTOCICLETA';
-  if(/REBOQUE|GUINCHO/.test(raw))return 'REBOQUE';
-  return 'AUTOMOVEL';
+  const raw=String(el('tipo_veiculo')?.value||global.CENTRAL_CHECKLIST_VEHICLE_TIPO||'AUTOMOVEL');
+  return global.ChecklistProfiles?global.ChecklistProfiles.normalizeVehicleTipo(raw):(/MOTO/i.test(raw)?'MOTOCICLETA':/GUINCHO|AGRALE/i.test(raw)?'GUINCHO':/REBOQUE/i.test(raw)?'REBOQUE':'AUTOMOVEL');
 }
 function collectItems(){
+  const CP=global.ChecklistProfiles;
   return [...document.querySelectorAll('.checklist-section .check-item')].filter(item=>!item.classList.contains('tipo-hidden')).map(item=>{
     const key=item.dataset.item||item.querySelector('input[type="radio"]')?.name||'';
     const sec=item.closest('.checklist-section');
     const label=item.querySelector('.item-name')?.textContent?.trim()||key;
     const situacao=selectedValue(item);
     const obs=item.querySelector('textarea')?.value?.trim()||'';
-    return {itemId:key,grupo:sec?.dataset.section||sec?.querySelector('h2')?.textContent?.trim()||'',item:label,situacao,descricao:obs,prioridade:'NORMAL'};
+    const meta=CP?.itemMeta(key);
+    const gera=CP
+      ? CP.shouldGeraAlteracaoMotomec(key,situacao)
+      : (item.dataset.geraMotomec!=='0' && isIrregular(situacao));
+    return {
+      itemId:key,
+      grupo:sec?.dataset.section||sec?.querySelector('h2')?.textContent?.trim()||'',
+      item:label,
+      situacao,
+      descricao:obs,
+      prioridade:'NORMAL',
+      geraPendenciaMotomec:!!(meta?meta.geraPendenciaMotomec:(item.dataset.geraMotomec!=='0')),
+      categoria:meta?.categoria||item.dataset.categoria||'',
+      abrirAlteracaoMotomec:!!gera
+    };
   }).filter(x=>x.item&&x.situacao);
 }
 function collectPhotos(){
@@ -45,7 +58,7 @@ async function finalizar(){
   if(issues.length){
     if(typeof global.updatePendingCount==='function')global.updatePendingCount();
     if(typeof global.focusPending==='function')global.focusPending(issues[0]);
-    alert('Conclua as pendências do checklist antes de enviar à Motomecanização.');
+    alert('Conclua as pendências de preenchimento do checklist antes de enviar à Motomecanização.');
     return;
   }
   if(!global.CentralCloud){alert('Módulo de nuvem indisponível. O checklist continua podendo ser gerado localmente.');return}
@@ -59,17 +72,22 @@ async function finalizar(){
   if(missing.length){alert('Ainda existem '+missing.length+' item(ns) do checklist sem resposta.');missing[0].scrollIntoView({behavior:'smooth',block:'center'});return}
   if(el('signatureData')&&!el('signatureData').value){alert('A assinatura do condutor é obrigatória antes da finalização no banco.');el('signatureBox')?.scrollIntoView({behavior:'smooth',block:'center'});return}
   const p=buildPayload();
+  const nAlt=(p.checklist.itens||[]).filter(x=>x.abrirAlteracaoMotomec).length;
   const btn=el('cloudChecklistBtn');if(btn)btn.disabled=true;
   try{
     const r=await global.CentralCloud.postOrQueue('checklist-upsert',p,{token,unit:unit(),popup:false});
     if(r.queued) alert('Checklist finalizado. O envio ao banco da Motomecanização ficou pendente e será reenviado automaticamente.');
-    else {alert((r.message||'Checklist registrado no banco da Motomecanização.')+' As alterações identificadas ficam disponíveis para acompanhamento da Motomecanização.');try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}}
+    else {
+      const msg=r.message||'Checklist registrado.';
+      alert(msg+(nAlt?(' '+nAlt+' alteração(ões) técnica(s) aberta(s) para a Motomecanização.'):' Nenhuma alteração técnica aplicável à Motomecanização.'));
+      try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}
+    }
   }catch(err){alert('Não foi possível sincronizar agora: '+err.message)}
   finally{if(btn)btn.disabled=false}
 }
 function install(){
   const toolbar=document.querySelector('.toolbar-inner');if(!toolbar||el('cloudChecklistBtn'))return;
-  const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='cloudChecklistBtn';b.textContent='Finalizar e enviar à Motomecanização';b.title='Finaliza o checklist e registra as alterações no banco da Motomecanização.';
+  const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='cloudChecklistBtn';b.textContent='Finalizar e enviar à Motomecanização';b.title='Finaliza o checklist. Só abre pendência na Motomecanização para irregularidades técnicas aplicáveis à VTR.';
   b.addEventListener('click',finalizar);
   const share=el('shareBtn');toolbar.insertBefore(b,share||toolbar.firstChild);
   const m=el('matricula');if(m){m.addEventListener('blur',()=>{m.value=global.CentralCloud?.formatMatricula(m.value)||m.value})}
