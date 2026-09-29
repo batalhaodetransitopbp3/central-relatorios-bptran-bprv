@@ -62,6 +62,7 @@ async function validate(c,ov,key){
   }
 }
 async function init(){
+  if(global.CENTRAL_READONLY_VIEWER)return;
   const c=config();if(!c||!global.CentralCloud)return;
   global.CENTRAL_MODULE_ACCESS_READY=false;lock(c);
   const ov=shell(c),saved=global.CentralCloud.getToken(c.kind);
