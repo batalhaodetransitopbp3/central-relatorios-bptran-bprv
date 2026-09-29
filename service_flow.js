@@ -30,7 +30,8 @@ function contextQuery(extra={}){
  if(c.serviceId)p.set('serviceId',c.serviceId);if(c.rsdReportId)p.set('rsdReportId',c.rsdReportId);if(c.segmento)p.set('segmento',String(c.segmento));
  return p.toString();
 }
-function openModule(kind){
+async function openModule(kind){
+ try{await global.centralRsdSyncNow?.()}catch(_){}
  const map={operation:/iphone|ipad|ipod/i.test(navigator.userAgent)?'relatorio_operacao_ios.html':'relatorio_operacao.html',
    cirvc:/iphone|ipad|ipod/i.test(navigator.userAgent)?'auto_remocao_veiculos_ios.html':'auto_remocao_veiculos.html',
    bo:/iphone|ipad|ipod/i.test(navigator.userAgent)?'boletim_ocorrencia_bptrans_1cprv_ios.html':'boletim_ocorrencia_bptrans_1cprv.html'};

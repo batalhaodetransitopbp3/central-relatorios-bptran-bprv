@@ -78,6 +78,35 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
       </table>
     </div>
   </section>
+
+  <section class="card" id="retifCard" hidden>
+    <div class="section-head" style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+      <h2 style="margin:0">Solicitações de retificação de RCO</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+        <div><label>Status</label><select id="retifStatus"><option value="PENDENTE">Pendentes</option><option value="">Todas</option><option value="APROVADA">Aprovadas</option><option value="NEGADA">Negadas</option><option value="CONCLUIDA">Concluídas</option></select></div>
+        <button type="button" class="secondary" id="btnRetif">Atualizar</button>
+      </div>
+    </div>
+    <p class="note">O Coordenador solicita no RCO. Aqui a Gestão de Sistema autoriza (abre EM_RETIFICACAO) ou nega. Não use a Gestão P3 para reabrir.</p>
+    <div class="tablewrap">
+      <table class="tbl" style="min-width:1200px">
+        <thead><tr><th>Data</th><th>Companhia</th><th>Solicitante</th><th>Motivo</th><th>Solicitado em</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody id="retifBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="dedupeCard" hidden>
+    <h2 style="margin:0 0 8px">Saneamento de duplicados legados</h2>
+    <p class="note">Diagnóstico e marcação auditável (STATUS=DUPLICADO_LEGADO + SUPERSEDED_BY). Não apaga linhas. Usa filtros de batalhão/companhia/data acima quando preenchidos.</p>
+    <div class="actions">
+      <button type="button" class="secondary" id="btnRcoDedupeDiag">Diagnóstico RCO duplicados</button>
+      <button type="button" class="warn" id="btnRcoDedupeSan">Saneamento RCO…</button>
+      <button type="button" class="secondary" id="btnRsdDedupeDiag">Diagnóstico RSD duplicados</button>
+      <button type="button" class="warn" id="btnRsdDedupeSan">Saneamento RSD…</button>
+    </div>
+    <pre id="dedupeOut" class="note" style="white-space:pre-wrap;max-height:42vh;overflow:auto;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#f7fafc">Nenhum diagnóstico executado.</pre>
+  </section>
 </main>
 
 <div id="modal" class="modal hidden"><div class="modalbox">
@@ -104,7 +133,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="list" id="vList"></div>
 </div></div>
 
-<script src="central_cloud.js?v=10.8.22-fix"></script>
+<script src="central_cloud.js?v=10.8.19"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -117,12 +146,12 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   function readSession(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch(_){return null}}
   function saveSession(s){session=s;try{if(s)sessionStorage.setItem(SESSION_KEY,JSON.stringify(s));else sessionStorage.removeItem(SESSION_KEY)}catch(_){} renderSession()}
   function renderSession(){
-    const st=$('sessionState'), out=$('btnLogout'), panel=$('panelCard'), list=$('listCard'), fb=$('fbCard');
+    const st=$('sessionState'), out=$('btnLogout'), panel=$('panelCard'), list=$('listCard'), fb=$('fbCard'), retif=$('retifCard'), dedupe=$('dedupeCard');
     if(session&&token()){
       st.className='state ok';st.innerHTML='<strong>'+esc(session.nome||'')+'</strong> — '+esc(session.matricula||'')+' · Gestão de Sistema ativa';
-      out.hidden=false; panel.hidden=false; list.hidden=false; if(fb)fb.hidden=false;
+      out.hidden=false; panel.hidden=false; list.hidden=false; if(fb)fb.hidden=false; if(retif)retif.hidden=false; if(dedupe)dedupe.hidden=false;
     }else{
-      st.className='state';st.textContent='Sessão não iniciada.'; out.hidden=true; panel.hidden=true; list.hidden=true; if(fb)fb.hidden=true;
+      st.className='state';st.textContent='Sessão não iniciada.'; out.hidden=true; panel.hidden=true; list.hidden=true; if(fb)fb.hidden=true; if(retif)retif.hidden=true; if(dedupe)dedupe.hidden=true;
     }
   }
   async function lookupMat(inputId,nomeId,{silent}={}){
@@ -172,6 +201,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
       $('senha').value='';
       await load();
       await loadFeedback();
+      await loadRetificacoes();
     }catch(e){
       CentralCloud.clearToken('comando');
       try{sessionStorage.removeItem('central-module-auth-comando-v1')}catch(_){}
@@ -285,9 +315,99 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
       $('fbBody').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(String(x.CRIADO_EM||'').replace('T',' ').slice(0,19))+'</td><td>'+esc(x.TIPO||'')+'</td><td>'+esc(x.MATRICULA||'')+'</td><td>'+esc(x.NOME||'—')+'</td><td>'+esc(x.MENSAGEM||'')+'</td></tr>').join(''):'<tr><td colspan="5" class="empty">Nenhuma mensagem recebida.</td></tr>';
     }catch(e){$('fbBody').innerHTML='<tr><td colspan="5" class="empty">'+esc(e.message||e)+'</td></tr>'}
   }
+  let retifItems=[];
+  async function loadRetificacoes(){
+    if(!token()||!$('retifBody'))return;
+    try{
+      const st=$('retifStatus')?.value??'PENDENTE';
+      const q={token:token()};
+      if(st)q.status=st;
+      const r=await CentralCloud.jsonp('rco-retification-list',q,{timeout:30000,tokenKind:'comando',forceJsonp:true});
+      retifItems=r.items||[];
+      window.__retifItems=retifItems;
+      $('retifBody').innerHTML=retifItems.length?retifItems.map((x,i)=>{
+        const pend=String(x.STATUS||'')==='PENDENTE';
+        const sol=[x.SOLICITANTE_NOME,x.SOLICITANTE_MATRICULA].filter(Boolean).join(' · ');
+        const acts=pend
+          ?'<button type="button" class="ok" onclick="decidirRetif('+i+',\'AUTORIZAR\')">Autorizar retificação</button> <button type="button" class="danger" onclick="decidirRetif('+i+',\'NEGAR\')">Negar</button>'
+          :'<span class="note">'+(x.DECIDIDO_POR_NOME?esc(x.DECIDIDO_POR_NOME)+' · ':'')+esc(String(x.DECIDIDO_EM||'').replace('T',' ').slice(0,19))+(x.OBSERVACAO_GESTOR?' · '+esc(x.OBSERVACAO_GESTOR):'')+'</span>';
+        return '<tr><td>'+esc(x.DATA_SERVICO||'—')+'</td><td>'+esc(x.COMPANHIA||'—')+(x.BATALHAO?'<br><small>'+esc(x.BATALHAO)+'</small>':'')+'</td><td>'+esc(sol||'—')+'</td><td>'+esc(x.MOTIVO||'—')+'</td><td>'+esc(String(x.SOLICITADO_EM||'').replace('T',' ').slice(0,19))+'</td><td>'+statusPill(x.STATUS)+'</td><td>'+acts+'</td></tr>';
+      }).join(''):'<tr><td colspan="7" class="empty">Nenhuma solicitação'+(st?' com status '+st:'')+'.</td></tr>';
+    }catch(e){$('retifBody').innerHTML='<tr><td colspan="7" class="empty">'+esc(e.message||e)+'</td></tr>'}
+  }
+  window.decidirRetif=async function(i,decisao){
+    const x=(window.__retifItems||[])[i]; if(!x||!session)return;
+    let observacao='';
+    if(decisao==='NEGAR'){
+      observacao=prompt('Observação da negação (obrigatória):','')||'';
+      if(!observacao.trim()){alert('Informe a observação ao negar.');return}
+    }else{
+      observacao=prompt('Observação opcional da autorização:','')||'';
+      if(!confirm('Autorizar retificação deste RCO?\n\n'+String(x.COMPANHIA||'')+' · '+String(x.DATA_SERVICO||'')+'\nREPORT_ID: '+String(x.RCO_REPORT_ID||'')+'\n\nO RCO passará a EM_RETIFICACAO para o Coordenador editar e reconsolidar.'))return;
+    }
+    try{
+      const r=await CentralCloud.submitForm('rco-retification-decide',{
+        solicitacaoId:x.SOLICITACAO_ID,decisao,
+        observacao:observacao.trim(),
+        autorMatricula:session.matricula,autorNome:session.nome,autorPostoGrad:session.postoGrad||'',
+        decididoPorMatricula:session.matricula,decididoPorNome:session.nome
+      },token(),{popup:false,timeout:30000,tokenKind:'comando'});
+      alert(r.message||'OK'); await loadRetificacoes();
+    }catch(e){alert(e.message||e)}
+  };
   $('btnFb')?.addEventListener('click',loadFeedback);
+  $('btnRetif')?.addEventListener('click',loadRetificacoes);
+  $('retifStatus')?.addEventListener('change',loadRetificacoes);
+  function dedupeScope(){
+    return {batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value||''};
+  }
+  function formatDedupeResult(r){
+    if(!r||!r.ok)return String((r&&r.message)||'Falha');
+    const lines=[];
+    lines.push((r.action||'')+(r.dryRun?' · DRY-RUN':' · APLICADO'));
+    lines.push(r.message||'');
+    if(r.totalGroups!=null)lines.push('Grupos: '+r.totalGroups+(r.wouldMark!=null?' · a marcar: '+r.wouldMark:'')+(r.marked!=null&&!r.dryRun?' · marcados: '+r.marked:'')+(r.wouldMarkServiceIds!=null?' · SERVICE_IDs: '+r.wouldMarkServiceIds:''));
+    (r.groups||[]).slice(0,40).forEach(function(g,i){
+      lines.push('');
+      lines.push((i+1)+'. '+g.key+(g.canonicalReportId?' · canônico RCO='+g.canonicalReportId:'')+(g.canonicalServiceId?' · canônico SERVICE_ID='+g.canonicalServiceId:''));
+      if(g.drafts)g.drafts.forEach(function(d){lines.push('   - '+d.reportId+' · '+d.status+' · rev '+d.revisao+(d.hasPayload?' · payload':' · vazio'));});
+      if(g.rows)g.rows.forEach(function(d){lines.push('   - '+d.reportId+' · sid='+d.serviceId+' · seg '+d.segmento+' · '+d.status);});
+      if(g.marks)g.marks.forEach(function(m){lines.push('   → marcar '+m.reportId+(m.serviceId?' (sid '+m.serviceId+')':'')+' · '+m.statusAnterior+' → DUPLICADO_LEGADO · SUPERSEDED_BY='+m.supersededBy);});
+    });
+    if((r.groups||[]).length>40)lines.push('\n… +'+(r.groups.length-40)+' grupo(s)');
+    return lines.join('\n');
+  }
+  async function runDedupeDiag(action){
+    if(!token()){alert('Faça o ingresso com a senha da Gestão de Sistema.');return}
+    $('dedupeOut').textContent='Consultando '+action+'…';
+    try{
+      const q=Object.assign({token:token()},dedupeScope());
+      const r=await CentralCloud.jsonp(action,q,{timeout:90000,tokenKind:'comando',forceJsonp:true});
+      $('dedupeOut').textContent=formatDedupeResult(r);
+    }catch(e){$('dedupeOut').textContent=String(e.message||e)}
+  }
+  async function runDedupeSanitize(action,label){
+    if(!token()||!session){alert('Faça o ingresso com a senha da Gestão de Sistema.');return}
+    const scope=dedupeScope();
+    $('dedupeOut').textContent='Montando plano (dry-run) de '+label+'…';
+    try{
+      const plan=await CentralCloud.submitForm(action,Object.assign({dryRun:true,autorMatricula:session.matricula,autorNome:session.nome},scope),token(),{popup:false,timeout:90000,tokenKind:'comando'});
+      $('dedupeOut').textContent=formatDedupeResult(plan);
+      const n=Number(plan.wouldMark||0);
+      if(!n){alert(plan.message||'Nada a marcar.');return}
+      if(!confirm('Aplicar saneamento '+label+'?\n\n'+n+' registro(s) em '+Number(plan.totalGroups||0)+' grupo(s) serão marcados como DUPLICADO_LEGADO.\nNenhuma linha será apagada.\n\nConfirma?'))return;
+      $('dedupeOut').textContent='Aplicando saneamento '+label+'…';
+      const r=await CentralCloud.submitForm(action,Object.assign({dryRun:false,autorMatricula:session.matricula,autorNome:session.nome},scope),token(),{popup:false,timeout:120000,tokenKind:'comando'});
+      $('dedupeOut').textContent=formatDedupeResult(r);
+      alert(r.message||'OK');
+    }catch(e){$('dedupeOut').textContent=String(e.message||e);alert(e.message||e)}
+  }
+  $('btnRcoDedupeDiag')?.addEventListener('click',()=>runDedupeDiag('rco-draft-dedupe-diagnose'));
+  $('btnRsdDedupeDiag')?.addEventListener('click',()=>runDedupeDiag('rsd-service-dedupe-diagnose'));
+  $('btnRcoDedupeSan')?.addEventListener('click',()=>runDedupeSanitize('rco-draft-dedupe-sanitize','RCO'));
+  $('btnRsdDedupeSan')?.addEventListener('click',()=>runDedupeSanitize('rsd-service-dedupe-sanitize','RSD'));
   saveSession(readSession());
-  if(session&&token()){load();loadFeedback()}
+  if(session&&token()){load();loadFeedback();loadRetificacoes()}
 })();
 </script>
 </body>

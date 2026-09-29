@@ -259,7 +259,7 @@ function pickerParams(el){
 }
 async function openServicePicker(type,mode){
  const receive=mode==='receive',title=receive?'Receber serviço em andamento':'Continuar serviço em andamento';
- const subtitle=receive?'Informe a chave no ingresso, escolha a companhia e selecione somente serviços com passagem disponibilizada.':'Informe a chave no ingresso, escolha a companhia e selecione o serviço aberto pela data, VTR e status.';
+ const subtitle=receive?'Informe a chave no ingresso, escolha a companhia e selecione somente serviços com passagem disponibilizada.':'Informe a chave no ingresso, escolha a companhia e selecione o serviço aberto (um por guarnição/RCO).';
  let key=savedIngressKey(type);if(!key)key=await requestIngressKey(type);if(!key){startScreen(type);return}
  const el=shell(title,subtitle,pickerUnitFields()+'<div class="central-access-toolbar"><button data-refresh>Atualizar serviços</button><button data-back>Voltar</button></div><div class="central-access-list" data-list><div class="central-access-empty">Selecione a companhia para consultar os serviços.</div></div>');
  const batt=q('[data-picker-batt]',el),comp=q('[data-picker-comp]',el);
@@ -277,11 +277,14 @@ async function loadOpenServices(el,type,mode){
    if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
    box.innerHTML=items.map((x,i)=>{
      const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
-     const stamp=fmtDateTime(mode==='receive'?(x.passagemEm||x.ultimoSyncEm):x.ultimoSyncEm);
-     const segment=type==='rsd'&&Number(x.segmento||1)>1?'Segmento '+Number(x.segmento):'';
-     const timing=stamp?((mode==='receive'?'Passagem disponibilizada: ':'Última atualização: ')+stamp):'';
-     const title=type==='rsd'?((x.guarnicao||'Guarnição')+' — VTR '+(x.vtrPrincipal||'—')):('RCO — '+(x.companhia||p.companhia));
-     const meta=type==='rsd'?[x.companhia,'Data: '+date,segment,status,timing].filter(Boolean):[x.companhia,'Data: '+date,status,timing].filter(Boolean);
+     const stamp=fmtDateTime(mode==='receive'?(x.passagemEm||x.lastSync||x.ultimoSyncEm):(x.lastSync||x.ultimoSyncEm));
+     const timing=stamp?((mode==='receive'?'Passagem disponibilizada: ':'Última sync: ')+stamp):'';
+     const vtr=x.vtr||x.vtrPrincipal||'—';
+     const cmt=x.comandante||x.responsavel||'';
+     const title=type==='rsd'?(x.guarnicao||'Guarnição'):('RCO — '+(x.companhia||p.companhia));
+     const meta=type==='rsd'
+       ?[x.companhia,'Data: '+date,'VTR '+vtr,cmt&&('Cmt: '+cmt),status,timing].filter(Boolean)
+       :[x.companhia,'Data: '+date,status,timing].filter(Boolean);
      const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
      return '<div class="central-access-item"><strong>'+esc(title)+'</strong><div class="central-access-meta">'+esc(meta.join(' • '))+'</div><button data-open="'+i+'">'+esc(action)+'</button></div>'
    }).join('');

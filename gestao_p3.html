@@ -81,7 +81,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <section class="card"><div class="section-head"><div><h2>Painel de Indicadores</h2><div class="note">Área destinada à apresentação visual dos indicadores operacionais para oficiais, comando, reuniões e briefings. A Gestão P3 é a fonte de consulta e conferência; o painel transforma esses mesmos dados em gráficos de leitura rápida.</div></div></div><div class="analysis-explain"><strong>Para que serve?</strong> Depois de consultar um indicador na Gestão P3, use este painel para apresentá-lo de forma visual: evolução por período, comparação entre companhias, distribuição dos resultados e outros gráficos gerenciais.</div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Verificando se há um painel institucional configurado...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir apresentação dos indicadores</button><button class="secondary" id="biConfigure">Configurar painel</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel de Indicadores"></iframe><div class="powerbi-frame-note">Se o painel não puder ser exibido dentro desta página, utilize “Abrir apresentação dos indicadores”.</div></div></section>
 </section>
 </main>
-<script src="central_cloud.js?v=10.8.16-auth"></script>
+<script src="central_cloud.js?v=10.8.19"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -357,21 +357,10 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    const r=await p3Get('p3-query',p(t,'rco')),items=r.items||[],ret=items.filter(x=>x.RETIFICADO_EM);
    $('rcoStats').innerHTML=cards([['RCOs',items.length],['Retificados',ret.length],['Com CPU',items.filter(x=>x.MODO_CONSOLIDACAO==='CPU').length],['P3/Oficial',items.filter(x=>x.MODO_CONSOLIDACAO==='SEM_CPU').length],['Companhias',new Set(items.map(x=>x.COMPANHIA).filter(Boolean)).size],['Guarnições informadas',items.reduce((a,x)=>a+(Number(x.QUANTIDADE_GUARNICOES)||0),0)]]);
    const cols=[['DATA_SERVICO','Data'],['BATALHAO','Batalhão'],['COMPANHIA','Companhia'],['VERSAO','Versão'],['STATUS','Status'],['MODO_CONSOLIDACAO','Modo'],['CONSOLIDADOR_POSTO_GRAD','Posto/Grad.'],['CONSOLIDADOR_NOME','Responsável'],['CONSOLIDADOR_MATRICULA','Matrícula'],['QUANTIDADE_GUARNICOES','Guarnições'],['ENVIADO_EM','Enviado em'],['RETIFICADO_EM','Retificado em'],['REPORT_ID','REPORT_ID']];
-   $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th>Ação</th></tr>';
-   $('rcoBody').innerHTML=items.length?items.map((x,i)=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'<td><button type="button" class="secondary" data-reopen-rco="'+i+'">Reabrir para retificação</button></td></tr>').join(''):'<tr><td colspan="'+(cols.length+1)+'" class="empty">Nenhum RCO para os filtros selecionados.</td></tr>';
-   $('rcoBody').querySelectorAll('[data-reopen-rco]').forEach(b=>b.onclick=async()=>{
-     const x=items[Number(b.dataset.reopenRco)];if(!x)return;
-     const motivo=prompt('Motivo da retificação deste RCO:','Correção de dado consolidado')||'';if(!motivo.trim())return;
-     if(!p3Actor?.matricula){alert('A sessão administrativa não está identificada.');return}
-     const autor=[p3Actor.postoGrad,p3Actor.nome,p3Actor.matricula].filter(Boolean).join(' ');
-     if(!confirm('Reabrir este RCO para retificação?\n\nREPORT_ID: '+String(x.REPORT_ID||'')+'\nAutorizado por: '+autor+'\n\nO mesmo relatório será corrigido e reenviado, sem criar outro RCO.'))return;
-     try{
-       beginProgress('Reabrindo o RCO para retificação e registrando a auditoria...');
-       progressStep(40,'Enviando a autorização ao backend...');
-       const rr=await p3Post('rco-retification-open',{reportId:x.REPORT_ID,motivo:motivo.trim(),autorMatricula:p3Actor.matricula,autorPerfil:p3Actor.perfil},t);
-       endProgress(true,'RCO reaberto para retificação.');alert(rr.message||'RCO reaberto para retificação.');await load()
-     }catch(e){endProgress(false,'Falha ao reabrir o RCO.');alert('Não foi possível reabrir o RCO: '+e.message)}
-   });
+   $('rcoHead').innerHTML='<tr>'+cols.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'</tr>';
+   $('rcoBody').innerHTML=items.length?items.map(x=>'<tr>'+cols.map(c=>'<td>'+fmt(c[0],x[c[0]],x)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="empty">Nenhum RCO para os filtros selecionados.</td></tr>';
+   const note=$('rcoRetifNote')||(()=>{const n=document.createElement('p');n.id='rcoRetifNote';n.className='plain-note';$('rcoStats')?.insertAdjacentElement('afterend',n)||$('rcoView')?.prepend(n);return n})();
+   note.innerHTML='Retificação de RCO consolidado: o <strong>Coordenador solicita</strong> no próprio RCO; a <strong>Gestão de Sistema</strong> autoriza ou nega. A reabertura direta pelo P3 foi desativada.';
  }
  async function loadBi(t){
    progressStep(35,'Buscando a configuração do Painel de Indicadores...');
