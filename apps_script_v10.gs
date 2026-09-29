@@ -1132,12 +1132,6 @@ function sistemaFeedbackList_(p){
   if(p.status)list=list.filter(function(x){return String(x.STATUS||'')===String(p.status)});
   return {ok:true,items:list.slice(0,300)};
 }
-function adminSetSistemaToken(token){
-  token=String(token||'').trim();
-  if(!token)throw new Error('Informe a senha.');
-  PropertiesService.getScriptProperties().setProperty('SISTEMA_TOKEN',token);
-  return {ok:true,message:'SISTEMA_TOKEN atualizado.'};
-}
 function rsdMarkIncluded_(payload) {
   var ids=payload.rsdReportIds||payload.reportIds||[];if(!Array.isArray(ids))ids=[];if(payload.reportId)ids.unshift(payload.reportId);ids=ids.filter(Boolean);
   if(!ids.length)throw new Error('Nenhum RSD informado.');
