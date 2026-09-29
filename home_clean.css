@@ -428,6 +428,10 @@ img, svg { display: block; max-width: 100%; }
   min-height: 96px;
 }
 
+.op-card .card-content {
+  min-width: 0;
+}
+
 .op-card h3 {
   margin: 0;
   font-size: 16px;
@@ -599,15 +603,6 @@ footer.site-foot {
   font-size: 12px;
   line-height: 1.35;
 }
-
-.inline-link {
-  color: var(--navy-700);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.inline-link:hover { color: var(--blue-600); }
 
 /* Documentos + apps (rodapé) */
 .resource-grid {
