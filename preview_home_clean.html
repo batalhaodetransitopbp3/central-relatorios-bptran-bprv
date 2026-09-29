@@ -4,8 +4,8 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="theme-color" content="#0B2742"/>
-<title>Central de Relatórios Operacionais - BPTran / BPRv</title>
-<link rel="stylesheet" href="home_clean.css?v=10.8.19"/>
+<title>Prévia — Central de Relatórios (layout clean)</title>
+<link rel="stylesheet" href="preview_home_clean.css"/>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -43,7 +43,7 @@
       </figure>
       <figure class="emblem-unit">
         <div class="emblem-frame">
-          <img class="emblem-image" src="preview_assets/brasao_bptran.jpg" alt="Brasão do BPTran" width="430" height="571"/>
+          <img class="emblem-image" src="preview_assets/brasao_bptran.jpg" alt="Brasão do BPTran"/>
         </div>
         <figcaption class="emblem-label">BPTran</figcaption>
       </figure>
@@ -67,37 +67,39 @@
     <label for="searchInput">Pesquisar relatório ou ferramenta</label>
     <div class="search-row">
       <svg aria-hidden="true"><use href="#i-search"/></svg>
-      <input id="searchInput" type="search" placeholder="Ex.: Checklist, CPU, Serviço Diário, Operação, Reboque, POD, Fisco, Remoção, BO..." autocomplete="off" oninput="filtrarCards()"/>
+      <input id="searchInput" type="search" placeholder="Ex.: Checklist, CPU, Serviço Diário, Operação, Reboque, POD, Fisco, Remoção, BO..." autocomplete="off"/>
       <span class="kbd" aria-hidden="true">Ctrl + K</span>
     </div>
   </section>
 
+  <!-- Acesso principal -->
   <section class="section" data-block="bo">
     <div class="section-head">
       <h2 class="section-title">Acesso principal</h2>
       <span class="section-aside">Rotina operacional</span>
     </div>
-    <article class="card bo-card item-card" data-search="boletim ocorrência bo bopm ciop copom">
+    <article class="card bo-card item-card" data-search="boletim ocorrência bo bopm">
       <svg class="card-watermark" viewBox="0 0 120 140" aria-hidden="true"><use href="#i-doc" stroke="#0B2742" fill="none"/></svg>
       <div class="icon-box icon-navy" aria-hidden="true"><svg><use href="#i-doc"/></svg></div>
       <div>
         <h2>Boletim de Ocorrência</h2>
         <p>Preenchimento do BO online. Quando aberto a partir do RSD, o número e o resumo da ocorrência retornam automaticamente ao serviço.</p>
         <div class="bo-actions">
-          <a class="btn btn-primary central-platform-link" href="boletim_ocorrencia_bptrans_1cprv.html?v=10.8.19" data-ios-href="boletim_ocorrencia_bptrans_1cprv_ios.html?v=10.8.19">Abrir Boletim de Ocorrência</a>
-          <a class="btn btn-ghost help-link" href="ajuda.html?relatorio=bopm">Tire aqui sua dúvida</a>
+          <a class="btn btn-primary" href="#">Abrir Boletim de Ocorrência</a>
+          <a class="btn btn-ghost" href="#">? Tire aqui sua dúvida</a>
         </div>
       </div>
     </article>
   </section>
 
+  <!-- Relatórios operacionais -->
   <section class="section" data-block="ops">
     <div class="section-head">
       <h2 class="section-title">Relatórios operacionais</h2>
       <span class="section-aside">Registro e produtividade</span>
     </div>
     <div class="ops-grid">
-      <a class="card op-card item-card is-link central-platform-link" href="relatorio_servico_diario.html?v=10.8.19" data-ios-href="relatorio_servico_diario_ios.html?v=10.8.19" data-search="rsd serviço diário relatórios operacionais">
+      <a class="card op-card item-card is-link" href="#" data-search="rsd serviço diário">
         <div class="icon-box icon-blue" aria-hidden="true"><svg><use href="#i-calendar"/></svg></div>
         <div>
           <h3>RSD</h3>
@@ -106,7 +108,7 @@
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
-      <a class="card op-card item-card is-link central-platform-link" href="relatorio_cpu.html?v=10.8.19" data-ios-href="relatorio_cpu_ios.html?v=10.8.19" data-search="rco coordenador cpu relatórios operacionais">
+      <a class="card op-card item-card is-link" href="#" data-search="rco coordenador cpu">
         <div class="icon-box icon-green" aria-hidden="true"><svg><use href="#i-users"/></svg></div>
         <div>
           <h3>RCO</h3>
@@ -115,7 +117,7 @@
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
-      <a class="card op-card item-card is-link central-platform-link" href="checklist_viatura.html?v=10.8.19" data-ios-href="checklist_viatura_ios.html?v=10.8.19" data-search="checklist vtr viatura inspeção relatórios operacionais">
+      <a class="card op-card item-card is-link" href="#" data-search="checklist vtr viatura inspeção">
         <div class="icon-box icon-amber" aria-hidden="true"><svg><use href="#i-check"/></svg></div>
         <div>
           <h3>Checklist de VTR</h3>
@@ -124,18 +126,18 @@
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
-      <a class="card op-card item-card is-link central-platform-link" href="relatorio_traslados_reboque.html?v=10.8.19" data-ios-href="relatorio_traslados_reboque_ios.html?v=10.8.19" data-search="traslado reboque detran cirvc relatórios operacionais">
+      <a class="card op-card item-card is-link" href="#" data-search="traslado reboque detran cirvc">
         <div class="icon-box icon-violet" aria-hidden="true"><svg><use href="#i-truck"/></svg></div>
         <div>
           <h3>Traslado de veículos</h3>
           <p class="sub">Reboque e transporte ao DETRAN</p>
-          <p class="desc">Relatório de traslados. <a class="inline-link" href="cirvc_transporte.html?v=10.8.19" onclick="event.stopPropagation()">CIRVC — Transporte ao DETRAN</a></p>
+          <p class="desc">Relatório de traslados e CIRVC — fluxo de remoção.</p>
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
     </div>
 
-    <a class="card contingency item-card is-link" href="contingencia_operacional.html" data-search="contingência operacional relatórios operacionais">
+    <a class="card contingency item-card is-link" href="#" data-search="contingência operacional">
       <div class="icon-box icon-muted" aria-hidden="true"><svg><use href="#i-alert"/></svg></div>
       <div>
         <h3>Contingência operacional</h3>
@@ -143,16 +145,16 @@
       </div>
       <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
     </a>
-    <p class="ops-note">ROP, CIRVC e ocorrências são abertos a partir do RSD para manter o vínculo automático com o serviço.</p>
   </section>
 
+  <!-- Gestão -->
   <section class="section" data-block="mgmt">
     <div class="section-head">
       <h2 class="section-title">Módulos de gestão</h2>
       <span class="section-aside">Controle e acompanhamento</span>
     </div>
     <div class="mgmt-grid">
-      <a class="card mgmt-card item-card is-link" href="gestao_p3.html?v=10.8.19" data-search="gestão p3 estatística módulos gestão">
+      <a class="card mgmt-card item-card is-link" href="#" data-search="gestão p3 estatística">
         <div class="icon-box icon-blue" aria-hidden="true"><svg><use href="#i-chart"/></svg></div>
         <div>
           <h3>Gestão P3</h3>
@@ -160,7 +162,7 @@
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
-      <a class="card mgmt-card item-card is-link" href="gestao_sistema.html?v=10.8.19" data-search="gestão sistema comando módulos gestão">
+      <a class="card mgmt-card item-card is-link" href="#" data-search="gestão sistema comando">
         <div class="icon-box icon-navy" aria-hidden="true"><svg><use href="#i-gear"/></svg></div>
         <div>
           <h3>Gestão de Sistema</h3>
@@ -168,7 +170,7 @@
         </div>
         <svg class="arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
       </a>
-      <a class="card mgmt-card item-card is-link" href="motomecanizacao.html?v=10.8.19" data-search="motomecanização frota checklist módulos gestão">
+      <a class="card mgmt-card item-card is-link" href="#" data-search="motomecanização frota checklist">
         <div class="icon-box icon-amber" aria-hidden="true"><svg><use href="#i-wrench"/></svg></div>
         <div>
           <h3>Motomecanização</h3>
@@ -179,126 +181,63 @@
     </div>
   </section>
 
+  <!-- Documentos / ferramentas -->
   <section class="section" data-block="resources">
     <div class="section-head">
       <h2 class="section-title">Documentos e ferramentas</h2>
     </div>
-    <div class="resource-grid">
+    <div class="bottom-grid">
       <article class="card resource-card item-card" data-search="documentos normativas pop pap">
-        <div class="resource-icon" aria-hidden="true">📚</div>
+        <div class="icon-box icon-navy" aria-hidden="true" style="margin-bottom:12px"><svg><use href="#i-folder"/></svg></div>
         <h3>Documentos e normativas</h3>
         <p>Resoluções internas, POPs, PAPs, normativas e orientações ao efetivo.</p>
-        <a class="resource-link" href="documentos_normativos.html">Acessar documentos <svg width="16" height="16" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <a class="resource-link" href="#">Acessar documentos <svg width="16" height="16" aria-hidden="true"><use href="#i-arrow"/></svg></a>
       </article>
       <article class="card resource-card item-card" data-search="ferramentas qap timestamp camera">
         <h3>Ferramentas úteis</h3>
         <p>Aplicativos de apoio à atuação operacional.</p>
-        <div class="app-grid">
-          <article class="app-mini">
-            <img alt="QAP Multas" src="https://play-lh.googleusercontent.com/cdo4BgaeiUILD8I3YiAxJCpRjK52FW6360ufrdCI_cMb1Dhaf7zQWPqvcqoFjLM7cGLGzamHgt_LJhLpOLTX-w=w240-h480"/>
+        <div class="tools-list">
+          <div class="tool-item">
+            <div class="tool-badge">QAP</div>
             <div>
               <strong>QAP Multas</strong>
               <span>Consulta de apoio ao agente de trânsito</span>
-              <div class="app-links">
-                <a href="https://play.google.com/store/apps/details?id=gf.qapmultas" rel="noopener" target="_blank">Android</a>
-                <a href="https://apps.apple.com/br/app/qap-multas/id1641122075" rel="noopener" target="_blank">iOS</a>
-              </div>
             </div>
-          </article>
-          <article class="app-mini">
-            <img alt="Timestamp Camera" src="https://play-lh.googleusercontent.com/d4arYGxzjh2FaE1HbvI8jNFPZpIMeSHVWkXOMLDcsKkOTEZq-_gc0oFD5c8-FNMd-QFSTw-lT8AvGGS3PrsgpA=w240-h480"/>
+          </div>
+          <div class="tool-item">
+            <div class="tool-badge">TS</div>
             <div>
               <strong>Timestamp Camera</strong>
               <span>Fotos com local, data e hora</span>
-              <div class="app-links">
-                <a href="https://play.google.com/store/apps/details?id=com.jeyluta.timestampcamerafree" rel="noopener" target="_blank">Android</a>
-                <a href="https://apps.apple.com/br/app/timestamp-camera-basic/id840110184" rel="noopener" target="_blank">iOS</a>
-              </div>
             </div>
-          </article>
+          </div>
         </div>
       </article>
     </div>
   </section>
 
   <footer class="site-foot">
-    BPTran / BPRv • Central de Relatórios Operacionais
+    BPTran / BPRv • Central de Relatórios Operacionais • Prévia de layout (sem integração)
   </footer>
 </main>
 
-<button type="button" id="fbFab" class="central-fb-fab" title="Sugestões, dificuldades ou críticas" aria-label="Enviar sugestão à Gestão de Sistema" aria-expanded="false">💬</button>
-<aside id="fbPanel" class="central-fb-panel" hidden>
-  <div class="central-fb-head">
-    <strong>Sugestão à Gestão de Sistema</strong>
-    <button type="button" id="fbClose" class="central-fb-close" aria-label="Fechar">×</button>
-  </div>
-  <p class="central-fb-note">Sugestões, dificuldades ou críticas. Informe sua matrícula e escreva a mensagem.</p>
-  <label for="fbTipo">Tipo</label>
-  <select id="fbTipo">
-    <option value="SUGESTAO">Sugestão</option>
-    <option value="DIFICULDADE">Dificuldade</option>
-    <option value="CRITICA">Crítica</option>
-    <option value="OUTRO">Outro</option>
-  </select>
-  <label for="fbMat">Matrícula</label>
-  <input id="fbMat" maxlength="9" placeholder="000.000-0" inputmode="numeric" autocomplete="off"/>
-  <label for="fbMsg">Mensagem</label>
-  <textarea id="fbMsg" rows="5" placeholder="Descreva sua sugestão, dificuldade ou crítica..."></textarea>
-  <div class="central-fb-actions">
-    <button type="button" id="fbSend">Enviar</button>
-  </div>
-  <div id="fbStatus" class="central-fb-status" aria-live="polite"></div>
-</aside>
-
-<script src="central_cloud.js?v=10.8.19"></script>
 <script>
-function filtrarCards() {
-  const termo = document.getElementById('searchInput').value.trim().toLowerCase();
-  document.querySelectorAll('.item-card').forEach(card => {
-    const texto = (card.innerText + ' ' + (card.getAttribute('data-search') || '')).toLowerCase();
-    card.classList.toggle('hidden', termo && !texto.includes(termo));
-  });
-}
 (function () {
   const input = document.getElementById('searchInput');
-  document.addEventListener('keydown', e => {
+  function filtrarCards() {
+    const termo = (input.value || '').trim().toLowerCase();
+    document.querySelectorAll('.item-card').forEach((card) => {
+      const texto = (card.innerText + ' ' + (card.getAttribute('data-search') || '')).toLowerCase();
+      card.classList.toggle('item-hidden', !!(termo && !texto.includes(termo)));
+    });
+  }
+  input.addEventListener('input', filtrarCards);
+  document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       input.focus();
       input.select();
     }
-  });
-})();
-(function () {
-  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (!ios) return;
-  document.querySelectorAll('.central-platform-link[data-ios-href]').forEach(a => { a.href = a.dataset.iosHref; });
-})();
-(function () {
-  const $ = id => document.getElementById(id);
-  const fab = $('fbFab'), panel = $('fbPanel'), st = $('fbStatus');
-  if (!fab || !panel) return;
-  function open() { panel.hidden = false; fab.setAttribute('aria-expanded', 'true'); $('fbMat')?.focus(); }
-  function close() { panel.hidden = true; fab.setAttribute('aria-expanded', 'false'); if (st) st.textContent = ''; }
-  fab.addEventListener('click', () => { panel.hidden ? open() : close(); });
-  $('fbClose')?.addEventListener('click', close);
-  $('fbMat')?.addEventListener('blur', () => { if (window.CentralCloud) $('fbMat').value = CentralCloud.formatMatricula($('fbMat').value); });
-  $('fbSend')?.addEventListener('click', async () => {
-    if (!window.CentralCloud) { alert('Módulo de nuvem indisponível.'); return; }
-    const matricula = CentralCloud.formatMatricula($('fbMat').value || '');
-    const mensagem = String($('fbMsg').value || '').trim();
-    const tipo = $('fbTipo').value;
-    if (!matricula || matricula.replace(/\D/g, '').length !== 7) { st.textContent = 'Informe a matrícula completa.'; return; }
-    if (mensagem.length < 8) { st.textContent = 'Escreva a mensagem com um pouco mais de detalhe.'; return; }
-    $('fbSend').disabled = true; st.textContent = 'Enviando…';
-    try {
-      await CentralCloud.probe();
-      const r = await CentralCloud.submitForm('sistema-feedback-enviar', { matricula, mensagem, tipo, userAgent: navigator.userAgent || '' }, '', { popup: false, progress: false, timeout: 25000, tokenKind: 'central' });
-      st.textContent = r.message || 'Enviado.';
-      $('fbMsg').value = '';
-      setTimeout(close, 1600);
-    } catch (e) { st.textContent = e.message || String(e); }
-    finally { $('fbSend').disabled = false; }
   });
 })();
 </script>

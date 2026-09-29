@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" role="img" aria-labelledby="title desc">
+  <title id="title">Espaco reservado - brasao BPRv</title>
+  <desc id="desc">Contorno generico de escudo sem heraldica. Placeholder ate o brasao oficial do BPRv ser fornecido.</desc>
+  <!-- Silhueta vazia de escudo (heater); sem simbolos, texto ou cores institucionais -->
+  <path
+    d="M50 6
+       L90 18
+       L90 58
+       Q90 92 50 114
+       Q10 92 10 58
+       L10 18
+       Z"
+    fill="#F4F6F8"
+    stroke="#8A97A5"
+    stroke-width="2.75"
+    stroke-linejoin="round"/>
+</svg>
