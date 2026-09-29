@@ -168,8 +168,8 @@ body.signature-open{overflow:hidden}
 </div>
 </main>
 
-<script src="central_cloud.js?v=10.8.13-auth"></script>
-<script src="module_access_gate.js?v=10.8.13"></script>
+<script src="central_cloud.js?v=10.8.14-auth"></script>
+<script src="module_access_gate.js?v=10.8.14"></script>
 <script>
 const STORE_KEY='pmpb-relatorio-traslados-reboque-v1';
 const REPORT_KEY='pmpb-relatorio-traslados-reboque-report-id-v1';
@@ -301,7 +301,9 @@ async function finalizeCloud(){
 }
 async function loadCloudViewer(){
   if(!VIEW_ONLY||!window.CentralCloud)return;
-  const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');if(!token)return;
+  let token='';try{token=sessionStorage.getItem('pmpb-cloud-viewer-token-v1')||sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+  token=token||CentralCloud.getToken('central')||CentralCloud.getToken('p3')||'';
+  if(!token){setCloudStatus('Visualização não autenticada','err');alert('Não foi possível autenticar a visualização. Feche esta aba e abra novamente o PDF pelo RCO.');return}
   document.body.classList.add('cloud-viewer');setCloudStatus('Carregando documento…');
   try{
     const r=await CentralCloud.jsonp('reboque-get',{reportId:CLOUD_VIEW_REPORT,token});applyCloudPayload(r.reboque||{});
