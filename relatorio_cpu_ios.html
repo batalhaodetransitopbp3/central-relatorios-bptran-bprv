@@ -646,7 +646,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.13-auth"></script>
+<script src="central_cloud.js?v=10.8.14-auth"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
@@ -825,24 +825,32 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(base==='reboque')return ios?'relatorio_traslados_reboque_ios.html':'relatorio_traslados_reboque.html';
     return '';
   }
+  function prepareCloudViewer(token){
+    const viewer=window.open('about:blank','_blank');
+    if(!viewer)return null;
+    try{viewer.sessionStorage.setItem('pmpb-cloud-viewer-token-v1',String(token||''));viewer.opener=null}catch(_){}
+    return viewer;
+  }
   function openCloudRsdPdf(item){
     if(!item?.reportId)return;
+    const token=rcoWorkflowToken(false);if(!token)return;
+    const viewer=prepareCloudViewer(token);if(!viewer){alert('O navegador bloqueou a nova aba do PDF. Permita pop-ups para a Central e tente novamente.');return}
     const url=cloudDocumentPage('rsd')+'?cloudView='+encodeURIComponent(item.reportId);
-    window.open(url,'_blank','noopener');
+    viewer.location.replace(url);
   }
   async function openCloudReboquePdf(item){
-    const viewer=window.open('about:blank','_blank');if(viewer)try{viewer.opener=null}catch(_){}
-    const token=rcoWorkflowToken(false);if(!token){try{viewer?.close()}catch(_){}return}
+    const token=rcoWorkflowToken(false);if(!token)return;
+    const viewer=prepareCloudViewer(token);if(!viewer){alert('O navegador bloqueou a nova aba do PDF. Permita pop-ups para a Central e tente novamente.');return}
     try{
       const params=item.serviceId?{serviceId:item.serviceId,token}:{rsdReportId:item.reportId,token};
       const r=await CentralCloud.jsonp('reboque-list',params);
       const docs=r.items||[];
-      if(!docs.length){try{viewer?.close()}catch(_){}alert('Não há relatório de traslados salvo na Central para esta guarnição.');return}
+      if(!docs.length){try{viewer.close()}catch(_){}alert('Não há relatório de traslados salvo na Central para esta guarnição.');return}
       const doc=docs.find(x=>String(x.status||'').toUpperCase()==='FINALIZADO')||docs[0];
-      if(String(doc.status||'').toUpperCase()!=='FINALIZADO'&&!confirm('O relatório do reboque ainda está em rascunho. Abrir a versão atual para conferência/PDF?')){try{viewer?.close()}catch(_){}return}
+      if(String(doc.status||'').toUpperCase()!=='FINALIZADO'&&!confirm('O relatório do reboque ainda está em rascunho. Abrir a versão atual para conferência/PDF?')){try{viewer.close()}catch(_){}return}
       const url=cloudDocumentPage('reboque')+'?cloudView='+encodeURIComponent(doc.reportId);
-      if(viewer)viewer.location.href=url;else window.open(url,'_blank','noopener');
-    }catch(e){try{viewer?.close()}catch(_){}alert('Não foi possível recuperar o relatório do reboque: '+e.message)}
+      viewer.location.replace(url);
+    }catch(e){try{viewer.close()}catch(_){}alert('Não foi possível recuperar o relatório do reboque: '+e.message)}
   }
 
   async function viewRsd(item){
@@ -1067,6 +1075,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.13"></script>
-<script src="service_flow.js?v=10.8.13"></script>
+<script src="service_access_layers.js?v=10.8.14"></script>
+<script src="service_flow.js?v=10.8.14"></script>
 </body></html>
