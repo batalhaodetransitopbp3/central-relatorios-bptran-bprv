@@ -104,7 +104,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   <div class="list" id="vList"></div>
 </div></div>
 
-<script src="central_cloud.js?v=10.8.18-auth"></script>
+<script src="central_cloud.js?v=10.8.19-sistema"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -125,34 +125,52 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
       st.className='state';st.textContent='Sessão não iniciada.'; out.hidden=true; panel.hidden=true; list.hidden=true; if(fb)fb.hidden=true;
     }
   }
-  async function lookupMat(inputId,nomeId){
+  async function lookupMat(inputId,nomeId,{silent}={}){
     const mat=CentralCloud.formatMatricula($(inputId).value); $(inputId).value=mat;
-    if(mat.replace(/\D/g,'').length<7)return null;
-    const t=token()||$('senha').value.trim(); if(!t)return null;
+    if(mat.replace(/\D/g,'').length<7){
+      if(!silent)alert('Informe a matrícula completa (000.000-0).');
+      return null;
+    }
+    const t=token()||$('senha').value.trim();
+    if(!t){
+      if(!silent)$('sessionState').textContent='Informe a senha para consultar o Cadastro Mestre.';
+      return null;
+    }
     try{
-      const r=await CentralCloud.searchCadastro('militar',mat,{batalhao:$('bat')?.value||'BPTran'},t);
-      const items=r.items||[]; const exact=items.find(x=>CentralCloud.formatMatricula(x.MATRICULA||'')===mat)||items[0];
-      if(exact){ $(nomeId).value=exact.NOME||''; return exact; }
-    }catch(_){}
-    return null;
+      const r=await CentralCloud.searchCadastro('militar',mat,{},t,{tokenKind:'comando',noRetry:true,progress:false,timeout:25000});
+      const items=r.items||[];
+      const exact=items.find(x=>CentralCloud.formatMatricula(x.MATRICULA||x.matricula||'')===mat)
+        ||items.find(x=>String(x.MATRICULA||'').replace(/\D/g,'')===mat.replace(/\D/g,''))
+        ||null;
+      if(exact){ $(nomeId).value=exact.NOME||exact.nome||''; return exact; }
+      if(!silent)alert('Matrícula '+mat+' não encontrada no Cadastro Mestre (aba MILITARES).');
+      return null;
+    }catch(e){
+      if(!silent)alert(e.message||'Falha ao consultar o Cadastro Mestre.');
+      return null;
+    }
   }
   $('bat').onchange=fillCia; fillCia();
   $('data').value=new Date().toISOString().slice(0,10);
-  $('mat').addEventListener('blur',()=>lookupMat('mat','nome'));
+  $('mat').addEventListener('blur',()=>lookupMat('mat','nome',{silent:true}));
   $('btnLogin').onclick=async()=>{
     const senha=$('senha').value.trim(); if(!senha){alert('Informe a senha da Gestão de Sistema.');return}
     CentralCloud.setToken(senha,'comando');
-    const mil=await lookupMat('mat','nome');
-    if(!$('mat').value||!$('nome').value){alert('Identifique o responsável com matrícula válida do Cadastro Mestre.');return}
+    try{sessionStorage.setItem('central-module-auth-comando-v1',(location.pathname.split('/').pop()||'gestao_sistema.html').toLowerCase())}catch(_){}
+    $('btnLogin').disabled=true;
+    $('sessionState').textContent='Validando matrícula e senha…';
     try{
+      const mil=await lookupMat('mat','nome');
+      if(!$('mat').value||!$('nome').value){CentralCloud.clearToken('comando');return}
       await CentralCloud.jsonp('rsd-list',{token:senha,batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value},{timeout:20000,tokenKind:'comando'});
-      saveSession({matricula:$('mat').value,nome:$('nome').value,postoGrad:mil?.POSTO_GRAD||''});
+      saveSession({matricula:$('mat').value,nome:$('nome').value,postoGrad:mil?.POSTO_GRAD||mil?.postoGrad||''});
       $('senha').value='';
       await load();
     }catch(e){
       CentralCloud.clearToken('comando');
-      alert(e.message||'Falha no ingresso. Confira a senha SISTEMA_TOKEN no Apps Script.');
-    }
+      alert(e.message||'Falha no ingresso. Confira a senha da Gestão de Sistema.');
+      renderSession();
+    }finally{$('btnLogin').disabled=false}
   };
   $('btnLogout').onclick=()=>{CentralCloud.clearToken('comando');saveSession(null)};
   function statusPill(st){

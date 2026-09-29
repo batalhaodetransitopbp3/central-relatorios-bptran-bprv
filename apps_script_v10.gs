@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.12';
+var CENTRAL_V10_VERSION = '10.8.13';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -529,15 +529,22 @@ function loadJsonPayload_(row) {
    ========================= */
 
 function cadastroSearch_(p) {
-  var tipo=String(p.tipo||'militar').toLowerCase(), q=String(p.q||'').toLowerCase().trim();
+  var tipo=String(p.tipo||'militar').toLowerCase(), qRaw=String(p.q||'').trim(), q=qRaw.toLowerCase();
+  var qMat=normMat_(qRaw), qDigits=String(qRaw).replace(/\D/g,'');
   var name=tipo.indexOf('viat')===0?'VIATURAS':'MILITARES';
   var list=objects_(sheet_(P3_SHEET_ID,name));
   var b=p.batalhao?normBattalion_(p.batalhao):'', comp=p.companhia?String(p.companhia):'';
   list=list.filter(function(x){
     if (b && String(x.BATALHAO)!==b) return false;
     if (comp && x.COMPANHIA && String(x.COMPANHIA)!==comp) return false;
+    if (!q) return true;
+    if (name==='MILITARES') {
+      var mat=normMat_(x.MATRICULA||x.matricula||'');
+      if (qMat && mat===qMat) return true;
+      if (qDigits.length>=5 && String(x.MATRICULA||'').replace(/\D/g,'').indexOf(qDigits)>=0) return true;
+    }
     var hay=Object.keys(x).map(function(k){return String(x[k]||'');}).join(' ').toLowerCase();
-    return !q || hay.indexOf(q)>=0;
+    return hay.indexOf(q)>=0 || (qDigits.length>=5 && hay.replace(/\D/g,'').indexOf(qDigits)>=0);
   }).slice(0,50);
   return {ok:true,items:list};
 }

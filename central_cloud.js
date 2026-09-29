@@ -57,7 +57,19 @@ async function postOrQueue(action,payload,{token,unit,popup=false}={}){const kin
 async function retryQueue(){if(!navigator.onLine)return {sent:0,pending:readQueue().length,authRequired:0};const q=readQueue(),left=[];let sent=0,authRequired=0;for(const item of q){const kind=item.tokenKind||tokenKindForAction(item.action),t=item.token||getToken(kind);try{await submitForm(item.action,item.payload,t,{popup:false,timeout:8000});sent++}catch(err){item.tries=(item.tries||0)+1;if(isAuthError(err)){item.token='';item.tokenKind=kind;authRequired++}left.push(item)}}writeQueue(left);return {sent,pending:left.length,authRequired}}
 function queueCount(){return readQueue().length}
 async function compressImage(file,{maxSide=1600,quality=.78,type='image/jpeg'}={}){if(!file)return null;const img=await new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);res(im)};im.onerror=e=>{URL.revokeObjectURL(u);rej(e)};im.src=u});let w=img.naturalWidth,h=img.naturalHeight,s=Math.min(1,maxSide/Math.max(w,h));w=Math.max(1,Math.round(w*s));h=Math.max(1,Math.round(h*s));const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);const dataUrl=canvas.toDataURL(type,quality);return {dataUrl,mimeType:type,largura:w,altura:h,tamanhoBytes:Math.round((dataUrl.length-dataUrl.indexOf(',')-1)*.75)}}
-async function searchCadastro(tipo,q,u,token){const isMilitar=String(tipo||'').toLowerCase().indexOf('militar')===0,up=isMilitar?{}:unitParams(u);let t=token||getToken('central')||askToken('central','Informe a chave operacional da Central para consultar o Cadastro Mestre:');if(!t)throw new Error('Consulta cancelada: chave operacional não informada.');try{return await jsonp('cadastros',{...up,tipo,q,token:t})}catch(err){if(!isAuthError(err))throw err;t=askToken('central','A chave informada é inválida. Digite novamente a chave operacional da Central:',true);if(!t)throw new Error('Consulta cancelada: chave operacional não informada.');return await jsonp('cadastros',{...up,tipo,q,token:t})}}
+async function searchCadastro(tipo,q,u,token,opts={}){
+  const isMilitar=String(tipo||'').toLowerCase().indexOf('militar')===0,up=isMilitar?{}:unitParams(u);
+  const kind=opts.tokenKind||(token&&getToken('comando')&&String(token)===String(getToken('comando'))?'comando':'central');
+  let t=token||getToken(kind)||(kind==='comando'?getToken('comando'):'')||askToken(kind==='comando'?'comando':'central',kind==='comando'?'Informe a senha da Gestão de Sistema para consultar o Cadastro Mestre:':'Informe a chave operacional da Central para consultar o Cadastro Mestre:');
+  if(!t)throw new Error('Consulta cancelada: credencial não informada.');
+  try{return await jsonp('cadastros',{...up,tipo,q,token:t},{timeout:opts.timeout||20000,tokenKind:kind,progress:opts.progress})}
+  catch(err){
+    if(!isAuthError(err)||opts.noRetry)throw err;
+    t=askToken(kind,kind==='comando'?'Senha inválida. Digite novamente a senha da Gestão de Sistema:':'A chave informada é inválida. Digite novamente a chave operacional da Central:',true);
+    if(!t)throw new Error('Consulta cancelada: credencial não informada.');
+    return await jsonp('cadastros',{...up,tipo,q,token:t},{timeout:opts.timeout||20000,tokenKind:kind,progress:opts.progress});
+  }
+}
 let progressDepth=0,progressEl=null,progressBarEl=null,progressTextEl=null,progressTimer=null,progressValue=0;
 function progressMessageForAction(action,phase='start'){
   const a=String(action||'').toLowerCase(),finish=phase==='finish'||phase==='response',wait=phase==='wait';
