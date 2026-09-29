@@ -7,6 +7,7 @@ const MODULES=[
   {re:/^relatorio_traslados_reboque(?:_ios)?\.html$/i,module:'REBOQUE',title:'Relatório de Traslado / Reboque'},
   {re:/^checklist_viatura(?:_ios)?\.html$/i,module:'CHECKLIST',title:'Checklist de Viatura'},
   {re:/^cirvc_transporte\.html$/i,module:'CIRVC_TRANSPORTE',title:'CIRVC — Transporte'},
+  {re:/^boletim_ocorrencia_bptrans_1cprv(?:_ios)?\.html$/i,module:'BOPM',title:'Boletim de Ocorrência — BOPM'},
   {re:/^cadastros_admin\.html$/i,module:'CADASTROS_ADMIN',title:'Cadastro Mestre — Administração',kind:'p3'},
   {re:/^motomecanizacao\.html$/i,module:'MOTOMECANIZACAO',title:'Motomecanização',kind:'p3'}
 ];
