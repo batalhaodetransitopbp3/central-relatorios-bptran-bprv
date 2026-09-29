@@ -10,14 +10,14 @@ function getToken(kind='central'){try{return localStorage.getItem(kind==='p3'?P3
 function setToken(v,kind='central'){try{const k=kind==='p3'?P3_TOKEN_KEY:TOKEN_KEY;if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(_){}}
 function moduleAuthLocked(kind='central'){try{const current=(location.pathname.split('/').pop()||'').toLowerCase(),operational=(sessionStorage.getItem('central-module-auth-operational-v1')||'').toLowerCase(),p3module=(sessionStorage.getItem('central-module-auth-p3-v1')||'').toLowerCase();if(kind==='central')return sessionStorage.getItem('central-module-auth-rsd-v1')==='1'||(operational&&operational===current);if(kind==='p3')return !!(p3module&&p3module===current);return false}catch(_){return false}}
 function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;if(moduleAuthLocked(kind)){setTimeout(()=>{try{global.dispatchEvent(new CustomEvent('central-module-auth-lost',{detail:{kind,message:'A credencial de ingresso não está disponível.'}}))}catch(_){}},0);return ''}t=prompt(message||(kind==='p3'?'Informe a Chave P3:':'Informe a chave operacional da Central:'))||'';t=t.trim();if(t)setToken(t,kind);return t}
-const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
-function tokenKindForAction(action){return P3_ACTIONS.has(String(action||''))?'p3':'central'}
+const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-analysis-compare','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-retification-open']);
+function tokenKindForAction(action){const a=String(action||'');if(a.startsWith('master-'))return 'master';return P3_ACTIONS.has(a)?'p3':'central'}
 function isAuthError(err){return err?.code==='AUTH_INVALID'||/(chave|credencial)[^\n]{0,80}inválid/i.test(String(err?.message||err||''))}
 function authError(action,message,token,kindOverride){const e=new Error(message||'Chave inválida.');if(/(chave|credencial)[^\n]{0,80}inválid/i.test(e.message)){const kind=kindOverride||tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;if(kind==='central'||kind==='p3'){const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind);setTimeout(()=>{try{global.dispatchEvent(new CustomEvent('central-module-auth-lost',{detail:{kind,message:e.message}}))}catch(_){}},0)}}return e}
 function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
-function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
+function jsonpRaw(action,params={},opts={}){return new Promise((resolve,reject)=>{
   const showProgress=action!=='version'&&opts.progress!==false;if(showProgress)beginProgress(progressMessageForAction(action,'start'));
   const callback='__central_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
   let done=false,timer;
@@ -35,6 +35,17 @@ function jsonp(action,params={},opts={}){return new Promise((resolve,reject)=>{
   if(showProgress)updateProgress(progressMessageForAction(action,'wait'),34);
   timer=setTimeout(()=>finish(new Error('Tempo esgotado ao consultar a Central.')),opts.timeout||20000);
 })}
+async function jsonp(action,params={},opts={}){
+  const token=String(params?.token||'');
+  if(!token||action==='version')return jsonpRaw(action,params,opts);
+  const payload={...params};delete payload.token;delete payload.callback;delete payload._;
+  try{
+    return await submitForm(action,payload,token,{popup:false,progress:opts.progress,timeout:opts.timeout||20000,tokenKind:opts.tokenKind||tokenKindForAction(action)});
+  }catch(err){
+    if(/não reconhecida|POST não reconhecida/i.test(String(err?.message||err)))return jsonpRaw(action,params,opts);
+    throw err;
+  }
+}
 function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2),showProgress=opts.progress!==false;let win=null,iframe=null,target=name;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}if(showProgress)beginProgress(progressMessageForAction(action,'start'));const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;if(showProgress)updateProgress(progressMessageForAction(action,'response'),88);cleanup(d.ok);d.ok?resolve(d):reject(authError(action,d.message||'Operação rejeitada.',token,opts.tokenKind))};function cleanup(ok){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400);if(showProgress)endProgress(ok===false?'Falha na operação.':'Concluído.')}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();if(showProgress)updateProgress(progressMessageForAction(action,'wait'),38);timer=setTimeout(()=>{cleanup(false);reject(new Error('Tempo esgotado ao comunicar com a Central.'))},opts.timeout||20000)})}
 function readQueue(){try{const x=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
 function writeQueue(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-100)))}catch(_){}}

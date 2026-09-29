@@ -727,7 +727,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     const ref=document.querySelector('.toolbar');
     if(ref && !document.querySelector('.service-state-bar')){
       const bar=document.createElement('div');bar.className='service-state-bar no-print';
-      bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço (limpar histórico)</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><button type="button" class="secondary small" onclick="gerarPassagemServico()">Realizar passagem de serviço</button><button type="button" class="secondary small" onclick="centralRsdReceiveCloud()">Receber passagem de serviço</button><a class="secondary small central-home-link" href="index.html" aria-label="Home" title="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h5v-6h3v6h5V9.5"></path></svg></a><span class="state-note">Fluxo normal pela nuvem. Use Inserir manualmente apenas em contingência.</span>';
+      bar.innerHTML='<button type="button" class="secondary small" onclick="window.centralReturnToAccess&&centralReturnToAccess(\'rsd\')">Trocar serviço</button><button type="button" class="secondary small" onclick="gerarPassagemServico()">Realizar passagem de serviço</button><a class="secondary small central-home-link" href="index.html" aria-label="Home" title="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h5v-6h3v6h5V9.5"></path></svg></a><span class="state-note">Serviço ativo. Novo, Continuar e Receber ficam no painel de acesso.</span>';
       ref.insertAdjacentElement('afterend',bar);
     }
     document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
@@ -802,7 +802,7 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.14-auth"></script>
+<script src="central_cloud.js?v=10.8.16-auth"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -939,24 +939,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   window.centralRsdClaimCloudItem=claimCloudItem;
   async function continueFromCloud(matOverride=''){
     if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rsd','continue');return true}
-    const token=CentralCloud.getToken('central')||promptOperationalKey(false);if(!token)return null;let mat=CentralCloud.formatMatricula(matOverride||val('matriculaResponsavel'));
-    if(!/^\d{3}\.\d{3}-\d$/.test(mat))mat=CentralCloud.formatMatricula(prompt('Informe a matrícula do comandante para localizar seu serviço:')||'');if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Matrícula inválida.');return true}
-    try{
-      const hints={matricula:mat,reportId:reportId||'',serviceId:serviceId||'',vtrPrincipal:val('viatura')||'',guarnicao:val('guarnicao')||'',token};
-      const r=await CentralCloud.jsonp('rsd-active',hints,{timeout:20000}),items=r.items||[];
-      if(items.length){
-        const choice=await chooseContinueService(items);if(!choice)return true;
-        if(choice.action==='cancel'){await cancelOwnedCloudItem(choice.item,mat);return true}
-        if(choice.action==='continue'){
-          if(String(choice.item?.status||'')==='PASSAGEM_DISPONIVEL'){alert('Este serviço está com passagem aguardando recebimento. Cancele a passagem ou aguarde o novo comandante assumir o serviço.');return true}
-          return await claimCloudItem(choice.item,false,mat)
-        }
-        return true
-      }
-      const hist=await CentralCloud.jsonp('rsd-list',{matricula:mat,token},{timeout:20000}),all=(hist.items||[]).sort((a,b)=>String(b.finalizadoEm||b.ultimoRascunhoEm||b.iniciadoEm||'').localeCompare(String(a.finalizadoEm||a.ultimoRascunhoEm||a.iniciadoEm||'')));
-      if(all.length){const item=all[0],rr=await CentralCloud.jsonp('rsd-get',{reportId:item.reportId,token},{timeout:20000});renderReviewBanner(rr.rsd||{});alert(reviewMessage(rr.rsd||{}));return true}
-      return false;
-    }catch(e){alert('Não foi possível consultar a Central agora: '+e.message);return null}
+    alert('Atualize a página para usar a busca de serviços abertos por companhia. A localização por matrícula foi desativada.');return false;
   }
   function zeroLike(x){if(Array.isArray(x))return[];if(x&&typeof x==='object'){const o={};Object.keys(x).forEach(k=>o[k]=zeroLike(x[k]));return o}return typeof x==='number'?0:''}
 
@@ -1211,6 +1194,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.14"></script>
-<script src="service_flow.js?v=10.8.13"></script>
+<script src="service_access_layers.js?v=10.8.16"></script>
+<script src="service_flow.js?v=10.8.16"></script>
 </body></html>

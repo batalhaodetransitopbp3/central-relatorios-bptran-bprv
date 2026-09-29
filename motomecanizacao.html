@@ -13,6 +13,7 @@
 <div><label>Status</label><select id="status"><option value="">Todos</option><option>ABERTA</option><option>EM_ANALISE</option><option>EM_MANUTENCAO</option><option>SOLUCIONADA</option></select></div>
 <div><label>Pesquisar prefixo/item/descrição</label><input id="q" type="search" placeholder="Ex.: 8563, giroflex, pneu..."></div>
 <button id="refresh">Atualizar</button></div>
+<div id="motomecStatus" class="empty" style="display:none;margin-top:8px;padding:10px;border:1px solid #d5e0e8;border-radius:9px;background:#f8fbfd;color:#52697e;font-size:12px;font-weight:700"></div>
 <div class="actions"><a href="index.html" class="btn secondary">Voltar à Central</a></div></section>
 <section class="stats" id="stats"></section>
 <section class="card"><h2>Pendências da frota</h2><div class="tablewrap"><table class="tbl"><thead><tr><th>VTR</th><th>Unidade</th><th>Item</th><th>Descrição</th><th>Status</th><th>Aberta em</th><th>Ação</th></tr></thead><tbody id="body"></tbody></table></div></section>
@@ -26,15 +27,25 @@
 <div><label>Foto da solução (opcional)</label><input id="mFoto" type="file" accept="image/*"></div>
 <div class="actions"><button id="mSave">Salvar atualização</button><button class="secondary" id="mCancel">Cancelar</button></div>
 </div></div>
-<script src="central_cloud.js?v=10.8.13-auth"></script>
-<script src="module_access_gate.js?v=10.8.13"></script><script>
+<script src="central_cloud.js?v=10.8.16-auth"></script>
+<script src="module_access_gate.js?v=10.8.16"></script><script>
 (function(){
  const $=id=>document.getElementById(id), allCias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];let data=[],current=null;
  $('cia').innerHTML='<option value="">Todas as 10 companhias</option>'+allCias.map(x=>'<option>'+x+'</option>').join('');
  function tok(){return CentralCloud.askToken('p3')}
  async function ensure(){if(!await CentralCloud.probe())throw new Error('Backend v10 ainda não publicado.');const t=tok();if(!t)throw new Error('Informe a Chave P3.');return t}
  async function load(){
-  try{const t=await ensure(),r=await CentralCloud.jsonp('motomecanizacao-list',{token:t,batalhao:$('bat').value,companhia:$('cia').value,status:$('status').value});data=r.pendencias||[];render()}catch(e){alert(e.message)}
+  const st=$('motomecStatus'),btn=$('refresh');
+  try{
+   if(st){st.style.display='block';st.textContent='Consultando pendências da frota na Central…'}
+   if(btn)btn.disabled=true;
+   const t=await ensure(),r=await CentralCloud.jsonp('motomecanizacao-list',{token:t,batalhao:$('bat').value,companhia:$('cia').value,status:$('status').value},{timeout:45000});
+   data=r.pendencias||[];render();
+   if(st){st.textContent=data.length?(data.length+' pendência(s) carregada(s).'):'Nenhuma pendência encontrada para os filtros.';setTimeout(()=>{st.style.display='none'},2500)}
+  }catch(e){
+   if(st){st.style.display='block';st.textContent=e.message||String(e)}
+   alert(e.message)
+  }finally{if(btn)btn.disabled=false}
  }
  function filtered(){const q=$('q').value.toLowerCase().trim();return data.filter(x=>!q||[x.PREFIXO,x.ITEM,x.DESCRICAO,x.COMPANHIA].join(' ').toLowerCase().includes(q))}
  function render(){

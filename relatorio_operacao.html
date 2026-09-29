@@ -67,7 +67,7 @@ function n(id){return num(val(id))}
 function localISODate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function init(){document.getElementById('operacaoNome').innerHTML=optionHtml(OPERACOES);bindCommon();document.getElementById('data').value=localISODate();atualizarLocalMode();togglePodStatusOperacao()}
 function atualizarLocalMode(){const blitz=val('modalidade')==='Checkpoint / Blitz';document.getElementById('blitzHelp').classList.toggle('hidden',!blitz);document.getElementById('rondaHelp').classList.toggle('hidden',blitz)}
-function togglePodStatusOperacao(){const st=val('podStatus');const wrap=document.getElementById('podMotivoWrap');if(wrap)wrap.classList.toggle('hidden',!['Executado em local diverso','Executado parcialmente','Não executado'].includes(st))}
+function togglePodStatusOperacao(){const st=val('podStatus');const wrap=document.getElementById('podMotivoWrap');if(wrap)wrap.classList.toggle('hidden',!['Executado em local diverso','Executado parcialmente','Não executado'].includes(st));const cb=document.getElementById('localDiferentePrevisto');if(cb){if(st==='Executado em local diverso')cb.checked=true;else if(st==='Executado conforme previsto')cb.checked=false}syncLocalOperacao()}
 function syncLocalOperacao(){const cb=document.getElementById('localDiferentePrevisto'),loc=document.getElementById('localDescricao'),prev=document.getElementById('podLocalPrevisto');if(!loc)return;const diferente=!!cb?.checked;loc.readOnly=!diferente;loc.setAttribute('aria-readonly',diferente?'false':'true');if(!diferente)loc.value=prev?.value||'';if(typeof syncPrintValue==='function')syncPrintValue(loc)}
 function capturarGPS(){if(!navigator.geolocation){alert('Geolocalização não disponível neste aparelho.');return}navigator.geolocation.getCurrentPosition(p=>{document.getElementById('coordenadas').value=`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`},()=>alert('Não foi possível obter a localização. Verifique a permissão do navegador.'),{enableHighAccuracy:true,timeout:12000})}
 function abrirMaps(){const c=val('coordenadas');if(!c){alert('Informe as coordenadas primeiro.');return}window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c)}`,'_blank','noopener')}
@@ -231,8 +231,8 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
 })();
 </script>
 
-<script src="central_cloud.js?v=10.8.13-auth"></script>
-<script src="module_access_gate.js?v=10.8.13"></script>
+<script src="central_cloud.js?v=10.8.16-auth"></script>
+<script src="module_access_gate.js?v=10.8.16"></script>
 <script id="operation-cloud-v10">
 (function(){
   function install(){

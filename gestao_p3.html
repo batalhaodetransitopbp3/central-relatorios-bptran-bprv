@@ -81,7 +81,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  <section class="card"><div class="section-head"><div><h2>Painel de Indicadores</h2><div class="note">Área destinada à apresentação visual dos indicadores operacionais para oficiais, comando, reuniões e briefings. A Gestão P3 é a fonte de consulta e conferência; o painel transforma esses mesmos dados em gráficos de leitura rápida.</div></div></div><div class="analysis-explain"><strong>Para que serve?</strong> Depois de consultar um indicador na Gestão P3, use este painel para apresentá-lo de forma visual: evolução por período, comparação entre companhias, distribuição dos resultados e outros gráficos gerenciais.</div><div class="powerbi-box"><div><div class="powerbi-state" id="biState">Verificando se há um painel institucional configurado...</div><div class="powerbi-url" id="biUrl"></div></div><div class="quick-links"><button id="biOpen">Abrir apresentação dos indicadores</button><button class="secondary" id="biConfigure">Configurar painel</button></div></div><div id="biFrameWrap" class="powerbi-frame-wrap hidden"><iframe id="biFrame" class="powerbi-frame" title="Painel de Indicadores"></iframe><div class="powerbi-frame-note">Se o painel não puder ser exibido dentro desta página, utilize “Abrir apresentação dos indicadores”.</div></div></section>
 </section>
 </main>
-<script src="central_cloud.js?v=10.8.4-progress1"></script>
+<script src="central_cloud.js?v=10.8.16-auth"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id),cias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
@@ -130,12 +130,20 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
    });
  }
  function beginProgress(msg){
-   clearInterval(progressTimer);progressValue=7;
+   clearInterval(progressTimer);progressValue=7;const startedAt=Date.now();
    const host=$('backendProgressHost');if(host){host.hidden=false;host.setAttribute('aria-busy','true')}
    $('progressBox')?.classList.add('show');if($('progressBar'))$('progressBar').style.width=progressValue+'%';
    if($('progressText'))$('progressText').textContent=msg||'Consultando a Central...';
    setBusyControls(true);
-   progressTimer=setInterval(()=>{progressValue=Math.min(92,progressValue+(progressValue<50?8:progressValue<75?4:2));if($('progressBar'))$('progressBar').style.width=progressValue+'%'},450)
+   progressTimer=setInterval(()=>{
+     progressValue=Math.min(92,progressValue+(progressValue<50?8:progressValue<75?4:2));
+     if($('progressBar'))$('progressBar').style.width=progressValue+'%';
+     const secs=Math.round((Date.now()-startedAt)/1000);
+     if($('progressText')&&secs>=3){
+       const base=String($('progressText').textContent||'').replace(/\s*\(\d+s\).*$/,'');
+       $('progressText').textContent=base+' ('+secs+'s). Aguarde — não clique novamente.';
+     }
+   },450)
  }
  function progressStep(value,msg){progressValue=Math.max(progressValue,Math.min(95,Number(value)||0));if($('progressBar'))$('progressBar').style.width=progressValue+'%';if(msg&&$('progressText'))$('progressText').textContent=msg}
  function endProgress(ok,msg){
@@ -176,7 +184,17 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
  function date(v){return v?String(v).slice(0,10).split('-').reverse().join('/'):'—'}
  function fmt(k,v){if(k==='STATUS'||k==='STATUS_CUSTODIA'||k==='STATUS_REGISTRO')return statusPill(v);if(/DATA_SERVICO|^DATA$/.test(k))return esc(date(v));if(k==='VALOR_FIPE'||k==='VALOR_FIPE_ESTATISTICO')return Number(v||0)?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';if(/EM$|DATA_HORA/.test(k)&&v){try{return esc(new Date(v).toLocaleString('pt-BR'))}catch(_){}}return esc(v??'')}
  const recordTiming=(action,t0,r)=>{const total=Math.round(performance.now()-t0),server=Number(r?.queryMs||0);lastQueryTiming={action,total,server};const el=$('queryTiming');if(el)el.textContent='Última comunicação: '+(total/1000).toFixed(1)+' s'+(server?' • processamento na Central: '+(server/1000).toFixed(1)+' s':'');return r};
- const p3Get=async(action,params)=>{const t0=performance.now();const r=await CentralCloud.jsonp(action,params,{timeout:60000});return recordTiming(action,t0,r)};
+ const p3Get=async(action,params)=>{
+   const t0=performance.now();
+   try{
+     const r=await CentralCloud.jsonp(action,params,{timeout:90000,progress:false});
+     return recordTiming(action,t0,r);
+   }catch(e){
+     if(/Tempo esgotado|timeout/i.test(String(e.message||e)))throw new Error('A consulta demorou mais de 90 segundos. Reduza o período ou o número de companhias e tente novamente. Os filtros foram preservados.');
+     if(/Falha de comunicação/i.test(String(e.message||e)))throw new Error('Falha de comunicação com a Central. Verifique a conexão e tente novamente. Os filtros foram preservados.');
+     throw e;
+   }
+ };
  const p3Post=async(action,payload,token,options={})=>{const t0=performance.now();const r=await CentralCloud.submitForm(action,payload,token,{popup:false,...options});return recordTiming(action,t0,r)};
  async function load(){
    const seq=++loadSequence;let ok=false;beginProgress(progressLabel());setSourceNote(null);

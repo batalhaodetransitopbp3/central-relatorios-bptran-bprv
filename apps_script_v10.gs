@@ -15,7 +15,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.7';
+var CENTRAL_V10_VERSION = '10.8.10';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -23,15 +23,18 @@ var CHECKLIST_PHOTO_FOLDER_ID = '13dEydl5Ej4zCW0Z1TNOLxooizF6lx3ZC';
 var RSD_PAYLOAD_FOLDER_ID = '13eMc58sdk2uD_6Np-8fvoUq9Dw3Sk3jn';
 var CIRVC_SIGNATURE_FOLDER_ID = '1IonmgIFfbeSvkBtDLOnrWJBnbzJ6AMfa';
 
-function doGet(e) {
-  try {
-    var p = (e && e.parameter) || {};
-    var action = String(p.action || 'version');
-    var out;
+function handleApiReadViaGet_(action, p) {
+  p = p || {};
+  action = String(action || 'version');
+  var out;
 
-    if (action === 'version') {
-      out = {ok:true, version:CENTRAL_V10_VERSION, schema:'central-v10'};
-    } else if (action === 'access-open-services') {
+  if (action === 'version') {
+    out = {ok:true, version:CENTRAL_V10_VERSION, schema:'central-v10'};
+  } else if (action === 'access-open-services') {
+      var openModule=String(p.module||'').toUpperCase();
+      if(openModule==='RCO') assertToken_(p.token,'coord');
+      else if(openModule==='RSD') assertToken_(p.token,'central');
+      else throw new Error('Módulo de acesso inválido.');
       out = {ok:true, items:accessOpenServices_(p)};
     } else if (action === 'access-check') {
       var accessModule=String(p.module||'').toUpperCase();
@@ -109,9 +112,17 @@ function doGet(e) {
     } else if (action === 'master-cadastros') {
       assertToken_(p.token, 'master-session');
       out = cadastroSearch_(p);
-    } else {
-      throw new Error('Ação GET não reconhecida: ' + action);
-    }
+  } else {
+    throw new Error('Ação de consulta não reconhecida: ' + action);
+  }
+  return out;
+}
+
+function doGet(e) {
+  try {
+    var p = (e && e.parameter) || {};
+    var action = String(p.action || 'version');
+    var out = handleApiReadViaGet_(action, p);
     if (String(p.transport||'') === 'message') return postMessagePage_(action, out, p.requestId||'');
     return jsonp_(out, p.callback);
   } catch (err) {
@@ -254,6 +265,10 @@ function doPost(e) {
     } else if (action === 'master-passagem-anular') {
       assertToken_(token, 'master-session');
       out = masterPassagemAnular_(payload);
+    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'version') {
+      var q=Object.assign({},payload||{});
+      q.token=token;
+      out = handleApiReadViaGet_(action, q);
     } else {
       throw new Error('Ação POST não reconhecida: ' + action);
     }
@@ -388,8 +403,15 @@ function deleteWhere_(s, field, value) {
   for (var i=vals.length-1;i>=0;i--) if (String(vals[i][0]) === String(value)) s.deleteRow(i+2);
 }
 function findOne_(s, field, value) {
-  var list=objects_(s);
-  for (var i=0;i<list.length;i++) if (String(list[i][field])===String(value)) return list[i];
+  var h = headers_(s), idx = h.indexOf(field), last = s.getLastRow();
+  if (idx < 0 || last < 2) return null;
+  var target = String(value), vals = s.getRange(2, idx + 1, last - 1, 1).getDisplayValues();
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) !== target) continue;
+    var row = i + 2, rowVals = s.getRange(row, 1, 1, h.length).getValues()[0], o = {_row: row};
+    h.forEach(function(k, j){ if (k) o[k] = rowVals[j]; });
+    return o;
+  }
   return null;
 }
 function uid_(p) { return (p||'id') + '-' + Utilities.getUuid(); }
@@ -1578,9 +1600,10 @@ function checklistList_(p) {
   return {ok:true,items:filterCommon_(list,p).slice(-500).reverse()};
 }
 function motomecanizacaoList_(p) {
-  var pend=filterCommon_(objects_(sheet_(CHECKLIST_SHEET_ID,'ALTERACOES')),p);
+  var fields=['ALTERACAO_ID','CHECKLIST_ID','VIATURA_ID','PREFIXO','BATALHAO','COMPANHIA','ITEM','DESCRICAO','STATUS','ABERTA_EM','EM_ANALISE_EM','EM_MANUTENCAO_EM','RESOLVIDO_EM','RESPONSAVEL_MATRICULA','RESPONSAVEL_NOME','FOTO_FINAL_URL','ATUALIZADO_EM','SOLUCAO'];
+  var pend=filterCommon_(objectsFields_(sheet_(CHECKLIST_SHEET_ID,'ALTERACOES'),fields),p);
   if(p.status) pend=pend.filter(function(x){return String(x.STATUS)===String(p.status);});
-  return {ok:true,pendencias:pend.slice(-1000).reverse(),viaturas:objects_(sheet_(CHECKLIST_SHEET_ID,'VIATURAS')).slice(0,3000)};
+  return {ok:true,pendencias:pend.slice(-1000).reverse()};
 }
 function motomecanizacaoUpdate_(payload) {
   var id=String(payload.pendenciaId||payload.alteracaoId||''), s=sheet_(CHECKLIST_SHEET_ID,'ALTERACOES'), row=findOne_(s,'ALTERACAO_ID',id);
@@ -1846,13 +1869,14 @@ function p3MetricContribution_(x,code){
 function p3Analysis_(p) {
   var catalog=p3IntegratedCatalog_(),requested=String(p.indicador||catalog[0].codigo),
       meta=catalog.filter(function(x){return x.codigo===requested||x.nome===requested})[0]||catalog[0],code=meta.codigo;
-  var facts=p3ProductionFacts_(p,'effective',0),list=facts.items,byCompany={},byDate={},total=0;
+  var di=dateText_(p.dataInicio||p.inicio||''),df=dateText_(p.dataFim||p.fim||'');
+  var scan=p3ProductionFastEffective_(p,di,df),list=scan.items||[],byCompany={},byDate={},total=0;
   list.forEach(function(x){
     var q=p3MetricContribution_(x,code);if(!q)return;
     var co=String(x.COMPANHIA||'Não informada'),d=dateText_(x.DATA_SERVICO||'');
     total+=q;byCompany[co]=(byCompany[co]||0)+q;if(d)byDate[d]=(byDate[d]||0)+q;
   });
-  return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:facts.sourceStats,
+  return {ok:true,indicadores:catalog.map(function(x){return x.nome}),catalogo:catalog,indicador:meta,total:total,sourceStats:scan.sourceStats,fast:true,
     porCompanhia:Object.keys(byCompany).sort().map(function(k){return {nome:k,valor:byCompany[k]};}),
     porData:Object.keys(byDate).sort().map(function(k){return {data:k,valor:byDate[k]};})};
 }
@@ -1935,7 +1959,8 @@ function p3Query_(p) {
     });
   }
   else if(view==='rco-origens'){
-    list=objects_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'));if(p.rcoReportId)list=list.filter(function(x){return String(x.RCO_REPORT_ID||'')===String(p.rcoReportId)});
+    list=p3FastFields_('RCO_ORIGENS',p,2000,['DATA_SERVICO','DATA'],['RCO_REPORT_ID','RSD_REPORT_ID','SERVICE_ID','SEGMENTO','GUARNICAO','STATUS','VERSAO','DATA_SERVICO','BATALHAO','COMPANHIA','INCLUIDO_EM']);
+    if(p.rcoReportId)list=list.filter(function(x){return String(x.RCO_REPORT_ID||'')===String(p.rcoReportId)});
   }
   else if(view==='operacoes'){
     var opFields=['REGISTRO_ID','DATA','COMPANHIA','GUARNICAO_RESPONSAVEL','OPERACAO','TURNO','LOCAL','LATITUDE','LONGITUDE','PESSOAS_ABORDADAS','MOTOCICLETAS_ABORDADAS','AUTOMOVEIS_ABORDADOS','CICLOMOTORES_ABORDADOS','ART_165','ART_165_A','ART_230_XI','OUTROS_AITS_COM_ABORDAGEM','AITS_SEM_ABORDAGEM','PRISOES','STATUS_REGISTRO'];
@@ -1963,8 +1988,14 @@ function p3Query_(p) {
     var newRows=newSheet?p3FastFields_('VEICULOS_OPERACIONAIS',p,2000,['DATA'],vehicleFields):[],oldRows=oldSheet?p3FastFields_('VEICULOS_RECUPERADOS',p,2000,['DATA'],vehicleFields):[];
     list=p3MergeById_(newRows,oldRows,['REGISTRO_ID']);
   }
-  else if(view==='viaturas')list=objects_(sheet_(P3_SHEET_ID,'VIATURAS'));
-  else if(view==='militares')list=objects_(sheet_(P3_SHEET_ID,'MILITARES'));
+  else if(view==='viaturas'){
+    list=filterCommon_(objectsFields_(sheet_(P3_SHEET_ID,'VIATURAS'),['PREFIXO','MODELO','MARCA','BATALHAO','COMPANHIA','STATUS','PLACA','TIPO','UNIDADE']),p);
+  }
+  else if(view==='militares'){
+    list=objectsFields_(sheet_(P3_SHEET_ID,'MILITARES'),['MATRICULA','NOME','POSTO_GRAD','BATALHAO','COMPANHIA','UNIDADE','SITUACAO']);
+    var mq=String(p.q||p.matricula||'').trim().toLowerCase();
+    if(mq)list=list.filter(function(x){return [x.MATRICULA,x.NOME,x.POSTO_GRAD,x.UNIDADE,x.COMPANHIA].join(' ').toLowerCase().indexOf(mq)>=0});
+  }
   else throw new Error('Visão P3 desconhecida.');
   return done_({ok:true,items:(list||[]).slice(-2000).reverse()});
 }
@@ -1997,10 +2028,15 @@ function masterLeaseState_(row){
   return {active:active,deviceId:String((row||{}).EDIT_DEVICE_ID||''),until:until};
 }
 function masterOverview_(p){
-  p=p||{};var rsd=objects_(sheet_(P3_SHEET_ID,'RSD')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
-      rco=objects_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
-      pass=objects_(sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO')).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
-      aud=objects_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES')).filter(function(x){
+  p=p||{};
+  var rsdFields=['REPORT_ID','SERVICE_ID','SEGMENTO','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','GUARNICAO_TIPO','VTR_PRINCIPAL','STATUS','RESPONSAVEL_NOME','RESPONSAVEL_POSTO_GRAD','RESPONSAVEL_MATRICULA','INICIADO_EM','FINALIZADO_EM','ULTIMO_RASCUNHO_EM','SINCRONIZADO_EM','RCO_REPORT_ID','EDIT_DEVICE_ID','EDIT_LEASE_UNTIL','CANCELADO_MOTIVO','CANCELADO_EM','CANCELADO_POR_NOME','REVIEW_STATUS'];
+  var rcoFields=['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS','RESPONSAVEL_NOME','RESPONSAVEL_MATRICULA','REVISAO','ULTIMO_SYNC_EM','ATUALIZADO_EM','EDIT_DEVICE_ID','EDIT_LEASE_UNTIL','ORIGEM'];
+  var passFields=['PASSAGEM_ID','SERVICE_ID','DATA_SERVICO','BATALHAO','COMPANHIA','GUARNICAO','STATUS','ENTREGUE_POR_NOME','ENTREGUE_POR_MATRICULA','DISPONIBILIZADA_EM','RECEBIDA_POR_NOME','RECEBIDA_POR_MATRICULA','RECEBIDA_EM','OBSERVACOES','ATUALIZADO_EM'];
+  var audFields=['AUDITORIA_ID','TIPO_ENTIDADE','ENTIDADE_ID','ACAO','DATA_HORA','RESPONSAVEL_NOME','RESPONSAVEL_MATRICULA','BATALHAO','COMPANHIA'];
+  var rsd=objectsFields_(sheet_(P3_SHEET_ID,'RSD'),rsdFields).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      rco=objectsFields_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),rcoFields).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      pass=objectsFields_(sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO'),passFields).filter(function(x){return masterFilter_(x,p,['DATA_SERVICO']);}),
+      aud=objectsFields_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES'),audFields).filter(function(x){
         if(p.batalhao&&String(x.BATALHAO||'')!==normBattalion_(p.batalhao))return false;
         if(p.companhia&&String(x.COMPANHIA||'')!==String(p.companhia))return false;
         if(p.data&&dateText_(x.DATA_HORA)!==dateText_(p.data))return false;

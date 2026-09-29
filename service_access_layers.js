@@ -222,6 +222,10 @@ function clearIngressKey(type){
  if(type==='rsd'){CentralCloud.clearToken('central');try{sessionStorage.removeItem(ACCESS_AUTH_RSD)}catch(_){}}
  else{try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem(ACCESS_AUTH_RCO)}catch(_){}}
 }
+function savedIngressKey(type){
+ if(type==='rsd'){try{return CentralCloud.getToken('central')||''}catch(_){return ''}}
+ try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}
+}
 global.centralReturnToAccess=function(type){
  type=type==='rsd'?'rsd':'rco';
  clearIngressKey(type);
@@ -253,9 +257,10 @@ function pickerParams(el){
  const b=q('[data-picker-batt]',el)?.value||'BPTran',n=Number(q('[data-picker-comp]',el)?.value||1)||1;
  return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}
 }
-function openServicePicker(type,mode){
- const receive=mode==='receive',label=type==='rsd'?'RSD':'RCO',title=receive?'Receber serviço em andamento':'Continuar serviço em andamento';
- const subtitle=receive?'Escolha a companhia. Serão exibidos somente os serviços formalmente disponibilizados para passagem.':'Escolha a companhia. Serão exibidos todos os serviços ainda abertos, com a data para identificação segura.';
+async function openServicePicker(type,mode){
+ const receive=mode==='receive',title=receive?'Receber serviço em andamento':'Continuar serviço em andamento';
+ const subtitle=receive?'Informe a chave no ingresso, escolha a companhia e selecione somente serviços com passagem disponibilizada.':'Informe a chave no ingresso, escolha a companhia e selecione o serviço aberto pela data, VTR e status.';
+ let key=savedIngressKey(type);if(!key)key=await requestIngressKey(type);if(!key){startScreen(type);return}
  const el=shell(title,subtitle,pickerUnitFields()+'<div class="central-access-toolbar"><button data-refresh>Atualizar serviços</button><button data-back>Voltar</button></div><div class="central-access-list" data-list><div class="central-access-empty">Selecione a companhia para consultar os serviços.</div></div>');
  const batt=q('[data-picker-batt]',el),comp=q('[data-picker-comp]',el);
  batt.onchange=()=>{comp.innerHTML=companies(batt.value,1);setTimeout(()=>loadOpenServices(el,type,mode),0)};
@@ -265,9 +270,10 @@ function openServicePicker(type,mode){
 }
 async function loadOpenServices(el,type,mode){
  const box=q('[data-list]',el);if(!box)return;const p=pickerParams(el);
+ let token=savedIngressKey(type);if(!token){token=await requestIngressKey(type);if(!token){box.innerHTML='<div class="central-access-error">Informe a chave de ingresso para consultar os serviços.</div>';return}}
  box.innerHTML='<div class="central-access-loading">Consultando os serviços da '+esc(p.companhia)+'…</div>';
  try{
-   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia},{timeout:20000}),rawItems=r.items||[],items=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
+   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia,token},{timeout:20000}),rawItems=r.items||[],items=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
    if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
    box.innerHTML=items.map((x,i)=>{
      const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
@@ -283,7 +289,7 @@ async function loadOpenServices(el,type,mode){
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
 }
 async function enterSelectedService(type,mode,item,el){
- const key=await requestIngressKey(type);if(!key)return false;
+ let key=savedIngressKey(type);if(!key)key=await requestIngressKey(type);if(!key)return false;
  if(type==='rsd'){
    if(mode==='receive'){
      if(typeof global.centralRsdReceiveSelectedPassage!=='function'){alert('Atualize a página para carregar o fluxo de recebimento.');return false}
@@ -320,29 +326,40 @@ function clearResumeIntent(){
  try{sessionStorage.removeItem(RETURN_KEY)}catch(_){}
  try{history.replaceState({},'',location.pathname)}catch(_){}
 }
+async function waitForRsdClaimApi(ms=8000){
+ const start=Date.now();
+ while(typeof global.centralRsdClaimCloudItem!=='function'&&Date.now()-start<ms){
+   await new Promise(r=>setTimeout(r,80));
+ }
+ return typeof global.centralRsdClaimCloudItem==='function';
+}
 async function resumeRsd(){
  const rc=resumeContext();
  shell('Retornando ao serviço','Reabrindo o RSD que estava em preenchimento.',`<div class="central-access-loading">Consultando primeiro o serviço salvo na Central…</div>`);
+ let lastError='';
  try{
    let local=null;
    try{local=JSON.parse(localStorage.getItem('pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
    const localMat=global.CentralCloud?CentralCloud.formatMatricula(local?.guarnicao?.matricula||local?.matriculaResponsavel||''):(local?.guarnicao?.matricula||'');
-   if(rc.reportId&&typeof global.centralRsdClaimCloudItem==='function'){
-     const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento,matricula:localMat},false,localMat);
-     if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
-   }
-   if(typeof global.centralContinueService==='function'){
-     const ok=await global.centralContinueService();
-     if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
+   let key=savedIngressKey('rsd');if(!key)key=await requestIngressKey('rsd');
+   if(!key){clearLayer();clearResumeIntent();alert('Informe a chave operacional para reabrir o RSD. Os dados locais foram preservados.');startScreen('rsd');return false}
+   if(rc.reportId){
+     const ready=await waitForRsdClaimApi();
+     if(ready){
+       try{
+         const ok=await global.centralRsdClaimCloudItem({reportId:rc.reportId,serviceId:rc.serviceId,segmento:rc.segmento,matricula:localMat},false,localMat,key);
+         if(ok){lockRsdHeader();clearLayer();exitSetup();clearResumeIntent();setTimeout(()=>global.centralRefreshServiceModules?.(),180);return true}
+       }catch(e){lastError=String(e&&e.message||e||'')}
+     }else lastError='O módulo de nuvem do RSD ainda não terminou de carregar. Atualize a página e tente novamente.';
    }
    if(local&&(!rc.reportId||String(local.reportId||'')===String(rc.reportId))&&typeof global.applyPayload==='function'){
-     if(confirm('A Central não conseguiu reabrir o serviço. Deseja carregar o rascunho local deste aparelho apenas como contingência?')){
+     if(confirm('A Central não conseguiu reabrir o serviço automaticamente'+(lastError?(' ('+lastError+')'):'')+'. Deseja carregar o rascunho local deste aparelho apenas como contingência? Os dados não serão apagados.')){
        global.applyPayload(local);clearLayer();exitSetup();clearResumeIntent();return true
      }
    }
- }catch(e){}
+ }catch(e){lastError=String(e&&e.message||e||'')}
  clearLayer();clearResumeIntent();
- alert('Não foi possível reabrir automaticamente o RSD anterior. O sistema manterá o fluxo de acesso para que o serviço possa ser localizado sem apagar dados.');
+ alert('Não foi possível reabrir automaticamente o RSD anterior'+(lastError?(': '+lastError):'')+'. O sistema manterá o fluxo de acesso para que o serviço possa ser localizado sem apagar dados.');
  startScreen('rsd');return false;
 }
 function init(){
@@ -362,9 +379,13 @@ function init(){
  startScreen(type);
 }
 global.addEventListener('central-module-auth-lost',e=>{
- const type=pageType();if(type!=='rsd'||e?.detail?.kind!=='central')return;
+ const type=pageType();
  if(q('#centralAccessKeyOverlay')||q('#centralAccessLayer'))return;
- setTimeout(()=>global.centralReturnToAccess?.('rsd'),0);
+ if(type==='rsd'&&e?.detail?.kind==='central'){setTimeout(()=>global.centralReturnToAccess?.('rsd'),0);return}
+ if(type==='rco'){
+  const msg=String(e?.detail?.message||'');
+  if(e?.detail?.kind==='central'||/rco|coordenad|credencial/i.test(msg))setTimeout(()=>global.centralReturnToAccess?.('rco'),0);
+ }
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,180));else setTimeout(init,180);
 })(window);
