@@ -8,8 +8,14 @@ function unit(){const b=String(val('globalBatalhao')||'BPTran').toUpperCase()===
 function checklistId(){let id='';try{id=localStorage.getItem(CHECKLIST_ID_KEY)||''}catch(_){}if(!id){id=global.CentralCloud?.uid('chk')||('chk-'+Date.now());try{localStorage.setItem(CHECKLIST_ID_KEY,id)}catch(_){}}return id}
 function selectedValue(item){return item.querySelector('input[type="radio"]:checked')?.value||''}
 function isIrregular(v){return ['nao','defeito','avaria','baixo','baixa','ausente'].includes(String(v||'').toLowerCase())}
+function currentVehicleTipo(){
+  const raw=String(el('tipo_veiculo')?.value||global.CENTRAL_CHECKLIST_VEHICLE_TIPO||'AUTOMOVEL').toUpperCase();
+  if(/MOTO/.test(raw))return 'MOTOCICLETA';
+  if(/REBOQUE|GUINCHO/.test(raw))return 'REBOQUE';
+  return 'AUTOMOVEL';
+}
 function collectItems(){
-  return [...document.querySelectorAll('.checklist-section .check-item')].map(item=>{
+  return [...document.querySelectorAll('.checklist-section .check-item')].filter(item=>!item.classList.contains('tipo-hidden')).map(item=>{
     const key=item.dataset.item||item.querySelector('input[type="radio"]')?.name||'';
     const sec=item.closest('.checklist-section');
     const label=item.querySelector('.item-name')?.textContent?.trim()||key;
@@ -25,11 +31,11 @@ function collectPhotos(){
   }).filter(Boolean);
 }
 function buildPayload(){
-  const u=unit(), id=checklistId();
+  const u=unit(), id=checklistId(), tipo=currentVehicleTipo();
   return {checklist:{
     checklistId:id,batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,companhia:u.companhia,
     dataHora:[val('data_inicio'),val('hora_inicio')].filter(Boolean).join('T')||new Date().toISOString(),
-    viatura:{prefixo:val('prefixo'),placa:val('placa'),marcaModelo:val('marca_modelo'),tipo:''},
+    viatura:{prefixo:val('prefixo'),placa:val('placa'),marcaModelo:val('marca_modelo'),tipo:tipo},
     km:val('km_inicial'),turno:val('turno'),local:val('local'),condutorMatricula:global.CentralCloud?.formatMatricula(val('matricula'))||val('matricula'),
     condutorNome:val('condutor'),condutorPostoGrad:'',itens:collectItems(),fotos:collectPhotos(),observacoes:val('observacoes'),assinaturaDataUrl:val('signatureData')
   }};
@@ -49,7 +55,7 @@ async function finalizar(){
   if(!val('prefixo')){alert('Informe o prefixo da viatura.');el('prefixo')?.focus();return}
   if(!val('matricula')){alert('Informe a matrícula do condutor.');el('matricula')?.focus();return}
   if(!val('condutor')){alert('Informe o nome do condutor.');el('condutor')?.focus();return}
-  const missing=[...document.querySelectorAll('.checklist-section .check-item')].filter(item=>!item.querySelector('input[type="radio"]:checked'));
+  const missing=[...document.querySelectorAll('.checklist-section .check-item')].filter(item=>!item.classList.contains('tipo-hidden')&&!item.querySelector('input[type="radio"]:checked'));
   if(missing.length){alert('Ainda existem '+missing.length+' item(ns) do checklist sem resposta.');missing[0].scrollIntoView({behavior:'smooth',block:'center'});return}
   if(el('signatureData')&&!el('signatureData').value){alert('A assinatura do condutor é obrigatória antes da finalização no banco.');el('signatureBox')?.scrollIntoView({behavior:'smooth',block:'center'});return}
   const p=buildPayload();
@@ -69,5 +75,6 @@ function install(){
   const m=el('matricula');if(m){m.addEventListener('blur',()=>{m.value=global.CentralCloud?.formatMatricula(m.value)||m.value})}
 }
 global.centralChecklistPayload=buildPayload;
+global.centralChecklistVehicleTipo=currentVehicleTipo;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })(window);

@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestão de Sistema — BPTran/BPRv</title>
+<style>
+:root{--b:#17375e;--b2:#2e6696;--bg:#edf3f7;--line:#c9d6e0;--ok:#176b3a;--warn:#8a5b00;--danger:#9a2b3e;--text:#19334b;--muted:#64798b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,Helvetica,sans-serif;color:var(--text)}
+.head{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;padding:16px}.head h1{margin:0;font-size:22px}.head p{margin:4px 0 0;opacity:.92}
+.wrap{max-width:1400px;margin:auto;padding:12px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:12px}
+label{display:block;font-size:10px;font-weight:900;color:#536b7d;margin-bottom:4px;text-transform:uppercase}
+input,select,textarea{width:100%;min-height:38px;border:1px solid #becdd8;border-radius:8px;padding:7px;background:#fff}
+button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.secondary{background:#e8eef3;color:var(--b);border:1px solid #c3d1dc}.danger{background:var(--danger)}.warn{background:#b7791f}
+.filters{display:grid;grid-template-columns:1fr 1.2fr 1fr auto auto;gap:8px;align-items:end}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.login{display:grid;grid-template-columns:1fr 1.2fr 1fr auto;gap:8px;align-items:end}.state{min-height:38px;display:flex;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#f7fafc;color:var(--muted);font-size:12px}.state.ok{background:#eaf6ee;color:var(--ok);border-color:#b9dac4}
+.tablewrap{overflow:auto;max-height:62vh;border:1px solid #d7e0e7;border-radius:9px}.tbl{width:100%;border-collapse:collapse;min-width:1100px}
+.tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid #d9e2e9;text-align:left;vertical-align:top}.tbl th{position:sticky;top:0;background:#f3f7f9;font-size:10px;color:#516a7f;text-transform:uppercase}
+.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:800;background:#edf2f6}
+.pill.ok{background:#e7f4ea;color:#176b3a}.pill.warn{background:#fff3d5;color:#7d5600}.pill.danger{background:#fbe8ed;color:#922b43}
+.modal{position:fixed;inset:0;background:#071523aa;display:flex;align-items:center;justify-content:center;padding:14px;z-index:60}.modal.hidden{display:none}
+.modalbox{width:min(820px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:14px;padding:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.note{font-size:12px;color:var(--muted)}.empty{padding:24px;text-align:center;color:var(--muted)}.list{display:grid;gap:6px;margin:8px 0}.list .item{border:1px solid #d7e0e7;border-radius:8px;padding:8px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+@media(max-width:900px){.filters,.login{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="head">
+  <h1>Gestão de Sistema</h1>
+  <p>Acompanhamento do batalhão por companhia · efetivo · viaturas · retificação e controle do serviço</p>
+</header>
+<main class="wrap">
+  <section class="card" id="loginCard">
+    <h2>Ingresso da Gestão de Sistema</h2>
+    <p class="note">Senha exclusiva da Gestão de Sistema (`SISTEMA_TOKEN`). Identifique o responsável com matrícula do Cadastro Mestre.</p>
+    <div class="login">
+      <div><label>Matrícula</label><input id="mat" placeholder="000.000-0" maxlength="9"></div>
+      <div><label>Nome (auto)</label><input id="nome" placeholder="Preenchido pelo cadastro"></div>
+      <div><label>Senha da Gestão de Sistema</label><input id="senha" type="password" autocomplete="off"></div>
+      <button id="btnLogin" type="button">Entrar</button>
+    </div>
+    <div id="sessionState" class="state" style="margin-top:10px">Sessão não iniciada.</div>
+    <div class="actions"><button type="button" class="secondary" id="btnLogout" hidden>Encerrar sessão</button><a class="btn secondary" href="index.html">Central</a></div>
+  </section>
+
+  <section class="card" id="panelCard" hidden>
+    <div class="filters">
+      <div><label>Batalhão</label><select id="bat"><option>BPTran</option><option>BPRv</option></select></div>
+      <div><label>Companhia</label><select id="cia"></select></div>
+      <div><label>Data do serviço</label><input id="data" type="date"></div>
+      <button id="btnLoad" type="button">Atualizar</button>
+      <button id="btnAuto" type="button" class="secondary">Auto 45s</button>
+    </div>
+    <p class="note" id="loadNote">Selecione companhia e data para ver as guarnições em serviço.</p>
+  </section>
+
+  <section class="card" id="listCard" hidden>
+    <h2>Guarnições da companhia</h2>
+    <div class="tablewrap">
+      <table class="tbl">
+        <thead><tr><th>Status</th><th>Guarnição</th><th>VTR</th><th>Comandante</th><th>Matrícula</th><th>Revisão</th><th>Ações</th></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="fbCard" hidden>
+    <div class="section-head" style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+      <h2 style="margin:0">Mensagens do efetivo</h2>
+      <button type="button" class="secondary" id="btnFb">Atualizar mensagens</button>
+    </div>
+    <p class="note">Sugestões, dificuldades e críticas enviadas pela Central (canto do index).</p>
+    <div class="tablewrap">
+      <table class="tbl">
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Matrícula</th><th>Nome</th><th>Mensagem</th></tr></thead>
+        <tbody id="fbBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modal hidden"><div class="modalbox">
+  <h2 id="mTitle">Detalhe do RSD</h2>
+  <p class="note" id="mMeta"></p>
+  <div class="actions" id="mActions"></div>
+  <h3>Efetivo</h3>
+  <div class="row">
+    <div><label>Matrícula</label><input id="eMat" placeholder="000.000-0"></div>
+    <div><label>Nome</label><input id="eNome" placeholder="Busca automática"></div>
+  </div>
+  <div class="actions"><button type="button" id="eAdd">Incluir militar</button></div>
+  <div class="list" id="eList"></div>
+  <h3>Viaturas</h3>
+  <div class="row">
+    <div><label>Prefixo</label><input id="vPrefixo"></div>
+    <div><label>Placa</label><input id="vPlaca"></div>
+  </div>
+  <div class="row">
+    <div><label>Marca/modelo</label><input id="vMarca"></div>
+    <div><label>Tipo</label><select id="vTipo"><option value="AUTOMOVEL">Automóvel</option><option value="MOTOCICLETA">Motocicleta</option><option value="REBOQUE">Reboque</option></select></div>
+  </div>
+  <div class="actions"><button type="button" id="vAdd">Incluir viatura</button><button type="button" id="btnSavePatch" class="warn">Salvar efetivo/VTR no RSD</button><button type="button" class="secondary" id="mClose">Fechar</button></div>
+  <div class="list" id="vList"></div>
+</div></div>
+
+<script src="central_cloud.js?v=10.8.18-auth"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const SESSION_KEY='pmpb-comando-session-v1';
+  const cias={BPTran:['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran'],BPRv:['1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv']};
+  let session=null, items=[], current=null, equipe=[], viaturas=[], autoTimer=null;
+  function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+  function token(){return CentralCloud.getToken('comando')||''}
+  function fillCia(){const b=$('bat').value; $('cia').innerHTML=cias[b].map(x=>'<option>'+x+'</option>').join('')}
+  function readSession(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch(_){return null}}
+  function saveSession(s){session=s;try{if(s)sessionStorage.setItem(SESSION_KEY,JSON.stringify(s));else sessionStorage.removeItem(SESSION_KEY)}catch(_){} renderSession()}
+  function renderSession(){
+    const st=$('sessionState'), out=$('btnLogout'), panel=$('panelCard'), list=$('listCard'), fb=$('fbCard');
+    if(session&&token()){
+      st.className='state ok';st.innerHTML='<strong>'+esc(session.nome||'')+'</strong> — '+esc(session.matricula||'')+' · Gestão de Sistema ativa';
+      out.hidden=false; panel.hidden=false; list.hidden=false; if(fb)fb.hidden=false;
+    }else{
+      st.className='state';st.textContent='Sessão não iniciada.'; out.hidden=true; panel.hidden=true; list.hidden=true; if(fb)fb.hidden=true;
+    }
+  }
+  async function lookupMat(inputId,nomeId){
+    const mat=CentralCloud.formatMatricula($(inputId).value); $(inputId).value=mat;
+    if(mat.replace(/\D/g,'').length<7)return null;
+    const t=token()||$('senha').value.trim(); if(!t)return null;
+    try{
+      const r=await CentralCloud.searchCadastro('militar',mat,{batalhao:$('bat')?.value||'BPTran'},t);
+      const items=r.items||[]; const exact=items.find(x=>CentralCloud.formatMatricula(x.MATRICULA||'')===mat)||items[0];
+      if(exact){ $(nomeId).value=exact.NOME||''; return exact; }
+    }catch(_){}
+    return null;
+  }
+  $('bat').onchange=fillCia; fillCia();
+  $('data').value=new Date().toISOString().slice(0,10);
+  $('mat').addEventListener('blur',()=>lookupMat('mat','nome'));
+  $('btnLogin').onclick=async()=>{
+    const senha=$('senha').value.trim(); if(!senha){alert('Informe a senha da Gestão de Sistema.');return}
+    CentralCloud.setToken(senha,'comando');
+    const mil=await lookupMat('mat','nome');
+    if(!$('mat').value||!$('nome').value){alert('Identifique o responsável com matrícula válida do Cadastro Mestre.');return}
+    try{
+      await CentralCloud.jsonp('rsd-list',{token:senha,batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value},{timeout:20000,tokenKind:'comando'});
+      saveSession({matricula:$('mat').value,nome:$('nome').value,postoGrad:mil?.POSTO_GRAD||''});
+      $('senha').value='';
+      await load();
+    }catch(e){
+      CentralCloud.clearToken('comando');
+      alert(e.message||'Falha no ingresso. Confira a senha SISTEMA_TOKEN no Apps Script.');
+    }
+  };
+  $('btnLogout').onclick=()=>{CentralCloud.clearToken('comando');saveSession(null)};
+  function statusPill(st){
+    const s=String(st||'');
+    const tone=/CANCEL|INDEFER/.test(s)?'danger':/RETIF|AGUARD|EM_SERVICO|PASSAGEM/.test(s)?'warn':'ok';
+    return '<span class="pill '+tone+'">'+esc(s||'—')+'</span>';
+  }
+  async function load(){
+    if(!token()){alert('Faça o ingresso com a senha da Gestão de Sistema.');return}
+    $('loadNote').textContent='Consultando guarnições…';
+    try{
+      const r=await CentralCloud.jsonp('rsd-list',{token:token(),batalhao:$('bat').value,companhia:$('cia').value,data:$('data').value,showCancelled:'1'},{timeout:45000,tokenKind:'comando'});
+      items=r.items||[];
+      $('body').innerHTML=items.length?items.map((x,i)=>'<tr><td>'+statusPill(x.status)+'</td><td>'+esc(x.guarnicao||'—')+'</td><td>'+esc(x.vtrPrincipal||'—')+'</td><td>'+esc(x.responsavel||'—')+'</td><td>'+esc(x.matricula||'—')+'</td><td>'+esc(x.reviewStatus||x.revisao||'—')+'</td><td><button onclick="openRsd('+i+')">Abrir</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhum RSD nesta companhia/data.</td></tr>';
+      window.__cmdItems=items;
+      $('loadNote').textContent=items.length+' registro(s) em '+$('cia').value+' · '+$('data').value;
+    }catch(e){$('loadNote').textContent=e.message;alert(e.message)}
+  }
+  $('btnLoad').onclick=load;
+  $('btnAuto').onclick=()=>{
+    if(autoTimer){clearInterval(autoTimer);autoTimer=null;$('btnAuto').textContent='Auto 45s';return}
+    load(); autoTimer=setInterval(load,45000); $('btnAuto').textContent='Parar auto';
+  };
+  function renderEquipe(){
+    $('eList').innerHTML=equipe.length?equipe.map((m,i)=>'<div class="item"><div><strong>'+esc(m.postoGrad?m.postoGrad+' ':'')+esc(m.nome||'')+'</strong><br><small>'+esc(m.matricula||'')+'</small></div><button class="secondary" onclick="rmEq('+i+')">Excluir</button></div>').join(''):'<div class="empty">Nenhum militar na equipe nominada.</div>';
+  }
+  function renderVtrs(){
+    $('vList').innerHTML=viaturas.length?viaturas.map((v,i)=>'<div class="item"><div><strong>'+esc(v.prefixo||'')+'</strong> · '+esc(v.placa||'—')+'<br><small>'+esc(v.marcaModelo||'')+' · '+esc(v.tipo||'')+'</small></div><button class="secondary" onclick="rmVtr('+i+')">Excluir</button></div>').join(''):'<div class="empty">Nenhuma viatura vinculada.</div>';
+  }
+  window.rmEq=i=>{equipe.splice(i,1);renderEquipe()};
+  window.rmVtr=i=>{viaturas.splice(i,1);renderVtrs()};
+  $('eMat').addEventListener('blur',()=>lookupMat('eMat','eNome'));
+  $('eAdd').onclick=async()=>{
+    await lookupMat('eMat','eNome');
+    const matricula=$('eMat').value,nome=$('eNome').value;
+    if(!matricula||!nome){alert('Informe matrícula válida.');return}
+    if(equipe.some(x=>x.matricula===matricula)){alert('Militar já está na equipe.');return}
+    equipe.push({matricula,nome,postoGrad:'',papel:'EFETIVO'});
+    $('eMat').value='';$('eNome').value='';renderEquipe();
+  };
+  $('vAdd').onclick=()=>{
+    const prefixo=String($('vPrefixo').value||'').trim().toUpperCase();
+    if(!prefixo){alert('Informe o prefixo.');return}
+    if(viaturas.some(x=>x.prefixo===prefixo)){alert('Viatura já incluída.');return}
+    viaturas.push({prefixo,placa:String($('vPlaca').value||'').toUpperCase(),marcaModelo:$('vMarca').value,tipo:$('vTipo').value});
+    $('vPrefixo').value='';$('vPlaca').value='';$('vMarca').value='';renderVtrs();
+  };
+  window.act=async function(action,extra){
+    if(!current)return;
+    const motivo=prompt('Motivo / observação da ação:','')||'';
+    if(!motivo.trim()){alert('Informe o motivo.');return}
+    const payload=Object.assign({
+      reportId:current.reportId||current.REPORT_ID,
+      motivo:motivo.trim(),
+      observacao:motivo.trim(),
+      autorMatricula:session.matricula,
+      autorNome:session.nome,
+      autorPostoGrad:session.postoGrad||'',
+      perfil:'COMANDO'
+    },extra||{});
+    try{
+      const r=await CentralCloud.submitForm(action,payload,token(),{popup:false,timeout:25000,tokenKind:'comando'});
+      alert(r.message||'OK'); await load();
+    }catch(e){alert(e.message)}
+  };
+  async function act(action,extra){return window.act(action,extra)}
+  window.openRsd=async(i)=>{
+    const base=(window.__cmdItems||[])[i]; if(!base)return;
+    try{
+      const r=await CentralCloud.jsonp('rsd-get',{token:token(),reportId:base.reportId},{timeout:30000,tokenKind:'comando'});
+      current=Object.assign({},base,r.rsd||{});
+      const g=current.guarnicao||{};
+      equipe=Array.isArray(g.equipe)?g.equipe.slice():[];
+      viaturas=(Array.isArray(current.viaturas)?current.viaturas:(Array.isArray(g.viaturas)?g.viaturas:[])).map(v=>typeof v==='string'?{prefixo:v}:v);
+      $('mTitle').textContent=(g.nome||'RSD')+' · '+(current.centralStatus||base.status||'');
+      $('mMeta').textContent='Report '+base.reportId+' · VTR '+(base.vtrPrincipal||g.vtrPrincipal||'—')+' · '+(g.responsavel||base.responsavel||'');
+      $('mActions').innerHTML=[
+        ['Enviar retificação',"act('rsd-review',{decision:'RETIFICACAO_SOLICITADA'})"],
+        ['Deferir',"act('rsd-review',{decision:'DEFERIDO'})"],
+        ['Deferir c/ ressalvas',"act('rsd-review',{decision:'DEFERIDO_COM_RESSALVAS'})"],
+        ['Indeferir',"act('rsd-review',{decision:'INDEFERIDO'})"],
+        ['Forçar finalização',"act('rsd-force-finalize')"],
+        ['Excluir/cancelar',"act('rsd-cancel')"]
+      ].map(a=>'<button type="button" class="'+(a[0].indexOf('Excluir')===0?'danger':a[0].indexOf('retif')>=0?'warn':'')+'" onclick="'+a[1]+'">'+a[0]+'</button>').join('');
+      renderEquipe(); renderVtrs(); $('modal').classList.remove('hidden');
+    }catch(e){alert(e.message)}
+  };
+  $('btnSavePatch').onclick=async()=>{
+    if(!current?.reportId)return;
+    try{
+      const r=await CentralCloud.submitForm('comando-rsd-patch',{
+        reportId:current.reportId,equipe,viaturas,
+        autorMatricula:session.matricula,autorNome:session.nome,acao:'EFETIVO_VIATURAS',motivo:'Atualização pela Gestão de Sistema'
+      },token(),{popup:false,timeout:25000,tokenKind:'comando'});
+      alert(r.message||'Salvo.'); await load();
+    }catch(e){alert(e.message)}
+  };
+  $('mClose').onclick=()=>{$('modal').classList.add('hidden');current=null};
+  async function loadFeedback(){
+    if(!token())return;
+    try{
+      const r=await CentralCloud.jsonp('sistema-feedback-list',{token:token()},{timeout:30000,tokenKind:'comando'});
+      const rows=r.items||[];
+      $('fbBody').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(String(x.CRIADO_EM||'').replace('T',' ').slice(0,19))+'</td><td>'+esc(x.TIPO||'')+'</td><td>'+esc(x.MATRICULA||'')+'</td><td>'+esc(x.NOME||'—')+'</td><td>'+esc(x.MENSAGEM||'')+'</td></tr>').join(''):'<tr><td colspan="5" class="empty">Nenhuma mensagem recebida.</td></tr>';
+    }catch(e){$('fbBody').innerHTML='<tr><td colspan="5" class="empty">'+esc(e.message||e)+'</td></tr>'}
+  }
+  $('btnFb')?.addEventListener('click',loadFeedback);
+  saveSession(readSession());
+  if(session&&token()){load();loadFeedback()}
+})();
+</script>
+</body>
+</html>

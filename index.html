@@ -585,6 +585,17 @@
 .card-fisco-subtle{background:linear-gradient(180deg,#fbfcfd,#f2f5f7)!important;border-color:#d7dfe5!important}.card-fisco-subtle p{font-weight:900;color:#5a6570}
 .resource-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:12px;margin:18px 0}.resource-card{display:flex;gap:12px;background:rgba(255,255,255,.94);border:1px solid #d3dde6;border-radius:17px;padding:15px;box-shadow:0 7px 20px rgba(15,23,42,.06)}.resource-card h2{font-size:15px;margin:0 0 5px;color:#0f4c81}.resource-card p{font-size:12px;color:#64748b;margin:0 0 9px}.resource-icon{font-size:30px}.resource-link,.app-links a{display:inline-flex;text-decoration:none;border-radius:9px;padding:7px 10px;background:#0f4c81;color:white;font-size:11px;font-weight:850}.app-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.app-mini{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:8px;border:1px solid #dce5ec;border-radius:11px;background:#fbfdff}.app-mini img{width:52px;height:52px;object-fit:cover;border-radius:12px;background:#e8eef4}.app-mini strong{display:block;font-size:12px;color:#263b50}.app-mini span{display:block;font-size:10.5px;color:#68798a;line-height:1.3;margin:2px 0 6px}.app-links{display:flex;gap:5px}.app-links a{padding:5px 7px;font-size:9.5px}
 @media(max-width:760px){.resource-grid{grid-template-columns:1fr}.app-grid{grid-template-columns:1fr}.resource-card{padding:11px}.app-mini{grid-template-columns:46px 1fr}.app-mini img{width:46px;height:46px}}
+.central-fb-fab{position:fixed;right:14px;bottom:14px;z-index:90;width:46px;height:46px;border-radius:999px;border:1px solid #b7c8d6;background:#f7fafc;color:#31506e;box-shadow:0 8px 20px rgba(15,23,42,.14);font-size:18px;cursor:pointer;opacity:.88}
+.central-fb-fab:hover{opacity:1;background:#fff}
+.central-fb-panel{position:fixed;right:14px;bottom:68px;z-index:91;width:min(340px,calc(100vw - 28px));background:#fff;border:1px solid #c9d6e0;border-radius:14px;padding:12px;box-shadow:0 14px 34px rgba(15,23,42,.18)}
+.central-fb-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.central-fb-head strong{font-size:13px;color:#0f4c81}
+.central-fb-close{border:0;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:#64748b}
+.central-fb-note{margin:0 0 8px;font-size:11px;color:#64748b;line-height:1.35}
+.central-fb-panel label{display:block;font-size:10px;font-weight:800;color:#536b7d;margin:7px 0 3px;text-transform:uppercase}
+.central-fb-panel input,.central-fb-panel select,.central-fb-panel textarea{width:100%;border:1px solid #becdd8;border-radius:8px;padding:8px;font:13px Arial,Helvetica,sans-serif}
+.central-fb-actions{margin-top:10px}.central-fb-actions button{width:100%;border:0;border-radius:9px;background:#0f4c81;color:#fff;padding:10px;font-weight:800;cursor:pointer}
+.central-fb-status{margin-top:8px;font-size:11px;color:#31506e;min-height:16px}
 </style><style id="central-index-compact-v108">
 .central-primary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px}
 .central-primary-card{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;padding:18px}
@@ -679,8 +690,9 @@
       <h2>Módulos de gestão</h2>
       <p>Ferramentas destinadas à conferência, estatística e acompanhamento administrativo.</p>
       <div class="central-secondary-grid compact">
-        <a class="central-secondary-link" href="gestao_p3.html"><strong>Gestão P3</strong><span>Produtividade, histórico e estatística</span></a>
-        <a class="central-secondary-link" href="motomecanizacao.html?v=10.8.16"><strong>Motomecanização</strong><span>Frota, checklists e pendências</span></a>
+        <a class="central-secondary-link" href="gestao_p3.html?v=10.8.18"><strong>Gestão P3</strong><span>Produtividade, histórico e estatística</span></a>
+        <a class="central-secondary-link" href="gestao_sistema.html?v=10.8.18"><strong>Gestão de Sistema</strong><span>Batalhão por companhia, efetivo e viaturas</span></a>
+        <a class="central-secondary-link" href="motomecanizacao.html?v=10.8.18"><strong>Motomecanização</strong><span>Frota, checklists e pendências</span></a>
       </div>
     </div>
   </article>
@@ -690,10 +702,37 @@
 <article class="resource-card tools-card"><div class="resource-icon">🧰</div><div><h2>Ferramentas úteis</h2><p>Aplicativos sugeridos para consulta de legislação e apoio ao registro operacional.</p><div class="app-grid">
 <article class="app-mini"><img alt="QAP Multas" src="https://play-lh.googleusercontent.com/cdo4BgaeiUILD8I3YiAxJCpRjK52FW6360ufrdCI_cMb1Dhaf7zQWPqvcqoFjLM7cGLGzamHgt_LJhLpOLTX-w=w240-h480"/><div><strong>QAP Multas</strong><span>Consulta atualizada de apoio à atuação do agente de trânsito.</span><div class="app-links"><a href="https://play.google.com/store/apps/details?id=gf.qapmultas" rel="noopener" target="_blank">Android</a><a href="https://apps.apple.com/br/app/qap-multas/id1641122075" rel="noopener" target="_blank">iOS</a></div></div></article>
 <article class="app-mini"><img alt="Timestamp Camera" src="https://play-lh.googleusercontent.com/d4arYGxzjh2FaE1HbvI8jNFPZpIMeSHVWkXOMLDcsKkOTEZq-_gc0oFD5c8-FNMd-QFSTw-lT8AvGGS3PrsgpA=w240-h480"/><div><strong>Timestamp Camera</strong><span>Fotografias com referência de local, data e hora.</span><div class="app-links"><a href="https://play.google.com/store/apps/details?id=com.jeyluta.timestampcamerafree" rel="noopener" target="_blank">Android</a><a href="https://apps.apple.com/br/app/timestamp-camera-basic/id840110184" rel="noopener" target="_blank">iOS</a></div></div></article>
-</div></div></article></section><footer>
+</div></div></article></section>
+
+<button type="button" id="fbFab" class="central-fb-fab" title="Sugestões, dificuldades ou críticas" aria-label="Enviar sugestão à Gestão de Sistema">💬</button>
+<aside id="fbPanel" class="central-fb-panel" hidden>
+  <div class="central-fb-head">
+    <strong>Fale com a Gestão de Sistema</strong>
+    <button type="button" id="fbClose" class="central-fb-close" aria-label="Fechar">×</button>
+  </div>
+  <p class="central-fb-note">Sugestões, dificuldades ou críticas. Informe sua matrícula e escreva a mensagem.</p>
+  <label for="fbTipo">Tipo</label>
+  <select id="fbTipo">
+    <option value="SUGESTAO">Sugestão</option>
+    <option value="DIFICULDADE">Dificuldade</option>
+    <option value="CRITICA">Crítica</option>
+    <option value="OUTRO">Outro</option>
+  </select>
+  <label for="fbMat">Matrícula</label>
+  <input id="fbMat" maxlength="9" placeholder="000.000-0" inputmode="numeric" autocomplete="off">
+  <label for="fbMsg">Mensagem</label>
+  <textarea id="fbMsg" rows="5" placeholder="Descreva sua sugestão, dificuldade ou crítica..."></textarea>
+  <div class="central-fb-actions">
+    <button type="button" id="fbSend">Enviar</button>
+  </div>
+  <div id="fbStatus" class="central-fb-status" aria-live="polite"></div>
+</aside>
+
+<footer>
       BPTran / BPRv • Central de Relatórios Operacionais
     </footer>
 </main>
+<script src="central_cloud.js?v=10.8.18-auth"></script>
 <script>
     function filtrarCards() {
       const termo = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -706,6 +745,33 @@
       const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
       if(!ios)return;
       document.querySelectorAll('.central-platform-link[data-ios-href]').forEach(a=>a.href=a.dataset.iosHref);
+    })();
+    (function(){
+      const $=id=>document.getElementById(id);
+      const fab=$('fbFab'), panel=$('fbPanel'), st=$('fbStatus');
+      if(!fab||!panel)return;
+      function open(){panel.hidden=false;fab.setAttribute('aria-expanded','true');$('fbMat')?.focus()}
+      function close(){panel.hidden=true;fab.setAttribute('aria-expanded','false');if(st)st.textContent=''}
+      fab.addEventListener('click',()=>{panel.hidden?open():close()});
+      $('fbClose')?.addEventListener('click',close);
+      $('fbMat')?.addEventListener('blur',()=>{if(window.CentralCloud)$('fbMat').value=CentralCloud.formatMatricula($('fbMat').value)});
+      $('fbSend')?.addEventListener('click',async()=>{
+        if(!window.CentralCloud){alert('Módulo de nuvem indisponível.');return}
+        const matricula=CentralCloud.formatMatricula($('fbMat').value||'');
+        const mensagem=String($('fbMsg').value||'').trim();
+        const tipo=$('fbTipo').value;
+        if(!matricula||matricula.replace(/\D/g,'').length!==7){st.textContent='Informe a matrícula completa.';return}
+        if(mensagem.length<8){st.textContent='Escreva a mensagem com um pouco mais de detalhe.';return}
+        $('fbSend').disabled=true;st.textContent='Enviando…';
+        try{
+          await CentralCloud.probe();
+          const r=await CentralCloud.submitForm('sistema-feedback-enviar',{matricula,mensagem,tipo,userAgent:navigator.userAgent||''},'',{popup:false,progress:false,timeout:25000,tokenKind:'central'});
+          st.textContent=r.message||'Enviado.';
+          $('fbMsg').value='';
+          setTimeout(close,1600);
+        }catch(e){st.textContent=e.message||String(e)}
+        finally{$('fbSend').disabled=false}
+      });
     })();
   </script>
 </body>

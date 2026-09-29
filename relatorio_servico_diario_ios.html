@@ -328,7 +328,7 @@ html.sig-ios-open,body.sig-ios-open{overflow:hidden!important;overscroll-behavio
 </div>
 <div class="head-grid rsd-team-row">
   <div class="field span5"><label>Tipo / identificação da guarnição</label><div class="rsd-team-ident"><select id="guarnicaoTipo"><option value="">Selecione</option><option value="BST">BST</option><option value="BASE">BASE</option><option value="GTTRAN">GTTRAN</option><option value="TOR">TOR</option><option value="REBOQUE">REBOQUE</option></select><input id="guarnicao" readonly placeholder="Numeração automática"></div><span class="print-value" data-print-for="guarnicao"></span></div>
-  <div class="field span4 rsd-vtr-field"><label>Viatura(s)</label><div class="rsd-vtr-main"><input id="viatura" class="vtr-prefix" maxlength="8" autocomplete="off" placeholder="Ex.: 9296"><button type="button" class="secondary no-print rsd-add-vtr" onclick="centralRsdAddViatura()">+ VTR</button></div><div id="rsdVtrExtras" class="rsd-vtr-extras no-print"></div><span class="print-value" data-print-for="viatura"></span></div>
+  <div class="field span4 rsd-vtr-field"><label>Viatura(s)</label><div class="rsd-vtr-main"><input id="viatura" class="vtr-prefix" maxlength="8" autocomplete="off" placeholder="Ex.: 9296"><button type="button" class="secondary no-print rsd-add-vtr" onclick="centralRsdAddViatura()">+ VTR</button></div><div id="rsdVtrHint" class="rsd-vtr-hint no-print" aria-live="polite"></div><div id="rsdVtrExtras" class="rsd-vtr-extras no-print"></div><span class="print-value" data-print-for="viatura"></span></div>
   <div class="field span3"><label>Efetivo</label><input id="efetivo" placeholder="Ex.: 03 PMs"><span class="print-value" data-print-for="efetivo"></span></div>
 </div>
 <div class="head-grid rsd-person-row">
@@ -791,7 +791,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
 </script>
 
 <style id="rsd-cloud-v10-style">
-.rsd-team-ident{display:grid;grid-template-columns:minmax(105px,.75fr) minmax(130px,1.25fr);gap:4px}.rsd-team-ident input[readonly]{font-weight:800;background:#eef4f8}.rsd-vtr-main{display:flex;gap:4px;align-items:center}.rsd-vtr-main input{min-width:0;flex:1}.rsd-add-vtr{min-width:54px!important;padding:4px 6px!important}.rsd-vtr-extras{display:grid;gap:4px;margin-top:4px}.rsd-vtr-extra{display:flex;gap:4px}.rsd-vtr-extra input{min-width:0;flex:1}.rsd-vtr-extra button{padding:4px 7px!important;min-width:34px!important}.rsd-militar-lookup{display:flex;gap:4px;align-items:center}.rsd-militar-lookup input{min-width:0;flex:1}.rsd-militar-lookup button{white-space:nowrap;min-height:38px;padding:6px 9px!important}.cloud-note{font-size:10px;color:#607286;margin-top:3px}
+.rsd-team-ident{display:grid;grid-template-columns:minmax(105px,.75fr) minmax(130px,1.25fr);gap:4px}.rsd-team-ident input[readonly]{font-weight:800;background:#eef4f8}.rsd-vtr-main{display:flex;gap:4px;align-items:center}.rsd-vtr-main input{min-width:0;flex:1}.rsd-add-vtr{min-width:54px!important;padding:4px 6px!important}.rsd-vtr-hint{font-size:10px;color:#607286;margin-top:3px;min-height:14px}.rsd-vtr-extras{display:grid;gap:4px;margin-top:4px}.rsd-vtr-extra{display:flex;gap:4px}.rsd-vtr-extra input{min-width:0;flex:1}.rsd-vtr-extra button{padding:4px 7px!important;min-width:34px!important}.rsd-militar-lookup{display:flex;gap:4px;align-items:center}.rsd-militar-lookup input{min-width:0;flex:1}.rsd-militar-lookup button{white-space:nowrap;min-height:38px;padding:6px 9px!important}.cloud-note{font-size:10px;color:#607286;margin-top:3px}
 .rsd-register-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 @media(max-width:760px){.rsd-vtr-field{grid-column:1/-1!important}.rsd-vtr-main{align-items:stretch}.rsd-add-vtr{min-height:38px!important}.rsd-register-row button{width:100%}}
 @media print{.rsd-vtr-main button,.rsd-vtr-extras,.rsd-register-row{display:none!important}}
@@ -802,7 +802,7 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.16-auth"></script>
+<script src="central_cloud.js?v=10.8.17-auth"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -810,9 +810,45 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   const READONLY_VIEWER=!!CLOUD_VIEW_REPORT;
   window.CENTRAL_READONLY_VIEWER=READONLY_VIEWER;
   function extras(){return Array.from(document.querySelectorAll('#rsdVtrExtras .rsd-vtr-extra input')).map(x=>x.value.trim().toUpperCase()).filter(Boolean)}
-  window.centralRsdAddViatura=function(value=''){const box=document.getElementById('rsdVtrExtras');if(!box)return;const row=document.createElement('div');row.className='rsd-vtr-extra';row.innerHTML='<input class="vtr-prefix" maxlength="8" autocomplete="off" placeholder="Outro prefixo"><button type="button" class="danger" title="Remover">×</button>';const inp=row.querySelector('input');inp.value=value||'';inp.addEventListener('input',()=>{inp.value=String(inp.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);window.centralAutosave?.()});row.querySelector('button').onclick=()=>{row.remove();syncVtrPrint();window.centralAutosave?.()};box.appendChild(row);syncVtrPrint();return inp}
-  function collectVtrs(){const first=(document.getElementById('viatura')?.value||'').trim().toUpperCase();return [first,...extras()].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).map((prefixo,i)=>({prefixo,ordem:i+1,origem:'RSD'}))}
+  const vtrCadastroCache={};
+  function normVtrKey(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+  function rememberVtrCadastro(prefixo,row){
+    const key=normVtrKey(prefixo||row?.PREFIXO||row?.prefixo||'');if(!key)return null;
+    const data={prefixo:String(row?.PREFIXO||row?.prefixo||prefixo||'').toUpperCase(),placa:String(row?.PLACA||row?.placa||'').toUpperCase(),marcaModelo:String(row?.MARCA_MODELO||row?.marcaModelo||row?.MODELO||'').trim(),tipo:String(row?.TIPO||row?.tipo||'').trim()};
+    vtrCadastroCache[key]=data;return data;
+  }
+  function vtrFromCache(prefixo){return vtrCadastroCache[normVtrKey(prefixo)]||null}
+  function setVtrHint(msg,ok){const h=document.getElementById('rsdVtrHint');if(!h)return;h.textContent=msg||'';h.style.color=ok?'#176b3a':'#607286'}
+  async function lookupVtrPrefix(input,opts={}){
+    const prefixo=String(input?.value||'').trim().toUpperCase();if(!prefixo){if(opts.main)setVtrHint('');return null}
+    input.value=prefixo;
+    const cached=vtrFromCache(prefixo);if(cached&&(cached.placa||cached.marcaModelo)){if(opts.main)setVtrHint((cached.placa||'—')+' · '+(cached.marcaModelo||'—')+(cached.tipo?' · '+cached.tipo:''),true);return cached}
+    const token=CentralCloud.getToken('central');if(!token){if(opts.main)setVtrHint('Informe a chave operacional para consultar o Cadastro Mestre (opcional).');return null}
+    try{
+      const vr=await CentralCloud.searchCadastro('viatura',prefixo,currentUnit(),token);
+      const items=vr.items||[];
+      const exact=items.find(x=>normVtrKey(x.PREFIXO||x.prefixo||'')===normVtrKey(prefixo));
+      if(exact){
+        const data=rememberVtrCadastro(prefixo,exact);
+        if(opts.main)setVtrHint((data.placa||'—')+' · '+(data.marcaModelo||'—')+(data.tipo?' · '+data.tipo:''),true);
+        return data;
+      }
+      if(opts.main)setVtrHint('VTR sem cadastro mestre — será vinculada ao serviço normalmente.');
+      return null;
+    }catch(e){
+      if(opts.main)setVtrHint(CentralCloud.isAuthError(e)?'Chave operacional necessária para consultar o cadastro.':'Consulta ao cadastro indisponível — VTR pode ser vinculada assim mesmo.');
+      return null;
+    }
+  }
+  function wireVtrInput(inp,main){
+    if(!inp||inp.dataset.vtrWired==='1')return;inp.dataset.vtrWired='1';
+    inp.addEventListener('input',()=>{inp.value=String(inp.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);if(main)setVtrHint('');window.centralAutosave?.();syncVtrPrint()});
+    inp.addEventListener('blur',()=>{lookupVtrPrefix(inp,{main:!!main});syncVtrPrint();window.centralAutosave?.()});
+  }
+  window.centralRsdAddViatura=function(value=''){const box=document.getElementById('rsdVtrExtras');if(!box)return;const row=document.createElement('div');row.className='rsd-vtr-extra';row.innerHTML='<input class="vtr-prefix" maxlength="8" autocomplete="off" placeholder="Outro prefixo"><button type="button" class="danger" title="Remover">×</button>';const inp=row.querySelector('input');inp.value=value||'';wireVtrInput(inp,false);row.querySelector('button').onclick=()=>{row.remove();syncVtrPrint();window.centralAutosave?.()};box.appendChild(row);syncVtrPrint();if(value)lookupVtrPrefix(inp,{main:false});return inp}
+  function collectVtrs(){const first=(document.getElementById('viatura')?.value||'').trim().toUpperCase();return [first,...extras()].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).map((prefixo,i)=>{const c=vtrFromCache(prefixo)||{};return {prefixo,placa:c.placa||'',marcaModelo:c.marcaModelo||'',tipo:c.tipo||'',ordem:i+1,origem:'RSD'}})}
   function syncVtrPrint(){const v=collectVtrs().map(x=>x.prefixo);const sp=document.querySelector('[data-print-for="viatura"]');if(sp)sp.textContent=v.length?v.join(' / '):'—'}
+  wireVtrInput(document.getElementById('viatura'),true);
   const SERVICE_ID_KEY='pmpb-transito-servico-diario-v2-service-id',SEGMENT_KEY='pmpb-transito-servico-diario-v2-segmento',PREV_RSD_KEY='pmpb-transito-servico-diario-v2-prev-rsd',PASS_ID_KEY='pmpb-transito-servico-diario-v2-passagem-id',REGISTERED_KEY='pmpb-transito-servico-diario-v2-cloud-registered',ACTIVE_CONTEXT_KEY='pmpb-active-service-v1';
   const deviceId=CentralCloud.getDeviceId();
   let commanderPostoGrad='',serviceId=READONLY_VIEWER?CentralCloud.uid('view'):localStorage.getItem(SERVICE_ID_KEY)||CentralCloud.uid('svc'),segmento=READONLY_VIEWER?1:(Number(localStorage.getItem(SEGMENT_KEY)||1)||1),rsdAnteriorId=READONLY_VIEWER?'':(localStorage.getItem(PREV_RSD_KEY)||''),passagemOrigemId=READONLY_VIEWER?'':(localStorage.getItem(PASS_ID_KEY)||''),serviceRegistered=READONLY_VIEWER?false:(localStorage.getItem(REGISTERED_KEY)==='1'),serviceStartedAt=READONLY_VIEWER?'':(()=>{try{return localStorage.getItem('pmpb-transito-servico-diario-v2-started-at')||''}catch(_){return ''}})(),cloudSyncTimer=null,cloudConflictNotified=false;
@@ -912,7 +948,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     if(!p.guarnicao?.vtrPrincipal){alert('Informe a VTR principal da guarnição.');return false}
     if(!p.guarnicao?.responsavel||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Confirme a matrícula do comandante antes de registrar o serviço.');return false}
     if(document.getElementById('responsavel')?.dataset.externalMode==='1'){alert('Finalize o pré-cadastro do comandante clicando em “Cadastrar comandante” antes de registrar a guarnição.');return false}
-    p.guarnicao.matricula=mat;let token=CentralCloud.getToken('central')||promptOperationalKey(false);if(!token)return false;try{const vr=await CentralCloud.searchCadastro('viatura',p.guarnicao.vtrPrincipal,currentUnit(),token),items=vr.items||[],exact=items.find(x=>String(x.PREFIXO||'').trim().toUpperCase()===String(p.guarnicao.vtrPrincipal||'').trim().toUpperCase());token=CentralCloud.getToken('central')||token;if(!exact&&!confirm('A VTR '+p.guarnicao.vtrPrincipal+' não foi localizada no Cadastro Mestre desta unidade. Confira o prefixo.\n\nDeseja continuar mesmo assim?'))return false}catch(e){token=CentralCloud.getToken('central')||token;if(CentralCloud.isAuthError(e)){token=promptOperationalKey(true);if(!token)return false}else{/* cadastro mestre indisponível: a validação de duplicidade pela VTR continua no backend */}}
+    p.guarnicao.matricula=mat;let token=CentralCloud.getToken('central')||promptOperationalKey(false);if(!token)return false;try{const vr=await CentralCloud.searchCadastro('viatura',p.guarnicao.vtrPrincipal,currentUnit(),token),items=vr.items||[],exact=items.find(x=>normVtrKey(x.PREFIXO||x.prefixo||'')===normVtrKey(p.guarnicao.vtrPrincipal||''));token=CentralCloud.getToken('central')||token;if(exact)rememberVtrCadastro(p.guarnicao.vtrPrincipal,exact);/* VTR sem cadastro segue vinculada normalmente ao serviço */}catch(e){token=CentralCloud.getToken('central')||token;if(CentralCloud.isAuthError(e)){token=promptOperationalKey(true);if(!token)return false}else{/* cadastro mestre indisponível: a validação de duplicidade pela VTR continua no backend */}}
     if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();try{localStorage.setItem('pmpb-transito-servico-diario-v2-started-at',serviceStartedAt)}catch(_){}p.servico.iniciadoEm=serviceStartedAt;
     const st=document.getElementById('rsdRegisterStatus');if(st)st.textContent='Registrando...';
     try{
@@ -1194,6 +1230,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.16"></script>
-<script src="service_flow.js?v=10.8.16"></script>
+<script src="service_access_layers.js?v=10.8.17"></script>
+<script src="service_flow.js?v=10.8.17"></script>
 </body></html>
