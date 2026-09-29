@@ -361,5 +361,10 @@ function init(){
  }
  startScreen(type);
 }
+global.addEventListener('central-module-auth-lost',e=>{
+ const type=pageType();if(type!=='rsd'||e?.detail?.kind!=='central')return;
+ if(q('#centralAccessKeyOverlay')||q('#centralAccessLayer'))return;
+ setTimeout(()=>global.centralReturnToAccess?.('rsd'),0);
+});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,180));else setTimeout(init,180);
 })(window);
