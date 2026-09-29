@@ -22,7 +22,10 @@ const today=()=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getF
 function centralToken(promptIfMissing=false){
  if(!global.CentralCloud)return '';
  let t=CentralCloud.getToken('central');
- if(!t&&promptIfMissing)t=CentralCloud.askToken('central','Informe a chave operacional da Central:');
+ if(!t&&promptIfMissing){
+  // RSD/RCO pages never mid-prompt; askToken itself hardens this and fires auth-lost
+  t=CentralCloud.askToken('central','Informe a chave operacional da Central:');
+ }
  return t||'';
 }
 function contextQuery(extra={}){

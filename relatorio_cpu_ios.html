@@ -139,7 +139,7 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
 #rcoResponsavelResultado strong{color:#17375e}.rco-sub-results{display:grid;gap:4px;margin-top:5px}.rco-sub-results button{text-align:left;background:#f7fbfe;color:#17375e;border:1px solid #cbd9e4;box-shadow:none}.rco-sub-selected{margin-top:5px;padding:7px;border:1px solid #bcd5c8;background:#eff8f3;border-radius:8px;color:#245f49;font-weight:700}
 .rco-cloud-item.duplicate{border-color:#d9a54c;background:#fffaf0}.rco-cloud-item .rco-item-actions{display:flex;gap:4px;flex-wrap:wrap;align-items:center}.rco-cloud-item .rco-item-actions button{font-size:10px}.rco-cloud-more{position:relative}.rco-cloud-more>summary{cursor:pointer;font-weight:800;padding:5px 8px;border:1px solid #cbd9e4;border-radius:7px;background:#f1f5f8;list-style:none}.rco-cloud-more>div{position:absolute;right:0;top:100%;z-index:4000;min-width:190px;background:#fff;border:1px solid #cbd9e4;border-radius:8px;padding:5px;box-shadow:0 10px 28px #0002}.rco-cloud-more button{width:100%;margin:2px 0;text-align:left}.rco-pending-summary{margin:7px 0;padding:7px;border-radius:8px;background:#fff8e8;border:1px solid #e3c98d;color:#6a501d;font-weight:700}
 #nomeAssinante[readonly]{background:#f4f7f9}#patenteAssinante:disabled{opacity:1;background:#f4f7f9;color:#1f344a}
-.rco-pass-pending{margin:9px 0;padding:10px 12px;border:1px solid #e2c479;border-radius:11px;background:#fff8e8;color:#654b16}.rco-pass-pending strong{display:block;color:#704f10;margin-bottom:3px}.rco-pass-pending .actions{margin-top:7px}
+.rco-pass-pending{margin:9px 0;padding:10px 12px;border:1px solid #e2c479;border-radius:11px;background:#fff8e8;color:#654b16}.rco-pass-pending strong{display:block;color:#704f10;margin-bottom:3px}.rco-pass-pending .actions{margin-top:7px}.rco-pass-pending[hidden],.rco-pass-pending:empty{display:none!important;margin:0!important;padding:0!important;border:0!important;min-height:0!important}
 .rco-pass-dialog{position:fixed;inset:0;z-index:12000;background:rgba(15,28,43,.58);display:flex;align-items:center;justify-content:center;padding:16px}.rco-pass-dialog-card{width:min(700px,100%);max-height:86vh;overflow:auto;background:#fff;border-radius:18px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.30)}.rco-pass-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}.rco-pass-dialog-head h3{margin:0;color:#17375e}.rco-pass-card{border:1px solid #cfdae4;border-radius:12px;padding:10px;margin:8px 0;background:#fbfdff}.rco-pass-card strong{color:#17375e}.rco-pass-meta{font-size:12px;color:#5e6e7f;margin:4px 0 8px}
 .rco-cloud-item.cancelled{opacity:.86;background:#f6f7f8;border-style:dashed}.rco-cancel-note{margin-top:4px;color:#7a3949!important}.rco-compare-dialog-card{width:min(1080px,100%)}.rco-compare-service{border:1px solid #cad7e2;border-radius:12px;padding:9px;margin:9px 0;background:#f9fbfd}.rco-compare-service h4{margin:0 0 7px;color:#17375e}.rco-compare-service h4 span{font-size:10px;color:#6a7c8d;font-weight:600}.rco-compare-justified{margin:5px 0 8px;padding:6px 8px;border-radius:8px;background:#edf8f3;border:1px solid #b9dcca;color:#22644f;font-size:11px}.rco-compare-row{display:grid;grid-template-columns:.65fr 1.25fr .65fr 1.15fr 1.2fr 1.1fr;gap:6px;padding:7px 0;border-top:1px solid #dce5ec;font-size:10.5px}.rco-compare-row:first-of-type{border-top:0}.rco-compare-row b{color:#40566d}.rco-code{font-family:monospace;font-size:9px;word-break:break-all}
 @media(max-width:700px){.rco-pass-dialog{padding:8px;align-items:flex-start}.rco-pass-dialog-card{margin-top:8px;max-height:94vh}.rco-compare-row{grid-template-columns:1fr 1fr}.rco-compare-row>div:last-child{grid-column:1/-1}}
@@ -186,6 +186,10 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
   <div class="field span3"><label>Matrícula</label><input id="rcoResponsavelMatricula" inputmode="numeric" maxlength="9" placeholder="000.000-0"></div>
   <div class="field span2"><label>Turno</label><select id="rcoResponsavelTurno"><option value="">Selecione</option><option>12h (dia)</option><option>12h (noite)</option><option>24h</option></select></div>
   <div class="field span4"><label>Credencial da função</label><input id="rcoResponsavelSenha" type="password" autocomplete="off" placeholder="Senha de Coordenação/P3"></div>
+ </div>
+ <div id="rcoContinuarComoBox" class="hidden" style="margin-top:9px;padding:9px;border:1px solid #c5d6e6;border-radius:9px;background:#f4f8fc">
+  <div id="rcoContinuarComoMsg" class="hint" style="margin:0 0 8px"></div>
+  <div class="actions" style="margin:0;gap:6px;flex-wrap:wrap"><button type="button" class="ok small" id="rcoContinuarComoBtn" onclick="rcoConfirmarContinuidadeResponsavel()">Confirmar continuidade</button><button type="button" class="secondary small" id="rcoContinuarOutraMatriculaBtn" onclick="rcoContinuarComOutraMatricula()">Usar outra matrícula</button></div>
  </div>
  <div class="actions" style="margin-top:7px"><button type="button" class="ok small" id="rcoResponsavelRegistrarBtn" onclick="rcoRegistrarResponsavel()">Identificar e registrar responsável</button><span id="rcoResponsavelProgresso" class="hint" role="status" aria-live="polite"></span></div>
  <div id="rcoResponsavelResultado" class="hint">Informe matrícula, função e a única credencial correspondente. O sistema localizará o militar no Cadastro Mestre.</div>
@@ -349,7 +353,7 @@ function atualizarDiaCpu(){const e=document.getElementById('diaSemanaCpu'),v=val
 function localISODate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function setDates(){const d=new Date();document.getElementById('dataInicio').value=localISODate(d);const n=new Date(d);n.setDate(n.getDate()+1);const next=localISODate(n);document.getElementById('dataTermino').value=next;document.getElementById('dataFinal').value=next;atualizarDiaCpu()}
 function syncAll(){document.querySelectorAll('input,select,textarea').forEach(syncPrintValue);document.getElementById('assinantePrint').textContent=[val('nomeAssinante'),val('patenteAssinante')].filter(Boolean).join(' – ')||'—';renderPrintMatrix()}
-function prepareAndPrint(){saveRcoHistory();renderGuarnicoes();syncAll();const first=cpuPeopleData()[0]||{};const nome=val('nomeAssinante')||first.nome||'COORDENADOR';const posto=val('patenteAssinante')||first.graduacao||'POSTO-GRAD';const old=document.title;document.title=`RCO – ${safeName(nome,'COORDENADOR')}-${safeName(posto,'POSTO-GRAD')} – DATA ${fmtDateFile(val('dataInicio'))}`;window.print();setTimeout(()=>document.title=old,800)}
+function prepareAndPrint(){saveRcoHistory();renderGuarnicoes();syncAll();const first=cpuPeopleData()[0]||{};const nome=val('nomeAssinante')||first.nome||'COORDENADOR';const posto=val('patenteAssinante')||first.graduacao||'POSTO-GRAD';const old=document.title;document.title=`RCO – ${safeName(nome,'COORDENADOR')}-${safeName(posto,'POSTO-GRAD')} – DATA ${fmtDateFile(val('dataInicio'))}`;window.print();setTimeout(()=>{document.title=old;try{window.centralRcoMarkPdfGenerated?.()}catch(_){}},800)}
 window.addEventListener('beforeprint',()=>{renderGuarnicoes();syncAll()});
 function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson();defaultAnexos();applyRcoHistory();document.getElementById('dataInicio').addEventListener('change',atualizarDiaCpu);document.getElementById('batalhao').addEventListener('change',()=>{refreshCompanyOptions();renderMatrix();renderGuarnicoes();syncDefaultFiscoAnexo();saveRcoHistory()});document.getElementById('companhiaNumero').addEventListener('change',()=>{renderMatrix();renderGuarnicoes();syncDefaultFiscoAnexo();saveRcoHistory()});['horarioServico','nomeAssinante','patenteAssinante'].forEach(id=>document.getElementById(id)?.addEventListener('change',saveRcoHistory));renderMatrix();syncDefaultFiscoAnexo()}document.addEventListener('DOMContentLoaded',initCpu);
 </script>
@@ -414,7 +418,7 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
     try{const ok=await window.centralRcoSyncNow?.(false);if(ok===false&&!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar mesmo assim?'))return}catch(_){if(!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar mesmo assim?'))return}
     syncActors();const slot=auditState.activeSlot,a=actor(slot),formal=window.rcoResponsibleData?.()||{};
     if(!a.nome&&!a.matricula){alert('Identifique o Coordenador atual antes de realizar a passagem de serviço.');return}
-    if(!formal.matricula){alert('Registre formalmente o CPU/Coordenador antes de realizar a passagem de serviço.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
+    if(!window.__rcoResponsavelRegistrado||!formal.matricula){alert('Registre formalmente o CPU/Coordenador antes de realizar a passagem de serviço.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     const last=auditState.passagens?.[auditState.passagens.length-1];
     if(last&&String(last.status||'AGUARDANDO_RECEBIMENTO')==='AGUARDANDO_RECEBIMENTO'&&Number(auditState.activeSlot||1)<=Number(last.slot||0)){alert('Já existe uma passagem deste RCO aguardando recebimento.');renderRcoOutgoingPassage();return}
     const base=baseCollect?baseCollect():{};auditState.activated=true;auditState.actors[String(slot)]={...auditState.actors[String(slot)],nome:a.nome,matricula:a.matricula,graduacao:a.graduacao,turno:a.turno};auditState.snapshots['cpu'+slot+'AtPassage']=clone({...base,auditoria:undefined});
@@ -432,9 +436,10 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
   };
   function pendingRcoPassage(){const last=auditState.passagens?.[auditState.passagens.length-1];return last&&String(last.status||'AGUARDANDO_RECEBIMENTO')==='AGUARDANDO_RECEBIMENTO'&&Number(auditState.activeSlot||1)<=Number(last.slot||0)?last:null}
   function renderRcoOutgoingPassage(){
-    let el=document.getElementById('rcoOutgoingPassage');if(!el){el=document.createElement('div');el.id='rcoOutgoingPassage';el.className='rco-pass-pending no-print';const ref=document.getElementById('rcoResponsavelCard')||document.querySelector('.service-state-bar');ref?.insertAdjacentElement('afterend',el)}
-    const p=pendingRcoPassage();if(!p){el.hidden=true;return}
-    el.hidden=false;el.innerHTML='<strong>Passagem aguardando recebimento</strong><div>Disponibilizada por '+escHtml(p.de||'Coordenador')+(p.em?' em '+escHtml(new Date(p.em).toLocaleString('pt-BR')):'')+'.</div>'+(p.observacao?'<div style="margin-top:4px">Observação: '+escHtml(p.observacao)+'</div>':'')+'<div class="actions"><button type="button" class="secondary small" id="rcoRetificarPassagem">Retificar passagem</button><button type="button" class="danger small" id="rcoCancelarPassagem">Cancelar passagem</button></div>';
+    const p=pendingRcoPassage();let el=document.getElementById('rcoOutgoingPassage');
+    if(!p){el?.remove();return}
+    if(!el){el=document.createElement('div');el.id='rcoOutgoingPassage';el.className='rco-pass-pending no-print';const ref=document.getElementById('rcoResponsavelCard')||document.querySelector('.service-state-bar');ref?.insertAdjacentElement('afterend',el)}
+    el.hidden=false;el.style.display='';el.innerHTML='<strong>Passagem aguardando recebimento</strong><div>Disponibilizada por '+escHtml(p.de||'Coordenador')+(p.em?' em '+escHtml(new Date(p.em).toLocaleString('pt-BR')):'')+'.</div>'+(p.observacao?'<div style="margin-top:4px">Observação: '+escHtml(p.observacao)+'</div>':'')+'<div class="actions"><button type="button" class="secondary small" id="rcoRetificarPassagem">Retificar passagem</button><button type="button" class="danger small" id="rcoCancelarPassagem">Cancelar passagem</button></div>';
     el.querySelector('#rcoRetificarPassagem').onclick=()=>{const obs=prompt('Observação/retificação da passagem:',p.observacao||'') ;if(obs===null)return;p.observacao=String(obs).trim();p.retificadaEm=new Date().toISOString();log('PASSAGEM','Retificação da passagem','','',p.observacao||'Sem observação');renderRcoOutgoingPassage();try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralRcoSyncNow?.(false),100)};
     el.querySelector('#rcoCancelarPassagem').onclick=()=>{const motivo=prompt('Motivo do cancelamento da passagem:','Passagem registrada por engano')||'';if(!motivo.trim())return;if(!confirm('Cancelar a passagem? O RCO continuará ativo sob responsabilidade do Coordenador atual.'))return;p.status='CANCELADA';p.canceladaEm=new Date().toISOString();p.cancelamentoMotivo=motivo.trim();setRowLocked([...document.querySelectorAll('#cpuPeople tr')][auditState.activeSlot-1],false);log('PASSAGEM','Cancelamento da passagem','','',motivo.trim());renderRcoOutgoingPassage();try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralRcoSyncNow?.(false),100)};
   }
@@ -527,7 +532,20 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
   const P3_TOKEN_KEY='pmpb-p3-token-v1';
   const P3_OPERATIONS_STORE='pmpb-transito-operacoes-dia-v1';
   const P3_CIRVC_STORE='pmpb-transito-cirvc-dia-v1';
-
+  window.RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG||'Sua sessão expirou. Volte às opções de acesso e entre novamente.';
+  if(typeof window.setRcoOpBusy!=='function'){
+    window.__rcoOpBusy=false;
+    window.setRcoOpBusy=function(busy){
+      window.__rcoOpBusy=!!busy;
+      document.querySelectorAll('button[onclick="abrirConsolidacaoP3()"],button[onclick="prepareAndPrint()"],#rcoResponsavelRegistrarBtn,#rcoContinuarComoBtn').forEach(b=>{
+        if(busy){if(b.dataset.rcoBusyPrev==null)b.dataset.rcoBusyPrev=b.disabled?'1':'0';b.disabled=true}
+        else if(b.dataset.rcoBusyPrev!=null){b.disabled=b.dataset.rcoBusyPrev==='1';delete b.dataset.rcoBusyPrev}
+      });
+    };
+  }
+  const RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG;
+  const setRcoOpBusy=window.setRcoOpBusy;
+  const rcoOpBusy=()=>!!window.__rcoOpBusy;
   function p3ReadArray(key){
     try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}
   }
@@ -565,33 +583,136 @@ function initCpu(){bindCommon();setDates();ensureGuarnicao('CPU');addCpuPerson()
   }
   window.centralP3BuildPackage=p3BuildPackage;
   function p3SetStatus(msg){const el=document.getElementById('p3Status');if(el)el.textContent=msg||''}
+  function p3ClosureFlags(src){
+    const p=src||{};
+    return {
+      pdfGerado:!!(p.pdfGerado===true||p.pdfGerado==='SIM'||p.pdfGerado===1),
+      pdfGeradoEm:String(p.pdfGeradoEm||''),
+      p3Consolidado:!!(p.p3Consolidado===true||p.p3Consolidado==='SIM'||p.p3Consolidado===1),
+      p3ConsolidadoEm:String(p.p3ConsolidadoEm||''),
+      encerrado:!!(p.encerrado===true||p.encerrado==='SIM'||p.encerrado===1||String(p.status||'').toUpperCase()==='FINALIZADO'),
+      encerradoEm:String(p.encerradoEm||'')
+    };
+  }
+  function p3ApplyClosureLocal(flags){
+    const f=p3ClosureFlags(flags);
+    window.__rcoClosureFlags=f;
+    try{
+      if(typeof collectState==='function'&&typeof DRAFT!=='undefined'){
+        const raw=collectState();
+        raw.pdfGerado=f.pdfGerado;raw.pdfGeradoEm=f.pdfGeradoEm;
+        raw.p3Consolidado=f.p3Consolidado;raw.p3ConsolidadoEm=f.p3ConsolidadoEm;
+        raw.encerrado=f.encerrado;raw.encerradoEm=f.encerradoEm;
+        localStorage.setItem(DRAFT,JSON.stringify(raw));
+      }
+    }catch(_){}
+    p3RefreshClosureStatus();
+    return f;
+  }
+  function p3RefreshClosureStatus(){
+    const f=window.__rcoClosureFlags||{};
+    if(f.encerrado){p3SetStatus('RCO encerrado.');return}
+    if(f.pdfGerado&&f.p3Consolidado){p3SetStatus('PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.');return}
+    if(f.pdfGerado&&!f.p3Consolidado){p3SetStatus('PDF gerado. Ainda falta Consolidar P3.');return}
+    if(!f.pdfGerado&&f.p3Consolidado){p3SetStatus('Dados consolidados. Ainda falta Gerar PDF do RCO.');return}
+  }
+  window.p3RefreshClosureStatus=p3RefreshClosureStatus;
+  window.centralRcoMarkPdfGenerated=async function(){
+    const f=p3ApplyClosureLocal(Object.assign({},window.__rcoClosureFlags||{},{pdfGerado:true,pdfGeradoEm:new Date().toISOString()}));
+    p3SetStatus(f.p3Consolidado?'PDF gerado. PDF e Consolidação P3 concluídos.':'PDF gerado. Ainda falta Consolidar P3.');
+    try{window.salvarRascunho?.(true)}catch(_){}
+    let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+    let reportId='';try{const p=collectState();reportId=String(p?.state?.reportId||p?.reportId||'')}catch(_){}
+    if(token&&window.CentralCloud&&reportId){
+      try{
+        const rr=await CentralCloud.submitForm('rco-mark-pdf',{reportId},token,{popup:false,timeout:30000});
+        p3ApplyClosureLocal({pdfGerado:true,pdfGeradoEm:rr.pdfGeradoEm||f.pdfGeradoEm,p3Consolidado:!!rr.p3Consolidado,p3ConsolidadoEm:rr.p3ConsolidadoEm||f.p3ConsolidadoEm,encerrado:false});
+        if(rr.message)p3SetStatus(rr.message);
+        try{await window.centralRcoSyncNow?.(true)}catch(_){}
+      }catch(err){
+        console.warn('Falha ao sincronizar marca de PDF',err);
+        p3SetStatus((f.p3Consolidado?'PDF gerado (local). PDF e P3 ok.':'PDF gerado (local). Ainda falta Consolidar P3.')+' Sincronização pendente.');
+      }
+    }
+    const done=window.__rcoClosureFlags||f;
+    if(done.pdfGerado&&done.p3Consolidado&&!done.encerrado){
+      if(confirm('PDF e Consolidação P3 foram concluídos. Deseja encerrar este serviço?\n\nSIM — finaliza o RCO e remove de Continuar.\nNÃO — mantém o RCO aberto.')){
+        await window.centralRcoEncerrarServico?.();
+      }else{
+        p3SetStatus('PDF e Consolidação P3 concluídos. RCO permanece aberto.');
+      }
+    }
+    return window.__rcoClosureFlags;
+  };
+  window.centralRcoEncerrarServico=async function(){
+    if(rcoOpBusy())return false;
+    let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+    if(!token){alert(RCO_SESSION_EXPIRED_MSG);try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralReturnToAccess?.('rco'),0);return false}
+    let reportId='';try{const p=collectState();reportId=String(p?.state?.reportId||p?.reportId||'')}catch(_){}
+    if(!reportId){alert('REPORT_ID do RCO indisponível.');return false}
+    const resp=window.rcoResponsibleData?.()||{};
+    p3SetStatus('Encerrando o serviço…');
+    setRcoOpBusy(true);
+    try{
+      const rr=await CentralCloud.submitForm('rco-encerrar',{reportId,matricula:resp.matricula||'',nome:resp.nome||'',coordenador:resp},token,{popup:false,timeout:60000});
+      p3ApplyClosureLocal({pdfGerado:true,p3Consolidado:true,encerrado:true,encerradoEm:new Date().toISOString()});
+      p3SetStatus(rr.message||'RCO encerrado.');
+      alert(rr.message||'RCO encerrado com sucesso.');
+      return true;
+    }catch(err){
+      if(CentralCloud.isAuthError?.(err)){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}alert(RCO_SESSION_EXPIRED_MSG);setTimeout(()=>window.centralReturnToAccess?.('rco'),0);}
+      else alert('Não foi possível encerrar o RCO: '+(err.message||err));
+      p3SetStatus('Falha no encerramento.');
+      return false;
+    }finally{setRcoOpBusy(false)}
+  };
   window.abrirConsolidacaoP3=async function(){
+    if(rcoOpBusy())return;
     try{const ok=await window.centralRcoSyncNow?.(false);if(ok===false&&!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar a consolidação mesmo assim?'))return}catch(_){if(!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar a consolidação mesmo assim?'))return}
     try{await window.centralRcoRefreshCloud?.()}catch(_){}
     const resp=window.rcoResponsibleData?.()||{};
-    if(!resp.matricula){alert('Registre primeiro o CPU ou o P3/oficial responsável pelo RCO.');return}
+    if(!window.__rcoResponsavelRegistrado||!resp.matricula){alert('Registre primeiro o CPU ou o P3/oficial responsável pelo RCO.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     const semCpu=!!document.getElementById('rcoSemCpu')?.checked;
     if(semCpu&&!['P3','OFICIAL'].includes(String(resp.perfil||'').toUpperCase())){alert('No modo de consolidação sem CPU, identifique e registre um responsável com perfil P3 ou Oficial.');return}
     let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
-    if(!token){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente no RCO. Nenhuma nova chave será solicitada dentro do módulo.');return}
+    if(!token){alert(RCO_SESSION_EXPIRED_MSG);try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralReturnToAccess?.('rco'),0);return}
     let pkg;try{pkg=p3BuildPackage()}catch(err){alert(err.message||String(err));return}
     const originsList=Array.isArray(pkg?.rco?.rcoOrigens)?pkg.rco.rcoOrigens:[];
     pkg.rsdReportIds=originsList.map(o=>o.rsdReportId).filter(Boolean);
     pkg.serviceIds=[...new Set(originsList.map(o=>o.serviceId).filter(Boolean))];
     pkg.coordenador={matricula:resp.matricula||'',nome:resp.nome||'',postoGrad:resp.postoGrad||'',turno:resp.turno||'',perfil:resp.perfil||'CPU'};
-    const confirmTxt='CONFIRMAR CONSOLIDAÇÃO DO RCO?\n\nConfirme que os dados apresentados neste RCO foram revisados.\nAo continuar:\n• os serviços vinculados serão encerrados;\n• eventuais pendências de fluxo serão resolvidas automaticamente;\n• o RCO será consolidado para a estatística;\n• o relatório ficará bloqueado para edição.';
+    pkg.encerrar=false;
+    const confirmTxt='CONFIRMAR CONSOLIDAÇÃO P3?\n\nOs dados deste RCO serão enviados à estatística e as pendências de fluxo dos RSDs vinculados serão resolvidas.\n\nO serviço NÃO será encerrado automaticamente — é necessário Gerar PDF e confirmar o encerramento depois.';
     if(!confirm(confirmTxt))return;
+    setRcoOpBusy(true);
     try{
       if(typeof salvarRascunho==='function')salvarRascunho(true);
       p3SetStatus('Consolidando o RCO na Central…');
       const rr=await CentralCloud.submitForm('rco-consolidate-final',pkg,token,{popup:false,timeout:90000});
-      p3SetStatus(rr.message||'RCO consolidado com sucesso.');
-      alert((rr.message||'RCO consolidado com sucesso.')+'\n\nSe precisar corrigir depois, use “Solicitar retificação de RCO consolidado”. A Gestão de Sistema precisa autorizar antes da edição.');
+      const flags=p3ApplyClosureLocal({
+        pdfGerado:!!rr.pdfGerado||!!(window.__rcoClosureFlags||{}).pdfGerado,
+        pdfGeradoEm:rr.pdfGeradoEm||(window.__rcoClosureFlags||{}).pdfGeradoEm||'',
+        p3Consolidado:rr.p3Consolidado!==false,
+        p3ConsolidadoEm:rr.p3ConsolidadoEm||new Date().toISOString(),
+        encerrado:!!rr.encerrado
+      });
+      p3SetStatus(rr.message||'Dados consolidados.');
+      if(rr.encerrado){
+        alert(rr.message||'RCO consolidado e encerrado.');
+      }else if(!flags.pdfGerado){
+        alert('Dados consolidados. Ainda falta Gerar PDF do RCO.');
+      }else if(confirm('PDF e Consolidação P3 foram concluídos. Deseja encerrar este serviço?\n\nSIM — finaliza o RCO e remove de Continuar.\nNÃO — mantém o RCO aberto.')){
+        setRcoOpBusy(false);
+        await window.centralRcoEncerrarServico?.();
+        return;
+      }else{
+        p3SetStatus('PDF e Consolidação P3 concluídos. RCO permanece aberto.');
+      }
     }catch(err){
-      if(CentralCloud.isAuthError?.(err)){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}alert('A credencial da sessão não foi aceita. Volte às opções de acesso e entre novamente no RCO.');}
+      if(CentralCloud.isAuthError?.(err)){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}alert(RCO_SESSION_EXPIRED_MSG);setTimeout(()=>window.centralReturnToAccess?.('rco'),0);}
       else alert('Não foi possível consolidar o RCO: '+(err.message||err));
       p3SetStatus('Falha na consolidação.');
-    }
+    }finally{setRcoOpBusy(false)}
   };
 })();
 </script>
@@ -657,16 +778,32 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.19"></script>
+<script src="central_cloud.js?v=10.8.22"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
   let cloudItems=[],cloudPayloads={},origins=[],showCancelledRsd=false;
   const rcoDeviceId=CentralCloud.getDeviceId();let rcoSyncTimer=null,rcoConflictNotified=false;
   function rcoStoredRoleToken(){try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}}
+  window.RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG||'Sua sessão expirou. Volte às opções de acesso e entre novamente.';
+  const RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG;
+  if(typeof window.setRcoOpBusy!=='function'){
+    window.__rcoOpBusy=false;
+    window.setRcoOpBusy=function(busy){
+      window.__rcoOpBusy=!!busy;
+      document.querySelectorAll('button[onclick="abrirConsolidacaoP3()"],button[onclick="prepareAndPrint()"],#rcoResponsavelRegistrarBtn,#rcoContinuarComoBtn').forEach(b=>{
+        if(busy){if(b.dataset.rcoBusyPrev==null)b.dataset.rcoBusyPrev=b.disabled?'1':'0';b.disabled=true}
+        else if(b.dataset.rcoBusyPrev!=null){b.disabled=b.dataset.rcoBusyPrev==='1';delete b.dataset.rcoBusyPrev}
+      });
+    };
+  }
   function rcoWorkflowToken(silent=false){
     const role=rcoStoredRoleToken();if(role)return role;
-    if(!silent)setTimeout(()=>{if(typeof window.centralReturnToAccess==='function')window.centralReturnToAccess('rco')},0);
+    if(!silent){
+      try{window.salvarRascunho?.(true)}catch(_){}
+      alert(RCO_SESSION_EXPIRED_MSG);
+      setTimeout(()=>{if(typeof window.centralReturnToAccess==='function')window.centralReturnToAccess('rco')},0);
+    }
     return '';
   }
   async function syncRcoDraft(silent=true){if(!navigator.onLine)return false;let token=rcoWorkflowToken(silent);if(!token)return false;let rco;try{rco=window.collectState()}catch(_){return false}try{const r=await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false});rcoConflictNotified=false;if(r&&r.existing&&r.reportId){if(!silent)alert(r.message||'Já existe RCO em andamento para esta unidade e data. Abrindo o relatório canônico.');const opened=await claimRcoDraft({reportId:r.reportId},false,false,token);return !!opened}window.centralMarkSaved?.();return true}catch(e){if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);return false}}
@@ -703,9 +840,10 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     },true);
   }
   function renderRcoRetificationBanner(meta){
-    let el=document.getElementById('rcoRetificationBanner');if(!el){el=document.createElement('div');el.id='rcoRetificationBanner';el.className='rco-pass-pending no-print';const ref=document.getElementById('rcoResponsavelCard')||document.querySelector('.service-state-bar');ref?.insertAdjacentElement('afterend',el)}
-    if(String(meta?.status||'')!=='EM_RETIFICACAO'){el.hidden=true;return}
-    el.hidden=false;
+    let el=document.getElementById('rcoRetificationBanner');
+    if(String(meta?.status||'')!=='EM_RETIFICACAO'){el?.remove();return}
+    if(!el){el=document.createElement('div');el.id='rcoRetificationBanner';el.className='rco-pass-pending no-print';const ref=document.getElementById('rcoResponsavelCard')||document.querySelector('.service-state-bar');ref?.insertAdjacentElement('afterend',el)}
+    el.hidden=false;el.style.display='';
     const motivo=meta.retificacaoMotivo||meta.RETIFICACAO_MOTIVO||'Não informado';
     const por=meta.retificacaoAbertaPor||meta.RETIFICACAO_ABERTA_POR||'';
     const em=meta.retificacaoAbertaEm||meta.RETIFICACAO_ABERTA_EM||'';
@@ -718,7 +856,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   }
   window.solicitarRetificacaoRco=async function(){
     const resp=window.rcoResponsibleData?.()||{};
-    if(!resp.matricula){alert('Registre primeiro o CPU/Coordenador responsável pelo RCO.');return}
+    if(!window.__rcoResponsavelRegistrado||!resp.matricula){alert('Registre primeiro o CPU/Coordenador responsável pelo RCO.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
     if(!token){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente.');return}
     const u=(typeof currentUnit==='function'?currentUnit():{})||{};
@@ -748,7 +886,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       alert('Não foi possível solicitar a retificação: '+(err.message||err));
     }
   };
-  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken=''){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force},token,{popup:false});window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.__rcoPendingReceiveAfterResponsible=true;window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nCorrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{alert('RCO carregado da nuvem neste aparelho.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
+  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken=''){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force},token,{popup:false});const hintResp=r.rco?.responsavelRco||r.responsavel||null;if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else window.__rcoPendingContinueResponsible=true;window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
   async function continueRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false}
 
   window.centralRcoContinueCloud=continueRcoCloud;
@@ -769,8 +907,8 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   window.centralRcoToggleSemCpu=function(){const on=semCpu();document.getElementById('rcoConsolidadorFields')?.classList.toggle('hidden',!on);if(on&&document.getElementById('rcoConsolidadorMatricula'))document.getElementById('rcoConsolidadorMatricula').value=CentralCloud?.formatMatricula(document.getElementById('rcoConsolidadorMatricula').value)||'';hideCpuColumns();window.centralAutosave?.()}
   if(baseRenderMatrix)window.renderMatrix=function(){const r=baseRenderMatrix.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
   if(baseRenderPrint)window.renderPrintMatrix=function(){const r=baseRenderPrint.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
-  window.collectState=function(){const p=baseCollect();p.rcoOrigens=origins.slice();p.rcoCloudPayloads=JSON.parse(JSON.stringify(cloudPayloads||{}));p.consolidacaoResponsavel=consolidator();p.semGuarnicaoCpu=semCpu();if(semCpu()){p.cpu=[];p.state=JSON.parse(JSON.stringify(p.state||{}));if(p.state.guarnicoes)delete p.state.guarnicoes.cpu;const keep=x=>String(x?.guarnicao||'').trim().toUpperCase()!=='CPU';p.operacoes=(p.operacoes||[]).filter(keep);p.veiculosRecuperados=(p.veiculosRecuperados||[]).filter(keep);p.tcos=(p.tcos||[]).filter(keep);p.arvc=(p.arvc||[]).filter(keep)}return p}
-  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu()}
+  window.collectState=function(){const p=baseCollect();p.rcoOrigens=origins.slice();p.rcoCloudPayloads=JSON.parse(JSON.stringify(cloudPayloads||{}));p.consolidacaoResponsavel=consolidator();p.semGuarnicaoCpu=semCpu();const cf=window.__rcoClosureFlags||{};p.pdfGerado=!!(p.pdfGerado||cf.pdfGerado);p.pdfGeradoEm=p.pdfGeradoEm||cf.pdfGeradoEm||'';p.p3Consolidado=!!(p.p3Consolidado||cf.p3Consolidado);p.p3ConsolidadoEm=p.p3ConsolidadoEm||cf.p3ConsolidadoEm||'';p.encerrado=!!(p.encerrado||cf.encerrado);p.encerradoEm=p.encerradoEm||cf.encerradoEm||'';if(semCpu()){p.cpu=[];p.state=JSON.parse(JSON.stringify(p.state||{}));if(p.state.guarnicoes)delete p.state.guarnicoes.cpu;const keep=x=>String(x?.guarnicao||'').trim().toUpperCase()!=='CPU';p.operacoes=(p.operacoes||[]).filter(keep);p.veiculosRecuperados=(p.veiculosRecuperados||[]).filter(keep);p.tcos=(p.tcos||[]).filter(keep);p.arvc=(p.arvc||[]).filter(keep)}return p}
+  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu();window.__rcoClosureFlags={pdfGerado:!!p?.pdfGerado,pdfGeradoEm:String(p?.pdfGeradoEm||''),p3Consolidado:!!p?.p3Consolidado,p3ConsolidadoEm:String(p?.p3ConsolidadoEm||''),encerrado:!!p?.encerrado,encerradoEm:String(p?.encerradoEm||'')};try{window.p3RefreshClosureStatus?.();const el=document.getElementById('p3Status');if(el&&!el.textContent){const f=window.__rcoClosureFlags;if(f.pdfGerado&&!f.p3Consolidado)el.textContent='PDF gerado. Ainda falta Consolidar P3.';else if(!f.pdfGerado&&f.p3Consolidado)el.textContent='Dados consolidados. Ainda falta Gerar PDF do RCO.';else if(f.pdfGerado&&f.p3Consolidado&&!f.encerrado)el.textContent='PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.'}}catch(_){}}
   function removeDynamicForGu(name){['cpuOperations','cpuVehicles','cpuTcos','cpuArvcs'].forEach(id=>document.querySelectorAll('#'+id+' .entry').forEach(e=>{const g=e.querySelector('[data-k="guarnicao"]');if(g&&String(g.value||'').trim().toLowerCase()===String(name||'').trim().toLowerCase())e.remove()}))}
   function payloadIds(p){return new Set([...(p?.ocorrencias||[]),...(p?.operacoes||[]),...(p?.veiculosRecuperados||[]),...(p?.tcos||[]),...(p?.arvc||p?.cirvc||[])].map(x=>x?.id).filter(Boolean))}
   function clearCloudGuarnicao(name){const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());if(name&&guId(name)!=='cpu')delete state.guarnicoes[guId(name)];removeDynamicForGu(name);const ids=new Set();related.forEach(o=>(o.recordIds||[]).forEach(id=>ids.add(id)));state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!ids.has(id));const reports=new Set(related.map(o=>o.rsdReportId));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!reports.has(id))}
@@ -984,13 +1122,28 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 
 
   async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&Number(oldOrigin.versao||0)>=Number(item.version||0)){alert('Esta versão do RSD já está incluída.');return}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:item.guarnicao,versao:item.version,status:item.status||'INCLUIDO',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(item.guarnicao);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();alert(oldOrigin?'RSD atualizado para a versão mais recente.':'RSD incluído na consolidação.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
+  /** Janela de datas do RCO: início, término e ±1 dia (overnight / DATA_SERVICO fora do dia de serviço). */
+  function rcoCloudDateWindow(inicio,fim){
+    const bases=new Set();if(inicio)bases.add(String(inicio).slice(0,10));if(fim)bases.add(String(fim).slice(0,10));
+    const out=new Set();
+    for(const d of bases){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d))continue;out.add(d);
+      const dt=new Date(d+'T12:00:00');if(Number.isNaN(dt.getTime()))continue;
+      const prev=new Date(dt),next=new Date(dt);prev.setDate(prev.getDate()-1);next.setDate(next.getDate()+1);
+      out.add(localISODate(prev));out.add(localISODate(next));
+    }
+    return [...out].sort();
+  }
+  const RCO_OPEN_STATUSES=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA'];
+  function rcoCloudStatusRank(st){const u=String(st||'').toUpperCase();const i=RCO_OPEN_STATUSES.indexOf(u);return i>=0?i:100}
   async function loadCloud(){
     const token=rcoWorkflowToken(false);if(!token)return;
     const inicio=val('dataInicio'),fim=val('dataTermino'),u=currentUnit();if(!inicio){alert('Informe a data de início do serviço.');return}
     try{
-      const dates=[inicio,...(fim&&fim!==inicio?[fim]:[])],map=new Map();
+      const dates=rcoCloudDateWindow(inicio,fim),map=new Map();
       for(const data of dates){const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data,showCancelled:'1',token});(r.items||[]).forEach(x=>map.set(x.reportId,x))}
-      cloudItems=Array.from(map.values());const removed=reconcileCancelledOrigins();renderCloud();
+      cloudItems=Array.from(map.values()).sort((a,b)=>rcoCloudStatusRank(a.status)-rcoCloudStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
+      const removed=reconcileCancelledOrigins();renderCloud();
       if(removed)alert(removed+' RSD(s) cancelado(s) foi(ram) retirado(s) automaticamente desta consolidação. Os registros permanecem disponíveis em “Mostrar cancelados” para auditoria.');
     }catch(e){alert('Não foi possível consultar os RSDs: '+e.message)}
   }
@@ -1003,7 +1156,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const pendingStatuses=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'],pending=dupGroups.size+active.filter(x=>pendingStatuses.includes(String(x.status||'').toUpperCase())).length;
     const ps=document.getElementById('rcoCloudPending');if(ps){ps.hidden=!pending;ps.textContent='Pendências das guarnições: '+pending+(pending?' — confira antes de consolidar.':'')}
     const toggle=document.getElementById('rcoShowCancelled');if(toggle){toggle.hidden=!cancelled.length;toggle.textContent=showCancelledRsd?'Ocultar cancelados':'Mostrar cancelados ('+cancelled.length+')'}
-    const visible=showCancelledRsd?cloudItems:active;
+    const visible=(showCancelledRsd?cloudItems.slice():active.slice()).sort((a,b)=>rcoCloudStatusRank(a.status)-rcoCloudStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
     if(!visible.length){box.innerHTML='<div class="context-empty">'+(cancelled.length?'Não há RSD ativo nesta consulta. Existem '+cancelled.length+' registro(s) cancelado(s) preservado(s) para auditoria.':'Nenhuma guarnição/RSD encontrado para a data e unidade.')+'</div>';return}
     box.innerHTML=visible.map(x=>{
       const o=origins.find(y=>y.rsdReportId===x.reportId),newer=o&&Number(x.version)>Number(o.versao||0),status=String(x.status||'').toLowerCase(),statusUp=String(x.status||'').toUpperCase(),isCancelled=statusUp==='CANCELADO',vtr=(x.viaturas||[]).map(v=>v.prefixo).filter(Boolean).join(','),sub=[x.responsavel,x.matricula,'Segmento '+(x.segmento||1),vtr?'VTR '+vtr:''].filter(Boolean).join(' • '),blocked=['RETIFICACAO_SOLICITADA','INDEFERIDO','CANCELADO'].includes(statusUp);
@@ -1073,10 +1226,21 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 </script>
 <script id="v10-6-rco-responsavel-script">
 (function(){
-  let selectedResponsible=null,subTimer=null;window.__rcoSubstituto=window.__rcoSubstituto||null;window.__rcoResponsavel=window.__rcoResponsavel||null;
+  let selectedResponsible=null,subTimer=null;window.__rcoSubstituto=window.__rcoSubstituto||null;window.__rcoResponsavel=window.__rcoResponsavel||null;window.__rcoResponsavelRegistrado=!!window.__rcoResponsavelRegistrado;window.__rcoContinueHint=window.__rcoContinueHint||null;
   const e=id=>document.getElementById(id),fmt=v=>window.CentralCloud?CentralCloud.formatMatricula(v):formatMatricula(v);
   function resultHtml(m){return '<strong>'+esc([m.POSTO_GRAD,m.NOME].filter(Boolean).join(' '))+'</strong><br>Matrícula: '+esc(m.MATRICULA||'')}
-  window.rcoResponsibleData=function(){const a=window.__rcoResponsavel||{};return {perfil:a.perfil||e('rcoResponsavelPerfil')?.value||'CPU',matricula:a.matricula||fmt(e('rcoResponsavelMatricula')?.value||''),nome:a.nome||'',postoGrad:a.postoGrad||'',turno:a.turno||e('rcoResponsavelTurno')?.value||''}}
+  function sessionTokenOrAlert(){
+    let senha='';try{senha=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
+    if(!senha){alert('Sua sessão expirou. Volte às opções de acesso e entre novamente.');try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>{if(typeof window.centralReturnToAccess==='function')window.centralReturnToAccess('rco')},0);return ''}
+    return senha;
+  }
+  window.rcoResponsibleData=function(){
+    const a=window.__rcoResponsavel||{};
+    if(!window.__rcoResponsavelRegistrado||!a.matricula){
+      return {perfil:e('rcoResponsavelPerfil')?.value||'CPU',matricula:'',nome:'',postoGrad:'',turno:e('rcoResponsavelTurno')?.value||''};
+    }
+    return {perfil:a.perfil||e('rcoResponsavelPerfil')?.value||'CPU',matricula:a.matricula||'',nome:a.nome||'',postoGrad:a.postoGrad||'',turno:a.turno||e('rcoResponsavelTurno')?.value||''};
+  }
   function setExternalResponsibleFields(show){
     const box=e('rcoCadastroExternoFields');if(box)box.classList.toggle('hidden',!show);
     const btn=e('rcoResponsavelRegistrarBtn');if(btn)btn.textContent=show?'Concluir cadastro e registrar':'Identificar e registrar responsável';
@@ -1087,12 +1251,21 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function externalResponsiblePayload(){
     return {postoGrad:String(e('rcoExternoPosto')?.value||'').trim(),nome:String(e('rcoExternoNome')?.value||'').trim(),unidadeOrigem:String(e('rcoExternoUnidade')?.value||'').trim()};
   }
+  function hideContinuarComo(){const box=e('rcoContinuarComoBox');if(box)box.classList.add('hidden');window.__rcoContinueHint=null}
+  function showContinuarComo(hint){
+    const box=e('rcoContinuarComoBox'),msg=e('rcoContinuarComoMsg');if(!box||!msg)return;
+    const label=[hint.postoGrad||hint.posto||'',hint.nome||'',hint.matricula||''].filter(Boolean).join(' ').trim();
+    if(!hint?.matricula||!label){box.classList.add('hidden');return}
+    window.__rcoContinueHint=hint;
+    msg.textContent='Continuar como '+label+'? Confirme para revalidar no Cadastro Mestre e registrar a responsabilidade nesta sessão, ou use outra matrícula.';
+    box.classList.remove('hidden');
+  }
   async function validateResponsibleCredential(){
     if(!window.CentralCloud||!await CentralCloud.probe()){alert('A Central em nuvem não está disponível.');return null}
     const inp=e('rcoResponsavelMatricula'),mat=fmt(inp.value);inp.value=mat;if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return null}
     const perfil=e('rcoResponsavelPerfil').value,turno=e('rcoResponsavelTurno').value;
-    let senha=String(e('rcoResponsavelSenha').value||'').trim();if(!senha){try{senha=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}}
-    if(!senha){alert('A credencial de ingresso do RCO não está disponível. Volte às opções de acesso e entre novamente.');return null}
+    let senha=String(e('rcoResponsavelSenha').value||'').trim();if(!senha)senha=sessionTokenOrAlert();
+    if(!senha)return null;
     const payload={perfil,matricula:mat};
     const extBox=e('rcoCadastroExternoFields');if(extBox&&!extBox.classList.contains('hidden'))payload.cadastroExterno=externalResponsiblePayload();
     const r=await CentralCloud.submitForm('rco-responsavel-validar',payload,senha,{popup:false,tokenKind:'role'});
@@ -1115,31 +1288,70 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const n=e('nomeAssinante'),p=e('patenteAssinante');if(n){n.value=m.NOME||'';n.readOnly=true;syncPrintValue(n)}if(p){p.value=m.POSTO_GRAD||'';p.disabled=true;syncPrintValue(p)}syncAll?.();
   }
   function setResponsibleCpuRowLocked(row,locked){if(!row)return;row.classList.toggle('audit-locked-row',!!locked);row.querySelectorAll('input,select').forEach(el=>{const pv=el.parentElement?.querySelector('.print-value');if(locked&&pv)pv.textContent=el.options&&el.selectedIndex>=0?el.options[el.selectedIndex].text:el.value;el.disabled=!!locked;el.hidden=false});row.querySelectorAll('button').forEach(b=>b.style.display=locked?'none':'')}
-  function setResponsibleLocked(locked){['rcoResponsavelPerfil','rcoResponsavelMatricula','rcoResponsavelTurno'].forEach(id=>{const x=e(id);if(x)x.disabled=!!locked});const reg=e('rcoResponsavelRegistrarBtn');if(reg)reg.classList.toggle('hidden',!!locked)}
-  function setResponsibleProgress(msg='',busy=false){const out=e('rcoResponsavelProgresso');if(out)out.textContent=msg;const btn=e('rcoResponsavelRegistrarBtn');if(btn)btn.disabled=!!busy}
+  function setResponsibleLocked(locked){['rcoResponsavelPerfil','rcoResponsavelMatricula','rcoResponsavelTurno'].forEach(id=>{const x=e(id);if(x)x.disabled=!!locked});const reg=e('rcoResponsavelRegistrarBtn');if(reg){reg.classList.toggle('hidden',!!locked);reg.hidden=!!locked}}
+  function setResponsibleProgress(msg='',busy=false){const out=e('rcoResponsavelProgresso');if(out)out.textContent=msg;const btn=e('rcoResponsavelRegistrarBtn');if(btn)btn.disabled=!!busy;const conf=e('rcoContinuarComoBtn');if(conf)conf.disabled=!!busy}
   function applyResponsible(m,perfil,turno,fromLoad=false){
-    const data={perfil,matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||'',turno:turno||m.turno||''};window.__rcoResponsavel=data;e('rcoResponsavelPerfil').value=data.perfil;e('rcoResponsavelMatricula').value=data.matricula;e('rcoResponsavelTurno').value=data.turno;
-    e('rcoResponsavelResultado').innerHTML='<strong>'+esc([data.postoGrad,data.nome].filter(Boolean).join(' '))+'</strong><br>Matrícula: '+esc(data.matricula)+'<br>Turno: '+esc(data.turno||'não informado');const badge=e('rcoResponsavelBadge');badge.textContent=(data.perfil==='CPU'?'CPU / Coordenador':data.perfil)+' registrado';badge.classList.add('ok');setResponsibleLocked(true);setResponsibleProgress('Responsável confirmado. O RCO está pronto para entrada.',false);
+    const data={perfil,matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||'',turno:turno||m.turno||''};window.__rcoResponsavel=data;window.__rcoResponsavelRegistrado=true;e('rcoResponsavelPerfil').value=data.perfil;e('rcoResponsavelMatricula').value=data.matricula;e('rcoResponsavelTurno').value=data.turno;
+    e('rcoResponsavelResultado').innerHTML='<strong>'+esc([data.postoGrad,data.nome].filter(Boolean).join(' '))+'</strong><br>Matrícula: '+esc(data.matricula)+'<br>Turno: '+esc(data.turno||'não informado');const badge=e('rcoResponsavelBadge');badge.textContent=(data.perfil==='CPU'?'CPU / Coordenador':data.perfil)+' registrado';badge.classList.add('ok');setResponsibleLocked(true);setResponsibleProgress('Responsável confirmado. O RCO está pronto para entrada.',false);hideContinuarComo();
     fillFooter({NOME:data.nome,POSTO_GRAD:data.postoGrad});
     if(data.perfil==='CPU'){if(!fromLoad)ensureCpuRow({NOME:data.nome,POSTO_GRAD:data.postoGrad,MATRICULA:data.matricula},data.turno);const tr=[...document.querySelectorAll('#cpuPeople tr')].find(r=>fmt(r.querySelector('[data-k="matricula"]')?.value||'')===data.matricula);if(tr)setResponsibleCpuRowLocked(tr,true)}
     else{e('rcoSemCpu').checked=true;e('rcoConsolidadorPosto').value=data.postoGrad;e('rcoConsolidadorNome').value=data.nome;e('rcoConsolidadorMatricula').value=data.matricula;e('rcoConsolidadorTurno').value=data.turno;centralRcoToggleSemCpu?.()}
   }
-  window.rcoPrepareIncomingResponsible=function(){
-    selectedResponsible=null;window.__rcoResponsavel=null;
-    setResponsibleLocked(false);setResponsibleProgress('',false);const ids=['rcoResponsavelMatricula','rcoResponsavelTurno','rcoResponsavelSenha'];ids.forEach(id=>{const x=e(id);if(x)x.value=''});
+  function unlockResponsibleCard(){
+    selectedResponsible=null;window.__rcoResponsavel=null;window.__rcoResponsavelRegistrado=false;
+    setResponsibleLocked(false);setResponsibleProgress('',false);
     clearExternalResponsibleFields();setExternalResponsibleFields(false);
+    const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Não registrado';badge.classList.remove('ok')}
+    const pw=e('rcoResponsavelSenha');if(pw){pw.value='';pw.disabled=false;const pf=pw.closest('.field');if(pf)pf.hidden=true}
+    const reg=e('rcoResponsavelRegistrarBtn');if(reg){reg.hidden=false;reg.classList.remove('hidden')}
+  }
+  window.rcoPrepareIncomingResponsible=function(){
+    unlockResponsibleCard();hideContinuarComo();
+    ['rcoResponsavelMatricula','rcoResponsavelTurno','rcoResponsavelSenha'].forEach(id=>{const x=e(id);if(x)x.value=''});
     const perfil=e('rcoResponsavelPerfil');if(perfil)perfil.value='CPU';
-    const out=e('rcoResponsavelResultado');if(out)out.textContent='Informe sua matrícula e confirme a entrada como novo CPU/Coordenador. A chave já validada no ingresso será reutilizada automaticamente.';
+    const out=e('rcoResponsavelResultado');if(out)out.textContent='Identifique o responsável que receberá este RCO. Informe sua matrícula; a chave já validada no ingresso será reutilizada automaticamente. A passagem só será concluída após o registro formal.';
     const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Aguardando novo responsável';badge.classList.remove('ok')}
     const n=e('nomeAssinante'),p=e('patenteAssinante');if(n){n.value='';syncPrintValue(n)}if(p){p.value='';syncPrintValue(p)}
+    setTimeout(()=>e('rcoResponsavelMatricula')?.focus(),40);
+  }
+  window.rcoPrepareContinueResponsible=function(hint){
+    unlockResponsibleCard();
+    const h=hint&&hint.matricula?hint:(window.__rcoContinueHint||null);
+    const perfil=e('rcoResponsavelPerfil');if(perfil)perfil.value=(h&&h.perfil)||'CPU';
+    if(h&&h.matricula){
+      e('rcoResponsavelMatricula').value=fmt(h.matricula);
+      if(h.turno)e('rcoResponsavelTurno').value=h.turno;
+      showContinuarComo(h);
+      const out=e('rcoResponsavelResultado');if(out)out.innerHTML='Identifique o responsável que continuará este RCO.<br>Há um responsável anterior no rascunho: <strong>'+esc([h.postoGrad,h.nome,h.matricula].filter(Boolean).join(' '))+'</strong>. Confirme a continuidade ou informe outra matrícula.';
+      const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Confirmação necessária';badge.classList.remove('ok')}
+    }else{
+      hideContinuarComo();
+      ['rcoResponsavelMatricula','rcoResponsavelTurno'].forEach(id=>{const x=e(id);if(x)x.value=''});
+      const out=e('rcoResponsavelResultado');if(out)out.textContent='Identifique o responsável que continuará este RCO. Informe matrícula e turno; a chave já validada no ingresso será reutilizada automaticamente.';
+      const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Aguardando identificação';badge.classList.remove('ok')}
+    }
+    setTimeout(()=>{if(h&&h.matricula&&!h.turno)e('rcoResponsavelTurno')?.focus();else if(!(h&&h.matricula))e('rcoResponsavelMatricula')?.focus();else e('rcoContinuarComoBtn')?.focus()},40);
+  }
+  window.rcoContinuarComOutraMatricula=function(){
+    hideContinuarComo();
+    ['rcoResponsavelMatricula','rcoResponsavelTurno'].forEach(id=>{const x=e(id);if(x)x.value=''});
+    const out=e('rcoResponsavelResultado');if(out)out.textContent='Informe a matrícula e o turno do responsável que continuará este RCO.';
+    setTimeout(()=>e('rcoResponsavelMatricula')?.focus(),30);
+  }
+  window.rcoConfirmarContinuidadeResponsavel=async function(){
+    const h=window.__rcoContinueHint;if(h?.matricula){e('rcoResponsavelMatricula').value=fmt(h.matricula);if(h.perfil)e('rcoResponsavelPerfil').value=h.perfil;if(h.turno&&!e('rcoResponsavelTurno').value)e('rcoResponsavelTurno').value=h.turno}
+    return window.rcoRegistrarResponsavel?.();
   }
   window.rcoRegistrarResponsavel=async function(){
     try{
       if(!e('rcoResponsavelTurno').value){alert('Selecione o turno: 12h (dia), 12h (noite) ou 24h.');return}
       setResponsibleProgress('Validando matrícula e credencial…',true);const v=await validateResponsibleCredential();if(!v){setResponsibleProgress('',false);return}if(v.pending){setResponsibleProgress('Cadastro complementar necessário.',false);return}
       setResponsibleProgress('Registrando responsável…',true);const mm=v.r.militar||{},mat=fmt(mm.matricula||e('rcoResponsavelMatricula').value);applyResponsible({NOME:mm.nome||'',POSTO_GRAD:mm.postoGrad||'',MATRICULA:mat},v.perfil,v.turno,false);
-      try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);if(window.__rcoPendingReceiveAfterResponsible){const recebido=window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Use “Entrar no RCO”.',false);
-    }catch(err){setResponsibleLocked(false);setResponsibleProgress('Falha no registro.',false);try{sessionStorage.removeItem('pmpb-rco-role-token-v1')}catch(_){}alert('Não foi possível registrar o responsável: '+err.message)}
+      try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);
+      if(window.__rcoPendingReceiveAfterResponsible){const recebido=window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
+      window.__rcoPendingContinueResponsible=false;
+      window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Use “Entrar no RCO”.',false);
+    }catch(err){setResponsibleLocked(false);window.__rcoResponsavelRegistrado=false;setResponsibleProgress('Falha no registro.',false);alert('Não foi possível registrar o responsável: '+err.message)}
   }
   function setSub(m){window.__rcoSubstituto=m?{matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||''}:null;const hidden=e('substitutoLegal'),print=document.querySelector('[data-print-for="substitutoLegal"]'),sel=e('rcoSubstitutoSelecionado');if(!m){hidden.value='';if(print)print.textContent='';if(sel){sel.hidden=true;sel.textContent=''}return}const a=window.__rcoSubstituto,text=[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' ');hidden.value=text;if(print)print.textContent=text;if(sel){sel.hidden=false;sel.innerHTML=esc(text)+' <button type="button" class="small secondary" onclick="rcoRemoverSubstituto()">Remover</button>'}window.centralAutosave?.()}
   window.rcoRemoverSubstituto=function(){setSub(null);e('rcoSubstitutoBusca').value='';e('rcoSubstitutoResultados').innerHTML=''}
@@ -1152,11 +1364,11 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     e('rcoHasSubstituto')?.addEventListener('change',ev=>{e('rcoSubstitutoFields').classList.toggle('hidden',!ev.target.checked);if(!ev.target.checked)rcoRemoverSubstituto()});
     e('rcoSubstitutoBusca')?.addEventListener('input',()=>{clearTimeout(subTimer);subTimer=setTimeout(searchSub,220)});
     const baseCollect=window.collectState;if(baseCollect&&!baseCollect.__respWrapped){const w=function(){const p=baseCollect();p.responsavelRco=window.rcoResponsibleData();p.substitutoLegalCadastro=window.__rcoSubstituto;return p};w.__respWrapped=true;window.collectState=w}
-    const baseApply=window.applyCpu;if(baseApply&&!baseApply.__respWrapped){const w=function(p){const r=baseApply(p);if(p?.responsavelRco?.matricula)applyResponsible({matricula:p.responsavelRco.matricula,nome:p.responsavelRco.nome,postoGrad:p.responsavelRco.postoGrad},p.responsavelRco.perfil||'CPU',p.responsavelRco.turno||'',true);if(p?.substitutoLegalCadastro){e('rcoHasSubstituto').checked=true;e('rcoSubstitutoFields').classList.remove('hidden');setSub(p.substitutoLegalCadastro)}else if(p?.passagem?.substituto){const x=String(p.passagem.substituto);e('substitutoLegal').value=x;const pr=document.querySelector('[data-print-for="substitutoLegal"]');if(pr)pr.textContent=x}return r};w.__respWrapped=true;window.applyCpu=w}
+    const baseApply=window.applyCpu;if(baseApply&&!baseApply.__respWrapped){const w=function(p){const r=baseApply(p);const gate=!!(window.__rcoPendingContinueResponsible||window.__rcoPendingReceiveAfterResponsible);if(p?.responsavelRco?.matricula){if(gate){e('rcoResponsavelPerfil').value=p.responsavelRco.perfil||'CPU';e('rcoResponsavelMatricula').value=fmt(p.responsavelRco.matricula||'');if(p.responsavelRco.turno)e('rcoResponsavelTurno').value=p.responsavelRco.turno;window.__rcoContinueHint=p.responsavelRco;window.__rcoResponsavel=null;window.__rcoResponsavelRegistrado=false}else applyResponsible({matricula:p.responsavelRco.matricula,nome:p.responsavelRco.nome,postoGrad:p.responsavelRco.postoGrad},p.responsavelRco.perfil||'CPU',p.responsavelRco.turno||'',true)}if(p?.substitutoLegalCadastro){e('rcoHasSubstituto').checked=true;e('rcoSubstitutoFields').classList.remove('hidden');setSub(p.substitutoLegalCadastro)}else if(p?.passagem?.substituto){const x=String(p.passagem.substituto);e('substitutoLegal').value=x;const pr=document.querySelector('[data-print-for="substitutoLegal"]');if(pr)pr.textContent=x}return r};w.__respWrapped=true;window.applyCpu=w}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.19"></script>
-<script src="service_flow.js?v=10.8.19"></script>
+<script src="service_access_layers.js?v=10.8.22"></script>
+<script src="service_flow.js?v=10.8.22"></script>
 </body></html>

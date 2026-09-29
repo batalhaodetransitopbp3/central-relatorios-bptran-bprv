@@ -9,13 +9,31 @@ function getDeviceId(){try{let d=localStorage.getItem(DEVICE_KEY)||'';if(!d){d=u
 function tokenStorageKey(kind){if(kind==='p3')return P3_TOKEN_KEY;if(kind==='comando')return SISTEMA_TOKEN_KEY;return TOKEN_KEY}
 function getToken(kind='central'){try{return localStorage.getItem(tokenStorageKey(kind))||''}catch(_){return ''}}
 function setToken(v,kind='central'){try{const k=tokenStorageKey(kind);if(v)localStorage.setItem(k,v);else localStorage.removeItem(k)}catch(_){}}
-function moduleAuthLocked(kind='central'){try{const current=(location.pathname.split('/').pop()||'').toLowerCase(),operational=(sessionStorage.getItem('central-module-auth-operational-v1')||'').toLowerCase(),p3module=(sessionStorage.getItem('central-module-auth-p3-v1')||'').toLowerCase(),comandomodule=(sessionStorage.getItem('central-module-auth-comando-v1')||'').toLowerCase();if(kind==='central')return sessionStorage.getItem('central-module-auth-rsd-v1')==='1'||(operational&&operational===current);if(kind==='p3')return !!(p3module&&p3module===current);if(kind==='comando')return !!(comandomodule&&comandomodule===current);return false}catch(_){return false}}
-function askToken(kind='central',message,force=false){let t=force?'':getToken(kind);if(t)return t;if(moduleAuthLocked(kind)){setTimeout(()=>{try{global.dispatchEvent(new CustomEvent('central-module-auth-lost',{detail:{kind,message:'A credencial de ingresso não está disponível.'}}))}catch(_){}},0);return ''}const msg=message||(kind==='p3'?'Informe a Chave P3:':kind==='comando'?'Informe a senha da Gestão de Sistema:':'Informe a chave operacional da Central:');t=prompt(msg)||'';t=t.trim();if(t)setToken(t,kind);return t}
-const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-analysis-compare','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-consolidate-final']);
+function currentModulePage(){try{return (location.pathname.split('/').pop()||'').toLowerCase()}catch(_){return ''}}
+function isRsdModulePage(){return /relatorio_servico_diario/i.test(currentModulePage())}
+function isRcoModulePage(){return /relatorio_cpu/i.test(currentModulePage())}
+function rcoRoleSessionToken(){try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}}
+const SESSION_EXPIRED_MSG='Sua sessão expirou. Volte às opções de acesso e entre novamente.';
+function fireModuleAuthLost(kind,message){setTimeout(()=>{try{global.dispatchEvent(new CustomEvent('central-module-auth-lost',{detail:{kind,message:message||SESSION_EXPIRED_MSG}}))}catch(_){}},0)}
+function moduleAuthLocked(kind='central'){try{const current=currentModulePage(),operational=(sessionStorage.getItem('central-module-auth-operational-v1')||'').toLowerCase(),p3module=(sessionStorage.getItem('central-module-auth-p3-v1')||'').toLowerCase(),comandomodule=(sessionStorage.getItem('central-module-auth-comando-v1')||'').toLowerCase();if(kind==='central')return sessionStorage.getItem('central-module-auth-rsd-v1')==='1'||(operational&&operational===current);if(kind==='p3')return sessionStorage.getItem('central-module-auth-rco-v1')==='1'||!!(p3module&&p3module===current);if(kind==='comando')return !!(comandomodule&&comandomodule===current);return false}catch(_){return false}}
+function resolveSessionToken(kind='central'){let t=getToken(kind);if(t)return t;if(kind==='p3'||isRcoModulePage()){t=rcoRoleSessionToken();if(t)return t}return ''}
+function askToken(kind='central',message,force=false){
+  let t=force?'':resolveSessionToken(kind);
+  if(t)return t;
+  // RSD/RCO: keys only at ingress overlay — never browser prompt mid-module
+  if(isRsdModulePage()||isRcoModulePage()){
+    fireModuleAuthLost(isRcoModulePage()||kind==='p3'?'p3':kind,SESSION_EXPIRED_MSG);return ''
+  }
+  if(moduleAuthLocked(kind)){fireModuleAuthLost(kind,SESSION_EXPIRED_MSG);return ''}
+  const msg=message||(kind==='p3'?'Informe a Chave P3:':kind==='comando'?'Informe a senha da Gestão de Sistema:':'Informe a chave operacional da Central:');
+  t=prompt(msg)||'';t=t.trim();if(t)setToken(t,kind);return t
+}
+// RCO consolidate/mark-pdf/encerrar map to 'p3' for fallback getToken; callers that pass an explicit token (e.g. session COORD key) win — submitForm uses the provided token as-is.
+const P3_ACTIONS=new Set(['p3-query','p3-analysis','p3-analysis-compare','p3-config','motomecanizacao-list','checklist-list','motomecanizacao-update','cadastro-upsert','p3-config-set','rco-upsert','rco-consolidate-final','rco-mark-pdf','rco-encerrar']);
 const COMANDO_ACTIONS=new Set(['comando-rsd-patch','sistema-rsd-patch','sistema-feedback-list','sistema-auth','rco-retification-list','rco-retification-decide','rco-retification-open','rco-draft-dedupe-diagnose','rsd-service-dedupe-diagnose','rco-draft-dedupe-sanitize','rsd-service-dedupe-sanitize']);
 function tokenKindForAction(action){const a=String(action||'');if(a.startsWith('master-'))return 'master';if(a==='sistema-feedback-enviar')return 'central';if(a==='rco-retification-request')return 'central';if(COMANDO_ACTIONS.has(a)||a.startsWith('comando-')||a.startsWith('sistema-'))return 'comando';return P3_ACTIONS.has(a)?'p3':'central'}
 function isAuthError(err){return err?.code==='AUTH_INVALID'||/(chave|credencial|senha)[^\n]{0,80}inválid/i.test(String(err?.message||err||''))}
-function authError(action,message,token,kindOverride){const e=new Error(message||'Chave inválida.');if(/(chave|credencial|senha)[^\n]{0,80}inválid/i.test(e.message)){const kind=kindOverride||tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;if(kind==='central'||kind==='p3'||kind==='comando'){const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind);setTimeout(()=>{try{global.dispatchEvent(new CustomEvent('central-module-auth-lost',{detail:{kind,message:e.message}}))}catch(_){}},0)}}return e}
+function authError(action,message,token,kindOverride){const e=new Error(message||'Chave inválida.');if(/(chave|credencial|senha)[^\n]{0,80}inválid/i.test(e.message)){const kind=kindOverride||tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;if(kind==='central'||kind==='p3'||kind==='comando'){const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind);if(kind==='p3'||isRcoModulePage()){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}}if(kind==='central'||isRsdModulePage()){try{sessionStorage.removeItem('central-module-auth-rsd-v1')}catch(_){}}fireModuleAuthLost(kind,SESSION_EXPIRED_MSG)}}return e}
 function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
@@ -58,12 +76,18 @@ function queueCount(){return readQueue().length}
 async function compressImage(file,{maxSide=1600,quality=.78,type='image/jpeg'}={}){if(!file)return null;const img=await new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);res(im)};im.onerror=e=>{URL.revokeObjectURL(u);rej(e)};im.src=u});let w=img.naturalWidth,h=img.naturalHeight,s=Math.min(1,maxSide/Math.max(w,h));w=Math.max(1,Math.round(w*s));h=Math.max(1,Math.round(h*s));const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);const dataUrl=canvas.toDataURL(type,quality);return {dataUrl,mimeType:type,largura:w,altura:h,tamanhoBytes:Math.round((dataUrl.length-dataUrl.indexOf(',')-1)*.75)}}
 async function searchCadastro(tipo,q,u,token,opts={}){
   const isMilitar=String(tipo||'').toLowerCase().indexOf('militar')===0,up=isMilitar?{}:unitParams(u);
-  const kind=opts.tokenKind||(token&&getToken('comando')&&String(token)===String(getToken('comando'))?'comando':'central');
-  let t=token||getToken(kind)||(kind==='comando'?getToken('comando'):'')||askToken(kind==='comando'?'comando':'central',kind==='comando'?'Informe a senha da Gestão de Sistema para consultar o Cadastro Mestre:':'Informe a chave operacional da Central para consultar o Cadastro Mestre:');
+  const kind=opts.tokenKind||(token&&getToken('comando')&&String(token)===String(getToken('comando'))?'comando':(isRcoModulePage()?'p3':'central'));
+  let t=token||resolveSessionToken(kind)||(kind==='comando'?getToken('comando'):'')||(isRcoModulePage()?rcoRoleSessionToken():'');
+  if(!t){
+    if(isRsdModulePage()||isRcoModulePage()){fireModuleAuthLost(isRcoModulePage()?'p3':kind,SESSION_EXPIRED_MSG);throw new Error(SESSION_EXPIRED_MSG)}
+    t=askToken(kind==='comando'?'comando':kind,kind==='comando'?'Informe a senha da Gestão de Sistema para consultar o Cadastro Mestre:':kind==='p3'?'Informe a Chave P3 para consultar o Cadastro Mestre:':'Informe a chave operacional da Central para consultar o Cadastro Mestre:');
+  }
   if(!t)throw new Error('Consulta cancelada: credencial não informada.');
   try{return await jsonp('cadastros',{...up,tipo,q,token:t},{timeout:opts.timeout||20000,tokenKind:kind,progress:opts.progress})}
   catch(err){
     if(!isAuthError(err)||opts.noRetry)throw err;
+    // RSD/RCO: never re-prompt mid-module after AUTH_INVALID
+    if(isRsdModulePage()||isRcoModulePage()){fireModuleAuthLost(isRcoModulePage()?'p3':kind,SESSION_EXPIRED_MSG);throw err}
     t=askToken(kind,kind==='comando'?'Senha inválida. Digite novamente a senha da Gestão de Sistema:':'A chave informada é inválida. Digite novamente a chave operacional da Central:',true);
     if(!t)throw new Error('Consulta cancelada: credencial não informada.');
     return await jsonp('cadastros',{...up,tipo,q,token:t},{timeout:opts.timeout||20000,tokenKind:kind,progress:opts.progress});
@@ -72,14 +96,30 @@ async function searchCadastro(tipo,q,u,token,opts={}){
 let progressDepth=0,progressEl=null,progressBarEl=null,progressTextEl=null,progressTimer=null,progressValue=0;
 function progressMessageForAction(action,phase='start'){
   const a=String(action||'').toLowerCase(),finish=phase==='finish'||phase==='response',wait=phase==='wait';
-  if(a==='cadastros'||a.includes('militar-validar'))return finish?'Cadastro localizado.':wait?'Consultando o Cadastro Mestre…':'Consultando o Cadastro Mestre…';
+  if(a==='cadastros'||a.includes('militar-validar')||a.includes('rsd-militar'))return finish?'Cadastro localizado.':wait?'Consultando o Cadastro Mestre…':'Consultando o Cadastro Mestre…';
+  if(a==='access-check')return finish?'Credencial validada.':'Validando a credencial de ingresso…';
+  if(a==='access-open-services')return finish?'Serviços carregados.':wait?'Consultando serviços abertos…':'Buscando serviços abertos na Central…';
   if(a==='guarnicao-next')return 'Definindo a identificação da guarnição…';
   if(a==='rsd-start')return finish?'Guarnição registrada.':wait?'Registrando a guarnição na Central…':'Registrando a guarnição no serviço…';
-  if(a==='rsd-draft-sync')return finish?'Rascunho sincronizado.':'Sincronizando o RSD na nuvem…';
+  if(a==='rsd-draft-sync')return finish?'Rascunho sincronizado.':wait?'Enviando o rascunho do RSD…':'Sincronizando o RSD na nuvem…';
   if(a==='rsd-upsert')return finish?'RSD enviado.':'Finalizando e enviando o RSD…';
   if(a==='rsd-force-finalize')return finish?'Finalização excepcional registrada.':'Finalizando o RSD por determinação do Coordenador…';
+  if(a==='rsd-claim')return finish?'Serviço carregado.':'Assumindo o serviço neste aparelho…';
+  if(a.startsWith('passagem-')){
+    if(a==='passagem-publicar')return finish?'Passagem disponibilizada.':'Publicando a passagem de serviço…';
+    if(a==='passagem-receber')return finish?'Passagem recebida.':'Registrando o recebimento da passagem…';
+    if(a==='passagem-cancelar')return finish?'Passagem cancelada.':'Cancelando a passagem de serviço…';
+    if(a==='passagem-retificar')return finish?'Passagem retificada.':'Retificando a passagem de serviço…';
+    if(a==='passagem-anular')return finish?'Recebimento anulado.':'Anulando o recebimento da passagem…';
+    return finish?'Passagem de serviço atualizada.':'Processando a passagem de serviço…';
+  }
+  if(a==='rco-mark-pdf')return finish?'PDF do RCO registrado.':'Registrando a geração do PDF do RCO…';
+  if(a==='rco-encerrar')return finish?'RCO encerrado.':'Encerrando o RCO na Central…';
+  if(a==='rco-consolidate-final')return finish?'RCO consolidado no P3.':'Consolidando o RCO no banco do P3…';
+  if(a==='rco-draft-claim')return finish?'RCO carregado.':'Assumindo o RCO neste aparelho…';
+  if(a==='rco-draft-upsert'||a==='rco-draft-sync')return finish?'Rascunho do RCO sincronizado.':'Sincronizando o rascunho do RCO…';
+  if(a==='rco-responsavel-validar')return finish?'Responsável validado.':'Validando o responsável do RCO…';
   if(a.startsWith('rsd-'))return finish?'RSD atualizado.':'Processando o RSD na Central…';
-  if(a.startsWith('passagem-'))return finish?'Passagem de serviço atualizada.':'Processando a passagem de serviço…';
   if(a.startsWith('operation-')||a.startsWith('service-event-'))return finish?'Operação sincronizada.':'Salvando dados da operação…';
   if(a.startsWith('cirvc-'))return finish?'CIRVC atualizado.':'Processando o CIRVC…';
   if(a.startsWith('reboque-'))return finish?'Relatório de traslado atualizado.':'Processando o relatório de traslado…';

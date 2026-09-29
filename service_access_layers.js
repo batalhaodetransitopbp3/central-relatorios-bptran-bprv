@@ -19,6 +19,11 @@ function css(){
 .central-access-action:hover{background:#f0f6fb;border-color:#9fb9cf}.central-access-action strong{display:block;font-size:15px;margin-bottom:4px}.central-access-action span{display:block;color:#657789;font-size:12px;font-weight:400}
 .central-access-unit{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.central-access-unit label{font-size:11px;font-weight:700;color:#52697e}.central-access-unit select,.central-access-unit input{width:100%;margin-top:4px;padding:10px;border:1px solid #cbd7e1;border-radius:9px;background:#fff;box-sizing:border-box}
 .central-access-list{display:grid;gap:8px;margin-top:12px}.central-access-item{border:1px solid #cbd7e1;border-radius:11px;padding:11px;background:#fff}.central-access-item strong{color:#17375e}.central-access-meta{font-size:11px;color:#647789;margin:4px 0 8px;line-height:1.45}.central-access-item button{padding:8px 11px;border:0;border-radius:8px;background:#17375e;color:#fff;font-weight:700;cursor:pointer}
+.central-access-badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.central-access-badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;line-height:1.35}
+.central-access-badge.passagem{background:#e8f1ff;color:#1a4a8a;border:1px solid #a8c4e8}
+.central-access-badge.legacy{background:#fff4df;color:#8a5a12;border:1px solid #e6c88a}
+.central-access-note{font-size:11px;color:#8a5a12;margin:0 0 8px;line-height:1.4}
 .central-access-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.central-access-toolbar button{padding:9px 12px;border-radius:8px;border:1px solid #bdcbd6;background:#fff;color:#29485f;font-weight:700;cursor:pointer}
 .central-access-loading,.central-access-empty{padding:16px;text-align:center;color:#66798a;background:#f7f9fb;border-radius:10px}
 .central-access-error{padding:12px;color:#7a2d2d;background:#fff1f1;border:1px solid #e3b8b8;border-radius:10px}
@@ -77,16 +82,24 @@ function startScreen(type){
  try{sessionStorage.removeItem(NEXT);sessionStorage.removeItem(MODE)}catch(_){}
  q('#centralSetupNav')?.remove();document.body.classList.remove('central-service-setup','rsd-setup','rco-setup');
  const label=type==='rsd'?'Relatório de Serviço Diário':'Relatório do Coordenador';
+ const retifBtn=type==='rco'?'<button class="central-access-action" data-retif><strong>Solicitar retificação de RCO encerrado</strong><span>Localiza RCO consolidado/encerrado por companhia e data. A reabertura só ocorre após deferimento na Gestão de Sistema.</span></button>':'';
  const el=shell(label,'Escolha como deseja acessar o serviço. A chave será solicitada apenas no momento de entrar no módulo.',`
  <div class="central-access-actions">
   <button class="central-access-action" data-new><strong>Iniciar um novo serviço</strong><span>Cria um novo serviço. A credencial será solicitada uma única vez para entrar.</span></button>
   <button class="central-access-action" data-continue><strong>Continuar serviço em andamento</strong><span>Escolha a companhia e veja todos os serviços ainda abertos, com a data do serviço.</span></button>
   <button class="central-access-action" data-receive><strong>Receber serviço em andamento</strong><span>Mostra exclusivamente os serviços que foram disponibilizados para passagem.</span></button>
+  ${retifBtn}
  </div>
  <div class="central-access-toolbar"><button data-home>Voltar à Central</button></div>`);
  q('[data-new]',el).onclick=()=>newService(type);
  q('[data-continue]',el).onclick=()=>openServicePicker(type,'continue');
  q('[data-receive]',el).onclick=()=>openServicePicker(type,'receive');
+ if(type==='rco')q('[data-retif]',el).onclick=async()=>{
+   let key=savedIngressKey('rco');if(!key)key=await requestIngressKey('rco');if(!key)return;
+   clearLayer();
+   if(typeof global.solicitarRetificacaoRco==='function')global.solicitarRetificacaoRco();
+   else alert('Atualize a página para carregar a solicitação de retificação.');
+ };
  q('[data-home]',el).onclick=()=>location.href='index.html';
 }
 function enterSetup(type,context=''){
@@ -105,7 +118,7 @@ function enterSetup(type,context=''){
    installRcoEnterButton();
    q('#centralRcoSetupStatus')?.removeAttribute('hidden');
    const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';const pf=pw.closest('.field');if(pf)pf.hidden=true}
-   if(context==='receive')lockRcoServiceIdentity();
+   if(context==='receive'||context==='continue')lockRcoServiceIdentity();
    q('#rcoResponsavelCard')?.scrollIntoView({block:'start'});
  }
 }
@@ -164,6 +177,7 @@ function lockRcoServiceIdentity(){
  ['diaSemanaCpu','horarioServico'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
  const mode=q('#rcoSemCpu');if(mode)mode.disabled=true;
 }
+/** Após Continuar/registro, esconde #rcoResponsavelRegistrarBtn. Se o botão ficar oculto para sempre e bloquear o responsável formal, o agente do gate de responsável trata — não reabrir aqui. */
 function lockRcoHeader(){
  lockRcoServiceIdentity();
  ['rcoResponsavelPerfil'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
@@ -189,16 +203,31 @@ function installRcoEnterButton(){
  btn.onclick=()=>{btn.hidden=true;lockRcoHeader();exitSetup();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);window.scrollTo({top:0,behavior:'smooth'})};
  return btn;
 }
+function rcoSetupDateWindow(inicio,fim){
+ const bases=new Set();if(inicio)bases.add(String(inicio).slice(0,10));if(fim)bases.add(String(fim).slice(0,10));
+ const out=new Set(),iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ for(const d of bases){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))continue;out.add(d);
+  const dt=new Date(d+'T12:00:00');if(Number.isNaN(dt.getTime()))continue;
+  const prev=new Date(dt),next=new Date(dt);prev.setDate(prev.getDate()-1);next.setDate(next.getDate()+1);
+  out.add(iso(prev));out.add(iso(next));
+ }
+ return [...out].sort();
+}
+const RCO_SETUP_OPEN=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA'];
+function rcoSetupStatusRank(st){const u=String(st||'').toUpperCase();const i=RCO_SETUP_OPEN.indexOf(u);return i>=0?i:100}
 async function loadRcoSetupStatus(){
  const box=q('#centralRcoSetupList');if(!box)return;
  let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
- const data=q('#dataInicio')?.value||'';
+ const data=q('#dataInicio')?.value||'',fim=q('#dataTermino')?.value||'';
  if(!token){box.innerHTML='<div class="central-access-empty">Identifique e registre o responsável pelo RCO para consultar as guarnições.</div>';return}
  if(!data){box.innerHTML='<div class="central-access-error">Informe a data de início do serviço.</div>';return}
  box.innerHTML='<div class="central-access-loading">Atualizando status das guarnições…</div>';
  try{
-   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data,token},{timeout:15000});
-   const items=(r.items||[]).filter(x=>String(x.status||'').toUpperCase()!=='CANCELADO');
+   const dates=rcoSetupDateWindow(data,fim),map=new Map();
+   for(const day of dates){const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data:day,token},{timeout:15000});(r.items||[]).forEach(x=>map.set(x.reportId,x))}
+   const items=[...map.values()].filter(x=>String(x.status||'').toUpperCase()!=='CANCELADO')
+     .sort((a,b)=>rcoSetupStatusRank(a.status)-rcoSetupStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
    if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum RSD registrado para esta unidade e data.</div>';return}
    box.innerHTML=items.map(x=>{
      const vs=(x.viaturas||[]).map(v=>v?.prefixo||v).filter(Boolean),vtr=vs.join(', ')||x.vtrPrincipal||x.viatura||'—',status=String(x.status||'').replaceAll('_',' ');
@@ -268,12 +297,42 @@ async function openServicePicker(type,mode){
  q('[data-refresh]',el).onclick=()=>loadOpenServices(el,type,mode);q('[data-back]',el).onclick=()=>startScreen(type);
  setTimeout(()=>loadOpenServices(el,type,mode),40)
 }
+function dedupeOpenServiceItems(items,type){
+ const seen=new Map();
+ (items||[]).forEach(x=>{
+   const logical=String(x.logicalKey||'').trim();
+   const sid=String(x.serviceId||'').trim();
+   const rid=String(x.reportId||'').trim();
+   const pid=String(x.passagemId||'').trim();
+   const key=logical||(type==='rsd'?(sid||rid||pid):(rid||logical))||('row:'+seen.size);
+   const prev=seen.get(key);
+   if(!prev){seen.set(key,x);return}
+   const aSync=String(x.ultimoSyncEm||x.lastSync||x.passagemEm||'');
+   const bSync=String(prev.ultimoSyncEm||prev.lastSync||prev.passagemEm||'');
+   const aRev=Number(x.revision||x.segmento||0),bRev=Number(prev.revision||prev.segmento||0);
+   const preferNew=aRev>bRev||(aRev===bRev&&aSync.localeCompare(bSync)>0);
+   const keep=preferNew?x:prev,drop=preferNew?prev:x;
+   const legacy=[].concat(keep.legacyDuplicates||[],drop.legacyDuplicates||[]);
+   if(drop.reportId||drop.serviceId)legacy.push({reportId:String(drop.reportId||''),serviceId:String(drop.serviceId||''),status:String(drop.status||'')});
+   const uniq=[],seenL={};
+   legacy.forEach(l=>{
+     const lk=String(l.serviceId||l.reportId||'');
+     if(!lk||lk===String(keep.serviceId||'')||lk===String(keep.reportId||'')||seenL[lk])return;
+     seenL[lk]=true;uniq.push(l);
+   });
+   seen.set(key,Object.assign({},keep,{legacyDuplicates:uniq,duplicadoLegadoHint:!!uniq.length||!!keep.duplicadoLegadoHint||!!drop.duplicadoLegadoHint}));
+ });
+ return Array.from(seen.values());
+}
 async function loadOpenServices(el,type,mode){
  const box=q('[data-list]',el);if(!box)return;const p=pickerParams(el);
  let token=savedIngressKey(type);if(!token){token=await requestIngressKey(type);if(!token){box.innerHTML='<div class="central-access-error">Informe a chave de ingresso para consultar os serviços.</div>';return}}
  box.innerHTML='<div class="central-access-loading">Consultando os serviços da '+esc(p.companhia)+'…</div>';
  try{
-   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia,token},{timeout:20000}),rawItems=r.items||[],items=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
+   const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia,token},{timeout:20000});
+   const rawItems=r.items||[];
+   const filtered=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
+   const items=dedupeOpenServiceItems(filtered,type);
    if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
    box.innerHTML=items.map((x,i)=>{
      const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
@@ -282,11 +341,19 @@ async function loadOpenServices(el,type,mode){
      const vtr=x.vtr||x.vtrPrincipal||'—';
      const cmt=x.comandante||x.responsavel||'';
      const title=type==='rsd'?(x.guarnicao||'Guarnição'):('RCO — '+(x.companhia||p.companhia));
+     const idHint=type==='rsd'
+       ?(x.serviceId?('Serviço '+String(x.serviceId).slice(0,12)+'…'):(x.reportId?('RSD '+String(x.reportId).slice(0,14)+'…'):''))
+       :(x.reportId?('RCO '+String(x.reportId).slice(0,14)+'…'):'');
      const meta=type==='rsd'
-       ?[x.companhia,'Data: '+date,'VTR '+vtr,cmt&&('Cmt: '+cmt),status,timing].filter(Boolean)
-       :[x.companhia,'Data: '+date,status,timing].filter(Boolean);
+       ?[x.companhia,'Data: '+date,'VTR '+vtr,cmt&&('Cmt: '+cmt),status,idHint,timing].filter(Boolean)
+       :[x.companhia,'Data: '+date,status,idHint,timing].filter(Boolean);
+     const badges=[];
+     if(x.passagemPendente||mode==='receive')badges.push('<span class="central-access-badge passagem">Passagem pendente — aguardando recebimento</span>');
+     const hasLegacy=!!(x.duplicadoLegadoHint||(x.legacyDuplicates&&x.legacyDuplicates.length));
+     if(hasLegacy)badges.push('<span class="central-access-badge legacy">Registro(s) legado(s)</span>');
+     const note=hasLegacy?'<div class="central-access-note">Há registro(s) legado(s) associados — Gestão pode arquivar</div>':'';
      const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
-     return '<div class="central-access-item"><strong>'+esc(title)+'</strong><div class="central-access-meta">'+esc(meta.join(' • '))+'</div><button data-open="'+i+'">'+esc(action)+'</button></div>'
+     return '<div class="central-access-item"><strong>'+esc(title)+'</strong>'+(badges.length?'<div class="central-access-badges">'+badges.join('')+'</div>':'')+'<div class="central-access-meta">'+esc(meta.join(' • '))+'</div>'+note+'<button data-open="'+i+'">'+esc(action)+'</button></div>'
    }).join('');
    box.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{const item=items[Number(b.dataset.open)];b.disabled=true;try{await enterSelectedService(type,mode,item,el)}finally{if(document.body.contains(b))b.disabled=false}})
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
@@ -304,8 +371,10 @@ async function enterSelectedService(type,mode,item,el){
  if(typeof global.centralRcoClaimCloudItem!=='function'){alert('Atualize a página para carregar o fluxo do RCO.');return false}
  const ok=await global.centralRcoClaimCloudItem(item,false,mode==='receive',key);
  if(ok){
-   if(mode==='receive'){clearLayer();enterSetup('rco','receive')}
-   else{lockRcoHeader();clearLayer();exitSetup()}
+   // Continuar e Receber exigem identificação formal do responsável nesta sessão
+   // antes de liberar a edição completa do RCO.
+   clearLayer();
+   enterSetup('rco',mode==='receive'?'receive':'continue');
  }
  return !!ok
 }
@@ -384,10 +453,22 @@ function init(){
 global.addEventListener('central-module-auth-lost',e=>{
  const type=pageType();
  if(q('#centralAccessKeyOverlay')||q('#centralAccessLayer'))return;
- if(type==='rsd'&&e?.detail?.kind==='central'){setTimeout(()=>global.centralReturnToAccess?.('rsd'),0);return}
+ const msg='Sua sessão expirou. Volte às opções de acesso e entre novamente.';
+ // Preserve typed data / drafts in localStorage; only clear session credentials on return-to-access.
+ try{
+  if(type==='rsd')global.salvarRascunhoGuarnicao?.(true);
+  if(type==='rco')global.salvarRascunho?.(true);
+ }catch(_){}
+ if(!global.__centralAuthLostAlerted){
+  global.__centralAuthLostAlerted=true;
+  try{alert(msg)}catch(_){}
+  setTimeout(()=>{global.__centralAuthLostAlerted=false},1200);
+ }
+ if(type==='rsd'&&(e?.detail?.kind==='central'||!e?.detail?.kind||e?.detail?.kind==='p3')){
+  setTimeout(()=>global.centralReturnToAccess?.('rsd'),0);return
+ }
  if(type==='rco'){
-  const msg=String(e?.detail?.message||'');
-  if(e?.detail?.kind==='central'||/rco|coordenad|credencial/i.test(msg))setTimeout(()=>global.centralReturnToAccess?.('rco'),0);
+  setTimeout(()=>global.centralReturnToAccess?.('rco'),0);
  }
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,180));else setTimeout(init,180);
