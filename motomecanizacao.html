@@ -37,6 +37,8 @@
  const $=id=>document.getElementById(id), allCias=['1ª CPTran','2ª CPTran','3ª CPTran','4ª CPTran','5ª CPTran','1ª CPRv','2ª CPRv','3ª CPRv','4ª CPRv','5ª CPRv'];
  let data=[],current=null,lookupTimer=null,lookupSeq=0;
  $('cia').innerHTML='<option value="">Todas as 10 companhias</option>'+allCias.map(x=>'<option>'+x+'</option>').join('');
+ const today=(d=>{return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})(new Date());
+ $('di').value=today;$('df').value=today;
  function tok(){return CentralCloud.askToken('p3')}
  async function ensure(){if(!await CentralCloud.probe())throw new Error('Backend v10 ainda não publicado.');const t=tok();if(!t)throw new Error('Informe a Chave P3.');return t}
  function pendDate(r){return String(r.DATA_PENDENCIA||r.DATA_CONSTACAO||(r.ABERTO_EM||r.ABERTA_EM||'').slice(0,10)||'')}
