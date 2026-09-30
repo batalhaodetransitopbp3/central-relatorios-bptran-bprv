@@ -811,8 +811,8 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.30"></script>
-<script src="rsd_hydration_guard.js?v=10.8.30"></script>
+<script src="central_cloud.js?v=10.8.31"></script>
+<script src="rsd_hydration_guard.js?v=10.8.31"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -862,12 +862,53 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   const SERVICE_ID_KEY='pmpb-transito-servico-diario-v2-service-id',SEGMENT_KEY='pmpb-transito-servico-diario-v2-segmento',PREV_RSD_KEY='pmpb-transito-servico-diario-v2-prev-rsd',PASS_ID_KEY='pmpb-transito-servico-diario-v2-passagem-id',REGISTERED_KEY='pmpb-transito-servico-diario-v2-cloud-registered',ACTIVE_CONTEXT_KEY='pmpb-active-service-v1';
   const deviceId=CentralCloud.getDeviceId();
   let commanderPostoGrad='',serviceId=READONLY_VIEWER?CentralCloud.uid('view'):localStorage.getItem(SERVICE_ID_KEY)||CentralCloud.uid('svc'),segmento=READONLY_VIEWER?1:(Number(localStorage.getItem(SEGMENT_KEY)||1)||1),rsdAnteriorId=READONLY_VIEWER?'':(localStorage.getItem(PREV_RSD_KEY)||''),passagemOrigemId=READONLY_VIEWER?'':(localStorage.getItem(PASS_ID_KEY)||''),serviceRegistered=READONLY_VIEWER?false:(localStorage.getItem(REGISTERED_KEY)==='1'),serviceStartedAt=READONLY_VIEWER?'':(()=>{try{return localStorage.getItem('pmpb-transito-servico-diario-v2-started-at')||''}catch(_){return ''}})(),cloudSyncTimer=null,cloudConflictNotified=false;
-  const rsdHydration=(window.RsdHydrationGuard&&window.RsdHydrationGuard.create)?window.RsdHydrationGuard.create({state:serviceRegistered?window.RsdHydrationGuard.STATES.UNRESOLVED:window.RsdHydrationGuard.STATES.NEW_SERVICE}):{canSync:()=>false,markLoading(){},markHydrated(){},markNewService(){},markError(){},markUnresolved(){},getKnownDraftRevision:()=>0,setKnownDraftRevision(){},errorMessage:()=>'Não foi possível carregar completamente o serviço. A sincronização foi bloqueada para proteger os dados. Tente novamente.',getState:()=>'ERROR'};
+  const rsdHydration=(window.RsdHydrationGuard&&window.RsdHydrationGuard.create)?window.RsdHydrationGuard.create({state:serviceRegistered?window.RsdHydrationGuard.STATES.UNRESOLVED:window.RsdHydrationGuard.STATES.NEW_SERVICE}):{canSync:()=>false,canLocalAutosave:()=>false,markLoading(){},markHydrated(){},markDegraded(){},markNewService(){},markError(){},markUnresolved(){},markSyncOffline(){},markSyncSaving(){},markSyncOk(){},markSyncPending(){},markSyncFailed(){},markSyncConflict(){},markSyncLegacyClient(){},applySyncFailure(){return'FAILED'},clearCloudSuspension(){},getKnownDraftRevision:()=>0,setKnownDraftRevision(){},errorMessage:()=>'Não foi possível carregar completamente o serviço. A sincronização foi bloqueada para proteger os dados. Tente novamente.',syncMessage:()=>'',getState:()=>'ERROR',getHydrationState:()=>'ERROR',getSyncState:()=>'FAILED',getSheetFallback:()=>null,hasPendingLocal:()=>false,isCloudSuspended:()=>true};
   window.__rsdHydration=rsdHydration;
+  window.__rsdLastSyncResult={ok:true,reason:''};
   function showRsdHydrationStatus(text,isError){const st=document.getElementById('rsdRegisterStatus');if(st)st.textContent=text||'';if(isError){const prog=document.getElementById('rsdProgressaoStatus');if(prog)prog.textContent=text||''}}
+  function ensureRsdSyncBanner(){
+    let el=document.getElementById('rsdSyncGuardBanner');
+    if(el)return el;
+    el=document.createElement('div');el.id='rsdSyncGuardBanner';el.className='rsd-sync-guard-banner no-print';el.hidden=true;
+    el.style.cssText='margin:8px 12px;padding:10px 12px;border:1px solid #c9a227;border-radius:8px;background:#fff8e1;color:#5c4b00;font-size:13px;line-height:1.35';
+    const host=document.querySelector('header.doc-head')||document.querySelector('.service-state-bar')||document.body;
+    host.insertAdjacentElement('afterend',el);return el;
+  }
+  function renderRsdSyncBanner(){
+    const el=ensureRsdSyncBanner();
+    const h=rsdHydration.getHydrationState?rsdHydration.getHydrationState():rsdHydration.getState();
+    const s=rsdHydration.getSyncState?rsdHydration.getSyncState():'IDLE';
+    const fb=rsdHydration.getSheetFallback?.();
+    let html='',show=false;
+    if(h==='DEGRADED'){
+      show=true;
+      const tip=fb?(' Referência da aba (somente leitura): '+[fb.nome,fb.vtr&&('VTR '+fb.vtr),fb.responsavel].filter(Boolean).join(' · ')+'.'):'';
+      html='<strong>Serviço com payload estrutural incompleto</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.DEGRADED_MSG||'A sincronização automática está bloqueada até a recuperação controlada.')+tip+'</div>';
+    }else if(s==='LEGACY_CLIENT'){
+      show=true;
+      html='<strong>Versão antiga da Central</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.LEGACY_CLIENT_MSG||rsdHydration.syncMessage())+'</div><div class="actions" style="margin-top:8px"><button type="button" class="ok" id="rsdLegacyReloadBtn">Atualizar / reabrir serviço</button></div>';
+    }else if(s==='CONFLICT'){
+      show=true;
+      html='<strong>Versão mais recente na Central</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.CONFLICT_MSG||rsdHydration.syncMessage())+' Os dados deste aparelho não foram apagados.</div><div class="actions" style="margin-top:8px"><button type="button" class="ok" id="rsdConflictReloadBtn">Recarregar dados da Central</button></div>';
+    }else if(s==='OFFLINE'||(rsdHydration.hasPendingLocal?.()&&(s==='PENDING'||s==='FAILED'))){
+      show=true;
+      html='<strong>Alterações pendentes de sincronização</strong><div style="margin-top:4px">'+(rsdHydration.syncMessage()||'Há alterações salvas neste aparelho ainda não confirmadas na Central.')+'</div>';
+    }
+    el.hidden=!show;el.innerHTML=show?html:'';
+    el.querySelector('#rsdLegacyReloadBtn')?.addEventListener('click',()=>location.reload());
+    el.querySelector('#rsdConflictReloadBtn')?.addEventListener('click',()=>reloadRsdFromCentralSafe());
+  }
+  window.addEventListener('rsd-guard-change',()=>renderRsdSyncBanner());
+  async function reloadRsdFromCentralSafe(){
+    const token=CentralCloud.getToken('central')||requireOperationalToken();if(!token)return;
+    rsdHydration.clearCloudSuspension?.();
+    const r=await recoverRegisteredServiceFromCloud(token,true);
+    if(r?.active){alert('Dados da Central recarregados neste aparelho.');renderRsdSyncBanner()}
+  }
   function currentFormIdentity(){const u=typeof currentUnit==='function'?currentUnit():{};return {nome:val('guarnicao'),tipo:val('guarnicaoTipo'),vtr:val('viatura'),responsavel:val('responsavel'),matricula:val('matriculaResponsavel'),data:val('data'),batalhao:u.batalhao||val('batalhao'),companhia:u.companhia||'',efetivo:val('efetivo')}}
   function rememberDraftRevision(src){const rev=src?.draftRevision??src?.meta?.draftRevision??src?.rsd?.draftRevision;if(rev!=null&&rev!=='')rsdHydration.setKnownDraftRevision(rev)}
   function confirmHydratedIdentity(rp){if(!window.RsdHydrationGuard?.payloadHasStructuralIdentity?.(rp))return true;const gaps=window.RsdHydrationGuard.identityGaps(rp,currentFormIdentity());return !gaps.length}
+  function isBlockingSyncReason(reason){return /LEGACY_CLIENT_RELOAD_REQUIRED|STALE_REVISION|CONFLICT|STRUCTURAL_REGRESSION/i.test(String(reason||''))}
   let teamSuggestionTimer=null;
   function teamTypeFromName(name){const m=String(name||'').trim().toUpperCase().match(/^(BST|BASE|GTTRAN|TOR|REBOQUE)\b/);return m?m[1]:''}
   function setTeamDisplay(name){const el=document.getElementById('guarnicao');if(!el)return;el.value=String(name||'');syncPrintValue(el)}
@@ -907,7 +948,20 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
       else if(!confirm('Confirma criar outro acionamento do Fisco neste mesmo serviço?'))return;
     }
     try{salvarRascunhoGuarnicao(true)}catch(_){}
-    if(serviceRegistered){try{await window.centralRsdSaveProgression?.()}catch(_){}}
+    if(serviceRegistered){
+      let saveOk=false;try{saveOk=!!await window.centralRsdSaveProgression?.()}catch(_){saveOk=false}
+      const last=window.__rsdLastSyncResult||{};
+      const syncSt=rsdHydration.getSyncState?.()||'';
+      if(isBlockingSyncReason(last.reason)||syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'){
+        alert(last.message||rsdHydration.syncMessage()||'Não foi possível salvar na Central. A navegação foi bloqueada para proteger o serviço.');
+        renderRsdSyncBanner();return;
+      }
+      if(!saveOk&&!navigator.onLine){
+        if(!confirm('Sem conexão com a Central. Os dados deste aparelho foram preservados localmente, com sincronização pendente.\n\nDeseja abrir o Fisco mesmo assim?'))return;
+      }else if(!saveOk){
+        if(!confirm('Não foi possível confirmar o salvamento na nuvem. Os dados deste aparelho não foram apagados.\n\nDeseja abrir o Fisco mesmo assim?'))return;
+      }
+    }
     const ios=/relatorio_servico_diario_ios\.html/i.test(location.pathname);
     const returnUrl=ios?'relatorio_servico_diario_ios.html':'relatorio_servico_diario.html';
     const acionamentoId=editId||('fisco-'+Date.now().toString(36));
@@ -975,31 +1029,82 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   }
   function summaryText(p){const d=p||{},n=x=>Array.isArray(x)?x.length:0,prod=d.producao||{},notif=prod.notificacoes||{},ab=prod.abordagens||{};return ['Confira antes de finalizar:','',`Guarnição: ${d.guarnicao?.nome||'—'}`,`Comandante: ${d.guarnicao?.responsavel||'—'}`,`Viaturas: ${(d.viaturas||[]).map(x=>x.prefixo).join(', ')||'—'}`,`AITs: ${notif['total-aits']||0}`,`Motocicletas abordadas: ${ab.motocicletas||0}`,`Automóveis abordados: ${ab.automoveis||0}`,`Operações: ${n(d.operacoes)}`,`Ocorrências: ${n(d.ocorrencias)}`,`Veículos recuperados: ${n(d.veiculosRecuperados)}`,`CIRVC: ${n(d.arvc||d.cirvc)}`].join('\n')}
   async function syncCloudDraft(silent=true){
-    if(window.__rsdContextAbandoned||READONLY_VIEWER||!serviceRegistered||!navigator.onLine)return false;
-    if(!rsdHydration.canSync()){if(!silent)alert(rsdHydration.errorMessage());return false}
+    window.__rsdLastSyncResult={ok:false,reason:'',message:''};
+    if(window.__rsdContextAbandoned||READONLY_VIEWER||!serviceRegistered)return false;
+    if(!navigator.onLine){
+      rsdHydration.markSyncOffline?.();
+      window.__rsdLastSyncResult={ok:false,reason:'OFFLINE',message:window.RsdHydrationGuard?.OFFLINE_MSG||'Sem conexão.'};
+      renderRsdSyncBanner();
+      return false;
+    }
+    const syncSt=rsdHydration.getSyncState?.()||'';
+    if(syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'||rsdHydration.isCloudSuspended?.()){
+      window.__rsdLastSyncResult={ok:false,reason:syncSt,message:rsdHydration.syncMessage?.()||rsdHydration.errorMessage()};
+      if(!silent)alert(window.__rsdLastSyncResult.message);
+      renderRsdSyncBanner();
+      return false;
+    }
+    if(!rsdHydration.canSync()){
+      window.__rsdLastSyncResult={ok:false,reason:rsdHydration.getHydrationState?.()||rsdHydration.getState(),message:rsdHydration.errorMessage()};
+      if(!silent)alert(rsdHydration.errorMessage());
+      return false;
+    }
     const token=CentralCloud.getToken('central');if(!token)return false;
     try{
+      rsdHydration.markSyncSaving?.();
       const p=window.payloadV2();
       p.draftRevision=rsdHydration.getKnownDraftRevision();p.knownDraftRevision=rsdHydration.getKnownDraftRevision();
       const r=await CentralCloud.submitForm('rsd-draft-sync',{rsd:p,deviceId,knownDraftRevision:rsdHydration.getKnownDraftRevision(),draftRevision:rsdHydration.getKnownDraftRevision()},token,{popup:false,progress:!silent});
-      if(r){if(r.draftRevision!=null)rsdHydration.setKnownDraftRevision(r.draftRevision);window.centralMarkSaved?.()}return !!r
+      if(r){
+        rsdHydration.markSyncOk?.(r.draftRevision);
+        window.centralMarkSaved?.();
+        window.__rsdLastSyncResult={ok:true,reason:'OK',draftRevision:r.draftRevision};
+        renderRsdSyncBanner();
+        return true;
+      }
+      rsdHydration.markSyncFailed?.('Resposta vazia da Central.');
+      window.__rsdLastSyncResult={ok:false,reason:'FAILED',message:'Resposta vazia da Central.'};
+      return false;
     }catch(e){
-      if(/outro aparelho/i.test(String(e.message||e))){if(!cloudConflictNotified){cloudConflictNotified=true;alert('Este RSD foi assumido em outro aparelho. As alterações deste dispositivo não serão enviadas até que você assuma novamente o serviço.')}}
-      else if(!silent)alert('Não foi possível sincronizar o rascunho: '+e.message);
-      return false
+      const msg=String(e?.message||e||'');
+      const code=rsdHydration.applySyncFailure?.(msg)||window.RsdHydrationGuard?.parseSyncErrorCode?.(msg)||'FAILED';
+      window.__rsdLastSyncResult={ok:false,reason:code||'FAILED',message:rsdHydration.syncMessage?.()||msg};
+      renderRsdSyncBanner();
+      if(/outro aparelho/i.test(msg)){if(!cloudConflictNotified){cloudConflictNotified=true;alert('Este RSD foi assumido em outro aparelho. As alterações deste dispositivo não serão enviadas até que você assuma novamente o serviço.')}}
+      else if(!silent||code==='LEGACY_CLIENT_RELOAD_REQUIRED'||code==='STALE_REVISION')alert(window.__rsdLastSyncResult.message||msg);
+      return false;
     }
   }
-  function scheduleCloudSync(){if(window.__rsdContextAbandoned||READONLY_VIEWER||!serviceRegistered)return;if(!rsdHydration.canSync()){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;return}saveActiveContext();clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncCloudDraft(true),8000)}
+  function scheduleCloudSync(){
+    if(window.__rsdContextAbandoned||READONLY_VIEWER||!serviceRegistered)return;
+    const syncSt=rsdHydration.getSyncState?.()||'';
+    if(syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'||rsdHydration.isCloudSuspended?.()){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;rsdHydration.markPendingLocal?.(true);renderRsdSyncBanner();return}
+    if(!navigator.onLine){rsdHydration.markSyncOffline?.();renderRsdSyncBanner();return}
+    if(!rsdHydration.canSync()){clearTimeout(cloudSyncTimer);cloudSyncTimer=null;return}
+    rsdHydration.markSyncPending?.();
+    saveActiveContext();clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncCloudDraft(true),8000)
+  }
   window.centralRsdSyncNow=()=>syncCloudDraft(false);
   window.centralRsdSaveProgression=async function(){
     const st=document.getElementById('rsdProgressaoStatus');
     if(READONLY_VIEWER||window.__rsdContextAbandoned){if(st)st.textContent='';return false}
     if(!serviceRegistered){if(st)st.textContent='Registre a guarnição no serviço para salvar a progressão na nuvem.';alert('Registre a guarnição no serviço antes de salvar a progressão na nuvem.');return false}
     try{salvarRascunhoGuarnicao(true)}catch(_){}
+    const syncSt=rsdHydration.getSyncState?.()||'';
+    if(syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'){
+      const msg=rsdHydration.syncMessage?.()||'Há um conflito de versão com a Central. Recarregue os dados antes de salvar a progressão.';
+      if(st)st.textContent=msg;alert(msg);renderRsdSyncBanner();return false;
+    }
+    if(rsdHydration.getHydrationState?.()==='DEGRADED'){
+      const msg=window.RsdHydrationGuard?.DEGRADED_MSG||'Sincronização bloqueada: serviço em recuperação.';
+      if(st)st.textContent=msg;alert(msg);renderRsdSyncBanner();return false;
+    }
     if(st)st.textContent='Salvando na nuvem...';
     let ok=false;try{ok=!!await syncCloudDraft(false)}catch(_){ok=false}
     if(ok){const hh=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:false});if(st)st.textContent='✓ Progressão salva na nuvem às '+hh;return true}
-    if(st)st.textContent='Não foi possível salvar na nuvem. Os dados deste aparelho não foram apagados.';return false;
+    const last=window.__rsdLastSyncResult||{};
+    if(st)st.textContent=last.message||'Não foi possível salvar na nuvem. Os dados deste aparelho não foram apagados.';
+    return false;
   };
   async function rsdSyncBeforeAction(warn=true){
     if(READONLY_VIEWER||!serviceRegistered)return true;
@@ -1074,7 +1179,14 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
       setRsdExitBusy(true,'Salvando progressão na nuvem…');
       let ok=false;try{ok=!!await window.centralRsdSaveProgression?.()}catch(_){ok=false}
       if(!ok){
-        setRsdExitBusy(false,'Não foi possível salvar na nuvem. Os dados deste aparelho não foram apagados.');
+        const last=window.__rsdLastSyncResult||{};
+        const syncSt=rsdHydration.getSyncState?.()||'';
+        if(isBlockingSyncReason(last.reason)||syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'){
+          setRsdExitBusy(false,last.message||rsdHydration.syncMessage?.()||'Sincronização bloqueada.');
+          alert(last.message||rsdHydration.syncMessage?.()||'Há conflito/versão antiga. Recarregue os dados da Central antes de sair com sincronização.');
+          renderRsdSyncBanner();return false;
+        }
+        setRsdExitBusy(false,last.message||'Não foi possível salvar na nuvem. Os dados deste aparelho não foram apagados.');
         if(!confirm('Sair mesmo assim? A passagem/serviço permanece na Central; apenas a sincronização recente pode estar pendente.'))return false;
       }
     }
@@ -1290,7 +1402,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     const token=String(providedToken||CentralCloud.getToken('central')||requireOperationalToken()).trim();if(!token)return false;
     if(providedToken){CentralCloud.setToken(token,'central');try{sessionStorage.setItem('central-module-auth-rsd-v1','1')}catch(_){}}
     const mat=CentralCloud.formatMatricula(autorMatricula||val('matriculaResponsavel')||item?.matricula||'');
-    try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force,autorMatricula:mat},token,{popup:false});rsdHydration.markLoading();serviceRegistered=true;window.__rsdContextAbandoned=false;cloudConflictNotified=false;window.applyPayload(r.rsd);rememberDraftRevision(r);if(!confirmHydratedIdentity(r.rsd)){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true);alert(rsdHydration.errorMessage());return false}rsdHydration.markHydrated(r.meta?.draftRevision??r.rsd?.draftRevision);renderReviewBanner(r.rsd||{});saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);window.dispatchEvent(new CustomEvent('central-rsd-registered',{detail:{reportId,serviceId,segmento,guarnicao:val('guarnicao'),continued:true}}));alert(r.message||'Serviço carregado da nuvem neste aparelho.');return true}
+    try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force,autorMatricula:mat},token,{popup:false});rsdHydration.markLoading();serviceRegistered=true;window.__rsdContextAbandoned=false;cloudConflictNotified=false;const rp=r.rsd||{};window.applyPayload(rp);rememberDraftRevision(r);const sheetFb=rp.sheetStructuralFallback||null;const degraded=!!(rp.structuralDegraded||window.RsdHydrationGuard?.isDegradedPayload?.(rp,sheetFb));if(degraded){rsdHydration.markDegraded(r.meta?.draftRevision??rp.draftRevision,sheetFb);renderReviewBanner(rp);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}renderRsdSyncBanner();alert(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage());return true}if(!confirmHydratedIdentity(rp)){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true);alert(rsdHydration.errorMessage());return false}rsdHydration.clearCloudSuspension?.();rsdHydration.markHydrated(r.meta?.draftRevision??rp.draftRevision);renderReviewBanner(rp);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);window.dispatchEvent(new CustomEvent('central-rsd-registered',{detail:{reportId,serviceId,segmento,guarnicao:val('guarnicao'),continued:true}}));renderRsdSyncBanner();alert(r.message||'Serviço carregado da nuvem neste aparelho.');return true}
     catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este serviço está aberto em outro aparelho. Deseja assumir a edição neste dispositivo? O aparelho anterior deixará de sincronizar.'))return claimCloudItem(item,true,mat,token)}alert('Não foi possível continuar o serviço: '+e.message);return false}
   }
   window.centralRsdClaimCloudItem=claimCloudItem;
@@ -1538,39 +1650,51 @@ async function publishPass(){
     b.textContent=s==='PASSAGEM_DISPONIVEL'||s==='ENCERRADO_PASSAGEM'?'Passagem pendente — não finalizar':s==='AGUARDANDO_ANALISE'?'RSD enviado — aguardando análise':locked?'RSD encerrado':'Finalizar serviço';
   }
   async function recoverRegisteredServiceFromCloud(token,notify=false){
-    if(!reportId||!token){if(serviceRegistered){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true)}return {active:false,token}}
+    if(!reportId||!token){if(serviceRegistered){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true);renderRsdSyncBanner()}return {active:false,token}}
     rsdHydration.markLoading();
     showRsdHydrationStatus('Carregando o serviço da Central...');
     try{
       const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:20000}),rp=atual.rsd||{},st=String(rp.centralStatus||rp.status||'').toUpperCase();
       rememberDraftRevision(rp);
       if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].includes(st)){
+        const sheetFb=rp.sheetStructuralFallback||null;
+        const degraded=!!(rp.structuralDegraded||window.RsdHydrationGuard?.isDegradedPayload?.(rp,sheetFb));
         window.applyPayload(rp);
         serviceRegistered=true;cloudConflictNotified=false;
         serviceId=rp.serviceId||rp.servico?.serviceId||serviceId;segmento=Number(rp.segmento||rp.servico?.segmento||segmento||1)||1;
         saveIdentity();saveActiveContext();updateIdentityLock();updateFinalizeUi(st);
+        if(degraded){
+          // NÃO preencher cabeçalho a partir da aba (evita recuperação silenciosa via autosave).
+          rsdHydration.markDegraded(rp.draftRevision,sheetFb);
+          try{salvarRascunhoGuarnicao(true)}catch(_){}
+          showRsdHydrationStatus(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage(),true);
+          renderReviewBanner(rp);renderRsdSyncBanner();
+          if(notify)alert(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage());
+          return {active:true,degraded:true,token,rp};
+        }
         if(!confirmHydratedIdentity(rp)){
           rsdHydration.markError();
-          showRsdHydrationStatus(rsdHydration.errorMessage(),true);
+          showRsdHydrationStatus(rsdHydration.errorMessage(),true);renderRsdSyncBanner();
           if(notify)alert(rsdHydration.errorMessage());
           return {active:false,token,error:new Error('hydrate-incomplete'),rp};
         }
+        rsdHydration.clearCloudSuspension?.();
         rsdHydration.markHydrated(rp.draftRevision);
         try{salvarRascunhoGuarnicao(true)}catch(_){}
         const el=document.getElementById('rsdRegisterStatus');if(el)el.textContent='Guarnição reconhecida na Central. Finalização liberada.';
-        renderReviewBanner(rp);
+        renderReviewBanner(rp);renderRsdSyncBanner();
         return {active:true,token,rp};
       }
       if(st){
         rsdHydration.markNewService();
-        renderReviewBanner(rp);updateFinalizeUi(st);if(notify)alert(reviewMessage(rp));
+        renderReviewBanner(rp);updateFinalizeUi(st);renderRsdSyncBanner();if(notify)alert(reviewMessage(rp));
         return {active:false,closed:true,token,rp};
       }
-      rsdHydration.markNewService();
+      rsdHydration.markNewService();renderRsdSyncBanner();
       return {active:false,token};
     }catch(error){
       rsdHydration.markError(error?.message);
-      showRsdHydrationStatus(rsdHydration.errorMessage(),true);
+      showRsdHydrationStatus(rsdHydration.errorMessage(),true);renderRsdSyncBanner();
       if(notify)alert(rsdHydration.errorMessage());
       return {active:false,token,error}
     }
@@ -1677,6 +1801,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.30"></script>
-<script src="service_flow.js?v=10.8.30"></script>
+<script src="service_access_layers.js?v=10.8.31"></script>
+<script src="service_flow.js?v=10.8.31"></script>
 </body></html>

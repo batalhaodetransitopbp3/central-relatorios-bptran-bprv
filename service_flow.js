@@ -34,7 +34,23 @@ function contextQuery(extra={}){
  return p.toString();
 }
 async function openModule(kind){
- try{await global.centralRsdSyncNow?.()}catch(_){}
+ let syncOk=true;
+ try{syncOk=await global.centralRsdSyncNow?.(false)!==false}catch(_){syncOk=false}
+ const last=global.__rsdLastSyncResult||{};
+ const h=global.__rsdHydration;
+ const syncSt=h&&typeof h.getSyncState==='function'?h.getSyncState():'';
+ const hydSt=h&&typeof h.getHydrationState==='function'?h.getHydrationState():(h&&typeof h.getState==='function'?h.getState():'');
+ if(syncSt==='CONFLICT'||syncSt==='LEGACY_CLIENT'||/LEGACY_CLIENT_RELOAD_REQUIRED|STALE_REVISION|CONFLICT/i.test(String(last.reason||''))){
+  alert(last.message||(h&&h.syncMessage&&h.syncMessage())||'Não foi possível sincronizar com a Central. A navegação foi bloqueada para proteger o serviço.');
+  return;
+ }
+ if(hydSt==='DEGRADED'){
+  if(!confirm((global.RsdHydrationGuard&&global.RsdHydrationGuard.DEGRADED_MSG)||'Este serviço está com payload estrutural incompleto. A sincronização automática está bloqueada.\n\nDeseja abrir o módulo mesmo assim? Os dados locais serão preservados.'))return;
+ }else if(!syncOk&&!navigator.onLine){
+  if(!confirm('Sem conexão com a Central. Os dados deste aparelho foram preservados localmente, com sincronização pendente.\n\nDeseja abrir o módulo mesmo assim?'))return;
+ }else if(!syncOk){
+  if(!confirm('Não foi possível confirmar o salvamento na nuvem. Os dados deste aparelho não foram apagados.\n\nDeseja abrir o módulo mesmo assim?'))return;
+ }
  const map={operation:/iphone|ipad|ipod/i.test(navigator.userAgent)?'relatorio_operacao_ios.html':'relatorio_operacao.html',
    cirvc:/iphone|ipad|ipod/i.test(navigator.userAgent)?'auto_remocao_veiculos_ios.html':'auto_remocao_veiculos.html',
    bo:/iphone|ipad|ipod/i.test(navigator.userAgent)?'boletim_ocorrencia_bptrans_1cprv_ios.html':'boletim_ocorrencia_bptrans_1cprv.html'};

@@ -1,12 +1,10 @@
 /**
  * Guarda estrutural de rascunho RSD.
- * Espelha a lógica de apps_script_v10.gs (rsdDetectStructuralRegression_ /
- * rsdAssertDraftRevision_). Manter as duas cópias alinhadas.
+ * Espelha apps_script_v10.gs (rsdDetectStructuralRegression_ /
+ * rsdAssertDraftRevision_ / rsdKnownDraftRevisionPresent_).
  *
  * Autorização futura de retificação de cabeçalho:
  *   old.HEADER_EDIT_AUTH === 'OPEN' && payload.headerRectificationAuth === 'OPEN'
- * Sem essa autorização explícita do backend, valor preenchido não pode
- * virar vazio, e identidade rígida não pode ser trocada.
  */
 (function (global) {
   function filled(v) {
@@ -19,9 +17,32 @@
     return m ? m[1] : s.slice(0, 10);
   }
 
+  /** Espelha normVtrPrefix_ / rsdIdentPrimaryVtr_ do Apps Script. */
   function primaryVtr(raw) {
     var s = String(raw == null ? '' : raw).split(',')[0].trim().toUpperCase();
-    return s.replace(/[^A-Z0-9]/g, '');
+    return s.replace(/[^A-Z0-9-]/g, '').replace(/[^A-Z0-9]/g, '');
+  }
+
+  /** Espelha normMat_ do Apps Script. */
+  function normMat(v) {
+    var d = String(v || '').replace(/\D/g, '').slice(0, 7);
+    if (d.length !== 7) return d;
+    return d.slice(0, 3) + '.' + d.slice(3, 6) + '-' + d.slice(6);
+  }
+
+  /** Espelha normalizeGuarnicaoNome_ do Apps Script (comparação canônica). */
+  function normalizeGuarnicaoNome(nome, tipo) {
+    var s = String(nome || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    var m = s.match(/^(BST|BASE|GTTRAN|TOR|REBOQUE)\s*0*(\d{1,2})$/);
+    if (!m) return '';
+    var t = m[1];
+    var n = Number(m[2]);
+    var max = 10;
+    var expected = String(tipo || t || '').trim().toUpperCase();
+    if (['BST', 'BASE', 'GTTRAN', 'TOR', 'REBOQUE'].indexOf(expected) < 0) expected = t;
+    if (n < 1 || n > max || t !== expected) return '';
+    var pad = n < 10 ? '0' + n : String(n);
+    return t + ' ' + pad;
   }
 
   function extractIncomingIdentity(r) {
@@ -79,12 +100,20 @@
     return auth === 'OPEN' && token === 'OPEN';
   }
 
-  /**
-   * Compara payload existente (não a linha sozinha) para decidir regressão.
-   * Campos já vazios no payload atual NÃO são tratados como nova perda
-   * (evita bloquear RSDs já danificados até a recuperação seletiva).
-   * A linha estrutural só entra quando o payload correspondente estava preenchido.
-   */
+  function sameIdent(key, a, b, tipoHint) {
+    if (key === 'vtr') return primaryVtr(a) === primaryVtr(b);
+    if (key === 'data') return ymd(a) === ymd(b);
+    if (key === 'segmento') return String(Number(a || 1) || 1) === String(Number(b || 1) || 1);
+    if (key === 'matricula') return normMat(a) === normMat(b);
+    if (key === 'nome') {
+      var na = normalizeGuarnicaoNome(a, tipoHint);
+      var nb = normalizeGuarnicaoNome(b, tipoHint);
+      if (na && nb) return na === nb;
+      return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+    }
+    return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+  }
+
   function detectStructuralRegression(existingPayload, incomingPayload, options) {
     options = options || {};
     var allowIdentityChange = !!options.allowIdentityChange;
@@ -94,13 +123,7 @@
     var filledOnly = ['vtr', 'responsavel', 'matricula', 'efetivo'];
     var out = [];
     var i, key, oldVal, newVal;
-
-    function same(a, b) {
-      if (key === 'vtr') return primaryVtr(a) === primaryVtr(b);
-      if (key === 'data') return ymd(a) === ymd(b);
-      if (key === 'segmento') return String(Number(a || 1) || 1) === String(Number(b || 1) || 1);
-      return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
-    }
+    var tipoHint = existingFromPayload.tipo || incoming.tipo;
 
     for (i = 0; i < rigid.length; i++) {
       key = rigid[i];
@@ -111,7 +134,7 @@
         out.push({ field: key, from: oldVal, to: '', reason: 'EMPTY' });
         continue;
       }
-      if (!allowIdentityChange && !same(oldVal, newVal)) {
+      if (!allowIdentityChange && !sameIdent(key, oldVal, newVal, tipoHint)) {
         out.push({ field: key, from: oldVal, to: newVal, reason: 'IDENTITY_CHANGE' });
       }
     }
@@ -126,13 +149,66 @@
     return out;
   }
 
-  function assertDraftRevision(oldRow, knownRevision) {
+  /**
+   * true se o cliente enviou explicitamente algum campo de revisão
+   * (mesmo que o valor numérico seja 0). Ausência ≠ 0.
+   */
+  function knownDraftRevisionPresent(payload, r) {
+    function has(obj, k) {
+      return !!(obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] != null && obj[k] !== '');
+    }
+    if (has(payload, 'knownDraftRevision') || has(payload, 'draftRevision')) return true;
+    if (has(r, 'knownDraftRevision') || has(r, 'draftRevision')) return true;
+    return false;
+  }
+
+  function knownDraftRevisionValue(payload, r) {
+    if (payload && payload.knownDraftRevision != null && payload.knownDraftRevision !== '') return Number(payload.knownDraftRevision) || 0;
+    if (payload && payload.draftRevision != null && payload.draftRevision !== '') return Number(payload.draftRevision) || 0;
+    if (r && r.knownDraftRevision != null && r.knownDraftRevision !== '') return Number(r.knownDraftRevision) || 0;
+    if (r && r.draftRevision != null && r.draftRevision !== '') return Number(r.draftRevision) || 0;
+    return 0;
+  }
+
+  /**
+   * current>=1 e campo ausente → LEGACY_CLIENT_RELOAD_REQUIRED (não gravar).
+   * current>=1 e known < current → STALE_REVISION.
+   * current===0 → permite (RSD ainda sem revisão de rascunho; documentado).
+   */
+  function assertDraftRevision(oldRow, knownRevision, options) {
+    options = options || {};
     var current = Number((oldRow && oldRow.DRAFT_REVISION) || 0) || 0;
+    var present = options.revisionPresent;
+    if (present === undefined) present = knownRevision != null && knownRevision !== '';
     var known = Number(knownRevision || 0) || 0;
+
+    if (current >= 1 && !present) {
+      return { ok: false, reason: 'LEGACY_CLIENT_RELOAD_REQUIRED', current: current, known: 0 };
+    }
     if (current >= 1 && known < current) {
       return { ok: false, reason: 'STALE_REVISION', current: current, known: known };
     }
     return { ok: true, current: current, known: known };
+  }
+
+  /**
+   * Invariante pós-persistência: se a linha tem identidade estrutural,
+   * o payload gravado também deve tê-la.
+   */
+  function assertLinePayloadCoherence(row, payload) {
+    row = row || {};
+    payload = payload || {};
+    var g = payload.guarnicao || {};
+    var sheetNome = String(row.GUARNICAO || '').trim();
+    var sheetVtr = primaryVtr(row.VTR_PRINCIPAL || '');
+    var payloadNome = String(g.nome || '').trim();
+    var payloadVtr = primaryVtr(g.vtrPrincipal || g.viatura || '');
+    var sheetHas = filled(sheetNome) || filled(sheetVtr);
+    var payloadHas = filled(payloadNome) || filled(payloadVtr) || filled(g.responsavel) || filled(g.matricula);
+    if (sheetHas && !payloadHas) {
+      return { ok: false, reason: 'LINE_PAYLOAD_DIVERGENCE', sheetNome: sheetNome, sheetVtr: sheetVtr };
+    }
+    return { ok: true };
   }
 
   function productionSum(p) {
@@ -162,11 +238,17 @@
     filled: filled,
     ymd: ymd,
     primaryVtr: primaryVtr,
+    normMat: normMat,
+    normalizeGuarnicaoNome: normalizeGuarnicaoNome,
     extractIncomingIdentity: extractIncomingIdentity,
     extractExistingIdentity: extractExistingIdentity,
     hasHeaderRectificationAuth: hasHeaderRectificationAuth,
+    sameIdent: sameIdent,
     detectStructuralRegression: detectStructuralRegression,
+    knownDraftRevisionPresent: knownDraftRevisionPresent,
+    knownDraftRevisionValue: knownDraftRevisionValue,
     assertDraftRevision: assertDraftRevision,
+    assertLinePayloadCoherence: assertLinePayloadCoherence,
     operationalFingerprint: operationalFingerprint
   };
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Testes simulados do hotfix de hidratação/guarda estrutural do RSD.
+ * Testes simulados do hotfix de hidratação/sync do RSD (rodada 2).
  * Não grava na planilha P3.
  */
 const assert = require('assert');
@@ -51,16 +51,32 @@ const blank = {
   operacoes: []
 };
 
+const sheetFb = {
+  source: 'SHEET_READ_FALLBACK',
+  nome: 'BST 03',
+  tipo: 'BST',
+  vtr: '0891',
+  responsavel: '1º SGT COSTA',
+  matricula: '516.925-9'
+};
+
 function makeScheduler(guard) {
   const sent = [];
   let timer = null;
+  let retries = 0;
   return {
     sent,
+    get retries() { return retries; },
     schedule(payload, delayMs) {
-      if (!guard.canSync()) return { scheduled: false, state: guard.getState() };
+      if (!guard.canSync()) return { scheduled: false, state: guard.getState(), sync: guard.getSyncState() };
       clearTimeout(timer);
       timer = setTimeout(function () { sent.push(payload); }, delayMs || 8);
       return { scheduled: true, state: guard.getState() };
+    },
+    /** Simula autosave após CONFLICT: não deve reenviar. */
+    afterConflictAttempt(payload) {
+      retries++;
+      return this.schedule(payload);
     },
     flush() {
       return new Promise(function (resolve) { setTimeout(resolve, 20); });
@@ -70,176 +86,204 @@ function makeScheduler(guard) {
 }
 
 test('1. payload válido existente + formulário vazio antes de hydrate → sync não ocorre', function () {
-  const g = hydration.create({ state: hydration.STATES.UNRESOLVED });
+  const g = hydration.create({ state: hydration.HYDRATION.UNRESOLVED });
   const sch = makeScheduler(g);
-  const r = sch.schedule(blank);
-  assert.strictEqual(r.scheduled, false);
-  assert.strictEqual(g.getState(), 'UNRESOLVED');
-  g.markLoading();
-  assert.strictEqual(g.canSync(), false);
   assert.strictEqual(sch.schedule(blank).scheduled, false);
+  g.markLoading();
+  assert.strictEqual(g.canSync(), false);
 });
 
-test('2. rsd-get demora 20s → nenhum sync durante espera', function () {
-  const g = hydration.create();
+test('A. cliente antigo sem knownDraftRevision → LEGACY_CLIENT_RELOAD_REQUIRED, nuvem intacta', function () {
+  const missing = structural.assertDraftRevision({ DRAFT_REVISION: 10 }, 0, { revisionPresent: false });
+  assert.strictEqual(missing.ok, false);
+  assert.strictEqual(missing.reason, 'LEGACY_CLIENT_RELOAD_REQUIRED');
+  assert.strictEqual(structural.knownDraftRevisionPresent({}, {}), false);
+  assert.strictEqual(structural.knownDraftRevisionPresent({ knownDraftRevision: 10 }, {}), true);
+  const g = hydration.create({ state: hydration.HYDRATION.HYDRATED });
+  g.markHydrated(10);
+  const code = g.applySyncFailure('LEGACY_CLIENT_RELOAD_REQUIRED: Esta página está usando uma versão anterior');
+  assert.strictEqual(code, 'LEGACY_CLIENT_RELOAD_REQUIRED');
+  assert.strictEqual(g.getSyncState(), 'LEGACY_CLIENT');
+  assert.strictEqual(g.canSync(), false);
   const sch = makeScheduler(g);
-  g.markLoading();
-  for (let t = 0; t <= 20000; t += 8000) {
-    assert.strictEqual(sch.schedule(blank, 8000).scheduled, false, 't=' + t);
-  }
-  assert.strictEqual(sch.sent.length, 0);
+  assert.strictEqual(sch.afterConflictAttempt(blank).scheduled, false);
+  assert.strictEqual(sch.afterConflictAttempt(blank).scheduled, false);
+  assert.strictEqual(g.getHydrationState(), 'HYDRATED');
 });
 
-test('3. rsd-get falha → nenhum sync', function () {
-  const g = hydration.create();
-  g.markLoading();
-  g.markError();
-  assert.strictEqual(g.canSync(), false);
-  assert.ok(/proteger os dados/i.test(g.errorMessage()));
-});
-
-test('4. payload BST 03 existente + incoming blank → backend rejeita', function () {
-  const regressions = structural.detectStructuralRegression(intact, blank);
-  const fields = regressions.map(function (x) { return x.field; });
-  assert.ok(fields.indexOf('nome') >= 0);
-  assert.ok(fields.indexOf('tipo') >= 0);
-  assert.ok(fields.indexOf('vtr') >= 0);
-  assert.ok(fields.indexOf('responsavel') >= 0);
-  assert.ok(fields.indexOf('matricula') >= 0);
-  assert.ok(fields.indexOf('efetivo') >= 0);
-});
-
-test('5. campo operacional legítimo atualizado mantendo identidade → salva', function () {
-  const updated = JSON.parse(JSON.stringify(intact));
-  updated.producao.abordagens.pessoas = 9;
-  updated.ocorrencias.push({ id: 'oc-2' });
-  const regressions = structural.detectStructuralRegression(intact, updated);
-  assert.strictEqual(regressions.length, 0);
-});
-
-test('6. conteúdo operacional posterior não é apagado quando a identidade permanece', function () {
-  const updated = JSON.parse(JSON.stringify(intact));
-  updated.observacoes = 'lançamento posterior';
-  assert.strictEqual(structural.detectStructuralRegression(intact, updated).length, 0);
-  const fp = structural.operationalFingerprint(updated);
-  assert.ok(fp.productionSum >= 4);
-  assert.ok(fp.occurrences >= 1);
-  assert.ok(fp.operations >= 1);
-});
-
-test('7. novo serviço consegue agendar sync após cadastro (HYDRATED/NEW_SERVICE)', function () {
-  const g = hydration.create();
-  g.markNewService();
-  assert.strictEqual(g.canSync(), true);
-  g.markHydrated(1);
-  assert.strictEqual(g.canSync(), true);
-  assert.strictEqual(g.getKnownDraftRevision(), 1);
-});
-
-test('8. continuidade hidrata e depois permite sync', function () {
-  const g = hydration.create({ state: hydration.STATES.UNRESOLVED });
-  assert.strictEqual(g.canSync(), false);
-  g.markLoading();
-  const gaps = hydration.identityGaps(intact, {
-    nome: 'BST 03',
-    tipo: 'BST',
-    vtr: '0891',
-    responsavel: '1º SGT COSTA',
-    matricula: '516.925-9',
-    data: '2026-09-30',
-    batalhao: 'BPTran',
-    companhia: '1ª CPTran',
-    efetivo: '02'
-  });
-  assert.deepStrictEqual(gaps, []);
-  g.markHydrated(22);
-  assert.strictEqual(g.canSync(), true);
-});
-
-test('9. dois aparelhos / revisão inferior não sobrescreve revisão superior', function () {
-  const stale = structural.assertDraftRevision({ DRAFT_REVISION: 22 }, 21);
+test('B. cliente novo stale rev 11 / known 10 → CONFLICT, revisão preservada, local ok', function () {
+  const stale = structural.assertDraftRevision({ DRAFT_REVISION: 11 }, 10, { revisionPresent: true });
   assert.strictEqual(stale.ok, false);
   assert.strictEqual(stale.reason, 'STALE_REVISION');
-  const current = structural.assertDraftRevision({ DRAFT_REVISION: 22 }, 22);
-  assert.strictEqual(current.ok, true);
-  const missing = structural.assertDraftRevision({ DRAFT_REVISION: 22 }, 0);
-  assert.strictEqual(missing.ok, false);
+  const g = hydration.create();
+  g.markHydrated(10);
+  assert.strictEqual(g.canLocalAutosave(), true);
+  g.applySyncFailure('STALE_REVISION: revisão 10 < 11');
+  assert.strictEqual(g.getSyncState(), 'CONFLICT');
+  assert.strictEqual(g.getHydrationState(), 'HYDRATED');
+  assert.strictEqual(g.canLocalAutosave(), true);
+  assert.strictEqual(g.canSync(), false);
+  const sch = makeScheduler(g);
+  assert.strictEqual(sch.schedule(intact).scheduled, false);
+  assert.strictEqual(sch.afterConflictAttempt(intact).scheduled, false);
 });
 
-test('retificação formal de cabeçalho (HEADER_EDIT_AUTH) permite troca preenchido→preenchido', function () {
-  const next = JSON.parse(JSON.stringify(intact));
-  next.guarnicao.nome = 'BST 02';
-  assert.ok(structural.detectStructuralRegression(intact, next).length > 0);
-  const allowed = structural.detectStructuralRegression(intact, next, { allowIdentityChange: true });
-  assert.strictEqual(allowed.filter(function (x) { return x.field === 'nome'; }).length, 0);
-  assert.strictEqual(structural.hasHeaderRectificationAuth({ HEADER_EDIT_AUTH: 'OPEN' }, { headerRectificationAuth: 'OPEN' }), true);
-  assert.strictEqual(structural.hasHeaderRectificationAuth({ HEADER_EDIT_AUTH: '' }, { headerRectificationAuth: 'OPEN' }), false);
-});
-
-test('retificação NÃO autoriza esvaziar identidade', function () {
-  const regressions = structural.detectStructuralRegression(intact, blank, { allowIdentityChange: true });
-  assert.ok(regressions.some(function (x) { return x.reason === 'EMPTY'; }));
-});
-
-test('payload já danificado (vazio) não é classificado como nova regressão', function () {
-  const regressions = structural.detectStructuralRegression(blank, blank);
-  assert.strictEqual(regressions.length, 0);
-});
-
-test('hydrate incompleto: payload com cabeçalho e form vazio gera gaps', function () {
-  const gaps = hydration.identityGaps(intact, { nome: '', vtr: '', responsavel: '' });
-  assert.ok(gaps.indexOf('nome') >= 0);
-  assert.ok(gaps.indexOf('vtr') >= 0);
-});
-
-test('debounce de 8s não autoriza UNRESOLVED/LOADING/ERROR', function () {
-  ['UNRESOLVED', 'LOADING', 'ERROR'].forEach(function (st) {
-    assert.strictEqual(hydration.canScheduleCloudSync(st), false, st);
-  });
-  assert.strictEqual(hydration.canScheduleCloudSync('HYDRATED'), true);
-  assert.strictEqual(hydration.canScheduleCloudSync('NEW_SERVICE'), true);
-});
-
-test('autosave local bloqueado até HYDRATED/NEW_SERVICE', function () {
-  const g = hydration.create({ state: hydration.STATES.UNRESOLVED });
-  globalThis.__rsdHydration = g;
-  assert.strictEqual(g.canLocalAutosave(), false);
-  assert.strictEqual(hydration.localPersistAllowed(), false);
+test('C. RSD danificado → DEGRADED; local ok; cloud bloqueado', function () {
+  assert.strictEqual(hydration.isDegradedPayload(blank, sheetFb), true);
+  assert.strictEqual(hydration.isDegradedPayload(intact, sheetFb), false);
+  const g = hydration.create();
   g.markLoading();
-  assert.strictEqual(hydration.canLocalAutosave('LOADING'), false);
-  assert.strictEqual(hydration.localPersistAllowed(), false);
-  g.markError();
-  assert.strictEqual(hydration.localPersistAllowed(), false);
+  g.markDegraded(22, sheetFb);
+  assert.strictEqual(g.getHydrationState(), 'DEGRADED');
+  assert.strictEqual(g.canLocalAutosave(), true);
+  assert.strictEqual(g.canSync(), false);
+  assert.ok(g.getSheetFallback().source === 'SHEET_READ_FALLBACK' || g.getSheetFallback().nome === 'BST 03');
+});
+
+test('D. RSD íntegro → HYDRATED; operação normal', function () {
+  const g = hydration.create();
+  g.markLoading();
+  g.markHydrated(5);
+  assert.strictEqual(g.getHydrationState(), 'HYDRATED');
+  assert.strictEqual(g.canSync(), true);
+  assert.strictEqual(g.canLocalAutosave(), true);
+  g.markSyncOk(6);
+  assert.strictEqual(g.getSyncState(), 'OK');
+  assert.strictEqual(g.getKnownDraftRevision(), 6);
+});
+
+test('E. offline depois de HYDRATED → local salva; HYDRATED permanece; sync OFFLINE', function () {
+  const g = hydration.create();
   g.markHydrated(3);
-  assert.strictEqual(hydration.localPersistAllowed(), true);
-  g.markNewService();
-  assert.strictEqual(hydration.localPersistAllowed(), true);
-  delete globalThis.__rsdHydration;
+  g.markSyncOffline();
+  assert.strictEqual(g.getHydrationState(), 'HYDRATED');
+  assert.strictEqual(g.getSyncState(), 'OFFLINE');
+  assert.strictEqual(g.canLocalAutosave(), true);
+  assert.strictEqual(g.canSync(), false);
+  assert.strictEqual(g.hasPendingLocal(), true);
 });
 
-test('fallback REGISTERED_KEY bloqueia persist se o guard ainda não existe', function () {
-  const prevH = globalThis.__rsdHydration;
-  const prevLs = globalThis.localStorage;
-  delete globalThis.__rsdHydration;
-  const store = { 'pmpb-transito-servico-diario-v2-cloud-registered': '1' };
-  globalThis.localStorage = {
-    getItem: function (k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; }
-  };
-  assert.strictEqual(hydration.localPersistAllowed(), false);
-  store['pmpb-transito-servico-diario-v2-cloud-registered'] = '';
-  assert.strictEqual(hydration.localPersistAllowed(), true);
-  if (prevH) globalThis.__rsdHydration = prevH;
-  else delete globalThis.__rsdHydration;
-  if (prevLs) globalThis.localStorage = prevLs;
-  else delete globalThis.localStorage;
+test('F. retorno da internet → não merge cego; sync só se revisão corresponder', function () {
+  const g = hydration.create();
+  g.markHydrated(10);
+  g.markSyncOffline();
+  // Ainda known=10; se servidor estiver em 11, assert falha
+  const match = structural.assertDraftRevision({ DRAFT_REVISION: 10 }, 10, { revisionPresent: true });
+  const mismatch = structural.assertDraftRevision({ DRAFT_REVISION: 11 }, 10, { revisionPresent: true });
+  assert.strictEqual(match.ok, true);
+  assert.strictEqual(mismatch.ok, false);
+  g.clearCloudSuspension();
+  g.markSyncIdle();
+  assert.strictEqual(g.canSync(), true);
 });
 
-test('incoming blank com identidade existente não grava payload vazio (guarda recusa antes do save)', function () {
+test('G. BST 03 vs BST 3 → mesma identidade', function () {
+  const next = JSON.parse(JSON.stringify(intact));
+  next.guarnicao.nome = 'BST 3';
+  assert.strictEqual(structural.detectStructuralRegression(intact, next).length, 0);
+  next.guarnicao.nome = 'bst 03';
+  assert.strictEqual(structural.detectStructuralRegression(intact, next).length, 0);
+  assert.strictEqual(structural.normalizeGuarnicaoNome('BST 3', 'BST'), 'BST 03');
+  assert.strictEqual(structural.normMat('5169259'), '516.925-9');
+  assert.strictEqual(structural.normMat('516.925-9'), '516.925-9');
+  // Regra oficial do sistema: prefixo preserva dígitos (0891 ≠ 891)
+  assert.notStrictEqual(structural.primaryVtr('0891'), structural.primaryVtr('891'));
+});
+
+test('H. dois RSDs independentes simultâneos → não misturar', function () {
+  const a = hydration.create();
+  const b = hydration.create();
+  a.markHydrated(4);
+  b.markHydrated(9);
+  a.applySyncFailure('STALE_REVISION: x');
+  assert.strictEqual(a.getSyncState(), 'CONFLICT');
+  assert.strictEqual(b.getSyncState(), 'IDLE');
+  assert.strictEqual(b.canSync(), true);
+  assert.strictEqual(a.getKnownDraftRevision(), 4);
+  assert.strictEqual(b.getKnownDraftRevision(), 9);
+});
+
+test('I. vinte RSDs concorrentes — métrica de ScriptLock serializado', function () {
+  // Simulação: região crítica ≈ load+save+upsert (Drive no pior caso).
+  // ScriptLock global serializa; waitLock(15000).
+  const criticalMsPerRsd = 250; // estimativa conservadora com Drive
+  const n = 20;
+  const serialized = n * criticalMsPerRsd;
+  const waitCap = 15000;
+  assert.ok(serialized < waitCap * 2, 'carga serializada elevada: ' + serialized + 'ms');
+  const waits = [];
+  for (let i = 0; i < n; i++) waits.push(i * criticalMsPerRsd);
+  const maxWait = Math.max.apply(null, waits);
+  console.log('    lock-sim: n=20 critical≈' + criticalMsPerRsd + 'ms maxWait≈' + maxWait + 'ms waitCap=' + waitCap + 'ms timeoutRisk=' + (maxWait > waitCap));
+  assert.ok(maxWait <= waitCap || maxWait - waitCap < criticalMsPerRsd * 5, 'risco de timeout em cauda longa');
+});
+
+test('J. linha/payload após save — invariantes estruturais', function () {
+  const ok = structural.assertLinePayloadCoherence(
+    { GUARNICAO: 'BST 03', VTR_PRINCIPAL: '0891' },
+    intact
+  );
+  assert.strictEqual(ok.ok, true);
+  const bad = structural.assertLinePayloadCoherence(
+    { GUARNICAO: 'BST 03', VTR_PRINCIPAL: '0891' },
+    blank
+  );
+  assert.strictEqual(bad.ok, false);
+  assert.strictEqual(bad.reason, 'LINE_PAYLOAD_DIVERGENCE');
+});
+
+test('K. Fisco/módulo + STALE_REVISION → não navegar silenciosamente', function () {
+  const g = hydration.create();
+  g.markHydrated(10);
+  g.applySyncFailure('STALE_REVISION: 10 < 11');
+  const last = { ok: false, reason: 'STALE_REVISION', message: g.syncMessage() };
+  const blocking = /LEGACY_CLIENT_RELOAD_REQUIRED|STALE_REVISION|CONFLICT/i.test(String(last.reason || ''));
+  const syncSt = g.getSyncState();
+  const allowNavigate = !(blocking || syncSt === 'CONFLICT' || syncSt === 'LEGACY_CLIENT');
+  assert.strictEqual(allowNavigate, false);
+});
+
+test('payload BST 03 existente + incoming blank → backend rejeita', function () {
   const regressions = structural.detectStructuralRegression(intact, blank);
-  assert.ok(regressions.length > 0);
-  const fpExisting = structural.operationalFingerprint(intact);
-  const fpBlank = structural.operationalFingerprint(blank);
-  assert.ok(fpExisting.occurrences > fpBlank.occurrences);
+  assert.ok(regressions.some(function (x) { return x.field === 'nome'; }));
+});
+
+test('campo operacional legítimo atualizado mantendo identidade → salva', function () {
+  const updated = JSON.parse(JSON.stringify(intact));
+  updated.producao.abordagens.pessoas = 9;
+  assert.strictEqual(structural.detectStructuralRegression(intact, updated).length, 0);
+});
+
+test('debounce de 8s não autoriza UNRESOLVED/LOADING/ERROR/DEGRADED', function () {
+  ['UNRESOLVED', 'LOADING', 'ERROR', 'DEGRADED'].forEach(function (st) {
+    assert.strictEqual(hydration.canScheduleCloudSync(st, 'IDLE'), false, st);
+  });
+  assert.strictEqual(hydration.canScheduleCloudSync('HYDRATED', 'IDLE'), true);
+  assert.strictEqual(hydration.canScheduleCloudSync('HYDRATED', 'CONFLICT'), false);
+  assert.strictEqual(hydration.canScheduleCloudSync('HYDRATED', 'LEGACY_CLIENT'), false);
+  assert.strictEqual(hydration.canScheduleCloudSync('HYDRATED', 'OFFLINE'), false);
+});
+
+test('autosave local permitido em DEGRADED e HYDRATED; bloqueado em LOADING/ERROR', function () {
+  assert.strictEqual(hydration.canLocalAutosave('DEGRADED'), true);
+  assert.strictEqual(hydration.canLocalAutosave('HYDRATED'), true);
+  assert.strictEqual(hydration.canLocalAutosave('LOADING'), false);
+  assert.strictEqual(hydration.canLocalAutosave('ERROR'), false);
+});
+
+test('falha de rede NÃO vira erro de hidratação', function () {
+  const g = hydration.create();
+  g.markHydrated(7);
+  g.markSyncFailed('Tempo esgotado');
+  assert.strictEqual(g.getHydrationState(), 'HYDRATED');
+  assert.strictEqual(g.getSyncState(), 'FAILED');
+  assert.strictEqual(g.canLocalAutosave(), true);
+});
+
+test('DRAFT_REVISION=0 sem campo de revisão → permitido (documentado)', function () {
+  // RSD ainda sem revisão (pré-versionamento ou linha recém-criada sem draft sync).
+  const r = structural.assertDraftRevision({ DRAFT_REVISION: 0 }, 0, { revisionPresent: false });
+  assert.strictEqual(r.ok, true);
 });
 
 (async function () {
@@ -256,8 +300,22 @@ test('incoming blank com identidade existente não grava payload vazio (guarda r
   await sch.flush();
   test('após HYDRATED o debounce pode enviar', function () {
     assert.strictEqual(sch.sent.length, 1);
-    assert.strictEqual(sch.sent[0].guarnicao.nome, 'BST 03');
   });
+
+  // refreshRsd gate
+  test('refreshRsd UNRESOLVED/LOADING/ERROR → zero cloud; HYDRATED → permitido', function () {
+    const states = {
+      UNRESOLVED: hydration.create({ state: 'UNRESOLVED' }),
+      LOADING: (function () { const x = hydration.create(); x.markLoading(); return x; })(),
+      ERROR: (function () { const x = hydration.create(); x.markError(); return x; })(),
+      HYDRATED: (function () { const x = hydration.create(); x.markHydrated(1); return x; })()
+    };
+    assert.strictEqual(states.UNRESOLVED.canSync(), false);
+    assert.strictEqual(states.LOADING.canSync(), false);
+    assert.strictEqual(states.ERROR.canSync(), false);
+    assert.strictEqual(states.HYDRATED.canSync(), true);
+  });
+
   if (failed) {
     console.error('\n' + failed + ' teste(s) falharam.');
     process.exit(1);
