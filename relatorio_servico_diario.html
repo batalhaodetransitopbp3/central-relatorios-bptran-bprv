@@ -709,7 +709,7 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.25"></script>
+<script src="central_cloud.js?v=10.8.26"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -776,7 +776,18 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
       location.href=ios?'relatorio_traslados_reboque_ios.html':'relatorio_traslados_reboque.html';
     });
   }
-  function updateIdentityLock(){const t=document.getElementById('guarnicaoTipo'),g=document.getElementById('guarnicaoNumero'),v=document.getElementById('viatura'),k=document.getElementById('rsdChangeKeyBtn');if(t)t.disabled=!!serviceRegistered;if(g)g.disabled=!!serviceRegistered;if(k){k.hidden=false;k.textContent='Sessão / trocar acesso'}if(v){v.readOnly=!!serviceRegistered;v.title=serviceRegistered?'A VTR principal identifica este serviço. Para substituição, use VTR adicional e registre a alteração.':''}updateReboqueShortcut()}
+  function updateIdentityLock(){
+    const t=document.getElementById('guarnicaoTipo'),g=document.getElementById('guarnicaoNumero'),v=document.getElementById('viatura'),k=document.getElementById('rsdChangeKeyBtn');
+    if(t)t.disabled=!!serviceRegistered;if(g)g.disabled=!!serviceRegistered;
+    if(k){k.hidden=false;k.textContent='Sessão / trocar acesso'}
+    if(v){v.readOnly=!!serviceRegistered;v.title=serviceRegistered?'A VTR principal identifica este serviço. Para substituição, use VTR adicional e registre a alteração.':''}
+    const nome=document.getElementById('responsavel'),mat=document.getElementById('matriculaResponsavel'),busca=document.getElementById('buscarMilitarBtn');
+    if(nome){nome.readOnly=true;if(serviceRegistered)nome.setAttribute('readonly','readonly')}
+    if(mat){mat.readOnly=!!serviceRegistered;if(serviceRegistered){mat.setAttribute('readonly','readonly');mat.title='Responsável fixo deste segmento. Alteração somente por passagem formal.'}else mat.removeAttribute('title')}
+    if(busca)busca.disabled=!!serviceRegistered;
+    if(serviceRegistered){try{window.lockRsdHeader?.()}catch(_){}try{document.getElementById('rsdExternalCommander')?.setAttribute('hidden','hidden')}catch(_){}}
+    updateReboqueShortcut()
+  }
   async function refreshTeamSuggestion(){
     if(serviceRegistered||document.getElementById('guarnicaoNumero'))return;
     const tipo=val('guarnicaoTipo'),data=val('data'),field=document.getElementById('guarnicao');
@@ -791,7 +802,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   function saveIdentity(){if(READONLY_VIEWER)return;try{localStorage.setItem(SERVICE_ID_KEY,serviceId);localStorage.setItem(SEGMENT_KEY,String(segmento));if(rsdAnteriorId)localStorage.setItem(PREV_RSD_KEY,rsdAnteriorId);else localStorage.removeItem(PREV_RSD_KEY);if(passagemOrigemId)localStorage.setItem(PASS_ID_KEY,passagemOrigemId);else localStorage.removeItem(PASS_ID_KEY);if(serviceRegistered)localStorage.setItem(REGISTERED_KEY,'1');else localStorage.removeItem(REGISTERED_KEY)}catch(_){}}
   function activeContext(){return {serviceId,rsdReportId:reportId,segmento,guarnicao:val('guarnicao'),comandante:val('responsavel'),comandanteMatricula:CentralCloud.formatMatricula(val('matriculaResponsavel')),vtrs:collectVtrs().map(x=>x.prefixo),unidade:currentUnit(),data:val('data'),iniciadoEm:serviceStartedAt||''}}
   function saveActiveContext(){if(READONLY_VIEWER)return;try{if(serviceRegistered)localStorage.setItem(ACTIVE_CONTEXT_KEY,JSON.stringify(activeContext()));else localStorage.removeItem(ACTIVE_CONTEXT_KEY)}catch(_){}}
-  function applyCommander(m){if(!m)return;commanderPostoGrad=m.POSTO_GRAD||m.postoGrad||'';const nome=((commanderPostoGrad||'')+' '+(m.NOME||m.nome||'')).trim(),mat=CentralCloud.formatMatricula(m.MATRICULA||m.matricula||'');const n=document.getElementById('responsavel'),mt=document.getElementById('matriculaResponsavel');if(n)n.value=nome;if(mt)mt.value=mat;window.centralRsdCommanderFound?.();if(n)syncPrintValue(n);if(mt)syncPrintValue(mt);window.centralAutosave?.()}
+  function applyCommander(m){if(!m||serviceRegistered)return;commanderPostoGrad=m.POSTO_GRAD||m.postoGrad||'';const nome=((commanderPostoGrad||'')+' '+(m.NOME||m.nome||'')).trim(),mat=CentralCloud.formatMatricula(m.MATRICULA||m.matricula||'');const n=document.getElementById('responsavel'),mt=document.getElementById('matriculaResponsavel');if(n)n.value=nome;if(mt)mt.value=mat;window.centralRsdCommanderFound?.();if(n)syncPrintValue(n);if(mt)syncPrintValue(mt);window.centralAutosave?.()}
   function enrichPayload(p){const v=collectVtrs();p.viaturas=v;p.serviceId=serviceId;p.segmento=segmento;p.rsdAnteriorId=rsdAnteriorId;p.passagemOrigemId=passagemOrigemId;p.cloudRegistered=serviceRegistered;p.guarnicao={...(p.guarnicao||{}),tipo:val('guarnicaoTipo'),viatura:v.map(x=>x.prefixo).join(', '),vtrPrincipal:v[0]?.prefixo||'',viaturas:v,postoGrad:commanderPostoGrad||p.guarnicao?.postoGrad||''};p.operacoesAcumuladas=typeof operacoesLocaisDoServicoRsd==='function'?operacoesLocaisDoServicoRsd():[];p.servico={...(p.servico||{}),iniciadoEm:serviceStartedAt||p.servico?.iniciadoEm||'',serviceId,segmento,rsdAnteriorId,passagemOrigemId};return p}
   window.payloadV2=function(){return enrichPayload(basePayload())}
   if(baseApply)window.applyPayload=function(p){baseApply(p);const gt=document.getElementById('guarnicaoTipo');if(gt)gt.value=String(p?.guarnicao?.tipo||teamTypeFromName(p?.guarnicao?.nome)||'').toUpperCase();if(p?.reportId){reportId=p.reportId;if(!READONLY_VIEWER)localStorage.setItem(REPORT_ID_KEY,reportId)}serviceId=p?.serviceId||p?.servico?.serviceId||serviceId;segmento=Number(p?.segmento||p?.servico?.segmento||segmento||1)||1;rsdAnteriorId=p?.rsdAnteriorId||p?.servico?.rsdAnteriorId||'';passagemOrigemId=p?.passagemOrigemId||p?.servico?.passagemOrigemId||'';if(!READONLY_VIEWER&&p?.cloudRegistered===true)serviceRegistered=true;const vs=Array.isArray(p?.viaturas)?p.viaturas:(Array.isArray(p?.guarnicao?.viaturas)?p.guarnicao.viaturas:[]);const extra=vs.map(x=>typeof x==='string'?x:(x.prefixo||x.viatura||'')).filter(Boolean);if(extra.length){document.getElementById('viatura').value=extra.shift();document.getElementById('rsdVtrExtras').innerHTML='';extra.forEach(v=>centralRsdAddViatura(v));syncVtrPrint()}commanderPostoGrad=p?.guarnicao?.postoGrad||'';serviceStartedAt=p?.servico?.iniciadoEm||p?.iniciadoEm||serviceStartedAt||'';if(!READONLY_VIEWER){try{if(serviceStartedAt)localStorage.setItem('pmpb-transito-servico-diario-v2-started-at',serviceStartedAt)}catch(_){}saveIdentity();saveActiveContext();updateIdentityLock();setTimeout(()=>renderReceivedPassage(passagemOrigemId),0)}else{syncVtrPrint();document.querySelectorAll('input,select,textarea').forEach(syncPrintValue)}}
@@ -805,6 +816,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     return r.militar||null;
   }
   async function lookupMilitar(interactive=false){
+    if(serviceRegistered){if(interactive)alert('O responsável deste segmento já está registrado e só pode ser alterado por passagem formal de serviço.');return}
     if(!window.CentralCloud){if(interactive)alert('O módulo de conexão da Central não foi carregado. Atualize a página e tente novamente.');return}
     const campo=document.getElementById('matriculaResponsavel'),mat=CentralCloud.formatMatricula(campo?.value||'');
     if(!/^\d{3}\.\d{3}-\d$/.test(mat)){if(interactive)alert('Informe primeiro a matrícula completa no padrão 000.000-0.');campo?.focus();return}
@@ -1479,6 +1491,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.25"></script>
-<script src="service_flow.js?v=10.8.25"></script>
+<script src="service_access_layers.js?v=10.8.26"></script>
+<script src="service_flow.js?v=10.8.26"></script>
 </body></html>

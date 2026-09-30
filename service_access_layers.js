@@ -26,7 +26,14 @@ function css(){
 .central-access-note{font-size:11px;color:#8a5a12;margin:0 0 8px;line-height:1.4}
 .central-access-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.central-access-toolbar button{padding:9px 12px;border-radius:8px;border:1px solid #bdcbd6;background:#fff;color:#29485f;font-weight:700;cursor:pointer}
 .central-access-loading,.central-access-empty{padding:16px;text-align:center;color:#66798a;background:#f7f9fb;border-radius:10px}
+.central-access-loading-bar{height:8px;margin:12px auto 0;max-width:280px;border-radius:99px;background:#d9e3ec;overflow:hidden}
+.central-access-loading-bar>i{display:block;height:100%;width:28%;border-radius:99px;background:linear-gradient(90deg,#17375e,#3d6ea3);animation:centralAccessLoad 1.1s ease-in-out infinite}
+@keyframes centralAccessLoad{0%{transform:translateX(-120%)}100%{transform:translateX(380%)}}
 .central-access-error{padding:12px;color:#7a2d2d;background:#fff1f1;border:1px solid #e3b8b8;border-radius:10px}
+.central-access-dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:8px 0;font-size:12px;color:#40566d}
+.central-access-dl dt{font-weight:700;color:#52697e}.central-access-dl dd{margin:0;color:#17375e;font-weight:600}
+.central-access-toolbar button[disabled],.central-access-unit select[disabled]{opacity:.55;cursor:wait}
+#centralProgressStatus{z-index:21050!important}
 .central-setup-nav{position:sticky;top:0;z-index:19000;background:#17375e;padding:8px 12px;box-shadow:0 3px 10px #0002}.central-setup-nav button{border:1px solid #ffffff55;background:#fff;color:#17375e;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer}
 body.central-service-setup.rsd-setup main.page>*:not(header.doc-head){display:none!important}
 body.central-service-setup .toolbar{display:none!important}
@@ -169,13 +176,14 @@ function installRsdCommanderFlow(){
 function lockRsdHeader(){
  ['batalhao','companhiaNumero'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['data','diaSemana','guarnicaoTipo','guarnicaoNumero'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
- ['viatura','efetivo','responsavel','matriculaResponsavel'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
+ ['viatura','efetivo','responsavel','matriculaResponsavel'].forEach(id=>{const el=q('#'+id);if(el){el.readOnly=true;el.setAttribute('readonly','readonly')}});
  q('#buscarMilitarBtn')?.setAttribute('disabled','disabled');
  q('#rsdChangeKeyBtn')?.setAttribute('hidden','hidden');
  q('#rsdRegisterServiceBtn')?.setAttribute('hidden','hidden');
  document.querySelectorAll('.rsd-add-vtr').forEach(el=>{el.disabled=true});
  q('#rsdVtrExtras')?.querySelectorAll('input,button').forEach(el=>{el.disabled=true});
 }
+global.lockRsdHeader=lockRsdHeader;
 function lockRcoServiceIdentity(){
  ['batalhao','companhiaNumero','dataInicio','dataTermino'].forEach(id=>{const el=q('#'+id);if(el)el.disabled=true});
  ['diaSemanaCpu','horarioServico'].forEach(id=>{const el=q('#'+id);if(el)el.readOnly=true});
@@ -346,10 +354,10 @@ async function openServicePicker(type,mode){
  let key=savedIngressKey(type);if(!key)key=await requestIngressKey(type);if(!key){startScreen(type);return}
  const el=shell(title,subtitle,pickerUnitFields()+'<div class="central-access-toolbar"><button data-refresh>Atualizar serviços</button><button data-back>Voltar</button></div><div class="central-access-list" data-list><div class="central-access-empty">Selecione a companhia para consultar os serviços.</div></div>');
  const batt=q('[data-picker-batt]',el),comp=q('[data-picker-comp]',el);
- batt.onchange=()=>{comp.innerHTML=companies(batt.value,1);setTimeout(()=>loadOpenServices(el,type,mode),0)};
- comp.onchange=()=>loadOpenServices(el,type,mode);
- q('[data-refresh]',el).onclick=()=>loadOpenServices(el,type,mode);q('[data-back]',el).onclick=()=>startScreen(type);
- setTimeout(()=>loadOpenServices(el,type,mode),40)
+ batt.onchange=()=>{comp.innerHTML=companies(batt.value,1);setTimeout(()=>loadOpenServices(el,type,mode,{force:true}),0)};
+ comp.onchange=()=>loadOpenServices(el,type,mode,{force:true});
+ q('[data-refresh]',el).onclick=()=>loadOpenServices(el,type,mode,{force:true});q('[data-back]',el).onclick=()=>startScreen(type);
+ setTimeout(()=>loadOpenServices(el,type,mode,{force:false}),40)
 }
 function dedupeOpenServiceItems(items,type){
  const seen=new Map();
@@ -378,39 +386,63 @@ function dedupeOpenServiceItems(items,type){
  });
  return Array.from(seen.values());
 }
-async function loadOpenServices(el,type,mode){
- const box=q('[data-list]',el);if(!box)return;const p=pickerParams(el);
+const OPEN_SERVICES_CACHE=new Map();
+const OPEN_SERVICES_TTL_MS=25000;
+function openServicesCacheKey(type,mode,p){return [type,mode,p.batalhao,p.companhia].join('|')}
+function setPickerBusy(el,busy){
+ el.__loading=!!busy;
+ [q('[data-refresh]',el),q('[data-picker-batt]',el),q('[data-picker-comp]',el)].forEach(b=>{if(b)b.disabled=!!busy});
+}
+function renderOpenServiceCards(box,items,type,mode,p){
+ if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
+ box.innerHTML=items.map((x,i)=>{
+   const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
+   const stamp=fmtDateTime(mode==='receive'?(x.passagemEm||x.lastSync||x.ultimoSyncEm):(x.lastSync||x.ultimoSyncEm));
+   const timing=stamp?((mode==='receive'?'Passagem disponibilizada: ':'Última sync: ')+stamp):'';
+   const vtr=x.vtr||x.vtrPrincipal||'—';
+   const nome=String(x.comandante||x.responsavel||'').trim()||'—';
+   const mat=String(x.matricula||'').trim()||'—';
+   const title=type==='rsd'?(x.guarnicao||'Guarnição'):('RCO — '+(x.companhia||p.companhia));
+   const rows=type==='rsd'
+     ?[['Responsável',nome],['Matrícula',mat],['Companhia',x.companhia||p.companhia||'—'],['Data',date],['Guarnição',x.guarnicao||'—'],['VTR',vtr],['Status',status]]
+     :[['Responsável',nome],['Matrícula',mat],['Companhia',x.companhia||p.companhia||'—'],['Data',date],['Status',status]];
+   const dl='<dl class="central-access-dl">'+rows.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+(timing?'<dt>Info</dt><dd>'+esc(timing)+'</dd>':'')+'</dl>';
+   const badges=[];
+   if(x.passagemPendente||mode==='receive')badges.push('<span class="central-access-badge passagem">Passagem pendente — aguardando recebimento</span>');
+   const hasLegacy=!!(x.duplicadoLegadoHint||(x.legacyDuplicates&&x.legacyDuplicates.length));
+   if(hasLegacy)badges.push('<span class="central-access-badge legacy">Registro(s) legado(s)</span>');
+   const note=hasLegacy?'<div class="central-access-note">Há registro(s) legado(s) associados — Gestão pode arquivar</div>':'';
+   const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
+   return '<div class="central-access-item"><strong>'+esc(title)+'</strong>'+(badges.length?'<div class="central-access-badges">'+badges.join('')+'</div>':'')+dl+note+'<button data-open="'+i+'">'+esc(action)+'</button></div>'
+ }).join('');
+ box.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{
+   if(box.closest('.central-access-layer')?.__loading)return;
+   const item=items[Number(b.dataset.open)];b.disabled=true;
+   try{await enterSelectedService(type,mode,item,box.closest('.central-access-layer')||document.body)}finally{if(document.body.contains(b))b.disabled=false}
+ });
+}
+async function loadOpenServices(el,type,mode,opts={}){
+ const box=q('[data-list]',el);if(!box)return;
+ if(el.__loading)return;
+ const p=pickerParams(el);
+ const cacheKey=openServicesCacheKey(type,mode,p);
+ const force=!!opts.force;
+ if(!force){
+   const hit=OPEN_SERVICES_CACHE.get(cacheKey);
+   if(hit&&(Date.now()-hit.at)<OPEN_SERVICES_TTL_MS){renderOpenServiceCards(box,hit.items,type,mode,p);return}
+ }
  let token=savedIngressKey(type);if(!token){token=await requestIngressKey(type);if(!token){box.innerHTML='<div class="central-access-error">Informe a chave de ingresso para consultar os serviços.</div>';return}}
- box.innerHTML='<div class="central-access-loading">Consultando os serviços da '+esc(p.companhia)+'…</div>';
+ setPickerBusy(el,true);
+ box.innerHTML='<div class="central-access-loading"><div>Consultando os serviços da '+esc(p.companhia)+'…</div><div class="central-access-loading-bar" aria-hidden="true"><i></i></div></div>';
  try{
    const r=await CentralCloud.jsonp('access-open-services',{module:type.toUpperCase(),mode,batalhao:p.batalhao,companhia:p.companhia,token},{timeout:20000});
    const rawItems=r.items||[];
    const filtered=rawItems.filter(x=>mode==='receive'?!!x.passagemPendente:!x.passagemPendente);
    const items=dedupeOpenServiceItems(filtered,type);
-   if(!items.length){box.innerHTML='<div class="central-access-empty">'+(mode==='receive'?'Nenhum serviço desta companhia foi disponibilizado para passagem.':'Nenhum serviço em aberto foi localizado nesta companhia.')+'</div>';return}
-   box.innerHTML=items.map((x,i)=>{
-     const date=fmtDate(x.data),status=String(x.status||'').replaceAll('_',' ');
-     const stamp=fmtDateTime(mode==='receive'?(x.passagemEm||x.lastSync||x.ultimoSyncEm):(x.lastSync||x.ultimoSyncEm));
-     const timing=stamp?((mode==='receive'?'Passagem disponibilizada: ':'Última sync: ')+stamp):'';
-     const vtr=x.vtr||x.vtrPrincipal||'—';
-     const cmt=x.comandante||x.responsavel||'';
-     const title=type==='rsd'?(x.guarnicao||'Guarnição'):('RCO — '+(x.companhia||p.companhia));
-     const idHint=type==='rsd'
-       ?(x.serviceId?('Serviço '+String(x.serviceId).slice(0,12)+'…'):(x.reportId?('RSD '+String(x.reportId).slice(0,14)+'…'):''))
-       :(x.reportId?('RCO '+String(x.reportId).slice(0,14)+'…'):'');
-     const meta=type==='rsd'
-       ?[x.companhia,'Data: '+date,'VTR '+vtr,cmt&&('Cmt: '+cmt),status,idHint,timing].filter(Boolean)
-       :[x.companhia,'Data: '+date,status,idHint,timing].filter(Boolean);
-     const badges=[];
-     if(x.passagemPendente||mode==='receive')badges.push('<span class="central-access-badge passagem">Passagem pendente — aguardando recebimento</span>');
-     const hasLegacy=!!(x.duplicadoLegadoHint||(x.legacyDuplicates&&x.legacyDuplicates.length));
-     if(hasLegacy)badges.push('<span class="central-access-badge legacy">Registro(s) legado(s)</span>');
-     const note=hasLegacy?'<div class="central-access-note">Há registro(s) legado(s) associados — Gestão pode arquivar</div>':'';
-     const action=mode==='receive'?'Receber este serviço':'Entrar neste serviço';
-     return '<div class="central-access-item"><strong>'+esc(title)+'</strong>'+(badges.length?'<div class="central-access-badges">'+badges.join('')+'</div>':'')+'<div class="central-access-meta">'+esc(meta.join(' • '))+'</div>'+note+'<button data-open="'+i+'">'+esc(action)+'</button></div>'
-   }).join('');
-   box.querySelectorAll('[data-open]').forEach(b=>b.onclick=async()=>{const item=items[Number(b.dataset.open)];b.disabled=true;try{await enterSelectedService(type,mode,item,el)}finally{if(document.body.contains(b))b.disabled=false}})
+   OPEN_SERVICES_CACHE.set(cacheKey,{at:Date.now(),items});
+   renderOpenServiceCards(box,items,type,mode,p);
  }catch(e){box.innerHTML='<div class="central-access-error">'+esc(e.message||e)+'</div>'}
+ finally{setPickerBusy(el,false);try{CentralCloud.forceEndProgress?.('Serviços carregados.')}catch(_){}}
 }
 async function enterSelectedService(type,mode,item,el){
  let key=savedIngressKey(type);if(!key)key=await requestIngressKey(type);if(!key)return false;
