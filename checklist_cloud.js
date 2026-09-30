@@ -1,11 +1,18 @@
 (function(global){
 'use strict';
 const CHECKLIST_ID_KEY='pmpb-checklist-cloud-id-v1';
+let completionLocked=false;
 function el(id){return document.getElementById(id)}
 function val(id){return String(el(id)?.value||'').trim()}
 function numCompany(){return Number(val('globalCompanhia'))||1}
 function unit(){const b=String(val('globalBatalhao')||'BPTran').toUpperCase()==='BPRV'?'BPRv':'BPTran';const n=numCompany();return {batalhao:b,companhiaNumero:n,companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
-function checklistId(){let id='';try{id=localStorage.getItem(CHECKLIST_ID_KEY)||''}catch(_){}if(!id){id=global.CentralCloud?.uid('chk')||('chk-'+Date.now());try{localStorage.setItem(CHECKLIST_ID_KEY,id)}catch(_){}}return id}
+function checklistId(){
+  const managed=global.centralChecklistId?.();
+  if(managed)return String(managed);
+  let id='';try{id=localStorage.getItem(CHECKLIST_ID_KEY)||''}catch(_){}
+  if(!id){id=global.CentralCloud?.uid('chk')||('chk-'+Date.now());try{localStorage.setItem(CHECKLIST_ID_KEY,id)}catch(_){}}
+  return id
+}
 function selectedValue(item){return item.querySelector('input[type="radio"]:checked')?.value||''}
 function isIrregular(v){return (global.ChecklistProfiles?.isIrregularSituacao||(x=>['nao','defeito','avaria','baixo','baixa','ausente'].includes(String(x||'').toLowerCase())))(v)}
 function currentVehicleTipo(){
@@ -54,6 +61,7 @@ function buildPayload(){
   }};
 }
 async function finalizar(){
+  if(completionLocked){alert('Este checklist já foi finalizado ou está na fila de envio.');return}
   const issues=typeof global.getBlockingIssues==='function'?global.getBlockingIssues():[];
   if(issues.length){
     if(typeof global.updatePendingCount==='function')global.updatePendingCount();
@@ -72,20 +80,32 @@ async function finalizar(){
   if(missing.length){alert('Ainda existem '+missing.length+' item(ns) do checklist sem resposta.');missing[0].scrollIntoView({behavior:'smooth',block:'center'});return}
   if(el('signatureData')&&!el('signatureData').value){alert('A assinatura do condutor é obrigatória antes da finalização no banco.');el('signatureBox')?.scrollIntoView({behavior:'smooth',block:'center'});return}
   const p=buildPayload();
+  const finalizedPrefix=val('prefixo');
+  const finalizedOperationalDate=global.centralChecklistOperationalDate?.()||'';
   const nAlt=(p.checklist.itens||[]).filter(x=>x.abrirAlteracaoMotomec).length;
   const btn=el('cloudChecklistBtn');if(btn)btn.disabled=true;
   try{
     const r=await global.CentralCloud.postOrQueue('checklist-upsert',p,{token,unit:unit(),popup:false});
-    if(r.queued) alert('Checklist finalizado. O envio ao banco da Motomecanização ficou pendente e será reenviado automaticamente.');
+    if(r.queued){
+      completionLocked=true;
+      alert('Dados preservados. O envio definitivo à Motomecanização está pendente e será reenviado automaticamente.');
+    }
     else {
+      completionLocked=true;
       const msg=r.message||'Checklist registrado.';
       alert(msg+(nAlt?(' '+nAlt+' alteração(ões) técnica(s) aberta(s) para a Motomecanização.'):' Nenhuma alteração técnica aplicável à Motomecanização.'));
       try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}
       // Rascunho local da VTR só é limpo após finalização oficial bem-sucedida
-      try{global.centralChecklistClearDraft?.(val('prefixo'))}catch(_){}
+      try{
+        const cleared=await global.centralChecklistClearDraft?.(finalizedPrefix,finalizedOperationalDate,true);
+        if(cleared===false)alert('O checklist foi registrado, mas o rascunho local não pôde ser removido automaticamente. Use “Limpar checklist” antes de iniciar outro serviço.');
+      }catch(_){
+        alert('O checklist foi registrado, mas o rascunho local não pôde ser removido automaticamente. Use “Limpar checklist” antes de iniciar outro serviço.');
+      }
+      try{global.centralChecklistResetId?.()}catch(_){}
     }
   }catch(err){alert('Não foi possível sincronizar agora: '+err.message)}
-  finally{if(btn)btn.disabled=false}
+  finally{if(btn)btn.disabled=completionLocked}
 }
 function install(){
   const toolbar=document.querySelector('.toolbar-inner');if(!toolbar||el('cloudChecklistBtn'))return;

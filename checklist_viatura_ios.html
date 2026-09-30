@@ -1620,15 +1620,22 @@
   (() => {
     'use strict';
 
-    const DRAFT_SCHEMA = 'checklist-draft-v5';
+    const DRAFT_SCHEMA = 'checklist-draft-v6';
     const DRAFT_LEGACY_KEY = 'checklist_viatura_1cprv_v3';
-    const DRAFT_PREFIX = 'checklist_viatura_draft_v4::';
-    const DRAFT_INDEX_KEY = 'checklist_viatura_draft_v4_index';
-    const DRAFT_LAST_KEY = 'checklist_viatura_draft_v4_last';
+    const DRAFT_PREFIX = 'checklist_viatura_draft_v6::';
+    const DRAFT_INDEX_KEY = 'checklist_viatura_draft_v6_index';
+    const DRAFT_LAST_KEY = 'checklist_viatura_draft_v6_last';
+    const DRAFT_V4_PREFIX = 'checklist_viatura_draft_v4::';
+    const DRAFT_V4_INDEX_KEY = 'checklist_viatura_draft_v4_index';
+    const DRAFT_V4_LAST_KEY = 'checklist_viatura_draft_v4_last';
     const STORAGE_KEY = DRAFT_LEGACY_KEY; // compatibilidade com leitores antigos
     const IDB_NAME = 'checklist_viatura_media_v1';
     const IDB_STORE = 'media';
     let draftMediaWarnShown = false;
+    let activeDraftKey = '';
+    let activeChecklistId = '';
+    let draftIdentityWarningShown = false;
+    let draftPersistenceSuppressed = false;
     const NEGATIVE_VALUES = new Set(['nao','defeito','baixo','baixa','avaria']);
     const DETAIL_REQUIRED_NEGATIVE = new Set(['defeito','baixo','baixa','avaria']);
     // ITEM_CONFIG / SECTION_CONFIG carregados de checklist_profiles.js (abaixo).
@@ -1805,7 +1812,6 @@
     document.getElementById('prefixo').addEventListener('input', applyVehicleAutofill);
     document.getElementById('prefixo').addEventListener('blur', applyVehicleAutofill);
     document.getElementById('tipo_veiculo')?.addEventListener('change', () => { applyChecklistTipoFilter(); updatePendingCount(); });
-    applyChecklistTipoFilter();
 
     function formatMatricula(value) {
       const digits = value.replace(/\D/g, '').slice(0, 7);
@@ -2038,9 +2044,34 @@
       return b+'_'+c;
     }
     function draftVtrKey(prefix){return normalizePrefix(prefix!=null?prefix:document.getElementById('prefixo')?.value||'')}
-    function draftStorageKey(prefix){
+    function shiftIsoDate(ymd,days){
+      const m=String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(!m)return '';
+      const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])+Number(days||0)));
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    }
+    function draftOperationalDate(data){
+      const date=String(data?.data_inicio??document.getElementById('data_inicio')?.value??'').slice(0,10);
+      const time=String(data?.hora_inicio??document.getElementById('hora_inicio')?.value??'');
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return localDateString(new Date());
+      const hour=Number((time.match(/^(\d{1,2}):/)||[])[1]);
+      return Number.isFinite(hour)&&hour<7?shiftIsoDate(date,-1):date;
+    }
+    function draftStorageKey(prefix,operationalDate){
       const vtr=draftVtrKey(prefix);
-      return DRAFT_PREFIX+draftUnitKey()+'::'+(vtr||'__noprefix__');
+      const op=String(operationalDate||draftOperationalDate());
+      return DRAFT_PREFIX+draftUnitKey()+'::'+op+'::'+(vtr||'__noprefix__');
+    }
+    function draftV4StorageKey(prefix){
+      const vtr=draftVtrKey(prefix);
+      return DRAFT_V4_PREFIX+draftUnitKey()+'::'+(vtr||'__noprefix__');
+    }
+    function draftUid(prefix='chk'){
+      try{return prefix+'-'+crypto.randomUUID()}catch(_){return prefix+'-'+Date.now()+'-'+Math.random().toString(36).slice(2)}
+    }
+    function ensureChecklistId(){
+      if(!activeChecklistId)activeChecklistId=draftUid('chk');
+      return activeChecklistId;
     }
     function draftFillScore(data){
       if(!data||typeof data!=='object')return 0;
@@ -2056,11 +2087,31 @@
       else if(data._meta?.photoCount)n+=Math.min(4,Number(data._meta.photoCount)||0)*2;
       return n;
     }
+    function draftSubstantiveScore(data){
+      if(!data||typeof data!=='object')return 0;
+      const automatic=new Set(['unidade','prefixo','placa','marca_modelo','tipo_veiculo','data_inicio','hora_inicio']);
+      let n=0;
+      for(const [k,v] of Object.entries(data)){
+        if(String(k).startsWith('_')||automatic.has(k)||k==='signatureData')continue;
+        if(typeof v==='boolean'){if(v)n++;continue}
+        if(v!=null&&String(v).trim())n++;
+      }
+      if(data.signatureData||data._meta?.hasSignature)n+=5;
+      const photoCount=Array.isArray(data._photos)?data._photos.length:Number(data._meta?.photoCount||0);
+      n+=Math.min(4,photoCount)*2;
+      return n;
+    }
     function readDraftIndex(){try{const x=JSON.parse(localStorage.getItem(DRAFT_INDEX_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
     function writeDraftIndex(key,data){
       try{
         const prefix=draftVtrKey(data.prefixo||data._meta?.prefixKey||'');
-        const entry={key,prefix,unit:draftUnitKey(),savedAt:data._meta?.savedAt||new Date().toISOString(),fillScore:draftFillScore(data)};
+        const entry={
+          key,prefix,unit:draftUnitKey(),
+          operationalDate:data._meta?.operationalDate||draftOperationalDate(data),
+          checklistId:data._meta?.checklistId||'',
+          savedAt:data._meta?.savedAt||new Date().toISOString(),
+          fillScore:draftFillScore(data)
+        };
         const list=readDraftIndex().filter(x=>x&&x.key!==key);
         list.unshift(entry);
         localStorage.setItem(DRAFT_INDEX_KEY,JSON.stringify(list.slice(0,40)));
@@ -2084,6 +2135,17 @@
         tx.onerror=()=>{try{db.close()}catch(_){} reject(tx.error||new Error('Falha ao gravar mídia'))};
       }));
     }
+    async function idbPutMediaVerified(key,payload){
+      await idbPutMedia(key,payload);
+      const saved=await idbGetMedia(key);
+      if(!saved||saved.revision!==payload.revision||saved.draftKey!==payload.draftKey||
+          String(saved.signatureData||'')!==String(payload.signatureData||'')||
+          !Array.isArray(saved.photos)||saved.photos.length!==payload.photos.length||
+          saved.photos.some((photo,index)=>photo!==payload.photos[index])){
+        throw new Error('Confirmação da mídia no IndexedDB falhou.');
+      }
+      return true;
+    }
     function idbGetMedia(key){
       return idbOpen().then(db=>new Promise((resolve,reject)=>{
         const tx=db.transaction(IDB_STORE,'readonly');
@@ -2097,6 +2159,24 @@
         try{
           const tx=db.transaction(IDB_STORE,'readwrite');
           tx.objectStore(IDB_STORE).delete(key);
+          tx.oncomplete=()=>{try{db.close()}catch(_){} resolve(true)};
+          tx.onerror=()=>{try{db.close()}catch(_){} resolve(false)};
+        }catch(_){try{db.close()}catch(__){} resolve(false)}
+      })).catch(()=>false);
+    }
+    function idbDeleteDraftMedia(draftKey){
+      return idbOpen().then(db=>new Promise((resolve)=>{
+        try{
+          const tx=db.transaction(IDB_STORE,'readwrite');
+          const store=tx.objectStore(IDB_STORE);
+          const req=store.openCursor();
+          req.onsuccess=()=>{
+            const cursor=req.result;
+            if(!cursor)return;
+            const key=String(cursor.key||'');
+            if(key===draftKey||key.startsWith(draftKey+'::media::'))cursor.delete();
+            cursor.continue();
+          };
           tx.oncomplete=()=>{try{db.close()}catch(_){} resolve(true)};
           tx.onerror=()=>{try{db.close()}catch(_){} resolve(false)};
         }catch(_){try{db.close()}catch(__){} resolve(false)}
@@ -2118,11 +2198,14 @@
       data.signatureData=embedMedia?sig:'';
       data._photos=embedMedia?photos:[];
       const prefixKey=draftVtrKey(data.prefixo||'');
+      const operationalDate=draftOperationalDate(data);
       data._meta={
         schema:DRAFT_SCHEMA,type:'Checklist de Viatura',
         unit:(window.getInstitution?getInstitution().curto:'BPTran / 1ª CPTran'),
-        version:'5.0',savedAt:new Date().toISOString(),
-        prefixKey,storageKey:draftStorageKey(prefixKey),
+        version:'6.0',savedAt:new Date().toISOString(),
+        prefixKey,operationalDate,storageKey:draftStorageKey(prefixKey,operationalDate),
+        checklistId:ensureChecklistId(),
+        mediaKey:String(opts.mediaKey||''),mediaRevision:String(opts.mediaRevision||''),
         hasSignature:!!sig,photoCount:photos.length,
         mediaInIdb:!embedMedia&&(!opts.omitSignature||!opts.omitPhotos)&&(!!sig||photos.length>0),
         signaturePersisted:false,photosPersisted:false,fillScore:0
@@ -2138,14 +2221,16 @@
       const json=JSON.stringify(data);
       localStorage.setItem(key,json);
       const readBack=localStorage.getItem(key);
-      if(!readBack||readBack.length<Math.min(32,json.length))throw new Error('Persistência não confirmada.');
-      try{JSON.parse(readBack)}catch(_){throw new Error('Persistência inválida.')}
+      if(readBack!==json)throw new Error('Confirmação do rascunho no localStorage falhou.');
+      const parsed=JSON.parse(readBack);
+      if(parsed?._meta?.storageKey!==key)throw new Error('Rascunho confirmado com identidade inválida.');
       writeDraftIndex(key,data);
-      try{localStorage.setItem(DRAFT_LEGACY_KEY,json)}catch(_){}
       return true;
     }
     async function persistDraft(opts={}){
       const silent=!!opts.silent;
+      if(draftPersistenceSuppressed&&silent)return false;
+      if(!silent)draftPersistenceSuppressed=false;
       const prefix=draftVtrKey();
       if(!prefix&&!opts.allowNoPrefix){if(!silent)showToast('Informe o prefixo da VTR antes de salvar o rascunho.');return false}
       const sig=currentSignature();
@@ -2153,51 +2238,93 @@
       const scoreProbe=serializeForm({embedMedia:true});
       const score=draftFillScore(Object.assign({},scoreProbe,{signatureData:sig,_photos:photos}));
       if(score<2){if(!silent)showToast('Preencha ao menos alguns campos antes de salvar o rascunho.');return false}
-      const key=draftStorageKey(prefix);
+      const operationalDate=draftOperationalDate(scoreProbe);
+      const key=draftStorageKey(prefix,operationalDate);
+      if(silent&&activeDraftKey&&activeDraftKey!==key){
+        if(!draftIdentityWarningShown){
+          draftIdentityWarningShown=true;
+          showToast('VTR ou período alterado: o autosave foi pausado para não misturar rascunhos. Use “Salvar rascunho” para confirmar o novo contexto.');
+        }
+        return false;
+      }
+      let existing=null;
       try{
         const existingRaw=localStorage.getItem(key);
-        if(existingRaw&&silent){
-          const existing=JSON.parse(existingRaw);
-          if(score+3<draftFillScore(existing))return true;
+        if(existingRaw){
+          existing=JSON.parse(existingRaw);
+          if(silent){
+            const existingContent=draftSubstantiveScore(existing);
+            const currentContent=draftSubstantiveScore(Object.assign({},scoreProbe,{signatureData:sig,_photos:photos}));
+            if(score+3<draftFillScore(existing)||
+                (existingContent>=2&&currentContent<Math.max(2,Math.floor(existingContent*.4)))){
+              return true;
+            }
+          }
         }
       }catch(_){}
       if(!silent)showToast('Salvando rascunho…');
 
-      let signaturePersisted=!(sig);
-      let photosPersisted=!(photos.length);
-      let mediaInIdb=false;
+      const previousMediaKey=String(existing?._meta?.mediaKey||'');
+      const revision=draftUid('rev');
+      let newMediaKey='';
 
       if(sig||photos.length){
         try{
-          await idbPutMedia(key,{signatureData:sig,photos,savedAt:new Date().toISOString(),prefix});
-          signaturePersisted=!!sig;photosPersisted=photos.length>=0;mediaInIdb=true;
-          if(sig)signaturePersisted=true;
-          photosPersisted=true;
+          newMediaKey=key+'::media::'+revision;
+          await idbPutMediaVerified(newMediaKey,{
+            draftKey:key,revision,signatureData:sig,photos,
+            savedAt:new Date().toISOString(),prefix,operationalDate
+          });
+          const data=serializeForm({
+            embedMedia:false,omitPhotos:true,omitSignature:true,
+            mediaKey:newMediaKey,mediaRevision:revision
+          });
+          data._meta.hasSignature=!!sig;
+          data._meta.photoCount=photos.length;
+          data._meta.mediaInIdb=true;
+          data._meta.signaturePersisted=true;
+          data._meta.photosPersisted=true;
+          try{
+            writeDraftRaw(key,data);
+          }catch(err){
+            await idbDeleteMedia(newMediaKey);
+            throw err;
+          }
+          activeDraftKey=key;
+          draftIdentityWarningShown=false;
+          if(previousMediaKey&&previousMediaKey!==newMediaKey)void idbDeleteMedia(previousMediaKey);
+          if(!silent){
+            const bits=[];
+            if(sig)bits.push('assinatura');
+            if(photos.length)bits.push(photos.length+' foto(s)');
+            showToast('Rascunho salvo integralmente'+(bits.length?' com '+bits.join(' e '):'')+'.');
+          }
+          return true;
         }catch(idbErr){
+          if(newMediaKey)void idbDeleteMedia(newMediaKey);
           // Fallback: tentar embutir no localStorage (assinatura tem prioridade sobre fotos)
           const embeds=[
             {omitPhotos:false,omitSignature:false},
             {omitPhotos:true,omitSignature:false}
           ];
-          let embedded=false;
           for(const emb of embeds){
             try{
               const full=serializeForm(Object.assign({embedMedia:true},emb));
               full._meta.hasSignature=!!(emb.omitSignature?'':sig);
-              full._meta.photoCount=emb.omitPhotos?0:photos.length;
+              full._meta.photoCount=photos.length;
               full._meta.mediaInIdb=false;
               full._meta.signaturePersisted=!!full.signatureData;
               full._meta.photosPersisted=(full._photos||[]).length>0||!photos.length;
               writeDraftRaw(key,full);
-              signaturePersisted=!!full.signatureData||!sig;
-              photosPersisted=(full._photos||[]).length>0||!photos.length||!!emb.omitPhotos;
-              embedded=true;
+              activeDraftKey=key;
+              draftIdentityWarningShown=false;
+              if(previousMediaKey)void idbDeleteMedia(previousMediaKey);
               if(!silent){
-                if(emb.omitPhotos&&photos.length)showToast('Rascunho salvo com assinatura; fotos não couberam no armazenamento local.');
-                else showToast('Rascunho da VTR '+(prefix||'—')+' salvo neste dispositivo.');
-              }
-              if(emb.omitPhotos&&photos.length&&!silent){
-                /* aviso explícito — fotos omitidas */
+                if(emb.omitPhotos&&photos.length){
+                  showToast('Dados básicos e assinatura salvos; '+photos.length+' foto(s) NÃO persistiram.');
+                }else{
+                  showToast('Rascunho salvo integralmente no armazenamento local.');
+                }
               }
               return true;
             }catch(_){}
@@ -2212,6 +2339,9 @@
             fields._meta.photosPersisted=false;
             fields._meta.mediaSaveFailed=true;
             writeDraftRaw(key,fields);
+            activeDraftKey=key;
+            draftIdentityWarningShown=false;
+            if(previousMediaKey)void idbDeleteMedia(previousMediaKey);
           }catch(_){
             if(!silent)showToast('Não foi possível salvar o rascunho. Espaço insuficiente ou navegação em modo privado.');
             return false;
@@ -2231,22 +2361,22 @@
 
       try{
         const data=serializeForm({embedMedia:false,omitPhotos:true,omitSignature:true});
-        data._meta.hasSignature=!!sig;
-        data._meta.photoCount=photos.length;
-        data._meta.mediaInIdb=mediaInIdb;
-        data._meta.signaturePersisted=signaturePersisted||!sig;
-        data._meta.photosPersisted=photosPersisted||!photos.length;
+        data._meta.hasSignature=false;
+        data._meta.photoCount=0;
+        data._meta.mediaInIdb=false;
+        data._meta.signaturePersisted=true;
+        data._meta.photosPersisted=true;
         writeDraftRaw(key,data);
+        activeDraftKey=key;
+        draftIdentityWarningShown=false;
+        if(previousMediaKey)void idbDeleteMedia(previousMediaKey);
+        // Remove mídia da versão antiga que usava diretamente a chave do rascunho.
+        void idbDeleteMedia(key);
       }catch(_){
         if(!silent)showToast('Não foi possível salvar o rascunho. Espaço insuficiente ou navegação em modo privado.');
         return false;
       }
-      if(!silent){
-        const bits=[];
-        if(sig&&(signaturePersisted||mediaInIdb))bits.push('assinatura');
-        if(photos.length&&(photosPersisted||mediaInIdb))bits.push(photos.length+' foto(s)');
-        showToast('Rascunho da VTR '+(prefix||'—')+' salvo neste dispositivo'+(bits.length?' ('+bits.join(', ')+')':'')+'.');
-      }
+      if(!silent)showToast('Rascunho salvo integralmente (sem mídia anexada).');
       return true;
     }
     function applyData(data){
@@ -2297,29 +2427,75 @@
       updatePendingCount();
     }
     let optsSilentApply=false;
+    function readDraftAtKey(key){
+      try{
+        const raw=localStorage.getItem(key);
+        if(!raw)return null;
+        const data=JSON.parse(raw);
+        return {raw,data,key};
+      }catch(_){return null}
+    }
+    function draftMatchesContext(data,prefix,operationalDate){
+      if(!data||typeof data!=='object')return false;
+      const dataPrefix=draftVtrKey(data.prefixo||data._meta?.prefixKey||'');
+      const dataOp=String(data._meta?.operationalDate||draftOperationalDate(data));
+      return (!prefix||!dataPrefix||dataPrefix===prefix)&&dataOp===operationalDate;
+    }
     function resolveDraftRaw(preferredPrefix){
       const prefix=draftVtrKey(preferredPrefix);
-      const key=draftStorageKey(prefix);
-      let raw=null;try{raw=localStorage.getItem(key)}catch(_){}
-      if(raw)return {raw,key,source:'vtr'};
+      const operationalDate=draftOperationalDate();
+      const key=draftStorageKey(prefix,operationalDate);
+      const exact=readDraftAtKey(key);
+      if(exact)return {raw:exact.raw,key,source:'vtr',operationalDate};
       if(!prefix){
         try{
           const last=localStorage.getItem(DRAFT_LAST_KEY)||'';
-          if(last&&last.indexOf(DRAFT_PREFIX+draftUnitKey()+'::')===0){raw=localStorage.getItem(last);if(raw)return {raw,key:last,source:'last'}}
+          if(last&&last.startsWith(DRAFT_PREFIX+draftUnitKey()+'::'+operationalDate+'::')){
+            const hit=readDraftAtKey(last);
+            if(hit)return {raw:hit.raw,key:last,source:'last',operationalDate};
+          }
         }catch(_){}
-        const idx=readDraftIndex().find(x=>x&&String(x.unit||'')===draftUnitKey());
-        if(idx?.key){try{raw=localStorage.getItem(idx.key);if(raw)return {raw,key:idx.key,source:'index'}}catch(_){}}
+        const idx=readDraftIndex().find(x=>x&&String(x.unit||'')===draftUnitKey()&&String(x.operationalDate||'')===operationalDate);
+        if(idx?.key){
+          const hit=readDraftAtKey(idx.key);
+          if(hit)return {raw:hit.raw,key:idx.key,source:'index',operationalDate};
+        }
+      }
+      // Migração controlada: v4 só é aceito quando VTR e período operacional coincidem.
+      const oldKey=draftV4StorageKey(prefix);
+      const old=readDraftAtKey(oldKey);
+      if(old&&draftMatchesContext(old.data,prefix,operationalDate)){
+        return {raw:old.raw,key:oldKey,source:'v4',operationalDate,migrateTo:key};
+      }
+      if(!prefix){
+        try{
+          const oldIndex=JSON.parse(localStorage.getItem(DRAFT_V4_INDEX_KEY)||'[]');
+          if(Array.isArray(oldIndex)){
+            for(const entry of oldIndex){
+              if(!entry?.key||String(entry.unit||'')!==draftUnitKey())continue;
+              const hit=readDraftAtKey(entry.key);
+              if(hit&&draftMatchesContext(hit.data,'',operationalDate)){
+                return {raw:hit.raw,key:entry.key,source:'v4-index',operationalDate,migrateTo:draftStorageKey(draftVtrKey(hit.data.prefixo||''),operationalDate)};
+              }
+            }
+          }
+        }catch(_){}
       }
       try{
-        raw=localStorage.getItem(DRAFT_LEGACY_KEY);
-        if(raw){
-          const legacy=JSON.parse(raw);
+        const legacyHit=readDraftAtKey(DRAFT_LEGACY_KEY);
+        if(legacyHit){
+          const legacy=legacyHit.data;
           const legPrefix=draftVtrKey(legacy.prefixo||legacy._meta?.prefixKey||'');
-          if(!prefix||!legPrefix||legPrefix===prefix)return {raw,key:DRAFT_LEGACY_KEY,source:'legacy',legPrefix};
-          return {raw:null,key:'',source:'legacy-mismatch',legPrefix};
+          const legOp=String(legacy._meta?.operationalDate||draftOperationalDate(legacy));
+          if(legOp===operationalDate&&(!prefix||!legPrefix||legPrefix===prefix)){
+            return {raw:legacyHit.raw,key:DRAFT_LEGACY_KEY,source:'legacy',legPrefix,operationalDate,migrateTo:draftStorageKey(legPrefix,operationalDate)};
+          }
+          if(legOp===operationalDate&&prefix&&legPrefix&&legPrefix!==prefix){
+            return {raw:null,key:'',source:'legacy-mismatch',legPrefix,operationalDate};
+          }
         }
       }catch(_){}
-      return {raw:null,key:'',source:'none'};
+      return {raw:null,key:'',source:'none',operationalDate};
     }
     async function loadDraft(opts={}){
       const silent=!!opts.silent;
@@ -2333,16 +2509,29 @@
       try{
         const data=JSON.parse(found.raw);
         const dataPrefix=draftVtrKey(data.prefixo||data._meta?.prefixKey||'');
+        const dataOp=String(data._meta?.operationalDate||draftOperationalDate(data));
         if(prefix&&dataPrefix&&prefix!==dataPrefix){
           if(!confirm('O rascunho encontrado é da VTR '+dataPrefix+', diferente da VTR atual ('+prefix+').\n\nCarregar mesmo assim?'))return false;
         }
+        if(dataOp!==found.operationalDate){
+          if(!silent)showToast('O rascunho localizado pertence ao período operacional '+dataOp+' e não foi carregado.');
+          return false;
+        }
+        activeChecklistId=String(data._meta?.checklistId||'')||draftUid('chk');
         optsSilentApply=!!silent;
         applyData(data);
         optsSilentApply=false;
+        activeDraftKey=draftStorageKey(dataPrefix,dataOp);
+        draftIdentityWarningShown=false;
         // Mídia preferencial no IndexedDB (campos já aplicados; assinatura/fotos em seguida)
         try{
-          const media=await idbGetMedia(found.key);
-          if(media&&typeof media==='object'){
+          const mediaKey=String(data._meta?.mediaKey||(data._meta?.mediaInIdb?found.key:''));
+          const media=mediaKey?await idbGetMedia(mediaKey):null;
+          const revision=String(data._meta?.mediaRevision||'');
+          const mediaValid=media&&typeof media==='object'&&
+            (!revision||String(media.revision||'')===revision)&&
+            (!media.draftKey||String(media.draftKey)===String(data._meta?.storageKey||found.key));
+          if(mediaValid){
             if(media.signatureData&&/^data:image\//i.test(media.signatureData)){
               signatureData.value=media.signatureData;
               signaturePreview.src=media.signatureData;
@@ -2372,21 +2561,55 @@
     document.getElementById('loadBtn').addEventListener('click', () => { void loadDraft({silent:false}); });
     window.centralReportSave = function(silent=false){return persistDraft({silent:!!silent,allowNoPrefix:!!silent})}
     window.centralReportLoad = function(silent=false){return loadDraft({silent:!!silent})}
-    window.centralChecklistClearDraft=function(prefix){
+    window.centralChecklistId=function(){return ensureChecklistId()};
+    window.centralChecklistResetId=function(){activeChecklistId='';return ensureChecklistId()};
+    window.centralChecklistOperationalDate=function(){return draftOperationalDate()};
+    window.centralChecklistClearDraft=async function(prefix,operationalDate,finalized=false){
+      const op=String(operationalDate||draftOperationalDate());
+      const key=draftStorageKey(prefix,op);
+      if(finalized)draftPersistenceSuppressed=true;
       try{
-        const key=draftStorageKey(prefix);
+        const saved=readDraftAtKey(key);
+        const mediaKey=String(saved?.data?._meta?.mediaKey||'');
         localStorage.removeItem(key);
         const list=readDraftIndex().filter(x=>x&&x.key!==key);
         localStorage.setItem(DRAFT_INDEX_KEY,JSON.stringify(list));
-        void idbDeleteMedia(key);
+        if(localStorage.getItem(DRAFT_LAST_KEY)===key)localStorage.removeItem(DRAFT_LAST_KEY);
+        if(mediaKey)await idbDeleteMedia(mediaKey);
+        await idbDeleteDraftMedia(key);
+        const oldKey=draftV4StorageKey(prefix);
+        const old=readDraftAtKey(oldKey);
+        if(old&&draftMatchesContext(old.data,draftVtrKey(prefix),op)){
+          localStorage.removeItem(oldKey);
+          await idbDeleteDraftMedia(oldKey);
+          try{
+            const oldIndex=JSON.parse(localStorage.getItem(DRAFT_V4_INDEX_KEY)||'[]');
+            if(Array.isArray(oldIndex))localStorage.setItem(DRAFT_V4_INDEX_KEY,JSON.stringify(oldIndex.filter(x=>x?.key!==oldKey)));
+            if(localStorage.getItem(DRAFT_V4_LAST_KEY)===oldKey)localStorage.removeItem(DRAFT_V4_LAST_KEY);
+          }catch(_){}
+        }
+        const legacy=readDraftAtKey(DRAFT_LEGACY_KEY);
+        if(legacy&&draftMatchesContext(legacy.data,draftVtrKey(prefix),op)){
+          localStorage.removeItem(DRAFT_LEGACY_KEY);
+          await idbDeleteDraftMedia(DRAFT_LEGACY_KEY);
+        }
+        if(activeDraftKey===key){
+          activeDraftKey='';
+          activeChecklistId='';
+        }
+        return !localStorage.getItem(key);
       }catch(_){}
+      return false;
     };
     window.addEventListener('pagehide',()=>{try{void persistDraft({silent:true,allowNoPrefix:true})}catch(_){}});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{void persistDraft({silent:true,allowNoPrefix:true})}catch(_){}}});
 
-    document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('clearBtn').addEventListener('click', async () => {
       if (!confirm('Deseja apagar todos os campos deste checklist?')) return;
+      await window.centralChecklistClearDraft(draftVtrKey(),draftOperationalDate());
       form.reset();
+      activeDraftKey='';
+      activeChecklistId='';
       signatureData.value = '';
       signaturePreview.removeAttribute('src');
       signatureBox.classList.remove('has-signature');
@@ -2564,10 +2787,10 @@
     const vehiclePhotoGrid=document.getElementById('vehiclePhotoGrid');
     const vehiclePhotoCount=document.getElementById('vehiclePhotoCount');
     function compressVehiclePhoto(file,maxSize=1600,quality=.84){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const scale=Math.min(1,maxSize/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',quality));};img.src=reader.result;};reader.readAsDataURL(file);});}
-    async function handleVehiclePhotos(files){const incoming=Array.from(files||[]).filter(f=>f.type.startsWith('image/'));const room=Math.max(0,4-vehiclePhotos.length);if(!room){showToast('Limite de 4 fotos atingido.');return;}for(const file of incoming.slice(0,room)){try{const src=await compressVehiclePhoto(file);vehiclePhotos.push(src);vehiclePhotoOriginals.push(src);}catch(e){showToast('Não foi possível processar uma das fotos.');}}renderVehiclePhotos();vehiclePhotosInput.value='';}
+    async function handleVehiclePhotos(files){const incoming=Array.from(files||[]).filter(f=>f.type.startsWith('image/'));const room=Math.max(0,4-vehiclePhotos.length);if(!room){showToast('Limite de 4 fotos atingido.');return;}for(const file of incoming.slice(0,room)){try{const src=await compressVehiclePhoto(file);vehiclePhotos.push(src);vehiclePhotoOriginals.push(src);}catch(e){showToast('Não foi possível processar uma das fotos.');}}renderVehiclePhotos();vehiclePhotosInput.value='';try{void persistDraft({silent:true,allowNoPrefix:true})}catch(_){}}
     function renderVehiclePhotos(){vehiclePhotoCount.textContent=`${vehiclePhotos.length}/4 foto(s)`;vehiclePhotoGrid.innerHTML=Array.from({length:4},(_,i)=>{const src=vehiclePhotos[i];return `<div class="vehicle-photo-card">${src?`<img src="${src}" alt="Foto ${i+1} da viatura"><button type="button" class="photo-adjust-btn no-print" onclick="adjustVehiclePhoto(${i})">Ajustar</button><button type="button" class="vehicle-photo-remove no-print" onclick="removeVehiclePhoto(${i})" aria-label="Remover foto ${i+1}">×</button>`:`<div class="vehicle-photo-empty">Foto ${String(i+1).padStart(2,'0')}</div>`}</div>`;}).join('');}
-    async function adjustVehiclePhoto(index){const src=vehiclePhotoOriginals[index]||vehiclePhotos[index];if(!src)return;try{const novo=await PhotoFramer.open(src,{aspect:5/3,maxWidth:1600,quality:.88,title:`Ajustar Foto ${index+1} da viatura`});if(novo){vehiclePhotos[index]=novo;renderVehiclePhotos();}}catch(e){console.warn(e);showToast('Não foi possível abrir o ajuste de enquadramento.');}}
-    function removeVehiclePhoto(index){vehiclePhotos.splice(index,1);vehiclePhotoOriginals.splice(index,1);renderVehiclePhotos();}
+    async function adjustVehiclePhoto(index){const src=vehiclePhotoOriginals[index]||vehiclePhotos[index];if(!src)return;try{const novo=await PhotoFramer.open(src,{aspect:5/3,maxWidth:1600,quality:.88,title:`Ajustar Foto ${index+1} da viatura`});if(novo){vehiclePhotos[index]=novo;renderVehiclePhotos();void persistDraft({silent:true,allowNoPrefix:true});}}catch(e){console.warn(e);showToast('Não foi possível abrir o ajuste de enquadramento.');}}
+    function removeVehiclePhoto(index){vehiclePhotos.splice(index,1);vehiclePhotoOriginals.splice(index,1);renderVehiclePhotos();try{void persistDraft({silent:true,allowNoPrefix:true})}catch(_){}}
     window.adjustVehiclePhoto=adjustVehiclePhoto; window.removeVehiclePhoto=removeVehiclePhoto;
     vehiclePhotosInput.addEventListener('change',e=>handleVehiclePhotos(e.target.files));
     function renderPhotoAnnex(){const host=document.getElementById('photoAnnexPages');const first=document.querySelector('#printSummary .print-page');if(!vehiclePhotos.length){host.innerHTML='';return;}const prefix=(document.getElementById('prefixo').value.trim()||'—');const placa=(document.getElementById('placa').value.trim()||'—');const data=pdfDateForFilename(document.getElementById('data_inicio').value)||'—';host.innerHTML=`<div class="print-page photo-annex-page"><div class="photo-annex-title">Anexo Fotográfico — Checklist de Viatura</div><div class="photo-annex-meta">VTR ${escapeHtml(prefix)} • Placa ${escapeHtml(placa)} • ${escapeHtml(data)}</div><div class="photo-annex-grid">${vehiclePhotos.map((src,i)=>`<div class="photo-annex-item"><img src="${src}" alt="Foto ${i+1}"><div class="photo-annex-label">VTR ${escapeHtml(prefix)} — Foto ${String(i+1).padStart(2,'0')}</div></div>`).join('')}${Array.from({length:4-vehiclePhotos.length},()=>'<div class="photo-annex-item"></div>').join('')}</div></div>`;}
@@ -2873,6 +3096,7 @@
       signatureBox.classList.remove('has-signature');
       updatePendingCount();
       showToast('Assinatura removida.');
+      try { void persistDraft({ silent: true, allowNoPrefix: true }); } catch (_) {}
     });
     signatureModal.addEventListener('click', (e) => {
       if (e.target === signatureModal) void closeSignature();
@@ -2992,6 +3216,7 @@
 <script id="central-service-state-script">
 (function(){
   const path=(location.pathname.split('/').pop()||'relatorio').toLowerCase();
+  const checklistSpecific=/checklist_viatura/i.test(path);
   const genericKey='central-autosave::'+path;
   let centralDirty=false, centralSuppressExit=false, saveTimer=null;
   function fieldKey(el,index){return el.id?('id:'+el.id):el.name?('name:'+el.name):(el.dataset&&el.dataset.name)?('data-name:'+el.dataset.name):(el.dataset&&el.dataset.k)?('data-k:'+el.dataset.k+':'+index):('idx:'+index)}
@@ -3000,8 +3225,9 @@
     const values={};fields.forEach((e,i)=>{values[fieldKey(e,i)]=e.type==='checkbox'||e.type==='radio'?!!e.checked:e.value});
     return {savedAt:new Date().toISOString(),values};
   }
-  function saveGeneric(){try{localStorage.setItem(genericKey,JSON.stringify(snapshotGeneric()))}catch(_){}}
+  function saveGeneric(){if(checklistSpecific)return false;try{localStorage.setItem(genericKey,JSON.stringify(snapshotGeneric()));return true}catch(_){return false}}
   function restoreGeneric(){
+    if(checklistSpecific)return false;
     let raw='';try{raw=localStorage.getItem(genericKey)||''}catch(_){}
     if(!raw)return false;
     try{
@@ -3109,9 +3335,9 @@
 </script>
 
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.27"></script>
+<script src="central_cloud.js?v=10.8.28"></script>
 <script src="module_access_gate.js?v=10.8.17"></script>
 <script src="checklist_profiles.js?v=10.8.15"></script>
-<script src="checklist_cloud.js?v=10.8.27"></script>
+<script src="checklist_cloud.js?v=10.8.28"></script>
 </body>
 </html>
