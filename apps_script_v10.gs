@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.32';
+var CENTRAL_V10_VERSION = '10.8.33';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -70,7 +70,7 @@ function handleApiReadViaGet_(action, p) {
       out = {ok:true, items:rcoDraftList_(p)};
     } else if (action === 'rco-draft-get') {
       assertToken_(p.token, 'rco');
-      out = {ok:true, rco:rcoDraftGet_(p.reportId)};
+      out = {ok:true, rco:rcoDraftGetScoped_(p)};
     } else if (action === 'reboque-list') {
       assertToken_(p.token, 'rco');
       out = {ok:true, items:reboqueList_(p)};
@@ -483,10 +483,13 @@ function normMat_(v) {
   if (d.length!==7) return d;
   return d.slice(0,3)+'.'+d.slice(3,6)+'-'+d.slice(6);
 }
+/** Allowlist estrita. CSV auditoria: somente BPTran|BPRv. Desconhecido → '' (nunca fallback BPTran). */
 function normBattalion_(v) {
-  var s=String(v||'').trim().toUpperCase();
+  var s=String(v||'').replace(/\u00a0/g,' ').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!s) return '';
-  return s==='BPRV' ? 'BPRv' : 'BPTran';
+  if(s==='BPRV') return 'BPRv';
+  if(s==='BPTRAN') return 'BPTran';
+  return '';
 }
 function companyNumber_(v){
   var m=String(v==null?'':v).match(/\d+/);
@@ -522,8 +525,8 @@ function resolveUnitScope_(p){
 }
 function requireUnitScope_(p){
   var s=resolveUnitScope_(p);
-  if(!s.batalhao)throw new Error('Consulta de RCO exige batalhão.');
-  if(!s.companhia)throw new Error('Consulta de RCO exige companhia canônica (batalhão + companhia).');
+  if(!s.batalhao)throw new Error('MISSING_UNIT_SCOPE: Consulta de RCO exige batalhão válido (BPTran|BPRv).');
+  if(!s.companhia)throw new Error('MISSING_UNIT_SCOPE: Consulta de RCO exige companhia canônica (batalhão + companhia).');
   return s;
 }
 function sheetUnitCanon_(row){
@@ -532,6 +535,7 @@ function sheetUnitCanon_(row){
   var compRaw=row.COMPANHIA!=null?row.COMPANHIA:(row.companhia||'');
   if(!String(battRaw||'').trim()||!String(compRaw||'').trim())return {batalhao:'',companhia:'',valid:false,reason:'MISSING_UNIT'};
   var b=normBattalion_(battRaw);
+  if(!b)return {batalhao:'',companhia:'',valid:false,reason:'INVALID_BATTALION'};
   var tipoLabel=companyTipoFromLabel_(compRaw);
   var tipoWanted=b==='BPRv'?'CPRv':'CPTran';
   if(tipoLabel&&tipoLabel!==tipoWanted)return {batalhao:b,companhia:'',valid:false,reason:'UNIT_TYPE_MISMATCH'};
@@ -1460,11 +1464,17 @@ function rsdListDateSet_(p){
   }else{if(di)set[di]=true;if(df)set[df]=true;}
   return set;
 }
-function rsdList_(p) {
+/**
+ * Lista RSDs. Escopo de unidade é obrigatório na API pública.
+ * allowUnscoped só via 2º argumento interno (rsdActive_) — flags do cliente são ignoradas.
+ */
+function rsdList_(p, internalOpt) {
   p=p||{};
+  internalOpt=internalOpt||{};
   var rs=sheet_(P3_SHEET_ID,'RSD');
   ensureHeaders_(rs,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL','FINALIZACAO_FORCADA','FINALIZACAO_FORCADA_MOTIVO','FINALIZACAO_FORCADA_POR_MATRICULA','FINALIZACAO_FORCADA_POR_NOME','FINALIZACAO_FORCADA_POR_PERFIL','FINALIZACAO_FORCADA_EM']);
-  var unscoped=!!p._rsdActiveUnscoped;
+  // Nunca ler allowUnscoped / _rsdActiveUnscoped / unscoped do payload do cliente.
+  var unscoped=internalOpt.allowUnscoped===true;
   var scope=null,batt='',comp='';
   if(!unscoped){
     // RCO / listagens unitárias: batalhão+companhia obrigatórios (nunca soltar filtro).
@@ -1645,8 +1655,10 @@ function rsdActive_(p) {
   p=p||{};
   var mat=normMat_(p.matricula||'');if(!mat)return [];
   var reportHint=String(p.reportId||''),serviceHint=String(p.serviceId||''),vtrHint=normVtrPrefix_(p.vtrPrincipal||p.vtr||''),guHint=String(p.guarnicao||'').trim().toLowerCase();
-  var q=Object.assign({},p);q.matricula='';q.batalhao='';q.companhia='';q.companhiaNumero='';q.data='';q.guarnicao='';q._rsdActiveUnscoped=true;
-  var items=rsdList_(q),rs=sheet_(P3_SHEET_ID,'RSD'),rows=objects_(rs),rowMap={};
+  // Varredura interna por matrícula do militar (não expõe unscoped na API pública).
+  var q=Object.assign({},p);q.matricula='';q.batalhao='';q.companhia='';q.companhiaNumero='';q.data='';q.guarnicao='';
+  delete q._rsdActiveUnscoped;delete q.allowUnscoped;delete q.unscoped;
+  var items=rsdList_(q,{allowUnscoped:true}),rs=sheet_(P3_SHEET_ID,'RSD'),rows=objects_(rs),rowMap={};
   rows.forEach(function(r){rowMap[String(r.REPORT_ID||'')]=r});
   var active=['EM_SERVICO','RETIFICACAO_SOLICITADA','PASSAGEM_DISPONIVEL'],out=[];
   items.forEach(function(x){
@@ -1700,20 +1712,48 @@ function rsdGet_(reportId) {
   p.structuralDegraded=(!payloadHas&&sheetHas);
   return p;
 }
-/** rsd-get com escopo RCO: não confiar só no reportId enviado pelo cliente. */
+function isScriptTokenKind_(token, kind){
+  var props=PropertiesService.getScriptProperties();
+  token=String(token||'');
+  if(!token)return false;
+  if(kind==='comando'){
+    var comando=String(props.getProperty('SISTEMA_TOKEN')||props.getProperty('COMANDO_TOKEN')||'');
+    return !!(comando&&token===comando);
+  }
+  if(kind==='central'){
+    var central=String(props.getProperty('CENTRAL_TOKEN')||'');
+    return !!(central&&token===central);
+  }
+  return false;
+}
+/**
+ * rsd-get público:
+ * - module=RSD + CENTRAL_TOKEN → continuidade operacional do próprio serviço;
+ * - module=COMANDO|SISTEMA + SISTEMA_TOKEN → gestão administrativa;
+ * - demais (RCO): DATA+BATALHÃO+COMPANHIA obrigatórios (fail-closed).
+ */
 function rsdGetScoped_(p){
   p=p||{};
   var reportId=String(p.reportId||'');
   if(!reportId)throw new Error('Informe o RSD.');
   var row=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
-  if(p.batalhao||p.companhia||p.companhiaNumero||(p.unidade&&(p.unidade.batalhao||p.unidade.companhia||p.unidade.companhiaNumero))){
-    var scope=requireUnitScope_(p);
-    if(!sameUnitScope_(row,scope))throw new Error('RSD fora do escopo do RCO (batalhão/companhia).');
-    var wantDate=dateText_(p.data||p.operationalDate||'');
-    if(wantDate){
-      var op=resolveOperationalServiceDate_(row.DATA_SERVICO,row.INICIADO_EM);
-      if(op!==wantDate)throw new Error('RSD fora da data operacional do RCO.');
+  var module=String(p.module||p.forModule||'').toUpperCase();
+  if(module==='RSD'){
+    if(!isScriptTokenKind_(p.token,'central')&&!isScriptTokenKind_(p.token,'comando')){
+      throw new Error('MISSING_UNIT_SCOPE: Continuidade RSD exige CENTRAL_TOKEN (ou Gestão de Sistema).');
     }
+    return rsdGet_(reportId);
+  }
+  if(module==='COMANDO'||module==='SISTEMA'){
+    if(!isScriptTokenKind_(p.token,'comando'))throw new Error('MISSING_UNIT_SCOPE: rsd-get administrativo exige SISTEMA_TOKEN.');
+    return rsdGet_(reportId);
+  }
+  var scope=requireUnitScope_(p);
+  if(!sameUnitScope_(row,scope))throw new Error('OUT_OF_RCO_SCOPE: RSD fora do escopo do RCO (batalhão/companhia).');
+  var wantDate=dateText_(p.data||p.operationalDate||'');
+  if(wantDate){
+    var op=resolveOperationalServiceDate_(row.DATA_SERVICO,row.INICIADO_EM);
+    if(op!==wantDate)throw new Error('OUT_OF_RCO_SCOPE: RSD fora da data operacional do RCO.');
   }
   return rsdGet_(reportId);
 }
@@ -3045,15 +3085,25 @@ function rcoDraftGet_(reportId){
   var p=loadJsonPayload_(row);if(!p||!Object.keys(p).length)throw new Error('Rascunho do RCO indisponível.');
   return rcoApplyClosureFlagsToPayload_(p,rcoClosureFlagsFrom_(row,p));
 }
+/** API pública rco-draft-get: escopo obrigatório (fail-closed). */
+function rcoDraftGetScoped_(p){
+  p=p||{};
+  var scope=requireUnitScope_(p);
+  var reportId=String(p.reportId||'');
+  if(!reportId)throw new Error('Informe o RCO.');
+  var row=findOne_(sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),'RCO_REPORT_ID',reportId);
+  if(!row)throw new Error('RCO em andamento não localizado.');
+  if(!sameUnitScope_(row,scope))throw new Error('OUT_OF_RCO_SCOPE: RCO fora do escopo da companhia.');
+  var payload=loadJsonPayload_(row);if(!payload||!Object.keys(payload).length)throw new Error('Rascunho do RCO indisponível.');
+  return rcoApplyClosureFlagsToPayload_(payload,rcoClosureFlagsFrom_(row,payload));
+}
 function rcoDraftClaim_(payload){
   var lock=LockService.getScriptLock();lock.waitLock(15000);
   try{
     var reportId=String(payload.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId||!deviceId)throw new Error('Identificação de continuidade do RCO incompleta.');
     var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',reportId);if(!row||['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(row.STATUS))<0)throw new Error('RCO em andamento/retificação não localizado.');
-    if(payload.batalhao||payload.companhia||payload.companhiaNumero||payload.unidade){
-      var claimScope=requireUnitScope_(payload.unidade||payload);
-      if(!sameUnitScope_(row,claimScope))throw new Error('RCO fora do escopo da companhia selecionada.');
-    }
+    var claimScope=requireUnitScope_(payload.unidade||payload);
+    if(!sameUnitScope_(row,claimScope))throw new Error('OUT_OF_RCO_SCOPE: RCO fora do escopo da companhia selecionada.');
     assertLease_(row,deviceId,!!payload.forceTakeover);row.EDIT_DEVICE_ID=deviceId;row.EDIT_LEASE_UNTIL=isoAfterMinutes_(3);row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',reportId,row);
     audit_('RCO',reportId,Number(row.REVISAO||1),'ACESSO_CONTINUIDADE',row.RESPONSAVEL_MATRICULA||'',row.RESPONSAVEL_NOME||'',row.BATALHAO,row.COMPANHIA,{deviceId:deviceId,forceTakeover:!!payload.forceTakeover});
     var rco=rcoDraftGet_(reportId),resp=rco&&rco.responsavelRco||{};

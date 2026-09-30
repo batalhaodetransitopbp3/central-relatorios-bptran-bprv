@@ -1,6 +1,7 @@
 /**
  * Escopo obrigatório do RCO: DATA OPERACIONAL ∧ BATALHÃO ∧ COMPANHIA.
  * 1ª CPTran ≠ 1ª CPRv — ordinal sozinho nunca identifica companhia.
+ * Batalhão: allowlist estrita BPTran|BPRv (sem fallback).
  */
 (function (global) {
   'use strict';
@@ -22,10 +23,13 @@
     return s.slice(0, 10);
   }
 
+  /** Allowlist estrita. Desconhecido → '' (nunca inventa BPTran). */
   function normBattalion(v) {
-    const s = String(v || '').trim().toUpperCase();
+    const s = String(v || '').replace(/\u00a0/g, ' ').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!s) return '';
-    return s === 'BPRV' ? 'BPRv' : 'BPTran';
+    if (s === 'BPRV') return 'BPRv';
+    if (s === 'BPTRAN') return 'BPTran';
+    return '';
   }
 
   function companyNumber(v) {
@@ -40,7 +44,6 @@
     return '';
   }
 
-  /** Identidade canônica: "Nª CPTran|CPRv" a partir de batalhão + rótulo/número. */
   function normCompany(batalhao, companhiaOrNumero) {
     const b = normBattalion(batalhao);
     if (!b) return '';
@@ -48,7 +51,6 @@
     if (!n) return '';
     const tipoFromLabel = companyTipoFromLabel(companhiaOrNumero);
     const tipoWanted = b === 'BPRv' ? 'CPRv' : 'CPTran';
-    // Se o rótulo traz tipo conflitante com o batalhão, é inválido.
     if (tipoFromLabel && tipoFromLabel !== tipoWanted) return '';
     return n + 'ª ' + tipoWanted;
   }
@@ -75,8 +77,8 @@
 
   function requireUnitScope(p) {
     const s = resolveUnitScope(p);
-    if (!s.batalhao) throw new Error('Consulta de RCO exige batalhão.');
-    if (!s.companhia) throw new Error('Consulta de RCO exige companhia canônica (batalhão + companhia).');
+    if (!s.batalhao) throw new Error('MISSING_UNIT_SCOPE: Consulta de RCO exige batalhão válido (BPTran|BPRv).');
+    if (!s.companhia) throw new Error('MISSING_UNIT_SCOPE: Consulta de RCO exige companhia canônica (batalhão + companhia).');
     return s;
   }
 
@@ -88,6 +90,7 @@
       return { batalhao: '', companhia: '', valid: false, reason: 'MISSING_UNIT' };
     }
     const b = normBattalion(battRaw);
+    if (!b) return { batalhao: '', companhia: '', valid: false, reason: 'INVALID_BATTALION' };
     const tipoLabel = companyTipoFromLabel(compRaw);
     const tipoWanted = b === 'BPRv' ? 'CPRv' : 'CPTran';
     if (tipoLabel && tipoLabel !== tipoWanted) {
@@ -148,6 +151,58 @@
     return { scope: scope, items: out, rejected: rejected };
   }
 
+  /** Espelha política de rsdList_: flags do cliente NUNCA habilitam unscoped. */
+  function rsdListAllowUnscoped(clientParams, internalOpt) {
+    void clientParams;
+    return !!(internalOpt && internalOpt.allowUnscoped === true);
+  }
+
+  /**
+   * Política de rsd-get (espelho do backend).
+   * mode: 'rco' | 'rsd' | 'comando'
+   */
+  function rsdGetAccessDecision(p, row) {
+    p = p || {};
+    row = row || {};
+    const module = String(p.module || p.forModule || '').toUpperCase();
+    if (module === 'RSD') {
+      if (p._tokenKind !== 'central' && p._tokenKind !== 'comando') {
+        return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: 'RSD module requires central/comando token' };
+      }
+      return { ok: true, path: 'RSD_OPERATIONAL' };
+    }
+    if (module === 'COMANDO' || module === 'SISTEMA') {
+      if (p._tokenKind !== 'comando') {
+        return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: 'admin rsd-get requires comando token' };
+      }
+      return { ok: true, path: 'COMANDO' };
+    }
+    let scope;
+    try { scope = requireUnitScope(p); }
+    catch (e) { return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: String(e && e.message || e) }; }
+    if (!sameUnitScope(row, scope)) {
+      return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
+    }
+    const wantDate = dateText(p.data || p.operationalDate || '');
+    if (wantDate) {
+      const op = operationalDateOf(row, function (d) { return dateText(d); });
+      if (op !== wantDate) return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope };
+    }
+    return { ok: true, path: 'RCO_SCOPED', scope: scope };
+  }
+
+  function rcoDraftAccessDecision(p, row) {
+    p = p || {};
+    row = row || {};
+    let scope;
+    try { scope = requireUnitScope(p); }
+    catch (e) { return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: String(e && e.message || e) }; }
+    if (!sameUnitScope(row, scope)) {
+      return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
+    }
+    return { ok: true, scope: scope };
+  }
+
   function payloadUnit(p) {
     p = p || {};
     return resolveUnitScope(p.unidade || {
@@ -170,6 +225,9 @@
     operationalDateOf: operationalDateOf,
     matchesRcoScope: matchesRcoScope,
     filterRowsForRco: filterRowsForRco,
+    rsdListAllowUnscoped: rsdListAllowUnscoped,
+    rsdGetAccessDecision: rsdGetAccessDecision,
+    rcoDraftAccessDecision: rcoDraftAccessDecision,
     payloadUnit: payloadUnit
   };
 
