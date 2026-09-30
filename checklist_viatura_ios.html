@@ -242,7 +242,9 @@
     }
   
 
-    /* Assinatura: z-index acima do menu/overlays; FS nativo ou modal 100dvh */
+    /* Assinatura: z-index acima do menu/overlays; FS nativo ou modal 100dvh.
+       Reserva inferior evita que o aviso nativo do Chrome (sair da tela cheia)
+       cubra Limpar / Salvar — sem tentar ocultar o aviso do navegador. */
     @media screen {
       #signatureModal{
         z-index:10050!important;
@@ -250,30 +252,88 @@
         align-items:stretch!important;
         justify-content:stretch!important;
         -webkit-overflow-scrolling:touch;
+        --sig-fs-bottom-reserve:0px;
       }
       #signatureModal.open{display:flex!important}
       #signatureModal .modal-card{
-        width:100vw!important;
+        width:100%!important;
         max-width:none!important;
         height:100vh!important;
         height:100dvh!important;
         max-height:none!important;
         margin:0!important;
         border-radius:0!important;
-        padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))!important;
-        display:grid!important;
-        grid-template-rows:auto minmax(0,1fr) auto!important;
+        box-sizing:border-box!important;
+        padding:
+          max(8px,env(safe-area-inset-top,0px))
+          max(8px,env(safe-area-inset-right,0px))
+          calc(env(safe-area-inset-bottom,0px) + var(--sig-fs-bottom-reserve,0px) + 8px)
+          max(8px,env(safe-area-inset-left,0px))!important;
+        display:flex!important;
+        flex-direction:column!important;
         gap:8px!important;
         min-height:0!important;
+        overflow:hidden!important;
+      }
+      #signatureModal .modal-head{
+        flex:0 0 auto!important;
+        z-index:3;
+        background:#fff;
       }
       #signatureModal .canvas-wrap{
+        flex:1 1 auto!important;
         width:100%!important;
-        height:100%!important;
-        min-height:120px!important;
+        height:auto!important;
+        min-height:0!important;
         border-radius:10px!important;
         touch-action:none!important;
       }
       #signatureModal #signatureCanvas{width:100%!important;height:100%!important;touch-action:none!important}
+      #signatureModal .modal-actions,
+      #signatureModal .signature-action-bar{
+        flex:0 0 auto!important;
+        display:flex!important;
+        justify-content:space-between!important;
+        align-items:stretch!important;
+        gap:10px!important;
+        flex-wrap:nowrap!important;
+        position:relative!important;
+        z-index:4!important;
+        background:#fff!important;
+        border-top:1px solid #d7e3dc;
+        padding:10px 0 2px!important;
+        margin:0!important;
+      }
+      #signatureModal .modal-actions .btn,
+      #signatureModal .signature-action-bar .btn{
+        flex:1 1 0;
+        min-height:48px;
+        margin:0;
+      }
+      #signatureModal .modal-actions #saveSignatureBtn,
+      #signatureModal .signature-action-bar #saveSignatureBtn{
+        flex:1.35 1 0;
+        order:2;
+      }
+      #signatureModal .modal-actions #modalClearBtn,
+      #signatureModal .signature-action-bar #modalClearBtn{
+        order:1;
+      }
+      /* Mobile: margem para UI do browser / aviso FS do Chrome (~80–120px). */
+      @media (max-width:900px){
+        #signatureModal.open{--sig-fs-bottom-reserve:88px}
+        #signatureModal.open.signature-native-fs{--sig-fs-bottom-reserve:112px}
+      }
+      @media (min-width:901px){
+        #signatureModal.open.signature-native-fs{--sig-fs-bottom-reserve:16px}
+      }
+      /* Toast/status nunca cobre a action-bar da assinatura. */
+      body.signature-open .toast{
+        bottom:auto!important;
+        top:max(16px,env(safe-area-inset-top,0px))!important;
+        z-index:10120!important;
+        pointer-events:none!important;
+      }
       .signature-box{touch-action:manipulation;-webkit-user-select:none;user-select:none}
     }
 </style>
@@ -1605,7 +1665,7 @@
       <div class="canvas-wrap" id="canvasWrap">
         <canvas id="signatureCanvas"></canvas>
       </div>
-      <div class="modal-actions">
+      <div class="modal-actions signature-action-bar" role="toolbar" aria-label="Ações da assinatura">
         <button class="btn danger" type="button" id="modalClearBtn">Limpar</button>
         <button class="btn primary" type="button" id="saveSignatureBtn">Salvar assinatura</button>
       </div>
@@ -2843,6 +2903,27 @@
     let signatureUiOpen = false;
     let signatureOpenLock = 0;
     let signatureNativeFs = false;
+    let signatureStrokeDirty = false;
+
+    function updateSignatureViewportChrome() {
+      if (!signatureUiOpen || !signatureModal) return;
+      const vv = window.visualViewport;
+      const mobile = window.matchMedia('(max-width:900px)').matches;
+      let reserve = 0;
+      if (mobile) {
+        reserve = signatureNativeFs ? 112 : 88;
+        if (vv) {
+          const gap = Math.max(0, (window.innerHeight || 0) - vv.height - (vv.offsetTop || 0));
+          // Se a viewport visual encolheu (teclado/UI nativa), amplia a reserva com teto.
+          reserve = Math.max(reserve, Math.min(140, Math.round(gap + 48)));
+        }
+      } else if (signatureNativeFs) {
+        reserve = 16;
+      }
+      signatureModal.style.setProperty('--sig-fs-bottom-reserve', reserve + 'px');
+      if (signatureNativeFs) signatureModal.classList.add('signature-native-fs');
+      else signatureModal.classList.remove('signature-native-fs');
+    }
 
     function canvasCssSize() {
       const wrap = document.getElementById('canvasWrap');
@@ -2854,8 +2935,9 @@
       if (h < 80) {
         const head = signatureModal.querySelector('.modal-head');
         const actions = signatureModal.querySelector('.modal-actions');
-        const chrome = (head?.offsetHeight || 52) + (actions?.offsetHeight || 52) + 24;
-        h = Math.max(160, Math.floor(((vv && vv.height) || window.innerHeight || 480) - chrome));
+        const chrome = (head?.offsetHeight || 52) + (actions?.offsetHeight || 56) + 24;
+        const vh = (vv && vv.height) || window.innerHeight || 480;
+        h = Math.max(160, Math.floor(vh - chrome));
       }
       return { width: Math.max(40, w), height: Math.max(80, h) };
     }
@@ -2905,7 +2987,8 @@
 
     function ensureCanvasReady(attempt = 0) {
       return new Promise((resolve) => {
-        const ok = resizeCanvas({ keepStroke: attempt > 0 && hasCanvasStroke });
+        // Sempre preservar traço em curso / assinatura já salva ao redimensionar.
+        const ok = resizeCanvas({ keepStroke: !!(hasCanvasStroke || signatureData.value) });
         if (ok) { resolve(true); return; }
         if (attempt >= 12) {
           // último recurso: forçar dimensões mínimas
@@ -2935,6 +3018,7 @@
       try { canvas.setPointerCapture(evt.pointerId); } catch (_) {}
       drawing = true;
       hasCanvasStroke = true;
+      signatureStrokeDirty = true;
       lastPoint = canvasPoint(evt);
     }
     function onPointerMove(evt) {
@@ -2978,6 +3062,7 @@
       const { width: cssW, height: cssH } = canvasCssSize();
       paintCanvasBackground(cssW, cssH);
       hasCanvasStroke = false;
+      signatureStrokeDirty = !!signatureData.value;
     }
 
     async function tryRequestFullscreen(el) {
@@ -3018,26 +3103,33 @@
         document.body.style.overflow = 'hidden';
         document.body.classList.add('signature-open');
         signatureUiOpen = true;
+        signatureStrokeDirty = false;
         drawing = false;
         lastPoint = null;
 
         const card = signatureModal.querySelector('.modal-card') || signatureModal;
         signatureNativeFs = await tryRequestFullscreen(card);
+        updateSignatureViewportChrome();
         // Sempre exibe o modal responsivo (fallback Safari/iPhone e quando FS falha)
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        updateSignatureViewportChrome();
         const ready = await ensureCanvasReady(0);
         if (signatureData.value) {
-          clearCanvas();
+          const prev = signatureData.value;
+          const { width: cssW, height: cssH } = canvasCssSize();
+          paintCanvasBackground(cssW, cssH);
           const img = new Image();
           img.onload = () => {
-            const { width: cssW, height: cssH } = canvasCssSize();
-            assinaturaDesenharContida(ctx, img, cssW, cssH);
+            const size = canvasCssSize();
+            assinaturaDesenharContida(ctx, img, size.width, size.height);
             hasCanvasStroke = true;
+            signatureStrokeDirty = false;
           };
           img.onerror = () => { hasCanvasStroke = false; };
-          img.src = signatureData.value;
+          img.src = prev;
         } else {
           clearCanvas();
+          signatureStrokeDirty = false;
         }
         if (!ready) showToast('Assinatura aberta. Se a área estiver pequena, gire o aparelho.');
       } catch (err) {
@@ -3045,20 +3137,41 @@
         signatureModal.classList.add('open');
         signatureModal.setAttribute('aria-hidden', 'false');
         signatureUiOpen = true;
+        updateSignatureViewportChrome();
         showToast('Abrindo assinatura…');
         try { await ensureCanvasReady(0); } catch (_) {}
       }
     }
 
-    async function closeSignature() {
+    function signatureHasUnsavedWork() {
+      if (signatureStrokeDirty) return true;
+      if (!hasCanvasStroke) return false;
+      if (!signatureData.value) return true;
+      try {
+        const current = assinaturaRecortarCanvas(canvas) || '';
+        return !!(current && current !== signatureData.value);
+      } catch (_) {
+        return hasCanvasStroke;
+      }
+    }
+
+    async function closeSignature(opts = {}) {
+      const force = !!opts.force;
+      if (!force && signatureUiOpen && signatureHasUnsavedWork()) {
+        const leave = window.confirm('Há uma assinatura ainda não salva. Deseja sair sem salvar?');
+        if (!leave) return false;
+      }
       signatureUiOpen = false;
       drawing = false;
       lastPoint = null;
+      signatureStrokeDirty = false;
       await exitNativeFullscreen();
-      signatureModal.classList.remove('open');
+      signatureModal.classList.remove('open', 'signature-native-fs');
+      signatureModal.style.removeProperty('--sig-fs-bottom-reserve');
       signatureModal.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
       document.body.classList.remove('signature-open');
+      return true;
     }
 
     function bindOpenSignature(el) {
@@ -3092,7 +3205,8 @@
       signaturePreview.src = dataUrl;
       signatureBox.classList.add('has-signature');
       document.getElementById('field_assinatura').classList.remove('validation-error');
-      void closeSignature();
+      signatureStrokeDirty = false;
+      void closeSignature({ force: true });
       updatePendingCount();
       showToast('Assinatura salva no checklist.');
       // Persistir rascunho sem finalizar / sem enviar
@@ -3109,20 +3223,25 @@
     signatureModal.addEventListener('click', (e) => {
       if (e.target === signatureModal) void closeSignature();
     });
-    window.addEventListener('resize', () => {
-      if (signatureUiOpen) void ensureCanvasReady(0);
-    });
+    const onSignatureViewportChange = () => {
+      if (!signatureUiOpen) return;
+      updateSignatureViewportChrome();
+      void ensureCanvasReady(0);
+    };
+    window.addEventListener('resize', onSignatureViewportChange);
     window.addEventListener('orientationchange', () => {
-      if (signatureUiOpen) setTimeout(() => { void ensureCanvasReady(0); }, 180);
+      if (signatureUiOpen) setTimeout(onSignatureViewportChange, 180);
     });
     if (window.visualViewport) {
-      visualViewport.addEventListener('resize', () => {
-        if (signatureUiOpen) void ensureCanvasReady(0);
+      visualViewport.addEventListener('resize', onSignatureViewportChange);
+      visualViewport.addEventListener('scroll', () => {
+        if (signatureUiOpen) updateSignatureViewportChrome();
       });
     }
     document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement && signatureUiOpen) signatureNativeFs = false;
-      if (signatureUiOpen) void ensureCanvasReady(0);
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      signatureNativeFs = !!(signatureUiOpen && fsEl);
+      if (signatureUiOpen) onSignatureViewportChange();
     });
 
     setInitialDateTime();
