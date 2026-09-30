@@ -2524,13 +2524,17 @@
         activeDraftKey=draftStorageKey(dataPrefix,dataOp);
         draftIdentityWarningShown=false;
         // Mídia preferencial no IndexedDB (campos já aplicados; assinatura/fotos em seguida)
+        let mediaLoadFailed=false;
         try{
           const mediaKey=String(data._meta?.mediaKey||(data._meta?.mediaInIdb?found.key:''));
           const media=mediaKey?await idbGetMedia(mediaKey):null;
           const revision=String(data._meta?.mediaRevision||'');
+          const mediaExpected=!!data._meta?.mediaInIdb&&(!!data._meta?.hasSignature||Number(data._meta?.photoCount||0)>0);
           const mediaValid=media&&typeof media==='object'&&
             (!revision||String(media.revision||'')===revision)&&
-            (!media.draftKey||String(media.draftKey)===String(data._meta?.storageKey||found.key));
+            (!media.draftKey||String(media.draftKey)===String(data._meta?.storageKey||found.key))&&
+            (!data._meta?.hasSignature||/^data:image\//i.test(String(media.signatureData||'')))&&
+            (!Number(data._meta?.photoCount||0)||(Array.isArray(media.photos)&&media.photos.length>=Number(data._meta.photoCount)));
           if(mediaValid){
             if(media.signatureData&&/^data:image\//i.test(media.signatureData)){
               signatureData.value=media.signatureData;
@@ -2543,9 +2547,13 @@
               renderVehiclePhotos();
             }
             updatePendingCount();
+          }else if(mediaExpected){
+            mediaLoadFailed=true;
           }
-        }catch(_){}
-        if(data._meta?.mediaSaveFailed&&data._meta?.hasSignature&&!signatureData.value&&!silent){
+        }catch(_){mediaLoadFailed=!!data._meta?.mediaInIdb}
+        if(mediaLoadFailed){
+          showToast('Dados básicos carregados, mas a assinatura/fotos não puderam ser recuperadas do armazenamento local.');
+        }else if(data._meta?.mediaSaveFailed&&data._meta?.hasSignature&&!signatureData.value&&!silent){
           showToast('Atenção: este rascunho foi salvo sem a assinatura persistida (falha de armazenamento).');
         }else if(!silent){
           showToast('Rascunho carregado'+(dataPrefix?' (VTR '+dataPrefix+')':'')+'.');
