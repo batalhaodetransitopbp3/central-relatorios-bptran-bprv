@@ -320,7 +320,7 @@ function addMetricMap(g,map){Object.entries(map).forEach(([k,v])=>g.metrics[k]=n
 function dedupeAppend(addFn,records){records.forEach(r=>{if(r.id&&state.importedRecordIds.includes(r.id))return;if(r.id)state.importedRecordIds.push(r.id);addFn(r)})}
 function canonicalUnitObject(u={}){const rawB=String(u.batalhao||u.batalhaoSigla||'').toUpperCase();const b=rawB==='BPRV'?'BPRv':'BPTran';let c=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;c=Math.min(5,Math.max(1,c));const tipo=b==='BPRv'?'CPRv':'CPTran';return {batalhao:b,batalhaoSigla:b,batalhaoNome:(UNIT_TYPES[b]||UNIT_TYPES.BPTran).nome,companhiaNumero:c,companhiaTipo:tipo,companhia:`${c}ª ${tipo}`,companhiaCodigo:`${b.toUpperCase()}_${c}_${tipo.toUpperCase()}`}}
 function sameOperationalUnit(a,b){const x=canonicalUnitObject(a),y=canonicalUnitObject(b);return x.batalhao===y.batalhao&&x.companhiaNumero===y.companhiaNumero}
-function validateImportedUnit(p,fileName='arquivo'){if(!p?.unidade)return true;const src=canonicalUnitObject(p.unidade),dst=canonicalUnitObject(currentUnit());if(sameOperationalUnit(src,dst))return true;alert(`${fileName} pertence a ${src.batalhao} / ${src.companhia}. O RCO atual está em ${dst.batalhao} / ${dst.companhia}. Ajuste o cabeçalho antes de cadastrar o relatório.`);return false}
+function validateImportedUnit(p,fileName='arquivo'){if(!p?.unidade){alert(`${fileName} sem unidade (batalhão/companhia). Não será importado automaticamente.`);return false}const src=canonicalUnitObject(p.unidade),dst=canonicalUnitObject(currentUnit());if(sameOperationalUnit(src,dst))return true;alert(`${fileName} pertence a ${src.batalhao} / ${src.companhia}. O RCO atual está em ${dst.batalhao} / ${dst.companhia}. Ajuste o cabeçalho antes de cadastrar o relatório.`);return false}
 function importDailyV2(p,fileName){if(!validateImportedUnit(p,fileName))return 'ign';if(state.importedReportIds.includes(p.reportId))return 'duplicado';const name=p.guarnicao?.nome||'Guarnição importada';const g=ensureGuarnicao(name);addMetricMap(g,productionMapV2(p.producao||{}));g.responsavel=p.guarnicao?.responsavel||g.responsavel;g.matricula=p.guarnicao?.matricula||g.matricula;g.efetivo=p.guarnicao?.efetivo||g.efetivo;g.viatura=String(p.guarnicao?.viatura||g.viatura||'').toUpperCase().slice(0,80);const lbl=fmtDateISO(p.servico?.data)||fileName;g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,lbl);g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,lbl);g.observacoes=appendText(g.observacoes,p.observacoes,lbl);for(const o of p.ocorrencias||[]){if(o.id&&!state.importedRecordIds.includes(o.id)){state.importedRecordIds.push(o.id);g.ocorrencias.push(o)}}dedupeAppend(addCpuOperation,(p.operacoes||[]).filter(o=>o.incluirNoCpu!==false).map(o=>({...o,guarnicao:o.guarnicao||name})));dedupeAppend(addCpuVehicle,(p.veiculosRecuperados||[]).map(o=>({...o,guarnicao:o.guarnicao||name})));for(const t of (p.tcos||[])){if(!g.ocorrencias.some(o=>(t.id&&o.id===t.id)||(t.numeroTco&&o.numeroTco===t.numeroTco))){g.ocorrencias.push({id:t.id||uid('oc'),data:p.servico?.data||val('dataInicio'),hora:t.hora||'',numero:t.numero||'',tipo:'TCO',descricao:t.descricao||'',tipificacao:t.tipificacao||'',tcoSasp:t.tcoSasp||'Sim',numeroTco:t.numeroTco||''})}}dedupeAppend(addCpuArvc,(p.cirvc||p.arvc||[]).map(o=>({...o,guarnicao:o.guarnicao||name})));state.importedReportIds.push(p.reportId);renderGuarnicoes();renderMatrix();renderFisco();return 'ok'}
 function legacyColName(p){const d=p.destinoCampo9||'';return d==='base01'?'Base 1':d==='base02'?'Base 2':d==='tatico'?'TOR':d==='cpu'?'CPU':p.guarnicao||'Guarnição antiga'}
 function importLegacy(p){const g=ensureGuarnicao(legacyColName(p));for(const [grp,itens] of Object.entries(p.campo9||{}))for(const [it,v] of Object.entries(itens||{})){const alias={'check-points-blitz':'checkpoints','total-de-aits-lavrados':'total-aits','quantidade-de-teste-de-etilometro-realizados':'testes-etilometro','cnh-s-recolhidas':'cnhs-recolhidas'};g.metrics[metricKey(grp,alias[it]||it)]=num(g.metrics[metricKey(grp,alias[it]||it)])+num(v)}g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,'JSON legado');g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,'JSON legado');renderGuarnicoes();renderMatrix()}
@@ -815,7 +815,8 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.27"></script>
+<script src="central_cloud.js?v=10.8.32"></script>
+<script src="rco_scope_guard.js?v=10.8.32"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
@@ -1179,7 +1180,17 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function toggleCancelledRsd(){showCancelledRsd=!showCancelledRsd;renderCloud()}
 
 
-  async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&Number(oldOrigin.versao||0)>=Number(item.version||0)){alert('Esta versão do RSD já está incluída.');return}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:item.guarnicao,versao:item.version,status:item.status||'INCLUIDO',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(item.guarnicao);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();alert(oldOrigin?'RSD atualizado para a versão mais recente.':'RSD incluído na consolidação.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
+  function rsdBelongsToRcoUnit(item,u){
+    u=u||currentUnit();
+    if(window.RcoScopeGuard){
+      try{
+        const scope=RcoScopeGuard.requireUnitScope(u);
+        return RcoScopeGuard.sameUnitScope({BATALHAO:item?.batalhao,COMPANHIA:item?.companhia,batalhao:item?.batalhao,companhia:item?.companhia},scope);
+      }catch(_){return false}
+    }
+    return sameOperationalUnit({batalhao:item?.batalhao,companhia:item?.companhia},u);
+  }
+  async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();const opDate=rcoOperationalDate(val('dataInicio'));if(!rsdBelongsToRcoUnit(item,u)){alert('Este RSD pertence a outra companhia/batalhão e não pode ser incluído neste RCO.');return}try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,data:opDate,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');if(p.unidade&&!validateImportedUnit(p,'RSD nuvem'))return;if(p.sheetStructuralFallback&&!rsdBelongsToRcoUnit({batalhao:p.sheetStructuralFallback.batalhao,companhia:p.sheetStructuralFallback.companhia},u)){alert('RSD fora do escopo do RCO (batalhão/companhia).');return}const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&Number(oldOrigin.versao||0)>=Number(item.version||0)){alert('Esta versão do RSD já está incluída.');return}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:item.guarnicao,versao:item.version,status:item.status||'INCLUIDO',data:item.operationalDate||item.data||opDate,batalhao:item.batalhao||u.batalhao,companhia:item.companhia||u.companhia,recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(item.guarnicao);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();alert(oldOrigin?'RSD atualizado para a versão mais recente.':'RSD incluído na consolidação.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
   /** Data operacional do RCO = período.inicio (janela 07h→07h). Não expandir ±1 dia — isso misturava serviços. */
   function rcoOperationalDate(inicio){
     const d=String(inicio||'').slice(0,10);
@@ -1187,7 +1198,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     return (CentralCloud.operationalISODate&&CentralCloud.operationalISODate())||'';
   }
   function rsdBelongsToRcoWindow(item,opDate){
-    if(!opDate)return true;
+    if(!opDate)return false;
     const raw=item?.operationalDate||item?.data||item?.DATA_SERVICO||'';
     if(raw&&/^\d{4}-\d{2}-\d{2}/.test(String(raw)))return String(raw).slice(0,10)===opDate;
     if(item?.iniciadoEm&&CentralCloud.operationalServiceDate)return CentralCloud.operationalServiceDate(item.iniciadoEm)===opDate;
@@ -1202,7 +1213,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     try{
       const map=new Map();
       const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data:opDate,showCancelled:'1',token});
-      (r.items||[]).forEach(x=>{if(rsdBelongsToRcoWindow(x,opDate))map.set(x.reportId,x)});
+      (r.items||[]).forEach(x=>{if(rsdBelongsToRcoUnit(x,u)&&rsdBelongsToRcoWindow(x,opDate))map.set(x.reportId,x)});
       cloudItems=Array.from(map.values()).sort((a,b)=>rcoCloudStatusRank(a.status)-rcoCloudStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
       const removed=reconcileCancelledOrigins();renderCloud();
       if(removed)alert(removed+' RSD(s) cancelado(s) foi(ram) retirado(s) automaticamente desta consolidação. Os registros permanecem disponíveis em “Mostrar cancelados” para auditoria.');
@@ -1436,6 +1447,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.27"></script>
-<script src="service_flow.js?v=10.8.27"></script>
+<script src="service_access_layers.js?v=10.8.32"></script>
+<script src="service_flow.js?v=10.8.32"></script>
 </body></html>

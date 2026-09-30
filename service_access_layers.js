@@ -266,10 +266,20 @@ async function loadRcoSetupStatus(){
  box.innerHTML='<div class="central-access-loading">Atualizando status das guarnições…</div>';
  try{
    const opDate=rcoSetupOperationalDate(data),map=new Map();
-   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data:opDate,token},{timeout:15000});
+   const u=unit();
+   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data:opDate,token},{timeout:15000});
    (r.items||[]).forEach(x=>{
      const raw=x.operationalDate||x.data||'';
-     if(raw&&String(raw).slice(0,10)!==opDate)return;
+     if(!raw||String(raw).slice(0,10)!==opDate)return;
+     // Escopo duro: DATA ∧ BATALHÃO ∧ COMPANHIA (1ª CPTran ≠ 1ª CPRv).
+     if(window.RcoScopeGuard){
+       try{
+         if(!RcoScopeGuard.sameUnitScope({BATALHAO:x.batalhao,COMPANHIA:x.companhia},RcoScopeGuard.requireUnitScope(u)))return;
+       }catch(_){return}
+     }else{
+       if(!x.batalhao||!x.companhia)return;
+       if(String(x.batalhao)!==u.batalhao||String(x.companhia)!==u.companhia)return;
+     }
      map.set(x.reportId,x);
    });
    const items=[...map.values()].filter(x=>String(x.status||'').toUpperCase()!=='CANCELADO')
