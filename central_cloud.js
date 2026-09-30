@@ -36,6 +36,34 @@ function isAuthError(err){return err?.code==='AUTH_INVALID'||/(chave|credencial|
 function authError(action,message,token,kindOverride){const e=new Error(message||'Chave inválida.');if(/(chave|credencial|senha)[^\n]{0,80}inválid/i.test(e.message)){const kind=kindOverride||tokenKindForAction(action);e.code='AUTH_INVALID';e.tokenKind=kind;if(kind==='central'||kind==='p3'||kind==='comando'){const saved=getToken(kind);if(!token||!saved||String(saved)===String(token))setToken('',kind);if(kind==='p3'||isRcoModulePage()){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}}if(kind==='central'||isRsdModulePage()){try{sessionStorage.removeItem('central-module-auth-rsd-v1')}catch(_){}}fireModuleAuthLost(kind,SESSION_EXPIRED_MSG)}}return e}
 function clearToken(kind='central'){setToken('',kind)}
 function unitParams(u={}){let b=String(u.batalhao||u.batalhaoSigla||'BPTran');b=b.toUpperCase()==='BPRV'?'BPRv':'BPTran';let n=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||1;n=Math.min(5,Math.max(1,n));return {batalhao:b,companhiaNumero:String(n),companhia:n+'ª '+(b==='BPRv'?'CPRv':'CPTran')}}
+/** Janela operacional 07:00→07:00 no fuso America/Fortaleza (Paraíba). */
+const SERVICE_WINDOW_HOUR=7,SERVICE_TZ='America/Fortaleza';
+function fortalezaParts_(when){
+  const d=when instanceof Date?when:(when==null||when===''?new Date():new Date(when));
+  if(Number.isNaN(d.getTime()))return fortalezaParts_(new Date());
+  try{
+    const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:SERVICE_TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hour12:false,minute:'2-digit',second:'2-digit'});
+    const parts=Object.fromEntries(fmt.formatToParts(d).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+    return {ymd:`${parts.year}-${parts.month}-${parts.day}`,hour:Number(parts.hour)||0,minute:Number(parts.minute)||0,second:Number(parts.second)||0};
+  }catch(_){
+    const off=d.getTimezoneOffset(),local=new Date(d.getTime()-(off+180)*60000);
+    return {ymd:`${local.getUTCFullYear()}-${String(local.getUTCMonth()+1).padStart(2,'0')}-${String(local.getUTCDate()).padStart(2,'0')}`,hour:local.getUTCHours(),minute:local.getUTCMinutes(),second:local.getUTCSeconds()};
+  }
+}
+function addCalendarDaysYmd(ymd,delta){
+  const s=String(ymd||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return '';
+  const [y,m,dd]=s.split('-').map(Number),dt=new Date(Date.UTC(y,m-1,dd+Number(delta||0)));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+}
+function getServiceWindow(when){
+  if(typeof when==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(when.trim())){
+    const op=when.trim();return {operationalDate:op,windowStart:op+'T07:00:00',windowEnd:addCalendarDaysYmd(op,1)+'T07:00:00',cutoffHour:SERVICE_WINDOW_HOUR,tz:SERVICE_TZ};
+  }
+  const p=fortalezaParts_(when),op=p.hour<SERVICE_WINDOW_HOUR?addCalendarDaysYmd(p.ymd,-1):p.ymd;
+  return {operationalDate:op,windowStart:op+'T07:00:00',windowEnd:addCalendarDaysYmd(op,1)+'T07:00:00',cutoffHour:SERVICE_WINDOW_HOUR,tz:SERVICE_TZ};
+}
+function operationalServiceDate(when){return getServiceWindow(when).operationalDate}
+function operationalISODate(when){return operationalServiceDate(when==null||when===''?new Date():when)}
 function qs(obj){return Object.entries(obj||{}).filter(([,v])=>v!==undefined&&v!==null&&v!=='').map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(String(v))).join('&')}
 function jsonpRaw(action,params={},opts={}){return new Promise((resolve,reject)=>{
   const showProgress=action!=='version'&&opts.progress!==false;if(showProgress)beginProgress(progressMessageForAction(action,'start'));
@@ -194,6 +222,6 @@ function installPassiveProgress(){
 function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('div');b.id='centralSyncBadge';b.className='no-print';b.setAttribute('role','status');b.setAttribute('aria-live','polite');Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:500,border:'0',borderRadius:'14px',padding:'5px 8px',background:'rgba(255,255,255,.46)',color:'#24425f',font:'700 10px Arial',boxShadow:'none',opacity:'.48',pointerEvents:'none',userSelect:'none'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{beginProgress('Sincronizando envios pendentes…');try{await retryQueue();refresh()}finally{endProgress('Sincronização concluída.')}},800));installPassiveProgress()}
 
 async function probe(){if(v10Enabled)return true;try{const r=await jsonp('version',{}, {timeout:10000});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}}
-global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress,forceEndProgress,progressMessageForAction,installPassiveProgress};
+global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,getServiceWindow,operationalServiceDate,operationalISODate,addCalendarDaysYmd,SERVICE_WINDOW_HOUR,SERVICE_TZ,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress,forceEndProgress,progressMessageForAction,installPassiveProgress};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();setTimeout(probe,150)});else{installStatusBadge();setTimeout(probe,150)}
 })(window);

@@ -249,29 +249,29 @@ function revealRcoEnterButton(){
  btn.hidden=false;btn.removeAttribute('hidden');btn.disabled=false;btn.style.display='';
  return btn;
 }
-function rcoSetupDateWindow(inicio,fim){
- const bases=new Set();if(inicio)bases.add(String(inicio).slice(0,10));if(fim)bases.add(String(fim).slice(0,10));
- const out=new Set(),iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
- for(const d of bases){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))continue;out.add(d);
-  const dt=new Date(d+'T12:00:00');if(Number.isNaN(dt.getTime()))continue;
-  const prev=new Date(dt),next=new Date(dt);prev.setDate(prev.getDate()-1);next.setDate(next.getDate()+1);
-  out.add(iso(prev));out.add(iso(next));
- }
- return [...out].sort();
+/** Data operacional do RCO (= dataInicio). Não expandir ±1 dia — misturava janelas 07h→07h. */
+function rcoSetupOperationalDate(inicio){
+ const d=String(inicio||'').slice(0,10);
+ if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+ return (global.CentralCloud&&CentralCloud.operationalISODate)?CentralCloud.operationalISODate():'';
 }
 const RCO_SETUP_OPEN=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA'];
 function rcoSetupStatusRank(st){const u=String(st||'').toUpperCase();const i=RCO_SETUP_OPEN.indexOf(u);return i>=0?i:100}
 async function loadRcoSetupStatus(){
  const box=q('#centralRcoSetupList');if(!box)return;
  let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
- const data=q('#dataInicio')?.value||'',fim=q('#dataTermino')?.value||'';
+ const data=q('#dataInicio')?.value||'';
  if(!token){box.innerHTML='<div class="central-access-empty">Identifique e registre o responsável pelo RCO para consultar as guarnições.</div>';return}
  if(!data){box.innerHTML='<div class="central-access-error">Informe a data de início do serviço.</div>';return}
  box.innerHTML='<div class="central-access-loading">Atualizando status das guarnições…</div>';
  try{
-   const dates=rcoSetupDateWindow(data,fim),map=new Map();
-   for(const day of dates){const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data:day,token},{timeout:15000});(r.items||[]).forEach(x=>map.set(x.reportId,x))}
+   const opDate=rcoSetupOperationalDate(data),map=new Map();
+   const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(unit()),data:opDate,token},{timeout:15000});
+   (r.items||[]).forEach(x=>{
+     const raw=x.operationalDate||x.data||'';
+     if(raw&&String(raw).slice(0,10)!==opDate)return;
+     map.set(x.reportId,x);
+   });
    const items=[...map.values()].filter(x=>String(x.status||'').toUpperCase()!=='CANCELADO')
      .sort((a,b)=>rcoSetupStatusRank(a.status)-rcoSetupStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
    if(!items.length){box.innerHTML='<div class="central-access-empty">Nenhum RSD registrado para esta unidade e data.</div>';return}

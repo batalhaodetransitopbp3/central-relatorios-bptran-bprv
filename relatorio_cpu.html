@@ -351,7 +351,11 @@ function defaultAnexos(){
 }
 function atualizarDiaCpu(){const e=document.getElementById('diaSemanaCpu'),v=val('dataInicio');if(!e)return;if(!v){e.value='';return}const d=new Date(v+'T12:00:00');e.value=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][d.getDay()]}
 function localISODate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-function setDates(){const d=new Date();document.getElementById('dataInicio').value=localISODate(d);const n=new Date(d);n.setDate(n.getDate()+1);const next=localISODate(n);document.getElementById('dataTermino').value=next;document.getElementById('dataFinal').value=next;atualizarDiaCpu()}
+function setDates(){
+  const op=(typeof CentralCloud!=='undefined'&&CentralCloud.operationalISODate)?CentralCloud.operationalISODate():localISODate();
+  const next=(typeof CentralCloud!=='undefined'&&CentralCloud.addCalendarDaysYmd)?CentralCloud.addCalendarDaysYmd(op,1):(function(){const n=new Date(op+'T12:00:00');n.setDate(n.getDate()+1);return localISODate(n)})();
+  document.getElementById('dataInicio').value=op;document.getElementById('dataTermino').value=next;document.getElementById('dataFinal').value=next;atualizarDiaCpu()
+}
 function syncAll(){document.querySelectorAll('input,select,textarea').forEach(syncPrintValue);document.getElementById('assinantePrint').textContent=[val('nomeAssinante'),val('patenteAssinante')].filter(Boolean).join(' – ')||'—';renderPrintMatrix()}
 function prepareAndPrint(){saveRcoHistory();renderGuarnicoes();syncAll();const first=cpuPeopleData()[0]||{};const nome=val('nomeAssinante')||first.nome||'COORDENADOR';const posto=val('patenteAssinante')||first.graduacao||'POSTO-GRAD';const old=document.title;document.title=`RCO – ${safeName(nome,'COORDENADOR')}-${safeName(posto,'POSTO-GRAD')} – DATA ${fmtDateFile(val('dataInicio'))}`;window.print();setTimeout(()=>{document.title=old;try{window.centralRcoMarkPdfGenerated?.()}catch(_){}},800)}
 window.addEventListener('beforeprint',()=>{renderGuarnicoes();syncAll()});
@@ -811,7 +815,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.26"></script>
+<script src="central_cloud.js?v=10.8.27"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
@@ -1176,26 +1180,29 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 
 
   async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&Number(oldOrigin.versao||0)>=Number(item.version||0)){alert('Esta versão do RSD já está incluída.');return}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:item.guarnicao,versao:item.version,status:item.status||'INCLUIDO',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(item.guarnicao);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();alert(oldOrigin?'RSD atualizado para a versão mais recente.':'RSD incluído na consolidação.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
-  /** Janela de datas do RCO: início, término e ±1 dia (overnight / DATA_SERVICO fora do dia de serviço). */
-  function rcoCloudDateWindow(inicio,fim){
-    const bases=new Set();if(inicio)bases.add(String(inicio).slice(0,10));if(fim)bases.add(String(fim).slice(0,10));
-    const out=new Set();
-    for(const d of bases){
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(d))continue;out.add(d);
-      const dt=new Date(d+'T12:00:00');if(Number.isNaN(dt.getTime()))continue;
-      const prev=new Date(dt),next=new Date(dt);prev.setDate(prev.getDate()-1);next.setDate(next.getDate()+1);
-      out.add(localISODate(prev));out.add(localISODate(next));
-    }
-    return [...out].sort();
+  /** Data operacional do RCO = período.inicio (janela 07h→07h). Não expandir ±1 dia — isso misturava serviços. */
+  function rcoOperationalDate(inicio){
+    const d=String(inicio||'').slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+    return (CentralCloud.operationalISODate&&CentralCloud.operationalISODate())||'';
+  }
+  function rsdBelongsToRcoWindow(item,opDate){
+    if(!opDate)return true;
+    const raw=item?.operationalDate||item?.data||item?.DATA_SERVICO||'';
+    if(raw&&/^\d{4}-\d{2}-\d{2}/.test(String(raw)))return String(raw).slice(0,10)===opDate;
+    if(item?.iniciadoEm&&CentralCloud.operationalServiceDate)return CentralCloud.operationalServiceDate(item.iniciadoEm)===opDate;
+    return false;
   }
   const RCO_OPEN_STATUSES=['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA'];
   function rcoCloudStatusRank(st){const u=String(st||'').toUpperCase();const i=RCO_OPEN_STATUSES.indexOf(u);return i>=0?i:100}
   async function loadCloud(){
     const token=rcoWorkflowToken(false);if(!token)return;
-    const inicio=val('dataInicio'),fim=val('dataTermino'),u=currentUnit();if(!inicio){alert('Informe a data de início do serviço.');return}
+    const inicio=val('dataInicio'),u=currentUnit();if(!inicio){alert('Informe a data de início do serviço.');return}
+    const opDate=rcoOperationalDate(inicio);
     try{
-      const dates=rcoCloudDateWindow(inicio,fim),map=new Map();
-      for(const data of dates){const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data,showCancelled:'1',token});(r.items||[]).forEach(x=>map.set(x.reportId,x))}
+      const map=new Map();
+      const r=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data:opDate,showCancelled:'1',token});
+      (r.items||[]).forEach(x=>{if(rsdBelongsToRcoWindow(x,opDate))map.set(x.reportId,x)});
       cloudItems=Array.from(map.values()).sort((a,b)=>rcoCloudStatusRank(a.status)-rcoCloudStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
       const removed=reconcileCancelledOrigins();renderCloud();
       if(removed)alert(removed+' RSD(s) cancelado(s) foi(ram) retirado(s) automaticamente desta consolidação. Os registros permanecem disponíveis em “Mostrar cancelados” para auditoria.');
@@ -1244,7 +1251,13 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   }
   async function lookupConsolidator(){if(!CentralCloud?.isEnabled())return;const e=document.getElementById('rcoConsolidadorMatricula'),mat=CentralCloud.formatMatricula(e.value);e.value=mat;const token=rcoWorkflowToken(true);if(!token||!/^\d{3}\.\d{3}-\d$/.test(mat))return;try{const r=await CentralCloud.jsonp('cadastros',{tipo:'militar',q:mat,token}),m=(r.items||[]).find(x=>x.MATRICULA===mat);if(m){document.getElementById('rcoConsolidadorNome').value=m.NOME||'';document.getElementById('rcoConsolidadorPosto').value=m.POSTO_GRAD||''}}catch(_){}}
   async function markIncluded(){if(!CentralCloud?.isEnabled()||!origins.length)return;const token=rcoWorkflowToken(true);if(!token)return;const p=baseCollect(),rcoId=p?.state?.reportId||p?.reportId||'';if(!rcoId)return;await CentralCloud.postOrQueue('rsd-mark-included',{unidade:currentUnit(),rcoReportId:rcoId,rsdReportIds:origins.map(x=>x.rsdReportId)},{token,unit:currentUnit(),popup:false})}
-  window.centralRcoHasOpenRsd=()=>origins.some(o=>['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'].includes(String(o.status||'').toUpperCase()))||cloudItems.some(x=>x.possibleDuplicate||['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'].includes(String(x.status||'').toUpperCase()));
+  window.centralRcoHasOpenRsd=()=>{
+    const op=rcoOperationalDate(val('dataInicio'));
+    const open=s=>['EM_SERVICO','PASSAGEM_DISPONIVEL','AGUARDANDO_ANALISE','RETIFICACAO_SOLICITADA','INDEFERIDO'].includes(String(s||'').toUpperCase());
+    const inWindow=x=>!op||rsdBelongsToRcoWindow(x,op)||(x&&origins.some(o=>o.rsdReportId===x.reportId));
+    return origins.some(o=>open(o.status)&&(!op||!o.data||String(o.data).slice(0,10)===op||rsdBelongsToRcoWindow(o,op)))
+      ||cloudItems.some(x=>inWindow(x)&&(x.possibleDuplicate||open(x.status)));
+  };
   function install(){installCloudBox();document.getElementById('rcoConsolidadorMatricula')?.addEventListener('blur',lookupConsolidator);document.getElementById('rcoConsolidadorMatricula')?.addEventListener('input',e=>{e.target.value=CentralCloud.formatMatricula(e.target.value)});centralRcoToggleSemCpu();window.addEventListener('message',e=>{if(e.data?.source==='central-p3-v10'&&e.data?.action==='rco'&&e.data?.ok)markIncluded()});const note=document.querySelector('.matrix-note');if(note)note.textContent='Os totais são calculados por guarnição. RSDs em nuvem preservam a origem e versões mais recentes substituem a versão anterior sem dupla contagem.';const oldAuto=window.centralAutosave;if(oldAuto&&!oldAuto.__rcoCloudWrapped){const w=function(){const r=oldAuto();scheduleRcoSync();return r};w.__rcoCloudWrapped=true;window.centralAutosave=w}const oldSave=window.salvarRascunho;if(oldSave&&!oldSave.__rcoCloudWrapped){const w=function(s=false){const r=oldSave(s);if(s)scheduleRcoSync();else syncRcoDraft(false);return r};w.__rcoCloudWrapped=true;window.salvarRascunho=w}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false};const box=document.getElementById('rcoCloudBox');if(box&&!document.getElementById('rcoCloudSaveDraft')){const b=document.createElement('button');b.type='button';b.id='rcoCloudSaveDraft';b.className='small secondary';b.textContent='Salvar RCO na nuvem';b.onclick=()=>syncRcoDraft(false);box.querySelector('.rco-cloud-actions')?.appendChild(b)}installRcoLeaveSyncGuards();setTimeout(installRcoLeaveSyncGuards,120)}
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
 })();
@@ -1423,6 +1436,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.26"></script>
-<script src="service_flow.js?v=10.8.26"></script>
+<script src="service_access_layers.js?v=10.8.27"></script>
+<script src="service_flow.js?v=10.8.27"></script>
 </body></html>

@@ -1002,5 +1002,79 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
+<script id="fisco-rsd-context-bridge">
+(function(){
+  const ACTIVE_KEY='pmpb-active-service-v1',RETURN_KEY='pmpb-fisco-return-v1',LINKS_KEY='pmpb-rsd-fisco-links-v1';
+  function readCtx(){
+    try{const a=JSON.parse(sessionStorage.getItem(RETURN_KEY)||'null');if(a&&a.rsdReportId)return a}catch(_){}
+    try{const a=JSON.parse(localStorage.getItem(ACTIVE_KEY)||'null');if(a&&a.rsdReportId&&a.returnModule==='rsd')return a}catch(_){}
+    return null;
+  }
+  function setVal(id,v){const e=document.getElementById(id);if(!e||v==null||v==='')return;e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}))}
+  function markLinkSaved(ctx){
+    if(!ctx||!(ctx.serviceId||ctx.rsdReportId))return;
+    try{
+      const all=JSON.parse(localStorage.getItem(LINKS_KEY)||'{}')||{};
+      const k=String(ctx.serviceId||ctx.rsdReportId);
+      const list=Array.isArray(all[k])?all[k]:[];
+      const id=ctx.fiscoAcionamentoId||('fisco-'+Date.now().toString(36));
+      const row={id,serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',data:ctx.data||ctx.operationalDate||'',guarnicao:ctx.guarnicao||'',salvoEm:new Date().toISOString(),status:'registrado'};
+      const i=list.findIndex(x=>x.id===id);if(i>=0)list[i]=Object.assign({},list[i],row);else list.push(row);
+      all[k]=list;localStorage.setItem(LINKS_KEY,JSON.stringify(all));
+    }catch(_){}
+  }
+  function returnToRsd(ctx){
+    try{window.centralReportSave?.(true)}catch(_){}
+    markLinkSaved(ctx);
+    const url=ctx.returnUrl||(/_ios\.html/i.test(location.pathname)?'relatorio_servico_diario_ios.html':'relatorio_servico_diario.html');
+    try{sessionStorage.removeItem(RETURN_KEY)}catch(_){}
+    location.href=url;
+  }
+  function installFiscoRsdBridge(){
+    const ctx=readCtx();if(!ctx||!ctx.rsdReportId)return;
+    // Prefill a partir do RSD de origem — não iniciar outro serviço
+    try{
+      if(ctx.unidade){
+        setVal('globalBatalhao',ctx.unidade.batalhao||'');
+        setVal('globalCompanhia',String(ctx.unidade.companhiaNumero||''));
+      }
+      setVal('data',ctx.data||ctx.operationalDate||'');
+      const gu=[ctx.guarnicao||'',(ctx.vtrs||[]).filter(Boolean).join(', ')].filter(Boolean).join(' / ');
+      setVal('guarnicao',gu);
+    }catch(_){}
+    // Draft scoped ao serviceId+acionamento (evita herdar Fisco de outro período)
+    try{
+      const scoped='pmpb-transito-fisco-v2-draft::'+String(ctx.serviceId||ctx.rsdReportId)+'::'+String(ctx.fiscoAcionamentoId||'default');
+      const prev=window.centralReportSave,prevLoad=window.centralReportLoad;
+      window.centralReportSave=function(silent){try{const snap=typeof fiscoDraftSnapshot==='function'?fiscoDraftSnapshot():null;if(snap){snap.contextoServico={serviceId:ctx.serviceId,rsdReportId:ctx.rsdReportId,segmento:ctx.segmento,fiscoAcionamentoId:ctx.fiscoAcionamentoId,operationalDate:ctx.operationalDate||ctx.data};localStorage.setItem(scoped,JSON.stringify(snap));markLinkSaved(ctx);return true}}catch(e){if(!silent)alert('Não foi possível salvar o acionamento.');return false}return prev?prev(silent):true};
+      window.centralReportLoad=function(silent){try{const raw=localStorage.getItem(scoped);if(!raw)return prevLoad?prevLoad(silent):false;const d=JSON.parse(raw);if(typeof aplicarCamposFisco==='function')aplicarCamposFisco(d.campos||{});if(Array.isArray(d.fotos)&&typeof renderizarFotos==='function'){fotosSelecionadas=d.fotos.slice(0,24);renderizarFotos()}return true}catch(_){return prevLoad?prevLoad(silent):false}};
+      window.centralReportLoad(true);
+    }catch(_){}
+    let bar=document.getElementById('fiscoRsdReturnBar');
+    if(!bar){
+      bar=document.createElement('div');bar.id='fiscoRsdReturnBar';bar.className='notice no-print';
+      bar.style.cssText='margin:8px 10px;padding:10px 12px;border:1px solid #9ec3b8;background:#ecfdf5;border-radius:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between';
+      bar.innerHTML='<div><strong>Acionamento vinculado ao RSD</strong><div style="font-size:12px;color:#526579;margin-top:2px">'+(ctx.guarnicao||'Guarnição')+' • serviço '+(ctx.operationalDate||ctx.data||'')+' • '+(ctx.serviceId||ctx.rsdReportId)+'</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="secondary" id="fiscoSaveLinkBtn">Salvar acionamento</button><button type="button" class="primary" id="fiscoReturnRsdBtn">Voltar ao RSD</button></div>';
+      (document.querySelector('.service-state-bar')||document.querySelector('main')||document.body).insertAdjacentElement('beforebegin',bar);
+      document.getElementById('fiscoSaveLinkBtn').onclick=()=>{try{window.centralReportSave?.(false);markLinkSaved(ctx);alert('Acionamento vinculado ao RSD de origem.')}catch(e){alert(e.message||e)}};
+      document.getElementById('fiscoReturnRsdBtn').onclick=()=>returnToRsd(ctx);
+    }
+    // Impede “Início do serviço” de apagar o RSD ativo ao vir do módulo
+    const prevStart=window.centralStartService;
+    window.centralStartService=function(){
+      if(!confirm('Você está no Acionamento do Fisco a partir de um RSD ativo.\n\nIsso NÃO encerra o RSD. Deseja apenas limpar este formulário de acionamento?'))return;
+      try{document.querySelectorAll('input,textarea').forEach(el=>{if(el.type==='date')el.value=ctx.data||el.value;else if(el.type!=='file')el.value=''})}catch(_){}
+      setVal('data',ctx.data||ctx.operationalDate||'');
+      setVal('guarnicao',[ctx.guarnicao||'',(ctx.vtrs||[]).filter(Boolean).join(', ')].filter(Boolean).join(' / '));
+    };
+    document.addEventListener('click',e=>{
+      const b=e.target.closest('button');if(!b)return;
+      if(/gerar pdf/i.test(b.textContent||''))setTimeout(()=>markLinkSaved(ctx),200);
+    },true);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(installFiscoRsdBridge,60));
+  else setTimeout(installFiscoRsdBridge,60);
+})();
+</script>
 </body>
 </html>

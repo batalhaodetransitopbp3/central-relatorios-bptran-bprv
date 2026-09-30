@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.26';
+var CENTRAL_V10_VERSION = '10.8.27';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -491,8 +491,50 @@ function normCompany_(b, v) {
 function parseJson_(v, fallback) { try { return JSON.parse(String(v||'')); } catch(_) { return fallback; } }
 function dateText_(v) {
   if (!v) return '';
-  if (Object.prototype.toString.call(v)==='[object Date]') return Utilities.formatDate(v, Session.getScriptTimeZone()||'America/Fortaleza','yyyy-MM-dd');
-  return String(v).slice(0,10);
+  if (Object.prototype.toString.call(v)==='[object Date]') return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
+  var s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  try{
+    var d=new Date(s);
+    if(!isNaN(d.getTime()))return Utilities.formatDate(d, scriptTz_(),'yyyy-MM-dd');
+  }catch(_){}
+  return s.slice(0,10);
+}
+/** Fuso oficial da Central (Paraíba). */
+function scriptTz_(){return Session.getScriptTimeZone()||'America/Fortaleza'}
+var SERVICE_WINDOW_HOUR_=7;
+function addCalendarDaysYmd_(ymd,delta){
+  ymd=dateText_(ymd);if(!ymd)return '';
+  var p=ymd.split('-'),d=new Date(Date.UTC(Number(p[0]),Number(p[1])-1,Number(p[2])+Number(delta||0)));
+  return Utilities.formatDate(d,'UTC','yyyy-MM-dd');
+}
+/**
+ * Janela operacional 07:00→07:00 (America/Fortaleza).
+ * operationalDate = dia civil em que a janela começou às 07:00.
+ * Ex.: 01/10 06:30 → operationalDate 30/09; 01/10 07:00 → 01/10.
+ */
+function getServiceWindow_(when){
+  var tz=scriptTz_(),now=when;
+  if(now==null||now==='')now=new Date();
+  if(typeof now==='string'){
+    var s=String(now).trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      return {operationalDate:s,windowStart:s+'T07:00:00',windowEnd:addCalendarDaysYmd_(s,1)+'T07:00:00',cutoffHour:SERVICE_WINDOW_HOUR_,tz:tz};
+    }
+    now=new Date(s);
+  }else if(typeof now==='number')now=new Date(now);
+  if(Object.prototype.toString.call(now)!=='[object Date]'||isNaN(now.getTime()))now=new Date();
+  var ymd=Utilities.formatDate(now,tz,'yyyy-MM-dd');
+  var hh=Number(Utilities.formatDate(now,tz,'H'))||0;
+  var op=hh<SERVICE_WINDOW_HOUR_?addCalendarDaysYmd_(ymd,-1):ymd;
+  return {operationalDate:op,windowStart:op+'T07:00:00',windowEnd:addCalendarDaysYmd_(op,1)+'T07:00:00',cutoffHour:SERVICE_WINDOW_HOUR_,tz:tz};
+}
+function operationalServiceDate_(when){return getServiceWindow_(when).operationalDate}
+/** Resolve DATA_SERVICO canônica: prioriza data explícita yyyy-MM-dd; senão deriva de instante (INICIADO_EM/agora). */
+function resolveOperationalServiceDate_(explicitDate, instant){
+  var d=dateText_(explicitDate);
+  if(d)return d;
+  return operationalServiceDate_(instant||new Date());
 }
 function normVehicleTipo_(v){
   var t=String(v||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -803,7 +845,7 @@ function normalizeGuarnicaoNome_(nome,tipo) {
 }
 function serviceKeyRsd_(batt,comp,data,guarnicaoNome,guarnicaoTipo) {
   var gu=normalizeGuarnicaoNome_(guarnicaoNome,guarnicaoTipo||guarnicaoTipoFromNome_(guarnicaoNome));
-  return [String(batt||''),String(comp||''),dateText_(data),gu].join('|');
+  return [String(batt||''),String(comp||''),resolveOperationalServiceDate_(data,''),gu].join('|');
 }
 function rsdOpenEditableStatuses_(){return ['EM_SERVICO','RETIFICACAO_SOLICITADA'];}
 function rsdPreferEditableSegment_(a,b){
@@ -911,11 +953,11 @@ function guarnicaoNextOrder_(s,batt,comp,data,tipo) {
 function guarnicaoNext_(p) {
   var batt=normBattalion_(p.batalhao||p.batalhaoSigla||'BPTran'),
       comp=p.companhia||normCompany_(batt,p.companhiaNumero),
-      data=dateText_(p.data||''),tipo=normGuarnicaoTipo_(p.tipo||'');
+      data=resolveOperationalServiceDate_(p.data||'',p.agora||p.now||new Date()),tipo=normGuarnicaoTipo_(p.tipo||'');
   if(!data)throw new Error('Informe a data do serviço.');
   if(!tipo)throw new Error('Selecione BST, BASE, GTTRAN, TOR ou REBOQUE.');
   var ordem=guarnicaoNextOrder_(sheet_(P3_SHEET_ID,'RSD'),batt,comp,data,tipo);
-  return {ok:true,tipo:tipo,ordem:ordem,nome:tipo+' '+padGuarnicaoOrdem_(ordem)};
+  return {ok:true,tipo:tipo,ordem:ordem,nome:tipo+' '+padGuarnicaoOrdem_(ordem),data:data,operationalDate:data,serviceWindow:getServiceWindow_(data)};
 }
 
 function rsdMilitarValidar_(payload) {
@@ -985,7 +1027,10 @@ function rsdDraftObject_(r,old,deviceId) {
   var posto=locked&&locked.postoGrad?locked.postoGrad:(g.postoGrad||'');
   var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||''),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
   var tipo=normGuarnicaoTipo_(g.tipo||guarnicaoTipoFromNome_(g.nome)||(old&&old.GUARNICAO_TIPO)||''),vtrPrincipal=rsdPrimaryVtr_(r)||normVtrPrefix_(old&&old.VTR_PRINCIPAL||''),ordem=Number(g.ordem||g.numero||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0;
-  return {REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dateText_((r.servico||{}).data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||(old&&old.GUARNICAO)||'',GUARNICAO_TIPO:tipo,GUARNICAO_ORDEM:ordem,VTR_PRINCIPAL:vtrPrincipal,TURNO:'',
+  // DATA_SERVICO = data operacional (janela 07h→07h). Histórico com DATA_SERVICO já gravada é preservado.
+  var dataServico=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date());
+  r.servico=r.servico||{};r.servico.data=dataServico;r.servico.operationalDate=dataServico;r.servico.serviceWindow=getServiceWindow_(dataServico);
+  return {REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataServico,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||(old&&old.GUARNICAO)||'',GUARNICAO_TIPO:tipo,GUARNICAO_ORDEM:ordem,VTR_PRINCIPAL:vtrPrincipal,TURNO:'',
     STATUS:'EM_SERVICO',RESPONSAVEL_MATRICULA:mat,RESPONSAVEL_POSTO_GRAD:posto,RESPONSAVEL_NOME:nome,
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||nowIso_(),FINALIZADO_EM:'',RETIFICADO_EM:'',CANCELADO_EM:'',
     RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',INCLUIDO_RCO_EM:old&&old.INCLUIDO_RCO_EM||'',PAYLOAD_JSON:saved.json,SCHEMA_VERSION:r.schemaVersion||2,SINCRONIZADO_EM:nowIso_(),
@@ -1004,14 +1049,16 @@ function rsdStart_(payload) {
   if(old&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD não está disponível para novo início/registro. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Use Continuar serviço para consultar a situação ou a devolutiva.');
 
   var u0=r.unidade||{},g0=r.guarnicao||{},batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran'),
-      comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero),data0=dateText_((r.servico||{}).data),
+      comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero),
+      data0=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date()),
       mat0=normMat_(g0.matricula||r.matriculaResponsavel||''),tipo0=normGuarnicaoTipo_(g0.tipo||guarnicaoTipoFromNome_(g0.nome)),vtr0=rsdPrimaryVtr_(r),passagem0=!!(r.passagemOrigemId||(r.servico&&r.servico.passagemOrigemId)),guEscolhida0=normalizeGuarnicaoNome_(g0.nome,tipo0);
+  r.servico=r.servico||{};r.servico.data=data0;r.servico.operationalDate=data0;r.servico.serviceWindow=getServiceWindow_(data0);
   if(!tipo0)throw new Error('Selecione o tipo da guarnição: BST, BASE, GTTRAN, TOR ou REBOQUE.');
   if(!vtr0)throw new Error('Informe a VTR principal da guarnição.');
   var mainVtrMap=rsdMainVtrMap_();
   var openStatuses=rsdOpenEditableStatuses_();
 
-  // Identidade dura do serviço: BATALHAO|COMPANHIA|DATA|GUARNICAO_NORMALIZADA.
+  // Identidade dura do serviço: BATALHAO|COMPANHIA|DATA_OPERACIONAL|GUARNICAO_NORMALIZADA (janela 07h→07h).
   // Troca de VTR NÃO cria novo SERVICE_ID — reabre o serviço/segmento editável atual.
   if(!old&&data0&&!passagem0&&guEscolhida0){
     var key0=serviceKeyRsd_(batt0,comp0,data0,guEscolhida0,tipo0);
@@ -1136,7 +1183,9 @@ function rsdUpsert_(payload) {
   var matFinal=lockedCmd?lockedCmd.matricula:normMat_(g.matricula||r.matriculaResponsavel||'');
   var nomeFinal=lockedCmd&&lockedCmd.nome?lockedCmd.nome:(g.responsavel||'');
   var postoFinal=lockedCmd&&lockedCmd.postoGrad?lockedCmd.postoGrad:(g.postoGrad||'');
-  var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dateText_((r.servico||{}).data),BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||old&&old.GUARNICAO||'',GUARNICAO_TIPO:tipoFinal,GUARNICAO_ORDEM:ordemFinal,VTR_PRINCIPAL:vtrFinal,TURNO:'',STATUS:'AGUARDANDO_ANALISE',
+  var dataFinal=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||old&&old.INICIADO_EM||new Date());
+  r.servico=r.servico||{};r.servico.data=dataFinal;r.servico.operationalDate=dataFinal;r.servico.serviceWindow=getServiceWindow_(dataFinal);
+  var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataFinal,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||old&&old.GUARNICAO||'',GUARNICAO_TIPO:tipoFinal,GUARNICAO_ORDEM:ordemFinal,VTR_PRINCIPAL:vtrFinal,TURNO:'',STATUS:'AGUARDANDO_ANALISE',
     RESPONSAVEL_MATRICULA:matFinal,RESPONSAVEL_POSTO_GRAD:postoFinal,RESPONSAVEL_NOME:nomeFinal,
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||'',FINALIZADO_EM:nowIso_(),RETIFICADO_EM:wasReturned?nowIso_():'',CANCELADO_EM:'',
     RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',INCLUIDO_RCO_EM:old&&old.INCLUIDO_RCO_EM||'',PAYLOAD_JSON:saved.json,SCHEMA_VERSION:r.schemaVersion||2,SINCRONIZADO_EM:nowIso_(),
@@ -1199,7 +1248,7 @@ function rsdList_(p) {
     var rv=vtrs.filter(function(v){return String(v.RSD_REPORT_ID)===String(x.REPORT_ID);}).sort(function(a,b){return Number(a.ORDEM||0)-Number(b.ORDEM||0);});
     var pv=normVtrPrefix_(x.VTR_PRINCIPAL||mainVtrMap[String(x.REPORT_ID||'')]||''),key=[x.BATALHAO,x.COMPANHIA,dateText_(x.DATA_SERVICO),pv||('LEGACY:'+String(x.GUARNICAO||'').trim().toUpperCase())].join('|');
     return {reportId:x.REPORT_ID,serviceId:x.SERVICE_ID||'',segmento:Number(x.SEGMENTO||1),rsdAnteriorId:x.RSD_ANTERIOR_ID||'',passagemOrigemId:x.PASSAGEM_ORIGEM_ID||'',version:Number(x.VERSAO||1),draftRevision:Number(x.DRAFT_REVISION||0),
-      data:x.DATA_SERVICO,batalhao:x.BATALHAO,companhia:x.COMPANHIA,guarnicao:x.GUARNICAO,guarnicaoTipo:normGuarnicaoTipo_(x.GUARNICAO_TIPO||guarnicaoTipoFromNome_(x.GUARNICAO)),guarnicaoOrdem:Number(x.GUARNICAO_ORDEM||0)||0,vtrPrincipal:pv,status:x.STATUS,responsavel:x.RESPONSAVEL_NOME,matricula:x.RESPONSAVEL_MATRICULA,
+      data:x.DATA_SERVICO,operationalDate:resolveOperationalServiceDate_(x.DATA_SERVICO,x.INICIADO_EM),batalhao:x.BATALHAO,companhia:x.COMPANHIA,guarnicao:x.GUARNICAO,guarnicaoTipo:normGuarnicaoTipo_(x.GUARNICAO_TIPO||guarnicaoTipoFromNome_(x.GUARNICAO)),guarnicaoOrdem:Number(x.GUARNICAO_ORDEM||0)||0,vtrPrincipal:pv,status:x.STATUS,responsavel:x.RESPONSAVEL_NOME,matricula:x.RESPONSAVEL_MATRICULA,
       iniciadoEm:x.INICIADO_EM,finalizadoEm:x.FINALIZADO_EM,ultimoRascunhoEm:x.ULTIMO_RASCUNHO_EM,rcoReportId:x.RCO_REPORT_ID,editDeviceId:x.EDIT_DEVICE_ID||'',editLeaseUntil:x.EDIT_LEASE_UNTIL||'',
       reviewStatus:x.REVIEW_STATUS||'',reviewMotivo:x.REVIEW_MOTIVO||'',reviewObservacao:x.REVIEW_OBSERVACAO||'',reviewAutorNome:x.REVIEW_AUTOR_NOME||'',reviewEm:x.REVIEW_EM||'',
       canceladoMotivo:x.CANCELADO_MOTIVO||'',canceladoPorNome:x.CANCELADO_POR_NOME||'',canceladoPorMatricula:x.CANCELADO_POR_MATRICULA||'',canceladoPorPerfil:x.CANCELADO_POR_PERFIL||'',canceladoEm:x.CANCELADO_EM||'',
@@ -3298,19 +3347,20 @@ function rcoConsolidateMarkReviewed_(row,autor,rcoReportId,statusAnterior){
 function rcoConsolidateResolveRsdStatuses_(payload,reportId,autor){
   var pkg=payload||{},rco=pkg.rco||pkg,u=pkg.unidade||rco.unidade||{};
   var batt=normBattalion_(u.batalhao||pkg.batalhao),comp=u.companhia||pkg.companhia||normCompany_(batt,u.companhiaNumero);
-  var periodo=rco.periodo||{},data=dateText_(periodo.inicio||rco.data||pkg.data||'');
+  var periodo=rco.periodo||{},data=resolveOperationalServiceDate_(periodo.inicio||rco.data||pkg.data||'',periodo.inicio||rco.data||pkg.data||'');
   var originIds=(rco.rcoOrigens||[]).map(function(o){return String(o.rsdReportId||'')}).filter(Boolean);
   var listedIds=[].concat(pkg.rsdReportIds||[],pkg.reportIds||[]).map(function(x){return String(x||'')}).filter(Boolean);
   var listedServices={};(pkg.serviceIds||[]).forEach(function(sid){if(sid)listedServices[String(sid)]=true;});
   (rco.rcoOrigens||[]).forEach(function(o){if(o&&o.serviceId)listedServices[String(o.serviceId)]=true;});
   var includeSet={};originIds.concat(listedIds).forEach(function(id){includeSet[id]=true;});
   var rsdSheet=sheet_(P3_SHEET_ID,'RSD');
+  // Somente RSDs da MESMA data operacional do RCO (janela 07h→07h). Não incluir ±1 dia.
   var unitRows=objects_(rsdSheet).filter(function(x){
     if(String(x.STATUS||'')==='CANCELADO')return false;
     if(String(x.STATUS||'')==='DUPLICADO_LEGADO')return false;
     if(batt&&String(x.BATALHAO||'')!==batt)return false;
     if(comp&&String(x.COMPANHIA||'')!==String(comp))return false;
-    if(data&&dateText_(x.DATA_SERVICO)!==data)return false;
+    if(data&&resolveOperationalServiceDate_(x.DATA_SERVICO,x.INICIADO_EM)!==data)return false;
     return true;
   });
   var byKey={},resolutions=[];

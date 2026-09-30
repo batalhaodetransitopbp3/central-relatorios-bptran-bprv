@@ -267,7 +267,7 @@ textarea{min-height:52px}
 </div>
   <div class="rsd-register-row no-print"><button type="button" class="ok" id="rsdRegisterServiceBtn">Registrar guarnição no serviço</button><button type="button" class="secondary" id="rsdChangeKeyBtn">Sessão / trocar acesso</button><button type="button" class="secondary" id="rsdOpenReboqueBtn" hidden disabled>Abrir relatório de traslados</button><span id="rsdRegisterStatus" class="cloud-note">Selecione o tipo, informe a VTR principal e identifique o comandante. A numeração da guarnição será atribuída automaticamente.</span></div>
 </header>
-<section class="card hidden" id="fiscoToggleCard"><h2 class="sec-title">Missão no Fisco Estadual</h2><div class="grid"><div class="field span12"><label class="pill"><input id="fiscoAtivo" onchange="toggleFiscoMode()" type="checkbox"/> Esta guarnição esteve empenhada em missão no Fisco Estadual neste serviço</label></div><div class="span12 hidden" id="fiscoFields"><div class="grid"><div class="field span3"><label>Quantidade de ocorrências do Fisco</label><input id="fiscoQtd" min="0" type="number"/><span class="print-value" data-print-for="fiscoQtd"></span></div><div class="field span9"><label>Alterações de efetivo</label><textarea data-default="Sem alteração de efetivo." id="fiscoAltEfetivo" placeholder="Informe somente se houve alteração do efetivo durante a missão no Fisco Estadual."></textarea><span class="print-value" data-print-for="fiscoAltEfetivo"></span></div></div><div class="notice">No modo Fisco, o relatório de serviço diário concentra data, efetivo, alterações de efetivo, material/viatura e quantidade de ocorrências. O detalhamento de cada acionamento permanece no Relatório de Acionamento do Fisco Estadual.</div></div></div></section>
+<section class="card hidden" id="fiscoToggleCard"><h2 class="sec-title">Missão no Fisco Estadual</h2><div class="grid"><div class="field span12"><label class="pill"><input id="fiscoAtivo" onchange="toggleFiscoMode()" type="checkbox"/> Esta guarnição esteve empenhada em missão no Fisco Estadual neste serviço</label></div><div class="span12 hidden" id="fiscoFields"><div class="grid"><div class="field span3"><label>Quantidade de ocorrências do Fisco</label><input id="fiscoQtd" min="0" type="number"/><span class="print-value" data-print-for="fiscoQtd"></span></div><div class="field span9"><label>Alterações de efetivo</label><textarea data-default="Sem alteração de efetivo." id="fiscoAltEfetivo" placeholder="Informe somente se houve alteração do efetivo durante a missão no Fisco Estadual."></textarea><span class="print-value" data-print-for="fiscoAltEfetivo"></span></div></div><div class="notice">No modo Fisco, o relatório de serviço diário concentra data, efetivo, alterações de efetivo, material/viatura e quantidade de ocorrências. O detalhamento de cada acionamento permanece no Relatório de Acionamento do Fisco Estadual.</div><div class="rsd-fisco-actions no-print" id="rsdFiscoActions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="ok small" id="rsdOpenFiscoBtn">Registrar acionamento do Fisco</button><span id="rsdFiscoLinkStatus" class="cloud-note"></span></div></div></div></section>
 <section class="card" id="normalProduction"><h2 class="sec-title">Produção operacional</h2><div class="metric-wrap" id="producao"></div><div class="hint">A estrutura de produção operacional foi preservada. O total de AITs é calculado automaticamente.</div></section>
 <section class="card compact-section"><h2 class="sec-title">Alterações e informações do serviço</h2><div class="grid"><div class="field span6"><label>Alterações na VTR?</label><div class="watermark-box"><div class="watermark">Registre somente se houve avaria, indisponibilidade, substituição ou outra alteração na viatura.</div><textarea data-default="Não houve alteração na VTR." data-watermark="1" id="altVtr"></textarea></div><span class="print-value" data-print-for="altVtr"></span></div><div class="field span6"><label>Alterações no serviço?</label><div class="watermark-box"><div class="watermark">Registre somente alteração relevante na execução normal do serviço.</div><textarea data-default="Não houve alteração no serviço." data-watermark="1" id="altServico"></textarea></div><span class="print-value" data-print-for="altServico"></span></div><div class="field span6"><label id="altMaterialLabel">ALTERAÇÃO NO MATERIAL CAUTELADO?</label><div class="watermark-box"><div class="watermark">Registre somente falta, avaria, substituição ou alteração do material carga.</div><textarea data-default="Não houve alteração no material cautelado." data-watermark="1" id="altMaterial"></textarea></div><span class="print-value" data-print-for="altMaterial"></span></div><div class="field span6"><label>Plano Operacional Diário (POD)</label><div class="watermark-box"><div class="watermark">Informe somente alteração no cumprimento do POD ou observação operacional pertinente.</div><textarea data-default="Sem alteração informada no cumprimento do Plano Operacional Diário original repassada pelo Coordenador." data-watermark="1" id="planoOperacionalDiario"></textarea></div><span class="print-value" data-print-for="planoOperacionalDiario"></span></div><div class="field span12"><label>Observações</label><div class="watermark-box"><div class="watermark">Registre apenas informação relevante que não tenha sido contemplada nos campos anteriores.</div><textarea data-default="Sem observações" data-watermark="1" id="observacoes"></textarea></div><span class="print-value" data-print-for="observacoes"></span></div></div></section>
 <div id="normalExtras">
@@ -363,9 +363,10 @@ function addArvc(d={}){
 }
 function atualizarDiaSemana(){const v=val('data');const e=document.getElementById('diaSemana');if(!v){e.value='';return}const d=new Date(v+'T12:00:00');e.value=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][d.getDay()];syncPrintValue(e)}
 function atualizarFiscoVisibility(){const u=currentUnit();const show=u.batalhao==='BPRv'&&u.companhiaNumero===1;document.getElementById('fiscoToggleCard').classList.toggle('hidden',!show);if(!show){document.getElementById('fiscoAtivo').checked=false;toggleFiscoMode()}}
-function toggleFiscoMode(){const on=document.getElementById('fiscoAtivo').checked;const card=document.getElementById('fiscoToggleCard');if(card)card.classList.toggle('fisco-print-active',on);document.getElementById('fiscoFields').classList.toggle('hidden',!on);document.getElementById('normalProduction').classList.toggle('hidden',on);document.getElementById('normalExtras').classList.toggle('hidden',on)}
+function toggleFiscoMode(){const on=document.getElementById('fiscoAtivo').checked;const card=document.getElementById('fiscoToggleCard');if(card)card.classList.toggle('fisco-print-active',on);document.getElementById('fiscoFields').classList.toggle('hidden',!on);document.getElementById('normalProduction').classList.toggle('hidden',on);document.getElementById('normalExtras').classList.toggle('hidden',on);try{window.centralRsdRefreshFiscoLink?.()}catch(_){}}
 function collectDynamic(){const ocorrencias=entriesFrom('occurrences');const tcos=ocorrencias.filter(o=>o.tipo==='TCO').map(o=>({id:o.id,numero:o.numero||'',numeroTco:o.numeroTco||'',tipificacao:o.tipificacao||'',tcoSasp:o.tcoSasp||'Não'}));return {ocorrencias,operacoes:entriesFrom('operations').map(o=>({...o,incluirNoCpu:true})),veiculosRecuperados:entriesFrom('vehicles'),tcos,arvc:entriesFrom('arvcs')}}
-function payloadV2(){const u=currentUnit();const dyn=collectDynamic();return {schema:'pmpb-transito-servico-diario-v2',schemaVersion:2,reportId,generatedAt:new Date().toISOString(),tipoRelatorio:'servico-diario-guarnicao',unidade:u,servico:{data:val('data'),diaSemana:val('diaSemana')},guarnicao:{nome:val('guarnicao'),viatura:val('viatura'),responsavel:val('responsavel'),matricula:val('matriculaResponsavel'),efetivo:val('efetivo')},producao:collectProduction(),alteracoes:{viatura:val('altVtr'),servico:val('altServico'),materialCarga:val('altMaterial'),planoOperacionalDiario:val('planoOperacionalDiario')},observacoes:val('observacoes'),...dyn,fisco:{ativo:document.getElementById('fiscoAtivo').checked,quantidadeOcorrencias:num(val('fiscoQtd')),alteracoesEfetivo:val('fiscoAltEfetivo')}}}
+function readFiscoAcionamentos(){try{const raw=localStorage.getItem('pmpb-rsd-fisco-links-v1');const all=raw?JSON.parse(raw):{};const sid=String(localStorage.getItem('pmpb-transito-servico-diario-v2-service-id')||'');const rid=String(localStorage.getItem('pmpb-transito-servico-diario-v2-report-id')||reportId||'');const list=all[sid||rid]||all[rid]||[];return Array.isArray(list)?list:[]}catch(_){return []}}
+function payloadV2(){const u=currentUnit();const dyn=collectDynamic();const opData=(typeof CentralCloud!=='undefined'&&CentralCloud.operationalServiceDate&&val('data'))?CentralCloud.operationalServiceDate(val('data')):val('data');return {schema:'pmpb-transito-servico-diario-v2',schemaVersion:2,reportId,generatedAt:new Date().toISOString(),tipoRelatorio:'servico-diario-guarnicao',unidade:u,servico:{data:opData||val('data'),diaSemana:val('diaSemana'),operationalDate:opData||val('data')},guarnicao:{nome:val('guarnicao'),viatura:val('viatura'),responsavel:val('responsavel'),matricula:val('matriculaResponsavel'),efetivo:val('efetivo')},producao:collectProduction(),alteracoes:{viatura:val('altVtr'),servico:val('altServico'),materialCarga:val('altMaterial'),planoOperacionalDiario:val('planoOperacionalDiario')},observacoes:val('observacoes'),...dyn,fisco:{ativo:document.getElementById('fiscoAtivo').checked,quantidadeOcorrencias:num(val('fiscoQtd')),alteracoesEfetivo:val('fiscoAltEfetivo'),acionamentos:readFiscoAcionamentos()}}}
 function exportarDadosGuarnicao(silent=false){if(!val('guarnicao')){if(!silent)alert('Informe o nome da guarnição antes de exportar.');return null}const p=payloadV2();dlJSON(`RSD - ${safeName(p.guarnicao.nome,'GUARNIÇÃO')} - ${fmtDateFile(p.servico.data)}.json`,p);return p}
 async function importarOperacaoJson(files){let ok=0;for(const f of Array.from(files||[])){try{const p=JSON.parse(await f.text());if(p.schema!=='pmpb-transito-operacao-v2'){alert(`Arquivo ${f.name} não é um relatório de operação compatível.`);continue}const st=operationToSummary(p);if(!document.querySelector(`#operations .entry[data-id="${CSS.escape(st.id)}"]`)){addOperationSummary(st);ok++}}catch(e){alert(`Não foi possível importar ${f.name}.`)}}if(ok)alert(`${ok} operação(ões) importada(s).`)}
 
@@ -503,7 +504,7 @@ function nomePdf(){return `RSD - ${safeName(val('guarnicao'),'GUARNIÇÃO')} - $
 function syncAllPrint(){document.querySelectorAll('input,select,textarea').forEach(syncPrintValue);document.querySelectorAll('.entry select:not([data-k]),.entry select[data-k],.entry input[data-k],.entry textarea[data-k]').forEach(syncPrintValue)}
 function prepareAndPrint(){syncAllPrint();atualizarAssinaturaPrint();const old=document.title;document.title=nomePdf();window.print();setTimeout(()=>document.title=old,800)}
 function localISODate(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-function setToday(){if(!val('data'))document.getElementById('data').value=localISODate();atualizarDiaSemana()}
+function setToday(){if(!val('data'))document.getElementById('data').value=(typeof CentralCloud!=='undefined'&&CentralCloud.operationalISODate)?CentralCloud.operationalISODate():localISODate();atualizarDiaSemana()}
 // signature — imagem sempre preservada em proporção real (sem esticar)
 const canvas=document.getElementById('assinatura'),ctx=canvas.getContext('2d');let drawing=false,last=null,assinaturaData='';
 function setupSignatureContext(dpr=1){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=2.2;ctx.strokeStyle='#111'}
@@ -709,7 +710,7 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.26"></script>
+<script src="central_cloud.js?v=10.8.27"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -776,6 +777,40 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
       location.href=ios?'relatorio_traslados_reboque_ios.html':'relatorio_traslados_reboque.html';
     });
   }
+  const FISCO_LINKS_KEY='pmpb-rsd-fisco-links-v1',FISCO_RETURN_KEY='pmpb-fisco-return-v1';
+  function fiscoLinkKey(){return String(serviceId||reportId||'')}
+  function listFiscoLinks(){try{const all=JSON.parse(localStorage.getItem(FISCO_LINKS_KEY)||'{}')||{};const k=fiscoLinkKey();const list=all[k]||[];return Array.isArray(list)?list:[]}catch(_){return []}}
+  function saveFiscoLinks(list){try{const all=JSON.parse(localStorage.getItem(FISCO_LINKS_KEY)||'{}')||{};all[fiscoLinkKey()]=list;localStorage.setItem(FISCO_LINKS_KEY,JSON.stringify(all))}catch(_){}}
+  function refreshFiscoLinkUi(){
+    const st=document.getElementById('rsdFiscoLinkStatus'),btn=document.getElementById('rsdOpenFiscoBtn');if(!st&&!btn)return;
+    const links=listFiscoLinks(),n=links.length;
+    if(st)st.textContent=n?('Acionamento do Fisco registrado'+(n>1?' ('+n+')':'')+'.'):'';
+    if(btn)btn.textContent=n?'Ver/editar acionamento do Fisco':'Registrar acionamento do Fisco';
+  }
+  window.centralRsdRefreshFiscoLink=refreshFiscoLinkUi;
+  async function openFiscoFromRsd(opts={}){
+    if(!document.getElementById('fiscoAtivo')?.checked){alert('Marque a opção de missão no Fisco Estadual antes de registrar o acionamento.');return}
+    if(!serviceRegistered){alert('Registre a guarnição no serviço antes de abrir o Acionamento do Fisco.');return}
+    const links=listFiscoLinks();
+    let editId=opts.editId||'';
+    if(!opts.forceNew&&links.length&&!editId){
+      const openExisting=confirm('Já existe acionamento do Fisco vinculado a este RSD.\n\nOK = ver/editar o último.\nCancelar = registrar um NOVO acionamento neste mesmo serviço.');
+      if(openExisting)editId=links[links.length-1].id;
+      else if(!confirm('Confirma criar outro acionamento do Fisco neste mesmo serviço?'))return;
+    }
+    try{salvarRascunhoGuarnicao(true)}catch(_){}
+    if(serviceRegistered){try{await window.centralRsdSaveProgression?.()}catch(_){}}
+    const ios=/relatorio_servico_diario_ios\.html/i.test(location.pathname);
+    const returnUrl=ios?'relatorio_servico_diario_ios.html':'relatorio_servico_diario.html';
+    const acionamentoId=editId||('fisco-'+Date.now().toString(36));
+    const ctx={...activeContext(),returnUrl,returnModule:'rsd',fiscoAcionamentoId:acionamentoId,operationalDate:val('data'),serviceWindow:CentralCloud.getServiceWindow?.(val('data')||new Date())||null};
+    try{sessionStorage.setItem(FISCO_RETURN_KEY,JSON.stringify(ctx));localStorage.setItem(ACTIVE_CONTEXT_KEY,JSON.stringify(ctx))}catch(_){}
+    if(!editId){
+      saveFiscoLinks(links.concat([{id:acionamentoId,serviceId,rsdReportId:reportId,data:val('data'),guarnicao:val('guarnicao'),salvoEm:new Date().toISOString(),status:'aberto'}]));
+      refreshFiscoLinkUi();
+    }
+    location.href=ios?'relatorio_fisco_ios.html':'relatorio_fisco.html';
+  }
   function updateIdentityLock(){
     const t=document.getElementById('guarnicaoTipo'),g=document.getElementById('guarnicaoNumero'),v=document.getElementById('viatura'),k=document.getElementById('rsdChangeKeyBtn');
     if(t)t.disabled=!!serviceRegistered;if(g)g.disabled=!!serviceRegistered;
@@ -803,9 +838,9 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   function activeContext(){return {serviceId,rsdReportId:reportId,segmento,guarnicao:val('guarnicao'),comandante:val('responsavel'),comandanteMatricula:CentralCloud.formatMatricula(val('matriculaResponsavel')),vtrs:collectVtrs().map(x=>x.prefixo),unidade:currentUnit(),data:val('data'),iniciadoEm:serviceStartedAt||''}}
   function saveActiveContext(){if(READONLY_VIEWER)return;try{if(serviceRegistered)localStorage.setItem(ACTIVE_CONTEXT_KEY,JSON.stringify(activeContext()));else localStorage.removeItem(ACTIVE_CONTEXT_KEY)}catch(_){}}
   function applyCommander(m){if(!m||serviceRegistered)return;commanderPostoGrad=m.POSTO_GRAD||m.postoGrad||'';const nome=((commanderPostoGrad||'')+' '+(m.NOME||m.nome||'')).trim(),mat=CentralCloud.formatMatricula(m.MATRICULA||m.matricula||'');const n=document.getElementById('responsavel'),mt=document.getElementById('matriculaResponsavel');if(n)n.value=nome;if(mt)mt.value=mat;window.centralRsdCommanderFound?.();if(n)syncPrintValue(n);if(mt)syncPrintValue(mt);window.centralAutosave?.()}
-  function enrichPayload(p){const v=collectVtrs();p.viaturas=v;p.serviceId=serviceId;p.segmento=segmento;p.rsdAnteriorId=rsdAnteriorId;p.passagemOrigemId=passagemOrigemId;p.cloudRegistered=serviceRegistered;p.guarnicao={...(p.guarnicao||{}),tipo:val('guarnicaoTipo'),viatura:v.map(x=>x.prefixo).join(', '),vtrPrincipal:v[0]?.prefixo||'',viaturas:v,postoGrad:commanderPostoGrad||p.guarnicao?.postoGrad||''};p.operacoesAcumuladas=typeof operacoesLocaisDoServicoRsd==='function'?operacoesLocaisDoServicoRsd():[];p.servico={...(p.servico||{}),iniciadoEm:serviceStartedAt||p.servico?.iniciadoEm||'',serviceId,segmento,rsdAnteriorId,passagemOrigemId};return p}
+  function enrichPayload(p){const v=collectVtrs();p.viaturas=v;p.serviceId=serviceId;p.segmento=segmento;p.rsdAnteriorId=rsdAnteriorId;p.passagemOrigemId=passagemOrigemId;p.cloudRegistered=serviceRegistered;p.guarnicao={...(p.guarnicao||{}),tipo:val('guarnicaoTipo'),viatura:v.map(x=>x.prefixo).join(', '),vtrPrincipal:v[0]?.prefixo||'',viaturas:v,postoGrad:commanderPostoGrad||p.guarnicao?.postoGrad||''};p.operacoesAcumuladas=typeof operacoesLocaisDoServicoRsd==='function'?operacoesLocaisDoServicoRsd():[];const opData=p.servico?.data||val('data');p.servico={...(p.servico||{}),iniciadoEm:serviceStartedAt||p.servico?.iniciadoEm||'',serviceId,segmento,rsdAnteriorId,passagemOrigemId,operationalDate:opData,serviceWindow:CentralCloud.getServiceWindow?.(opData||new Date())||null};p.fisco={...(p.fisco||{}),acionamentos:listFiscoLinks()};return p}
   window.payloadV2=function(){return enrichPayload(basePayload())}
-  if(baseApply)window.applyPayload=function(p){baseApply(p);const gt=document.getElementById('guarnicaoTipo');if(gt)gt.value=String(p?.guarnicao?.tipo||teamTypeFromName(p?.guarnicao?.nome)||'').toUpperCase();if(p?.reportId){reportId=p.reportId;if(!READONLY_VIEWER)localStorage.setItem(REPORT_ID_KEY,reportId)}serviceId=p?.serviceId||p?.servico?.serviceId||serviceId;segmento=Number(p?.segmento||p?.servico?.segmento||segmento||1)||1;rsdAnteriorId=p?.rsdAnteriorId||p?.servico?.rsdAnteriorId||'';passagemOrigemId=p?.passagemOrigemId||p?.servico?.passagemOrigemId||'';if(!READONLY_VIEWER&&p?.cloudRegistered===true)serviceRegistered=true;const vs=Array.isArray(p?.viaturas)?p.viaturas:(Array.isArray(p?.guarnicao?.viaturas)?p.guarnicao.viaturas:[]);const extra=vs.map(x=>typeof x==='string'?x:(x.prefixo||x.viatura||'')).filter(Boolean);if(extra.length){document.getElementById('viatura').value=extra.shift();document.getElementById('rsdVtrExtras').innerHTML='';extra.forEach(v=>centralRsdAddViatura(v));syncVtrPrint()}commanderPostoGrad=p?.guarnicao?.postoGrad||'';serviceStartedAt=p?.servico?.iniciadoEm||p?.iniciadoEm||serviceStartedAt||'';if(!READONLY_VIEWER){try{if(serviceStartedAt)localStorage.setItem('pmpb-transito-servico-diario-v2-started-at',serviceStartedAt)}catch(_){}saveIdentity();saveActiveContext();updateIdentityLock();setTimeout(()=>renderReceivedPassage(passagemOrigemId),0)}else{syncVtrPrint();document.querySelectorAll('input,select,textarea').forEach(syncPrintValue)}}
+  if(baseApply)window.applyPayload=function(p){baseApply(p);const gt=document.getElementById('guarnicaoTipo');if(gt)gt.value=String(p?.guarnicao?.tipo||teamTypeFromName(p?.guarnicao?.nome)||'').toUpperCase();if(p?.reportId){reportId=p.reportId;if(!READONLY_VIEWER)localStorage.setItem(REPORT_ID_KEY,reportId)}serviceId=p?.serviceId||p?.servico?.serviceId||serviceId;segmento=Number(p?.segmento||p?.servico?.segmento||segmento||1)||1;rsdAnteriorId=p?.rsdAnteriorId||p?.servico?.rsdAnteriorId||'';passagemOrigemId=p?.passagemOrigemId||p?.servico?.passagemOrigemId||'';if(!READONLY_VIEWER&&p?.cloudRegistered===true)serviceRegistered=true;const vs=Array.isArray(p?.viaturas)?p.viaturas:(Array.isArray(p?.guarnicao?.viaturas)?p.guarnicao.viaturas:[]);const extra=vs.map(x=>typeof x==='string'?x:(x.prefixo||x.viatura||'')).filter(Boolean);if(extra.length){document.getElementById('viatura').value=extra.shift();document.getElementById('rsdVtrExtras').innerHTML='';extra.forEach(v=>centralRsdAddViatura(v));syncVtrPrint()}commanderPostoGrad=p?.guarnicao?.postoGrad||'';serviceStartedAt=p?.servico?.iniciadoEm||p?.iniciadoEm||serviceStartedAt||'';try{const ac=p?.fisco?.acionamentos;if(Array.isArray(ac)&&ac.length&&serviceId){const all=JSON.parse(localStorage.getItem(FISCO_LINKS_KEY)||'{}')||{};if(!all[serviceId]?.length){all[serviceId]=ac;localStorage.setItem(FISCO_LINKS_KEY,JSON.stringify(all))}}}catch(_){}if(!READONLY_VIEWER){try{if(serviceStartedAt)localStorage.setItem('pmpb-transito-servico-diario-v2-started-at',serviceStartedAt)}catch(_){}saveIdentity();saveActiveContext();updateIdentityLock();refreshFiscoLinkUi();setTimeout(()=>renderReceivedPassage(passagemOrigemId),0)}else{syncVtrPrint();document.querySelectorAll('input,select,textarea').forEach(syncPrintValue)}}
   async function preCadastrarMilitarRsd(mat,token){
     mat=CentralCloud.formatMatricula(mat||'');
     if(!/^\d{3}\.\d{3}-\d$/.test(mat))return null;
@@ -871,7 +906,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     }catch(err){console.error(err)}
   }
   function isRsdDirtyUnsynced(){try{return !!(typeof window.centralIsDirty==='function'&&window.centralIsDirty())}catch(_){return false}}
-  function closeRsdExitModal(){document.getElementById('rsdExitDialog')?.remove()}
+  function closeRsdExitModal(){document.getElementById('rsdExitDialog')?.remove();rsdExitBusy=false}
   function setRsdExitBusy(busy,statusText){
     rsdExitBusy=!!busy;
     const ov=document.getElementById('rsdExitDialog');if(!ov)return;
@@ -963,7 +998,6 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     });
   }
   async function openRsdExitFlow(nextAction){
-    setRsdExitBusy(false,'Consultando o estado do serviço…');
     showRsdExitDialog({
       title:'Sair do RSD',
       message:'Consultando o estado do serviço na Central…',
@@ -971,7 +1005,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     });
     setRsdExitBusy(true,'Consultando o estado do serviço…');
     let ctx;try{ctx=await resolveRsdExitContext()}catch(_){ctx={mode:serviceRegistered?'finalize':'leave',source:'fallback'}}
-    closeRsdExitModal();
+    closeRsdExitModal(); // também zera rsdExitBusy — sem isso o SIM da finalização ficava ignorado
 
     if(ctx.mode==='passagem'){
       showRsdExitDialog({
@@ -1026,19 +1060,17 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
         if(act==='yes'){
           setRsdExitBusy(true,'Finalizando o serviço na Central…');
           let result=null;
-          try{result=await window.finalizarServico?.({skipPrint:true,fromExit:true,skipConfirm:true})}catch(e){result=false;alert('Não foi possível finalizar o serviço: '+(e?.message||e))}
+          try{result=await window.finalizarServico?.({skipPrint:true,fromExit:true,skipConfirm:true})}catch(e){result=false;setRsdExitBusy(false,'Não foi possível finalizar: '+(e?.message||e));return}
           if(result===true){closeRsdExitModal();runRsdExitAction(nextAction);return}
           if(result==='passagem'){
-            setRsdExitBusy(false,'Este serviço está com passagem pendente. Use a opção de saída sem finalizar.');
-            // Reopen passage-aware flow
             closeRsdExitModal();
             openRsdExitFlow(nextAction);
             return;
           }
           const msg=result===false
-            ?'Não foi possível finalizar. O relatório permanece neste aparelho.'
+            ?'Não foi possível finalizar. O relatório permanece neste aparelho — tente novamente.'
             :(result===null||result===undefined)
-              ?'A finalização não foi concluída. Nenhuma navegação foi feita.'
+              ?'A finalização não foi concluída (timeout ou resposta inválida). Os dados locais foram preservados — tente novamente.'
               :'A finalização não confirmou sucesso. Nenhuma navegação foi feita.';
           setRsdExitBusy(false,msg);
           return;
@@ -1441,7 +1473,7 @@ async function publishPass(){
     const mat=CentralCloud.formatMatricula(val('matriculaResponsavel'));if(!val('responsavel')||!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Identifique o comandante da guarnição antes de finalizar o RSD.');return false}
     // Passagem pendente: não usar finalização definitiva.
     const localPass=localOutgoingPassageId();
-    if(localPass){alert('Há uma passagem de serviço aguardando recebimento. Cancele a passagem se quiser retomar a edição, ou saia mantendo a passagem pendente. A finalização definitiva não se aplica neste estado.');return 'passagem'}
+    if(localPass){if(!opts.fromExit)alert('Há uma passagem de serviço aguardando recebimento. Cancele a passagem se quiser retomar a edição, ou saia mantendo a passagem pendente. A finalização definitiva não se aplica neste estado.');return 'passagem'}
     let token=CentralCloud.getToken('central')||requireOperationalToken();if(!token)return false;
     setRsdOpBusy(true);
     try{
@@ -1450,20 +1482,32 @@ async function publishPass(){
       if(reportId){
         try{
           const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:12000}),rp=atual.rsd||{},st=String(rp.centralStatus||'').toUpperCase();
-          if(st==='PASSAGEM_DISPONIVEL'||st==='ENCERRADO_PASSAGEM'){renderOutgoingPassage(localPass||'');alert('Este RSD está com passagem disponibilizada. Não finalize: o próximo militar deve receber a passagem. Você pode sair da tela mantendo a passagem pendente.');return 'passagem'}
-          if(st&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(st)<0){renderReviewBanner(rp);alert(reviewMessage(rp));return false}
+          if(st==='PASSAGEM_DISPONIVEL'||st==='ENCERRADO_PASSAGEM'){renderOutgoingPassage(localPass||'');if(!opts.fromExit)alert('Este RSD está com passagem disponibilizada. Não finalize: o próximo militar deve receber a passagem. Você pode sair da tela mantendo a passagem pendente.');return 'passagem'}
+          // Idempotência: já finalizado na Central → sucesso sem reenviar
+          if(st&&['AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','INCLUIDO_RCO','FINALIZADO'].includes(st)){
+            serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner(rp);updateFinalizeUi(st);return true;
+          }
+          if(st&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(st)<0){renderReviewBanner(rp);if(!opts.fromExit)alert(reviewMessage(rp));return false}
         }catch(e){if(!/não localizado|indisponível/i.test(String(e.message||e)))console.warn(e)}
       }
       await fetchCloudOperations(true);await carregarRemocoesDoDia(true);if(!serviceStartedAt)serviceStartedAt=new Date().toISOString();
       const p=window.payloadV2();p.guarnicao.matricula=mat;p.servico.iniciadoEm=serviceStartedAt;p.servico.finalizadoEm=new Date().toISOString();
       const skipConfirm=!!(opts.skipConfirm||opts.fromExit);
       if(!skipConfirm&&!confirm(summaryText(p)+'\n\nFinalizar e enviar este RSD para análise do Coordenador?'))return false;
-      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'}});updateFinalizeUi(r.status||'AGUARDANDO_ANALISE');if(r.message&&!opts.fromExit)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}
+      const r=await CentralCloud.submitForm('rsd-upsert',{rsd:p,deviceId},token,{popup:false,timeout:45000});serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner({centralStatus:r.status||'AGUARDANDO_ANALISE',revisaoCoordenador:{status:r.status||'AGUARDANDO_ANALISE'}});updateFinalizeUi(r.status||'AGUARDANDO_ANALISE');if(r.message&&!opts.fromExit)alert(r.message);try{salvarRascunhoGuarnicao(true)}catch(_){}
       if(!opts.skipPrint)setTimeout(()=>prepareAndPrint(),180);
       return true;
     }catch(e){
-      try{const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:10000});if(atual?.rsd){renderReviewBanner(atual.rsd);alert(reviewMessage(atual.rsd));return false}}catch(_){}
-      alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.');
+      // Timeout / perda de resposta: confirmar se o backend já persistiu (idempotente)
+      try{
+        const atual=await CentralCloud.jsonp('rsd-get',{reportId,token},{timeout:12000});
+        const st=String(atual?.rsd?.centralStatus||'').toUpperCase();
+        if(['AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','INCLUIDO_RCO','FINALIZADO'].includes(st)){
+          serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner(atual.rsd);updateFinalizeUi(st);return true;
+        }
+        if(atual?.rsd){renderReviewBanner(atual.rsd);if(!opts.fromExit)alert(reviewMessage(atual.rsd));return false}
+      }catch(_){}
+      if(!opts.fromExit)alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.');
       return false;
     }
     }finally{setRsdOpBusy(false)}
@@ -1486,11 +1530,11 @@ async function publishPass(){
       syncAllPrint();atualizarAssinaturaPrint?.();
     }catch(e){alert('Não foi possível recuperar o RSD da Central: '+e.message)}
   }
-  function install(){if(READONLY_VIEWER){window.centralRsdReceiveCloud=()=>{};loadCloudViewer();return}window.centralRsdReceiveCloud=receivePass;const gt=document.getElementById('guarnicaoTipo');if(gt&&!gt.dataset.autoBound){gt.dataset.autoBound='1';gt.addEventListener('change',()=>{scheduleTeamSuggestion();updateReboqueShortcut()})}['data','batalhao','companhiaNumero'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.teamAutoBound){el.dataset.teamAutoBound='1';el.addEventListener('change',scheduleTeamSuggestion)}});try{renderOutgoingPassage(localStorage.getItem(OUTGOING_PASS_KEY)||'');renderReceivedPassage(passagemOrigemId)}catch(_){};const mainVtr=document.getElementById('viatura');if(mainVtr&&!mainVtr.dataset.vtrBound){mainVtr.dataset.vtrBound='1';mainVtr.addEventListener('input',()=>{mainVtr.value=String(mainVtr.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);syncVtrPrint()})}const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}const tow=document.getElementById('rsdOpenReboqueBtn');if(tow&&!tow.dataset.bound){tow.dataset.bound='1';tow.onclick=openReboqueFromRsd}syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';const cirvcBtn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Carregar remoções do dia');if(cirvcBtn)cirvcBtn.onclick=()=>carregarRemocoesDoDia(false);window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rsd','continue');return true}let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok){serviceRegistered=false;saveIdentity();saveActiveContext()}return !!ok}alert('Atualize a página para usar a busca de serviços por companhia.');return false};updateIdentityLock();if(!serviceRegistered){const savedToken=CentralCloud.getToken('central');if(savedToken&&reportId)recoverRegisteredServiceFromCloud(savedToken,false).then(r=>{if(r?.active){scheduleCloudSync();return}if(!r?.closed)scheduleTeamSuggestion()}).catch(()=>scheduleTeamSuggestion());else scheduleTeamSuggestion()}if(serviceRegistered){saveActiveContext();scheduleCloudSync()}installRsdLeaveSyncGuards();setTimeout(installRsdLeaveSyncGuards,120)}
+  function install(){if(READONLY_VIEWER){window.centralRsdReceiveCloud=()=>{};loadCloudViewer();return}window.centralRsdReceiveCloud=receivePass;const gt=document.getElementById('guarnicaoTipo');if(gt&&!gt.dataset.autoBound){gt.dataset.autoBound='1';gt.addEventListener('change',()=>{scheduleTeamSuggestion();updateReboqueShortcut()})}['data','batalhao','companhiaNumero'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.teamAutoBound){el.dataset.teamAutoBound='1';el.addEventListener('change',scheduleTeamSuggestion)}});try{renderOutgoingPassage(localStorage.getItem(OUTGOING_PASS_KEY)||'');renderReceivedPassage(passagemOrigemId)}catch(_){};const mainVtr=document.getElementById('viatura');if(mainVtr&&!mainVtr.dataset.vtrBound){mainVtr.dataset.vtrBound='1';mainVtr.addEventListener('input',()=>{mainVtr.value=String(mainVtr.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,8);syncVtrPrint()})}const mat=document.getElementById('matriculaResponsavel');if(mat&&!mat.dataset.lookupBound){mat.dataset.lookupBound='1';mat.addEventListener('blur',()=>lookupMilitar(false))}const buscar=document.getElementById('buscarMilitarBtn');if(buscar&&!buscar.dataset.lookupBound){buscar.dataset.lookupBound='1';buscar.addEventListener('click',()=>lookupMilitar(true))}const reg=document.getElementById('rsdRegisterServiceBtn');if(reg&&!reg.dataset.bound){reg.dataset.bound='1';reg.onclick=registerService}const tow=document.getElementById('rsdOpenReboqueBtn');if(tow&&!tow.dataset.bound){tow.dataset.bound='1';tow.onclick=openReboqueFromRsd}const fiscoBtn=document.getElementById('rsdOpenFiscoBtn');if(fiscoBtn&&!fiscoBtn.dataset.bound){fiscoBtn.dataset.bound='1';fiscoBtn.onclick=()=>openFiscoFromRsd()}refreshFiscoLinkUi();syncVtrPrint();const btn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Importar operações');if(btn)btn.textContent='Carregar operações do dia';const cirvcBtn=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Carregar remoções do dia');if(cirvcBtn)cirvcBtn.onclick=()=>carregarRemocoesDoDia(false);window.finalizarServico=finalizeCloud;window.gerarPassagemServico=publishPass;const localAutosave=window.centralAutosave;if(localAutosave&&!localAutosave.__cloudWrapped){const wrapped=function(){const r=localAutosave();scheduleCloudSync();return r};wrapped.__cloudWrapped=true;window.centralAutosave=wrapped}const baseContinue=window.centralContinueService;window.centralContinueService=async function(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rsd','continue');return true}let hasLocal=false;try{hasLocal=!!localStorage.getItem(DRAFT_KEY)}catch(_){}if(hasLocal){const ok=baseContinue?.();if(ok){serviceRegistered=false;saveIdentity();saveActiveContext()}return !!ok}alert('Atualize a página para usar a busca de serviços por companhia.');return false};updateIdentityLock();if(!serviceRegistered){const savedToken=CentralCloud.getToken('central');if(savedToken&&reportId)recoverRegisteredServiceFromCloud(savedToken,false).then(r=>{if(r?.active){scheduleCloudSync();return}if(!r?.closed)scheduleTeamSuggestion()}).catch(()=>scheduleTeamSuggestion());else scheduleTeamSuggestion()}if(serviceRegistered){saveActiveContext();scheduleCloudSync()}installRsdLeaveSyncGuards();setTimeout(installRsdLeaveSyncGuards,120)}
   document.getElementById('rsdChangeKeyBtn')?.addEventListener('click',window.centralRsdChangeOperationalKey);
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.26"></script>
-<script src="service_flow.js?v=10.8.26"></script>
+<script src="service_access_layers.js?v=10.8.27"></script>
+<script src="service_flow.js?v=10.8.27"></script>
 </body></html>
