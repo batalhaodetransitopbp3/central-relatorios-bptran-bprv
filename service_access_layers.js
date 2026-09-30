@@ -33,8 +33,10 @@ body.central-service-setup .toolbar{display:none!important}
 body.central-service-setup .service-state-bar{display:none!important}
 body.central-service-setup header.doc-head{display:block!important}
 body.central-service-setup.rsd-setup header.doc-head{margin-bottom:18px!important}
-.central-enter-report{margin-left:auto}
+.central-enter-report{margin-left:0;min-height:42px;padding:11px 16px!important;font-size:14px!important;font-weight:800!important}
+#rcoResponsavelActions #centralEnterRcoBtn:not([hidden]){flex:1 1 180px}
 .central-registered-note{font-weight:700;color:#17633d}
+@media(max-width:620px){#rcoResponsavelActions #centralEnterRcoBtn:not([hidden]){flex:1 1 100%;width:100%}}
 body.central-service-setup.rco-setup main.page>*{display:none!important}
 body.central-service-setup.rco-setup header.doc-head,
 body.central-service-setup.rco-setup #rcoConsolidacaoMode,
@@ -117,6 +119,7 @@ function enterSetup(type,context=''){
    installRcoSetupStatus();
    installRcoEnterButton();
    q('#centralRcoSetupStatus')?.removeAttribute('hidden');
+   const enter=q('#centralEnterRcoBtn');if(enter){enter.hidden=true;enter.setAttribute('hidden','hidden');enter.onclick=e=>{e?.preventDefault?.();enterRcoReport()}}
    const pw=q('#rcoResponsavelSenha');if(pw){pw.value='';const pf=pw.closest('.field');if(pf)pf.hidden=true}
    if(context==='receive'||context==='continue')lockRcoServiceIdentity();
    q('#rcoResponsavelCard')?.scrollIntoView({block:'start'});
@@ -196,11 +199,45 @@ function installRcoSetupStatus(){
  }
  return box;
 }
+function enterRcoReport(){
+ lockRcoHeader();
+ const btn=q('#centralEnterRcoBtn');if(btn){btn.hidden=true;btn.setAttribute('hidden','hidden')}
+ hideContinuarComoBox();
+ exitSetup();
+ setTimeout(()=>global.centralRcoRefreshCloud?.(),120);
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+function hideContinuarComoBox(){
+ const box=q('#rcoContinuarComoBox');if(box){box.classList.add('hidden');box.hidden=true}
+}
 function installRcoEnterButton(){
- const actions=q('#rcoResponsavelCard .actions');if(!actions)return null;
+ // NÃO usar "#rcoResponsavelCard .actions": o primeiro .actions é a caixa oculta "Continuar como".
+ let actions=q('#rcoResponsavelActions');
+ if(!actions){
+   const reg=q('#rcoResponsavelRegistrarBtn');
+   actions=reg?.closest('.actions')||q('#rcoResponsavelCard');
+ }
+ if(!actions)return null;
  let btn=q('#centralEnterRcoBtn');
- if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterRcoBtn';btn.className='ok small central-enter-report';btn.textContent='Entrar no RCO';btn.hidden=true;actions.appendChild(btn)}
- btn.onclick=()=>{btn.hidden=true;lockRcoHeader();exitSetup();setTimeout(()=>global.centralRcoRefreshCloud?.(),120);window.scrollTo({top:0,behavior:'smooth'})};
+ if(!btn){btn=document.createElement('button');btn.type='button';btn.id='centralEnterRcoBtn';btn.className='ok central-enter-report';btn.textContent='Entrar no RCO';btn.hidden=true;btn.setAttribute('hidden','hidden');
+   const reg=q('#rcoResponsavelRegistrarBtn');
+   if(reg&&reg.parentElement===actions)reg.insertAdjacentElement('afterend',btn);else actions.appendChild(btn);
+ }else{
+   btn.classList.add('ok','central-enter-report');
+   btn.classList.remove('small');
+   btn.textContent='Entrar no RCO';
+   // Se o botão ficou preso na caixa "Continuar como", move para a barra correta.
+   if(btn.closest('#rcoContinuarComoBox')||(actions.id==='rcoResponsavelActions'&&btn.parentElement!==actions)){
+     const reg=q('#rcoResponsavelRegistrarBtn');
+     if(reg&&reg.parentElement===actions)reg.insertAdjacentElement('afterend',btn);else actions.appendChild(btn);
+   }
+ }
+ btn.onclick=e=>{e?.preventDefault?.();enterRcoReport()};
+ return btn;
+}
+function revealRcoEnterButton(){
+ const btn=installRcoEnterButton();if(!btn)return null;
+ btn.hidden=false;btn.removeAttribute('hidden');btn.disabled=false;btn.style.display='';
  return btn;
 }
 function rcoSetupDateWindow(inicio,fim){
@@ -237,10 +274,22 @@ async function loadRcoSetupStatus(){
 }
 function markRcoRegisteredSetup(){
  lockRcoHeader();
- const btn=installRcoEnterButton(),status=q('#rcoResponsavelProgresso');
- if(btn){btn.hidden=false;btn.disabled=false}
- if(status){status.textContent='Responsável registrado. Confira abaixo o status das guarnições e clique em “Entrar no RCO”.'}
+ hideContinuarComoBox();
+ q('#rcoResponsavelRegistrarBtn')?.setAttribute('hidden','hidden');
+ const btn=revealRcoEnterButton();
+ const status=q('#rcoResponsavelProgresso');
+ if(status)status.textContent='Responsável registrado. Confira as guarnições abaixo e clique em “Entrar no RCO” para abrir o relatório.';
+ const setup=q('#centralRcoSetupStatus');if(setup)setup.removeAttribute('hidden');
  loadRcoSetupStatus();
+ if(btn)setTimeout(()=>{try{btn.focus()}catch(_){}btn.scrollIntoView({behavior:'smooth',block:'center'})},60);
+}
+function ensureRcoEnterAfterResponsible(){
+ // Sempre oferece um caminho visível após o registro formal — nunca só texto sem botão.
+ if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}
+ // Fora do setup (ex.: reload parcial): entra no setup e mostra o botão, ou libera o relatório.
+ try{document.body.classList.add('central-service-setup','rco-setup')}catch(_){}
+ installRcoSetupStatus();
+ markRcoRegisteredSetup();
 }
 const ACCESS_AUTH_RSD='central-module-auth-rsd-v1',ACCESS_AUTH_RCO='central-module-auth-rco-v1';
 function saveIngressKey(type,key){
@@ -439,7 +488,11 @@ function init(){
  if(type==='rsd'){installRsdGuarnicaoChoice();installRsdCommanderFlow()}
  if(type==='rsd'&&resumeRequested()){resumeRsd();return}
  global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
- global.addEventListener('central-rco-responsavel-registrado',()=>{if(document.body.classList.contains('rco-setup')){markRcoRegisteredSetup();return}lockRcoHeader();const d=q('#dataInicio');if(d&&d.value&&typeof global.centralRcoRefreshCloud==='function')setTimeout(function(){global.centralRcoRefreshCloud();},120)});
+ global.addEventListener('central-rco-responsavel-registrado',()=>{
+   ensureRcoEnterAfterResponsible();
+ });
+ global.centralEnterRcoReport=enterRcoReport;
+ global.centralRevealRcoEnterButton=revealRcoEnterButton;
  let next='',mode='';try{next=sessionStorage.getItem(NEXT)||'';mode=sessionStorage.getItem(MODE)||''}catch(_){}
  if(next===type+'-setup'||mode===type+'-setup'){
    let hasIngress=false;

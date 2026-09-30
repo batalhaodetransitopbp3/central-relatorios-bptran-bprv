@@ -191,7 +191,7 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
   <div id="rcoContinuarComoMsg" class="hint" style="margin:0 0 8px"></div>
   <div class="actions" style="margin:0;gap:6px;flex-wrap:wrap"><button type="button" class="ok small" id="rcoContinuarComoBtn" onclick="rcoConfirmarContinuidadeResponsavel()">Confirmar continuidade</button><button type="button" class="secondary small" id="rcoContinuarOutraMatriculaBtn" onclick="rcoContinuarComOutraMatricula()">Usar outra matrícula</button></div>
  </div>
- <div class="actions" style="margin-top:7px"><button type="button" class="ok small" id="rcoResponsavelRegistrarBtn" onclick="rcoRegistrarResponsavel()">Identificar e registrar responsável</button><span id="rcoResponsavelProgresso" class="hint" role="status" aria-live="polite"></span></div>
+ <div class="actions" id="rcoResponsavelActions" style="margin-top:7px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="ok small" id="rcoResponsavelRegistrarBtn" onclick="rcoRegistrarResponsavel()">Identificar e registrar responsável</button><button type="button" class="ok" id="centralEnterRcoBtn" hidden>Entrar no RCO</button><span id="rcoResponsavelProgresso" class="hint" role="status" aria-live="polite"></span></div>
  <div id="rcoResponsavelResultado" class="hint">Informe matrícula, função e a única credencial correspondente. O sistema localizará o militar no Cadastro Mestre.</div>
  <div id="rcoCadastroExternoFields" class="grid hidden" style="margin-top:9px;padding:9px;border:1px solid #d6e0e8;border-radius:9px;background:#f8fafc">
   <div class="field span3"><label>Posto/graduação</label><input id="rcoExternoPosto" placeholder="Ex.: 2º SGT"></div>
@@ -778,7 +778,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 @media print{#rcoConsolidacaoMode,.rco-cloud-box{display:none!important}body.rco-sem-cpu #rcoCpuSection{display:none!important}}
 </style>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.22"></script>
+<script src="central_cloud.js?v=10.8.23"></script>
 <script id="rco-cloud-v10-script">
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
@@ -1350,7 +1350,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);
       if(window.__rcoPendingReceiveAfterResponsible){const recebido=window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
       window.__rcoPendingContinueResponsible=false;
-      window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Use “Entrar no RCO”.',false);
+      window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Clique em “Entrar no RCO” para prosseguir.',false);
     }catch(err){setResponsibleLocked(false);window.__rcoResponsavelRegistrado=false;setResponsibleProgress('Falha no registro.',false);alert('Não foi possível registrar o responsável: '+err.message)}
   }
   function setSub(m){window.__rcoSubstituto=m?{matricula:fmt(m.MATRICULA||m.matricula||''),nome:m.NOME||m.nome||'',postoGrad:m.POSTO_GRAD||m.postoGrad||''}:null;const hidden=e('substitutoLegal'),print=document.querySelector('[data-print-for="substitutoLegal"]'),sel=e('rcoSubstitutoSelecionado');if(!m){hidden.value='';if(print)print.textContent='';if(sel){sel.hidden=true;sel.textContent=''}return}const a=window.__rcoSubstituto,text=[a.postoGrad,a.nome,a.matricula].filter(Boolean).join(' ');hidden.value=text;if(print)print.textContent=text;if(sel){sel.hidden=false;sel.innerHTML=esc(text)+' <button type="button" class="small secondary" onclick="rcoRemoverSubstituto()">Remover</button>'}window.centralAutosave?.()}
@@ -1369,6 +1369,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.22"></script>
-<script src="service_flow.js?v=10.8.22"></script>
+<script src="service_access_layers.js?v=10.8.23"></script>
+<script src="service_flow.js?v=10.8.23"></script>
 </body></html>
