@@ -1609,12 +1609,17 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="checklist_profiles.js?v=10.8.15"></script>
+  <script src="checklist_profiles.js?v=10.8.27"></script>
   <script>
   (() => {
     'use strict';
 
-    const STORAGE_KEY = 'checklist_viatura_1cprv_v3';
+    const DRAFT_SCHEMA = 'checklist-draft-v4';
+    const DRAFT_LEGACY_KEY = 'checklist_viatura_1cprv_v3';
+    const DRAFT_PREFIX = 'checklist_viatura_draft_v4::';
+    const DRAFT_INDEX_KEY = 'checklist_viatura_draft_v4_index';
+    const DRAFT_LAST_KEY = 'checklist_viatura_draft_v4_last';
+    const STORAGE_KEY = DRAFT_LEGACY_KEY; // compatibilidade com leitores antigos
     const NEGATIVE_VALUES = new Set(['nao','defeito','baixo','baixa','avaria']);
     const DETAIL_REQUIRED_NEGATIVE = new Set(['defeito','baixo','baixa','avaria']);
     // ITEM_CONFIG / SECTION_CONFIG carregados de checklist_profiles.js (abaixo).
@@ -2018,83 +2023,224 @@
       input.addEventListener('change', updatePendingCount);
     });
 
-        function serializeForm() {
-      const data = {};
-      form.querySelectorAll('input, select, textarea').forEach(el => {
-        if (!el.name) return;
-        if (el.type === 'radio') {
-          if (el.checked) data[el.name] = el.value;
-        } else if (el.type === 'checkbox') {
-          data[el.name] = el.checked;
-        } else {
-          data[el.name] = el.value;
-        }
+    function draftUnitKey(){
+      const b=String(document.getElementById('globalBatalhao')?.value||'BPTran');
+      const c=String(document.getElementById('globalCompanhia')?.value||'1');
+      return b+'_'+c;
+    }
+    function draftVtrKey(prefix){return normalizePrefix(prefix!=null?prefix:document.getElementById('prefixo')?.value||'')}
+    function draftStorageKey(prefix){
+      const vtr=draftVtrKey(prefix);
+      return DRAFT_PREFIX+draftUnitKey()+'::'+(vtr||'__noprefix__');
+    }
+    function draftFillScore(data){
+      if(!data||typeof data!=='object')return 0;
+      let n=0;
+      for(const [k,v] of Object.entries(data)){
+        if(String(k).startsWith('_'))continue;
+        if(typeof v==='boolean'){if(v)n++;continue}
+        if(v!=null&&String(v).trim())n++;
+      }
+      if(data.signatureData||data._signature)n+=5;
+      if(Array.isArray(data._photos))n+=Math.min(4,data._photos.length)*2;
+      return n;
+    }
+    function readDraftIndex(){try{const x=JSON.parse(localStorage.getItem(DRAFT_INDEX_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
+    function writeDraftIndex(key,data){
+      try{
+        const prefix=draftVtrKey(data.prefixo||data._meta?.prefixKey||'');
+        const entry={key,prefix,unit:draftUnitKey(),savedAt:data._meta?.savedAt||new Date().toISOString(),fillScore:draftFillScore(data)};
+        const list=readDraftIndex().filter(x=>x&&x.key!==key);
+        list.unshift(entry);
+        localStorage.setItem(DRAFT_INDEX_KEY,JSON.stringify(list.slice(0,40)));
+        localStorage.setItem(DRAFT_LAST_KEY,key);
+      }catch(_){}
+    }
+    function serializeForm(opts={}){
+      const data={};
+      form.querySelectorAll('input, select, textarea').forEach(el=>{
+        if(!el.name||el.type==='file')return;
+        if(el.type==='radio'){if(el.checked)data[el.name]=el.value}
+        else if(el.type==='checkbox')data[el.name]=!!el.checked;
+        else data[el.name]=el.value;
       });
-      data._photos = vehiclePhotos.slice();
-      data._meta = {type:'Checklist de Viatura', unit:(window.getInstitution?getInstitution().curto:'BPTran / 1ª CPTran'), version:'3.2', savedAt:new Date().toISOString()};
+      data.signatureData=opts.omitSignature?'':(signatureData.value||data.signatureData||'');
+      data._photos=opts.omitPhotos?[]:((typeof vehiclePhotos!=='undefined'&&Array.isArray(vehiclePhotos))?vehiclePhotos.slice(0,4):[]);
+      const prefixKey=draftVtrKey(data.prefixo||'');
+      data._meta={
+        schema:DRAFT_SCHEMA,type:'Checklist de Viatura',
+        unit:(window.getInstitution?getInstitution().curto:'BPTran / 1ª CPTran'),
+        version:'4.0',savedAt:new Date().toISOString(),
+        prefixKey,storageKey:draftStorageKey(prefixKey),
+        hasSignature:!!data.signatureData,photoCount:(data._photos||[]).length,fillScore:0
+      };
+      data._meta.fillScore=draftFillScore(data);
       return data;
     }
-
-    function applyData(data) {
-      form.querySelectorAll('input, select, textarea').forEach(el => {
-        if (!el.name || !(el.name in data)) return;
-        const value = data[el.name];
-        if (el.type === 'radio') el.checked = el.value === value;
-        else if (el.type === 'checkbox') el.checked = Boolean(value);
-        else el.value = value ?? '';
-      });
-
-      document.querySelectorAll('.check-item').forEach(item => {
-        const selected = item.querySelector('input[type="radio"]:checked');
-        const details = item.querySelector('textarea').value.trim();
-        const value = selected?.value || '';
-        if (NEGATIVE_VALUES.has(value) || details) openDetail(item);
-        else closeDetail(item);
-      });
-
-      if (signatureData.value) {
-        signaturePreview.src = signatureData.value;
-        signatureBox.classList.add('has-signature');
-      } else {
-        signaturePreview.removeAttribute('src');
-        signatureBox.classList.remove('has-signature');
+    function writeDraftRaw(key,data){
+      const json=JSON.stringify(data);
+      localStorage.setItem(key,json);
+      const readBack=localStorage.getItem(key);
+      if(!readBack||readBack.length<Math.min(32,json.length))throw new Error('Persistência não confirmada.');
+      try{JSON.parse(readBack)}catch(_){throw new Error('Persistência inválida.')}
+      writeDraftIndex(key,data);
+      // espelho legado (sem misturar VTR no load preferencial)
+      try{localStorage.setItem(DRAFT_LEGACY_KEY,json)}catch(_){}
+      return true;
+    }
+    function persistDraft(opts={}){
+      const silent=!!opts.silent;
+      const prefix=draftVtrKey();
+      if(!prefix&&!opts.allowNoPrefix){if(!silent)showToast('Informe o prefixo da VTR antes de salvar o rascunho.');return false}
+      let data=serializeForm({omitPhotos:false,omitSignature:false});
+      const score=draftFillScore(data);
+      if(score<2){if(!silent)showToast('Preencha ao menos alguns campos antes de salvar o rascunho.');return false}
+      const key=draftStorageKey(prefix);
+      try{
+        const existingRaw=localStorage.getItem(key);
+        if(existingRaw&&silent){
+          const existing=JSON.parse(existingRaw);
+          if(score+3<draftFillScore(existing))return true; // não sobrescrever rascunho rico com estado quase vazio
+        }
+      }catch(_){}
+      if(!silent)showToast('Salvando rascunho…');
+      const attempts=[
+        {omitPhotos:false,omitSignature:false,okMsg:null},
+        {omitPhotos:true,omitSignature:false,okMsg:'Rascunho salvo sem fotos (armazenamento limitado neste aparelho).'},
+        {omitPhotos:true,omitSignature:true,okMsg:'Rascunho salvo sem fotos e sem assinatura (armazenamento limitado). Os demais campos foram preservados.'}
+      ];
+      for(const attempt of attempts){
+        try{
+          data=serializeForm(attempt);
+          if(draftFillScore(data)<2)continue;
+          writeDraftRaw(key,data);
+          if(!silent){
+            if(attempt.okMsg)showToast(attempt.okMsg);
+            else{
+              const bits=[];
+              if(data._meta.hasSignature)bits.push('assinatura');
+              if(data._meta.photoCount)bits.push(data._meta.photoCount+' foto(s)');
+              showToast('Rascunho da VTR '+(prefix||'—')+' salvo neste dispositivo'+(bits.length?' ('+bits.join(', ')+')':'')+'.');
+            }
+          }
+          return true;
+        }catch(_){/* tenta versão mais leve */}
       }
-
-      vehiclePhotos = Array.isArray(data._photos) ? data._photos.slice(0,4) : [];
-      vehiclePhotoOriginals = vehiclePhotos.slice();
-      renderVehiclePhotos();
-      obs.disabled = semObs.checked;
-      applyVehicleAutofill();
+      if(!silent)showToast('Não foi possível salvar o rascunho. Espaço insuficiente ou navegação em modo privado.');
+      return false;
+    }
+    function applyData(data){
+      if(!data||typeof data!=='object')throw new Error('Rascunho inválido.');
+      const plateBefore=String(data.placa||'');
+      const modelBefore=String(data.marca_modelo||'');
+      form.querySelectorAll('input, select, textarea').forEach(el=>{
+        if(!el.name||!(el.name in data))return;
+        if(el.name==='signatureData')return; // tratado à parte
+        const value=data[el.name];
+        if(el.type==='radio')el.checked=el.value===value;
+        else if(el.type==='checkbox')el.checked=Boolean(value);
+        else el.value=value??'';
+      });
+      try{
+        const sig=String(data.signatureData||data._signature||'');
+        if(sig&&/^data:image\//i.test(sig)){
+          signatureData.value=sig;signaturePreview.src=sig;signatureBox.classList.add('has-signature');
+        }else{
+          signatureData.value='';signaturePreview.removeAttribute('src');signatureBox.classList.remove('has-signature');
+        }
+      }catch(_){
+        try{signatureData.value='';signaturePreview.removeAttribute('src');signatureBox.classList.remove('has-signature')}catch(__){}
+      }
+      try{
+        vehiclePhotos=Array.isArray(data._photos)?data._photos.filter(p=>typeof p==='string'&&/^data:image\//i.test(p)).slice(0,4):[];
+        vehiclePhotoOriginals=vehiclePhotos.slice();
+        renderVehiclePhotos();
+      }catch(_){vehiclePhotos=[];vehiclePhotoOriginals=[];try{renderVehiclePhotos()}catch(__){}}
+      document.querySelectorAll('.check-item').forEach(item=>{
+        const selected=item.querySelector('input[type="radio"]:checked');
+        const details=item.querySelector('textarea')?.value?.trim()||'';
+        const value=selected?.value||'';
+        if(NEGATIVE_VALUES.has(value)||details)openDetail(item);else closeDetail(item);
+      });
+      try{
+        const plateEl=document.getElementById('placa'),modelEl=document.getElementById('marca_modelo');
+        if(plateEl)plateEl.dataset.autofilled='';
+        if(modelEl)modelEl.dataset.autofilled='';
+        applyVehicleAutofill();
+        const key=normalizePrefix(document.getElementById('prefixo')?.value||'');
+        if(!VEHICLE_CATALOG[key]){
+          if(plateEl&&plateBefore)plateEl.value=plateBefore;
+          if(modelEl&&modelBefore)modelEl.value=modelBefore;
+        }
+      }catch(_){try{applyChecklistTipoFilter()}catch(__){}}
+      obs.disabled=!!semObs.checked;
       updatePendingCount();
     }
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeForm()));
-        showToast('Rascunho salvo neste dispositivo.');
-      } catch (error) {
-        showToast('Não foi possível salvar o rascunho.');
+    let optsSilentApply=false;
+    function resolveDraftRaw(preferredPrefix){
+      const prefix=draftVtrKey(preferredPrefix);
+      const key=draftStorageKey(prefix);
+      let raw=null;try{raw=localStorage.getItem(key)}catch(_){}
+      if(raw)return {raw,key,source:'vtr'};
+      if(!prefix){
+        try{
+          const last=localStorage.getItem(DRAFT_LAST_KEY)||'';
+          if(last&&last.indexOf(DRAFT_PREFIX+draftUnitKey()+'::')===0){raw=localStorage.getItem(last);if(raw)return {raw,key:last,source:'last'}}
+        }catch(_){}
+        const idx=readDraftIndex().find(x=>x&&String(x.unit||'')===draftUnitKey());
+        if(idx?.key){try{raw=localStorage.getItem(idx.key);if(raw)return {raw,key:idx.key,source:'index'}}catch(_){}}
       }
-    });
-
-    document.getElementById('loadBtn').addEventListener('click', () => {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return showToast('Nenhum rascunho salvo.');
-      try {
-        applyData(JSON.parse(raw));
-        showToast('Rascunho carregado.');
-      } catch (error) {
-        showToast('O rascunho salvo está inválido.');
+      try{
+        raw=localStorage.getItem(DRAFT_LEGACY_KEY);
+        if(raw){
+          const legacy=JSON.parse(raw);
+          const legPrefix=draftVtrKey(legacy.prefixo||legacy._meta?.prefixKey||'');
+          if(!prefix||!legPrefix||legPrefix===prefix)return {raw,key:DRAFT_LEGACY_KEY,source:'legacy',legPrefix};
+          return {raw:null,key:'',source:'legacy-mismatch',legPrefix};
+        }
+      }catch(_){}
+      return {raw:null,key:'',source:'none'};
+    }
+    function loadDraft(opts={}){
+      const silent=!!opts.silent;
+      const prefix=draftVtrKey();
+      const found=resolveDraftRaw(prefix);
+      if(found.source==='legacy-mismatch'){
+        if(!silent)showToast('Há rascunho legado da VTR '+(found.legPrefix||'?')+'. Informe o mesmo prefixo para carregá-lo, evitando misturar veículos.');
+        return false;
       }
-    });
-
-    window.centralReportSave = function(silent=false){
-      try{localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeForm()));if(!silent)showToast('Rascunho salvo neste dispositivo.');return true}catch(error){if(!silent)showToast('Não foi possível salvar o rascunho.');return false}
+      if(!found.raw){if(!silent)showToast(prefix?'Nenhum rascunho salvo para a VTR '+prefix+'.':'Nenhum rascunho salvo neste aparelho.');return false}
+      try{
+        const data=JSON.parse(found.raw);
+        const dataPrefix=draftVtrKey(data.prefixo||data._meta?.prefixKey||'');
+        if(prefix&&dataPrefix&&prefix!==dataPrefix){
+          if(!confirm('O rascunho encontrado é da VTR '+dataPrefix+', diferente da VTR atual ('+prefix+').\n\nCarregar mesmo assim?'))return false;
+        }
+        optsSilentApply=!!silent;
+        applyData(data);
+        optsSilentApply=false;
+        if(!silent)showToast('Rascunho carregado'+(dataPrefix?' (VTR '+dataPrefix+')':'')+'.');
+        return true;
+      }catch(error){
+        optsSilentApply=false;
+        if(!silent)showToast('Não foi possível carregar o rascunho: dados inválidos ou corrompidos. Os campos atuais não foram apagados.');
+        return false;
+      }
+    }
+    document.getElementById('saveBtn').addEventListener('click', () => { persistDraft({silent:false}); });
+    document.getElementById('loadBtn').addEventListener('click', () => { loadDraft({silent:false}); });
+    window.centralReportSave = function(silent=false){return persistDraft({silent:!!silent,allowNoPrefix:!!silent})}
+    window.centralReportLoad = function(silent=false){return loadDraft({silent:!!silent})}
+    window.centralChecklistClearDraft=function(prefix){
+      try{
+        const key=draftStorageKey(prefix);
+        localStorage.removeItem(key);
+        const list=readDraftIndex().filter(x=>x&&x.key!==key);
+        localStorage.setItem(DRAFT_INDEX_KEY,JSON.stringify(list));
+      }catch(_){}
     };
-    window.centralReportLoad = function(silent=false){
-      const raw=localStorage.getItem(STORAGE_KEY);if(!raw){if(!silent)showToast('Nenhum rascunho salvo.');return false}
-      try{applyData(JSON.parse(raw));if(!silent)showToast('Rascunho carregado.');return true}catch(error){if(!silent)showToast('O rascunho salvo está inválido.');return false}
-    };
+    window.addEventListener('pagehide',()=>{try{persistDraft({silent:true,allowNoPrefix:true})}catch(_){}});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{persistDraft({silent:true,allowNoPrefix:true})}catch(_){}}});
 
     document.getElementById('clearBtn').addEventListener('click', () => {
       if (!confirm('Deseja apagar todos os campos deste checklist?')) return;
@@ -2664,9 +2810,9 @@
 </script>
 
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.22-fix"></script>
+<script src="central_cloud.js?v=10.8.27"></script>
 <script src="module_access_gate.js?v=10.8.17"></script>
 <script src="checklist_profiles.js?v=10.8.15"></script>
-<script src="checklist_cloud.js?v=10.8.15"></script>
+<script src="checklist_cloud.js?v=10.8.27"></script>
 </body>
 </html>

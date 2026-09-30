@@ -81,6 +81,8 @@ async function finalizar(){
       const msg=r.message||'Checklist registrado.';
       alert(msg+(nAlt?(' '+nAlt+' alteração(ões) técnica(s) aberta(s) para a Motomecanização.'):' Nenhuma alteração técnica aplicável à Motomecanização.'));
       try{localStorage.removeItem(CHECKLIST_ID_KEY)}catch(_){}
+      // Rascunho local da VTR só é limpo após finalização oficial bem-sucedida
+      try{global.centralChecklistClearDraft?.(val('prefixo'))}catch(_){}
     }
   }catch(err){alert('Não foi possível sincronizar agora: '+err.message)}
   finally{if(btn)btn.disabled=false}
