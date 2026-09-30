@@ -77,6 +77,21 @@
     return state === STATES.HYDRATED || state === STATES.NEW_SERVICE;
   }
 
+  function canLocalAutosave(state) {
+    return canScheduleCloudSync(state);
+  }
+
+  var REGISTERED_KEY = 'pmpb-transito-servico-diario-v2-cloud-registered';
+
+  function localPersistAllowed() {
+    var h = global.__rsdHydration;
+    if (h && typeof h.canLocalAutosave === 'function') return !!h.canLocalAutosave();
+    try {
+      if (global.localStorage && global.localStorage.getItem(REGISTERED_KEY) === '1') return false;
+    } catch (_) {}
+    return true;
+  }
+
   function createRsdHydrationGuard(initial) {
     var state = initial && initial.state ? initial.state : STATES.UNRESOLVED;
     var knownDraftRevision = Number(initial && initial.knownDraftRevision || 0) || 0;
@@ -90,6 +105,7 @@
       getKnownDraftRevision: function () { return knownDraftRevision; },
       getLastHydratedAt: function () { return lastHydratedAt; },
       canSync: function () { return canScheduleCloudSync(state); },
+      canLocalAutosave: function () { return canLocalAutosave(state); },
       markUnresolved: function () { state = STATES.UNRESOLVED; lastError = ''; },
       markLoading: function () { state = STATES.LOADING; lastError = ''; },
       markHydrated: function (rev) {
@@ -122,9 +138,12 @@
     payloadHasStructuralIdentity: payloadHasStructuralIdentity,
     identityGaps: identityGaps,
     canScheduleCloudSync: canScheduleCloudSync,
+    canLocalAutosave: canLocalAutosave,
+    localPersistAllowed: localPersistAllowed,
     create: createRsdHydrationGuard
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.RsdHydrationGuard = api;
+  global.rsdLocalPersistAllowed = localPersistAllowed;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.29';
+var CENTRAL_V10_VERSION = '10.8.30';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -1247,6 +1247,11 @@ function rsdDraftSync_(payload){
   ensureHeaders_(s,['HEADER_EDIT_AUTH','HEADER_EDIT_AUTH_EM','HEADER_EDIT_AUTH_POR']);
   var old=findOne_(s,'REPORT_ID',reportId);
   if(!old)return rsdStart_(payload);
+  var lock=LockService.getScriptLock();
+  lock.waitLock(15000);
+  try{
+  old=findOne_(s,'REPORT_ID',reportId);
+  if(!old)throw new Error('RSD não localizado.');
   var incomingTipo=normGuarnicaoTipo_((r.guarnicao||{}).tipo||guarnicaoTipoFromNome_((r.guarnicao||{}).nome)),oldTipo=normGuarnicaoTipo_(old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(old.GUARNICAO));
   if(oldTipo&&incomingTipo&&oldTipo!==incomingTipo)throw new Error('O tipo da guarnição já foi definido para este serviço e não pode ser alterado.');
   if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD não está disponível para edição.');
@@ -1261,6 +1266,7 @@ function rsdDraftSync_(payload){
   if(old.REVIEW_STATUS)obj.REVIEW_STATUS=old.REVIEW_STATUS;if(old.REVIEW_MOTIVO)obj.REVIEW_MOTIVO=old.REVIEW_MOTIVO;if(old.REVIEW_OBSERVACAO)obj.REVIEW_OBSERVACAO=old.REVIEW_OBSERVACAO;
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   return {ok:true,message:'Rascunho sincronizado.',reportId:reportId,serviceId:obj.SERVICE_ID,segmento:obj.SEGMENTO,draftRevision:obj.DRAFT_REVISION,status:obj.STATUS};
+  }finally{lock.releaseLock();}
 }
 function rsdOwnerMat_(row){
   if(!row)return '';

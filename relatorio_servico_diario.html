@@ -495,7 +495,7 @@ function validarFinalizacao(){
 }
 function finalizarServico(){if(!validarFinalizacao())return;const p=exportarDadosGuarnicao(true);if(!p)return;setTimeout(()=>prepareAndPrint(),180)}
 function draftObj(){return payloadV2()}
-function salvarRascunhoGuarnicao(s=false){if(window.CENTRAL_READONLY_VIEWER)return true;localStorage.setItem(DRAFT_KEY,JSON.stringify(draftObj()));if(!s)alert('Rascunho salvo neste aparelho.');return true}
+function salvarRascunhoGuarnicao(s=false){if(window.CENTRAL_READONLY_VIEWER)return true;if(typeof window.rsdLocalPersistAllowed==='function'?!window.rsdLocalPersistAllowed():(function(){try{return localStorage.getItem('pmpb-transito-servico-diario-v2-cloud-registered')==='1'}catch(_){return false}})()){if(!s)alert('Aguarde o carregamento completo do serviço antes de salvar o rascunho.');return false}localStorage.setItem(DRAFT_KEY,JSON.stringify(draftObj()));if(!s)alert('Rascunho salvo neste aparelho.');return true}
 function clearEntries(){['occurrences','operations','vehicles','arvcs'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=''})}
 function carregarRascunhoGuarnicao(){const raw=localStorage.getItem(DRAFT_KEY);if(!raw){alert('Nenhum rascunho salvo.');return false}try{const p=JSON.parse(raw);if(p?.reportId){reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId)}applyPayload(p);alert('Rascunho carregado.');return true}catch(e){alert('Rascunho inválido.');return false}}
 function applyPayload(p){const u=p.unidade||{};if(u.batalhao)document.getElementById('batalhao').value=u.batalhao;if(u.companhiaNumero)document.getElementById('companhiaNumero').value=String(u.companhiaNumero);document.getElementById('data').value=p.servico?.data||'';atualizarDiaSemana();for(const [id,v] of Object.entries({guarnicao:p.guarnicao?.nome,viatura:p.guarnicao?.viatura,responsavel:p.guarnicao?.responsavel,matriculaResponsavel:p.guarnicao?.matricula,efetivo:p.guarnicao?.efetivo,altVtr:p.alteracoes?.viatura,altServico:p.alteracoes?.servico,altMaterial:p.alteracoes?.materialCarga,planoOperacionalDiario:p.alteracoes?.planoOperacionalDiario,observacoes:p.observacoes,fiscoQtd:p.fisco?.quantidadeOcorrencias,fiscoAltEfetivo:p.fisco?.alteracoesEfetivo})){const e=document.getElementById(id);if(e)e.value=v??''}setProduction(p.producao||{});clearEntries();const occ=[...(p.ocorrencias||[])];for(const x of (p.tcos||[])){if(!occ.some(o=>(x.id&&o.id===x.id)||(o.tipo==='TCO'&&o.numero===x.numero&&o.numeroTco===x.numeroTco)))occ.push({...x,tipo:'TCO',tcoSasp:(x.tcoSasp||x.numeroTco)?'Sim':'Não'})}occ.forEach(addOccurrence);(p.operacoes||[]).forEach(addOperationSummary);(p.veiculosRecuperados||[]).forEach(addVehicle);(p.cirvc||p.arvc||[]).forEach(addArvc);document.getElementById('fiscoAtivo').checked=!!p.fisco?.ativo;syncUnitHeader();toggleFiscoMode();document.querySelectorAll('input,select,textarea').forEach(syncPrintValue)}
@@ -577,7 +577,8 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     const values={};fields.forEach((e,i)=>{values[fieldKey(e,i)]=e.type==='checkbox'||e.type==='radio'?!!e.checked:e.value});
     return {savedAt:new Date().toISOString(),values};
   }
-  function saveGeneric(){if(window.CENTRAL_READONLY_VIEWER)return;try{localStorage.setItem(genericKey,JSON.stringify(snapshotGeneric()))}catch(_){}}
+  function rsdPersistOk(){if(typeof window.rsdLocalPersistAllowed==='function')return window.rsdLocalPersistAllowed();try{return localStorage.getItem('pmpb-transito-servico-diario-v2-cloud-registered')!=='1'}catch(_){return true}}
+  function saveGeneric(){if(window.CENTRAL_READONLY_VIEWER||!rsdPersistOk())return;try{localStorage.setItem(genericKey,JSON.stringify(snapshotGeneric()))}catch(_){}}
   function restoreGeneric(){
     let raw='';try{raw=localStorage.getItem(genericKey)||''}catch(_){}
     if(!raw)return false;
@@ -588,6 +589,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     }catch(_){return false}
   }
   function saveSpecific(){
+    if(!rsdPersistOk())return false;
     try{
       if(typeof window.centralReportSave==='function'){return window.centralReportSave(true)!==false}
       if(typeof salvarRascunhoGuarnicao==='function'){salvarRascunhoGuarnicao(true);return true}
@@ -605,7 +607,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     }catch(_){}
     return false;
   }
-  window.centralAutosave=function(){if(window.CENTRAL_READONLY_VIEWER)return;saveGeneric();saveSpecific()};
+  window.centralAutosave=function(){if(window.CENTRAL_READONLY_VIEWER||!rsdPersistOk())return;saveGeneric();saveSpecific()};
   window.centralMarkSaved=function(){centralDirty=false;saveGeneric();saveSpecific()};
   window.centralIsDirty=function(){return !!centralDirty};
   window.centralAllowNavigate=function(){centralSuppressExit=true;centralDirty=false};
@@ -639,7 +641,7 @@ function init(){renderProduction();bindCommon();setToday();document.getElementBy
     document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
     document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,180)}},true);
     document.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;const txt=(b.textContent||'').toLowerCase();if(/salvar rascunho|finalizar serviço|gerar apenas pdf|consolidar relatório|gerar pdf|exportar json|realizar passagem|receber serviço/.test(txt))setTimeout(()=>{centralDirty=false;saveGeneric()},100)},true);
-    window.addEventListener('beforeunload',e=>{if(window.CENTRAL_READONLY_VIEWER)return;if(centralDirty&&!centralSuppressExit){saveGeneric();saveSpecific();e.preventDefault();e.returnValue=''}});
+    window.addEventListener('beforeunload',e=>{if(window.CENTRAL_READONLY_VIEWER)return;if(centralDirty&&!centralSuppressExit){if(rsdPersistOk()){saveGeneric();saveSpecific()}e.preventDefault();e.returnValue=''}});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
@@ -710,8 +712,8 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.29"></script>
-<script src="rsd_hydration_guard.js?v=10.8.29"></script>
+<script src="central_cloud.js?v=10.8.30"></script>
+<script src="rsd_hydration_guard.js?v=10.8.30"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -1577,6 +1579,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.29"></script>
-<script src="service_flow.js?v=10.8.29"></script>
+<script src="service_access_layers.js?v=10.8.30"></script>
+<script src="service_flow.js?v=10.8.30"></script>
 </body></html>

@@ -200,6 +200,48 @@ test('debounce de 8s não autoriza UNRESOLVED/LOADING/ERROR', function () {
   assert.strictEqual(hydration.canScheduleCloudSync('NEW_SERVICE'), true);
 });
 
+test('autosave local bloqueado até HYDRATED/NEW_SERVICE', function () {
+  const g = hydration.create({ state: hydration.STATES.UNRESOLVED });
+  globalThis.__rsdHydration = g;
+  assert.strictEqual(g.canLocalAutosave(), false);
+  assert.strictEqual(hydration.localPersistAllowed(), false);
+  g.markLoading();
+  assert.strictEqual(hydration.canLocalAutosave('LOADING'), false);
+  assert.strictEqual(hydration.localPersistAllowed(), false);
+  g.markError();
+  assert.strictEqual(hydration.localPersistAllowed(), false);
+  g.markHydrated(3);
+  assert.strictEqual(hydration.localPersistAllowed(), true);
+  g.markNewService();
+  assert.strictEqual(hydration.localPersistAllowed(), true);
+  delete globalThis.__rsdHydration;
+});
+
+test('fallback REGISTERED_KEY bloqueia persist se o guard ainda não existe', function () {
+  const prevH = globalThis.__rsdHydration;
+  const prevLs = globalThis.localStorage;
+  delete globalThis.__rsdHydration;
+  const store = { 'pmpb-transito-servico-diario-v2-cloud-registered': '1' };
+  globalThis.localStorage = {
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; }
+  };
+  assert.strictEqual(hydration.localPersistAllowed(), false);
+  store['pmpb-transito-servico-diario-v2-cloud-registered'] = '';
+  assert.strictEqual(hydration.localPersistAllowed(), true);
+  if (prevH) globalThis.__rsdHydration = prevH;
+  else delete globalThis.__rsdHydration;
+  if (prevLs) globalThis.localStorage = prevLs;
+  else delete globalThis.localStorage;
+});
+
+test('incoming blank com identidade existente não grava payload vazio (guarda recusa antes do save)', function () {
+  const regressions = structural.detectStructuralRegression(intact, blank);
+  assert.ok(regressions.length > 0);
+  const fpExisting = structural.operationalFingerprint(intact);
+  const fpBlank = structural.operationalFingerprint(blank);
+  assert.ok(fpExisting.occurrences > fpBlank.occurrences);
+});
+
 (async function () {
   const g = hydration.create();
   const sch = makeScheduler(g);
