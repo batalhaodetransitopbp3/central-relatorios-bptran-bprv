@@ -1,0 +1,16 @@
+---
+description: Após correções RSD/RCO/Central, sempre commit + push (GitHub Pages)
+alwaysApply: true
+---
+
+# Ship após correção
+
+Quando concluir correções ou melhorias neste projeto (frontend RSD/RCO, `central_cloud.js`, `service_access_layers.js`, HTML, etc.):
+
+1. **Sempre** criar o commit (mensagem objetiva no estilo do repositório).
+2. **Sempre** fazer `git push` para o remote rastreado (`main` / origem configurada).
+3. GitHub Pages atualiza pelo push — não pedir confirmação extra para commit/push nesses casos.
+4. Não incluir artefatos locais/sensiveis (`gas_deploy/_*`, tokens, `_set_token.js`, preview diagnostics) a menos que o usuário peça.
+5. Se o backend Apps Script também mudou e o usuário pediu deploy GAS, tratar à parte (clasp); push Pages ≠ republicar `/exec`.
+
+Não perguntar “quer que eu faça commit/push?” — faça.

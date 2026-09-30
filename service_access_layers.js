@@ -106,6 +106,7 @@ function startScreen(type){
 }
 function enterSetup(type,context=''){
  clearLayer();q('#centralSetupNav')?.remove();document.body.classList.add('central-service-setup',type==='rco'?'rco-setup':'rsd-setup');
+ try{global.__rsdContextAbandoned=false;global.__rcoContextAbandoned=false}catch(_){}
  const nav=document.createElement('div');nav.id='centralSetupNav';nav.className='central-setup-nav no-print';nav.innerHTML='<button type="button">← Voltar às opções de acesso</button>';document.body.prepend(nav);nav.querySelector('button').onclick=()=>{exitSetup();startScreen(type)};
  try{sessionStorage.removeItem(NEXT);sessionStorage.setItem(MODE,type+'-setup')}catch(_){}
  if(type==='rsd'){
@@ -304,11 +305,15 @@ function savedIngressKey(type){
  if(type==='rsd'){try{return CentralCloud.getToken('central')||''}catch(_){return ''}}
  try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}
 }
-global.centralReturnToAccess=function(type){
+global.centralReturnToAccess=function(type,opts){
  type=type==='rsd'?'rsd':'rco';
+ opts=opts||{};
+ // Pós-exclusão/cancelamento: não revalidar sync do serviço já encerrado.
+ try{if(opts.skipSync||opts.afterCancel){global.__centralSkipLeaveSync=true}}catch(_){}
  clearIngressKey(type);
  try{sessionStorage.removeItem(NEXT);sessionStorage.removeItem(MODE)}catch(_){}
  exitSetup();startScreen(type);
+ setTimeout(()=>{try{global.__centralSkipLeaveSync=false}catch(_){}},80);
 };
 function requestIngressKey(type){
  return new Promise(resolve=>{
@@ -487,7 +492,10 @@ function init(){
  const type=pageType();if(!type||global.CENTRAL_READONLY_VIEWER)return;css();
  if(type==='rsd'){installRsdGuarnicaoChoice();installRsdCommanderFlow()}
  if(type==='rsd'&&resumeRequested()){resumeRsd();return}
- global.addEventListener('central-rsd-registered',ev=>{lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})});
+ global.addEventListener('central-rsd-registered',ev=>{
+  try{global.__rsdContextAbandoned=false}catch(_){}
+  lockRsdHeader();exitSetup();const st=q('#rsdRegisterStatus');if(st){st.classList.remove('central-registered-note');st.textContent='Serviço em andamento. Os dados de identificação da guarnição estão bloqueados.'}window.scrollTo({top:0,behavior:'smooth'})
+ });
  global.addEventListener('central-rco-responsavel-registrado',()=>{
    ensureRcoEnterAfterResponsible();
  });

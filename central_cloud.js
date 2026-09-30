@@ -42,7 +42,7 @@ function jsonpRaw(action,params={},opts={}){return new Promise((resolve,reject)=
   const callback='__central_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2),script=document.createElement('script');
   let done=false,timer;
   function cleanup(){clearTimeout(timer);try{delete global[callback]}catch(_){global[callback]=undefined}script.remove()}
-  function finish(err,data){if(done)return;done=true;if(showProgress)updateProgress(progressMessageForAction(action,err?'error':'finish'),err?96:92);cleanup();if(showProgress)endProgress(err?'Falha na operação.':'Concluído.');err?reject(err):resolve(data)}
+  function finish(err,data){if(done)return;done=true;if(showProgress)updateProgress(progressMessageForAction(action,err?'error':'finish'),err?96:100);cleanup();if(showProgress){endProgress(err?'Falha na operação.':(progressMessageForAction(action,'finish')||'Concluído.'));if(progressDepth>0)forceEndProgress(err?'Falha na operação.':(progressMessageForAction(action,'finish')||'Concluído.'))}err?reject(err):resolve(data)}
   global[callback]=function(data){
     if(showProgress)updateProgress(progressMessageForAction(action,'response'),86);
     if(data&&data.ok===false)finish(authError(action,data.message||'Consulta rejeitada.',params.token));
@@ -66,7 +66,7 @@ async function jsonp(action,params={},opts={}){
     throw err;
   }
 }
-function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2),showProgress=opts.progress!==false;let win=null,iframe=null,target=name;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}if(showProgress)beginProgress(progressMessageForAction(action,'start'));const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;if(showProgress)updateProgress(progressMessageForAction(action,'response'),88);cleanup(d.ok);d.ok?resolve(d):reject(authError(action,d.message||'Operação rejeitada.',token,opts.tokenKind))};function cleanup(ok){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400);if(showProgress)endProgress(ok===false?'Falha na operação.':'Concluído.')}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();if(showProgress)updateProgress(progressMessageForAction(action,'wait'),38);timer=setTimeout(()=>{cleanup(false);reject(new Error('Tempo esgotado ao comunicar com a Central.'))},opts.timeout||20000)})}
+function submitForm(action,payload,token,opts={}){return new Promise((resolve,reject)=>{const requestId=uid('post'),name='central_post_'+Date.now()+'_'+Math.random().toString(36).slice(2),showProgress=opts.progress!==false;let win=null,iframe=null,target=name,finished=false;if(opts.popup!==false){win=window.open('about:blank',name,'width=620,height=540');if(!win){reject(new Error('O navegador bloqueou a janela de confirmação. Permita pop-ups e tente novamente.'));return}}else{iframe=document.createElement('iframe');iframe.name=name;iframe.style.display='none';document.body.appendChild(iframe)}if(showProgress)beginProgress(progressMessageForAction(action,'start'));const form=document.createElement('form');form.method='POST';form.action=ENDPOINT;form.target=target;form.style.display='none';for(const [k,v] of Object.entries({action,token,requestId,payload:JSON.stringify(payload||{})})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i)}let timer;const onMsg=e=>{const d=e.data;if(!d||d.source!=='central-p3-v10'||d.action!==action||String(d.requestId||'')!==requestId)return;if(showProgress)updateProgress(progressMessageForAction(action,'response'),88);finish(d.ok,d)};function finish(ok,data){if(finished)return;finished=true;cleanup(ok);if(ok)resolve(data||{ok:true});else reject(authError(action,(data&&data.message)||'Operação rejeitada.',token,opts.tokenKind))}function cleanup(ok){clearTimeout(timer);global.removeEventListener('message',onMsg);form.remove();if(iframe)setTimeout(()=>iframe.remove(),400);if(showProgress){const msg=ok===false?'Falha na operação.':(progressMessageForAction(action,'finish')||'Concluído.');endProgress(msg);if(progressDepth>0)forceEndProgress(msg)}}global.addEventListener('message',onMsg);document.body.appendChild(form);form.submit();if(showProgress)updateProgress(progressMessageForAction(action,'wait'),38);timer=setTimeout(()=>{finish(false,{message:'Tempo esgotado ao comunicar com a Central.'})},opts.timeout||20000)})}
 function readQueue(){try{const x=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(x)?x:[]}catch(_){return []}}
 function writeQueue(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-100)))}catch(_){}}
 function enqueue(action,payload,unit,token){const q=readQueue();q.push({id:uid('sync'),action,payload,unit,token:token||'',tokenKind:tokenKindForAction(action),createdAt:new Date().toISOString(),tries:0});writeQueue(q);return q.length}
@@ -145,7 +145,7 @@ function ensureProgressStatus(){
   Object.assign(txt.style,{marginTop:'6px',textAlign:'center',lineHeight:'1.25'});
   track.appendChild(bar);progressEl.appendChild(track);progressEl.appendChild(txt);document.body.appendChild(progressEl);return progressEl
 }
-function setProgressValue(v){progressValue=Math.max(progressValue,Math.min(100,Number(v)||0));if(progressBarEl)progressBarEl.style.width=progressValue+'%'}
+function setProgressValue(v){progressValue=Math.max(0,Math.min(100,Number(v)||0));if(progressBarEl)progressBarEl.style.width=progressValue+'%'}
 function beginProgress(message='Processando…'){
   progressDepth++;const el=ensureProgressStatus();if(!el)return progressDepth;
   if(progressDepth===1){clearInterval(progressTimer);progressValue=8;setProgressValue(8);progressTimer=setInterval(()=>setProgressValue(progressValue<55?progressValue+6:progressValue<78?progressValue+3:progressValue<91?progressValue+1:progressValue),420)}
@@ -155,23 +155,45 @@ function beginProgress(message='Processando…'){
 function updateProgress(message='Processando…',value){
   const el=ensureProgressStatus();if(el&&progressDepth>0){if(message&&progressTextEl)progressTextEl.textContent=message;if(value!=null)setProgressValue(value);if(!dedicatedProgressVisible())el.style.opacity='1'}
 }
-function endProgress(finalMessage='Concluído.'){
-  progressDepth=Math.max(0,progressDepth-1);const el=ensureProgressStatus();
-  if(el&&progressDepth===0){clearInterval(progressTimer);setProgressValue(100);if(progressTextEl)progressTextEl.textContent=finalMessage;el.setAttribute('aria-busy','false');if(!dedicatedProgressVisible())el.style.opacity='1';setTimeout(()=>{if(progressDepth===0){el.style.opacity='0';progressValue=0;if(progressBarEl)progressBarEl.style.width='0%'}},650)}
+function hideProgressSoon(){
+  const el=ensureProgressStatus();if(!el)return;
+  setTimeout(()=>{if(progressDepth===0){el.style.opacity='0';progressValue=0;if(progressBarEl)progressBarEl.style.width='0%';if(progressTextEl)progressTextEl.textContent=''}},700)
 }
+function endProgress(finalMessage='Concluído.',opts={}){
+  if(opts&&opts.force)progressDepth=0;else progressDepth=Math.max(0,progressDepth-1);
+  const el=ensureProgressStatus();
+  if(el&&progressDepth===0){
+    clearInterval(progressTimer);progressTimer=null;
+    setProgressValue(100);
+    if(progressTextEl)progressTextEl.textContent=finalMessage||'Concluído.';
+    el.setAttribute('aria-busy','false');
+    if(!dedicatedProgressVisible())el.style.opacity='1';
+    hideProgressSoon();
+  }
+  return progressDepth
+}
+function forceEndProgress(finalMessage='Concluído.'){return endProgress(finalMessage,{force:true})}
 function installPassiveProgress(){
   if(global.__centralPassiveProgressInstalled)return;global.__centralPassiveProgressInstalled=true;
   document.addEventListener('click',e=>{
     const a=e.target?.closest?.('a[href]');if(!a)return;
     const href=String(a.getAttribute('href')||'');if(!href||href.startsWith('#')||/^javascript:/i.test(href)||a.target==='_blank'||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
-    try{const u=new URL(a.href,location.href);if(u.origin===location.origin){beginProgress('Abrindo a próxima etapa…');updateProgress('Carregando a página solicitada…',42)}}catch(_){}
+    // Se o clique for interceptado (preventDefault) e a página permanecer, não deixar a barra presa.
+    setTimeout(()=>{
+      if(e.defaultPrevented||e.cancelBubble){if(progressDepth>0)forceEndProgress('');return}
+      try{
+        const u=new URL(a.href,location.href);
+        if(u.origin===location.origin&&u.href!==location.href){beginProgress('Abrindo a próxima etapa…');updateProgress('Carregando a página solicitada…',42)}
+      }catch(_){}
+    },0);
   },true);
   global.addEventListener('beforeprint',()=>{beginProgress('Preparando impressão / PDF…');updateProgress('Organizando o documento para impressão…',72)});
-  global.addEventListener('afterprint',()=>endProgress('Documento preparado.'));
+  global.addEventListener('afterprint',()=>forceEndProgress('Documento preparado.'));
+  global.addEventListener('pagehide',()=>forceEndProgress(''));
 }
 function installStatusBadge(){if(document.getElementById('centralSyncBadge'))return;const b=document.createElement('div');b.id='centralSyncBadge';b.className='no-print';b.setAttribute('role','status');b.setAttribute('aria-live','polite');Object.assign(b.style,{position:'fixed',right:'10px',bottom:'10px',zIndex:500,border:'0',borderRadius:'14px',padding:'5px 8px',background:'rgba(255,255,255,.46)',color:'#24425f',font:'700 10px Arial',boxShadow:'none',opacity:'.48',pointerEvents:'none',userSelect:'none'});function refresh(){const n=queueCount();b.textContent=n?'☁ '+n+' envio(s) pendente(s)':'☁ Sincronizado';b.style.color=n?'#8a5a00':'#176b3a'}document.body.appendChild(b);refresh();global.addEventListener('online',()=>setTimeout(async()=>{beginProgress('Sincronizando envios pendentes…');try{await retryQueue();refresh()}finally{endProgress('Sincronização concluída.')}},800));installPassiveProgress()}
 
 async function probe(){if(v10Enabled)return true;try{const r=await jsonp('version',{}, {timeout:10000});v10Enabled=!!(r&&r.ok&&String(r.version||'').startsWith('10'));if(v10Enabled)global.dispatchEvent(new CustomEvent('central-v10-ready',{detail:r}));return v10Enabled}catch(_){return false}}
-global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress,progressMessageForAction,installPassiveProgress};
+global.CentralCloud={ENDPOINT,get V10_ENABLED(){return v10Enabled},isEnabled:()=>v10Enabled,probe,uid,formatMatricula,getDeviceId,getToken,setToken,clearToken,askToken,isAuthError,tokenKindForAction,unitParams,jsonp,submitForm,postOrQueue,retryQueue,queueCount,compressImage,searchCadastro,installStatusBadge,beginProgress,updateProgress,endProgress,forceEndProgress,progressMessageForAction,installPassiveProgress};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{installStatusBadge();setTimeout(probe,150)});else{installStatusBadge();setTimeout(probe,150)}
 })(window);
