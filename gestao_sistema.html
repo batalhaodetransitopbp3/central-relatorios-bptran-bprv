@@ -278,7 +278,7 @@ button,.btn{border:0;border-radius:9px;background:var(--b2);color:#fff;padding:9
   window.openRsd=async(i)=>{
     const base=(window.__cmdItems||[])[i]; if(!base)return;
     try{
-      const r=await CentralCloud.jsonp('rsd-get',{token:token(),reportId:base.reportId},{timeout:30000,tokenKind:'comando',forceJsonp:true});
+      const r=await CentralCloud.jsonp('rsd-get',{token:token(),reportId:base.reportId,module:'COMANDO'},{timeout:30000,tokenKind:'comando',forceJsonp:true});
       current=Object.assign({},base,r.rsd||{});
       const g=current.guarnicao||{};
       equipe=Array.isArray(g.equipe)?g.equipe.slice():[];
