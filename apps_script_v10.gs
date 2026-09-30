@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.27';
+var CENTRAL_V10_VERSION = '10.8.29';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -1014,6 +1014,118 @@ function rsdApplyLockedCommanderToPayload_(r, old){
   if(locked.postoGrad)r.guarnicao.postoGrad=locked.postoGrad;
   return r;
 }
+function rsdFilledIdent_(v){return String(v==null?'':v).replace(/\u00a0/g,' ').trim()!=='';}
+function rsdIdentYmd_(v){
+  var s=String(v==null?'':v).trim();
+  var m=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m?m[1]:s.slice(0,10);
+}
+function rsdIdentPrimaryVtr_(raw){
+  var s=String(raw==null?'':raw).split(',')[0].trim().toUpperCase();
+  return s.replace(/[^A-Z0-9]/g,'');
+}
+function rsdExtractIncomingIdentity_(r){
+  r=r||{};
+  var g=r.guarnicao||{},u=r.unidade||{},s=r.servico||{},vs=r.viaturas||g.viaturas||[],first='';
+  if(Object.prototype.toString.call(vs)==='[object Array]'&&vs.length){
+    var v0=vs[0];first=typeof v0==='string'?v0:((v0&&(v0.prefixo||v0.viatura))||'');
+  }
+  return {
+    reportId:String(r.reportId||''),
+    serviceId:String(r.serviceId||s.serviceId||''),
+    segmento:String(r.segmento!=null?r.segmento:(s.segmento!=null?s.segmento:'')),
+    data:rsdIdentYmd_(s.operationalDate||s.data||r.data||''),
+    batalhao:String(u.batalhao||u.batalhaoSigla||''),
+    companhia:String(u.companhia||''),
+    nome:String(g.nome||''),
+    tipo:String(g.tipo||''),
+    vtr:rsdIdentPrimaryVtr_(g.vtrPrincipal||first||g.viatura||''),
+    responsavel:String(g.responsavel||''),
+    matricula:String(g.matricula||r.matriculaResponsavel||''),
+    efetivo:String(g.efetivo||'')
+  };
+}
+function rsdHasHeaderRectificationAuth_(old, payload, r){
+  var auth=String((old&&old.HEADER_EDIT_AUTH)||'').toUpperCase();
+  var token=String((payload&&payload.headerRectificationAuth)||(r&&r.headerRectificationAuth)||'').toUpperCase();
+  return auth==='OPEN'&&token==='OPEN';
+}
+function rsdSameIdent_(key,a,b){
+  if(key==='vtr')return rsdIdentPrimaryVtr_(a)===rsdIdentPrimaryVtr_(b);
+  if(key==='data')return rsdIdentYmd_(a)===rsdIdentYmd_(b);
+  if(key==='segmento')return String(Number(a||1)||1)===String(Number(b||1)||1);
+  return String(a||'').trim().toUpperCase()===String(b||'').trim().toUpperCase();
+}
+function rsdDetectStructuralRegression_(existingPayload, incomingPayload){
+  var existing=rsdExtractIncomingIdentity_(existingPayload||{});
+  var incoming=rsdExtractIncomingIdentity_(incomingPayload||{});
+  var rigid=['reportId','serviceId','segmento','data','batalhao','companhia','nome','tipo'];
+  var filledOnly=['vtr','responsavel','matricula','efetivo'];
+  var out=[],i,key,oldVal,newVal;
+  for(i=0;i<rigid.length;i++){
+    key=rigid[i];oldVal=existing[key];newVal=incoming[key];
+    if(!rsdFilledIdent_(oldVal))continue;
+    if(!rsdFilledIdent_(newVal)){out.push({field:key,from:String(oldVal),to:'',reason:'EMPTY'});continue;}
+    if(!rsdSameIdent_(key,oldVal,newVal))out.push({field:key,from:String(oldVal),to:String(newVal),reason:'IDENTITY_CHANGE'});
+  }
+  for(i=0;i<filledOnly.length;i++){
+    key=filledOnly[i];oldVal=existing[key];newVal=incoming[key];
+    if(rsdFilledIdent_(oldVal)&&!rsdFilledIdent_(newVal))out.push({field:key,from:String(oldVal),to:'',reason:'EMPTY'});
+  }
+  return out;
+}
+function rsdKnownDraftRevision_(payload, r){
+  if(payload&&payload.knownDraftRevision!=null&&payload.knownDraftRevision!=='')return Number(payload.knownDraftRevision)||0;
+  if(payload&&payload.draftRevision!=null&&payload.draftRevision!=='')return Number(payload.draftRevision)||0;
+  if(r&&r.knownDraftRevision!=null&&r.knownDraftRevision!=='')return Number(r.knownDraftRevision)||0;
+  if(r&&r.draftRevision!=null&&r.draftRevision!=='')return Number(r.draftRevision)||0;
+  return 0;
+}
+function rsdAssertDraftRevision_(old, knownRevision){
+  var current=Number((old&&old.DRAFT_REVISION)||0)||0;
+  var known=Number(knownRevision||0)||0;
+  if(current>=1&&known<current)return {ok:false,reason:'STALE_REVISION',current:current,known:known};
+  return {ok:true,current:current,known:known};
+}
+function rsdAuditBlockedDraft_(old, r, payload, reason, extra){
+  var g=(r&&r.guarnicao)||{};
+  var snap={
+    blocked:true,
+    action:'rsd-draft-sync',
+    reason:reason,
+    reportId:String((old&&old.REPORT_ID)||(r&&r.reportId)||''),
+    serviceId:String((old&&old.SERVICE_ID)||(r&&r.serviceId)||''),
+    receivedRevision:rsdKnownDraftRevision_(payload,r),
+    currentRevision:Number((old&&old.DRAFT_REVISION)||0)||0,
+    fields:(extra&&extra.fields)||[],
+    deviceId:String((payload&&payload.deviceId)||(r&&r.deviceId)||''),
+    headerEditAuth:String((old&&old.HEADER_EDIT_AUTH)||'')
+  };
+  audit_('RSD',snap.reportId,snap.currentRevision,'RASCUNHO_REGRESSAO_BLOQUEADA',
+    old&&old.RESPONSAVEL_MATRICULA||g.matricula||'',
+    old&&old.RESPONSAVEL_NOME||g.responsavel||'',
+    old&&old.BATALHAO||'',
+    old&&old.COMPANHIA||'',
+    snap);
+}
+function rsdGuardExistingDraft_(r, old, payload){
+  if(!old||!r)return r;
+  var known=rsdKnownDraftRevision_(payload,r);
+  var rev=rsdAssertDraftRevision_(old,known);
+  if(!rev.ok){
+    rsdAuditBlockedDraft_(old,r,payload,'STALE_REVISION',{fields:['DRAFT_REVISION']});
+    throw new Error('Este rascunho está desatualizado em relação à Central (revisão '+rev.known+' < '+rev.current+'). Recarregue o serviço para continuar sem perder dados.');
+  }
+  var existing=loadJsonPayload_(old)||{};
+  var regressions=rsdDetectStructuralRegression_(existing,r);
+  var auth=rsdHasHeaderRectificationAuth_(old,payload||{},r);
+  if(auth)regressions=regressions.filter(function(x){return x.reason==='EMPTY';});
+  if(regressions.length){
+    rsdAuditBlockedDraft_(old,r,payload,'STRUCTURAL_REGRESSION',{fields:regressions});
+    throw new Error('A sincronização foi recusada porque o rascunho apagaria dados de identificação do serviço. Recarregue a página para proteger o RSD.');
+  }
+  return r;
+}
 function rsdDraftObject_(r,old,deviceId) {
   rsdAssertCommanderImmutable_(r,old);
   r=rsdApplyLockedCommanderToPayload_(r,old)||r||{};
@@ -1037,7 +1149,8 @@ function rsdDraftObject_(r,old,deviceId) {
     ORIGEM:r.origem||(old&&old.ORIGEM)||'RSD_WEB',OBSERVACOES:r.observacoes||'',PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),
     SERVICE_ID:serviceId,SEGMENTO:seg,RSD_ANTERIOR_ID:r.rsdAnteriorId||(r.servico||{}).rsdAnteriorId||(old&&old.RSD_ANTERIOR_ID)||'',
     PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||(old&&old.PASSAGEM_ORIGEM_ID)||'',ULTIMO_RASCUNHO_EM:nowIso_(),
-    EDIT_DEVICE_ID:String(deviceId||old&&old.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),DRAFT_REVISION:rev};
+    EDIT_DEVICE_ID:String(deviceId||old&&old.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),DRAFT_REVISION:rev,
+    HEADER_EDIT_AUTH:old&&old.HEADER_EDIT_AUTH||'',HEADER_EDIT_AUTH_EM:old&&old.HEADER_EDIT_AUTH_EM||'',HEADER_EDIT_AUTH_POR:old&&old.HEADER_EDIT_AUTH_POR||''};
 }
 function rsdStart_(payload) {
   var lock=LockService.getScriptLock();lock.waitLock(15000);
@@ -1045,7 +1158,7 @@ function rsdStart_(payload) {
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
-  ensureHeaders_(s,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','DUPLICATE_OVERRIDE_JUSTIFICATIVA','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL']);
+  ensureHeaders_(s,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','DUPLICATE_OVERRIDE_JUSTIFICATIVA','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL','HEADER_EDIT_AUTH','HEADER_EDIT_AUTH_EM','HEADER_EDIT_AUTH_POR']);
   if(old&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD não está disponível para novo início/registro. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Use Continuar serviço para consultar a situação ou a devolutiva.');
 
   var u0=r.unidade||{},g0=r.guarnicao||{},batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran'),
@@ -1120,6 +1233,7 @@ function rsdStart_(payload) {
   r=rsdApplyLockedCommanderToPayload_(r,old)||r;
   g0=r.guarnicao||g0;r.guarnicao=g0;
   assertLease_(old,deviceId,!!payload.forceTakeover);
+  if(old)r=rsdGuardExistingDraft_(r,old,payload)||r;
   var obj=rsdDraftObject_(r,old,deviceId);
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   audit_('RSD',reportId,obj.DRAFT_REVISION,old?'RASCUNHO_ATUALIZADO':'INICIADO',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,obj.BATALHAO,obj.COMPANHIA,r);
@@ -1129,7 +1243,9 @@ function rsdStart_(payload) {
 function rsdDraftSync_(payload){
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
-  var s=sheet_(P3_SHEET_ID,'RSD'),old=findOne_(s,'REPORT_ID',reportId);
+  var s=sheet_(P3_SHEET_ID,'RSD');
+  ensureHeaders_(s,['HEADER_EDIT_AUTH','HEADER_EDIT_AUTH_EM','HEADER_EDIT_AUTH_POR']);
+  var old=findOne_(s,'REPORT_ID',reportId);
   if(!old)return rsdStart_(payload);
   var incomingTipo=normGuarnicaoTipo_((r.guarnicao||{}).tipo||guarnicaoTipoFromNome_((r.guarnicao||{}).nome)),oldTipo=normGuarnicaoTipo_(old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(old.GUARNICAO));
   if(oldTipo&&incomingTipo&&oldTipo!==incomingTipo)throw new Error('O tipo da guarnição já foi definido para este serviço e não pode ser alterado.');
@@ -1137,7 +1253,11 @@ function rsdDraftSync_(payload){
   rsdAssertCommanderImmutable_(r,old);
   r=rsdApplyLockedCommanderToPayload_(r,old)||r;
   assertLease_(old,deviceId,!!payload.forceTakeover);
+  r=rsdGuardExistingDraft_(r,old,payload)||r;
   var obj=rsdDraftObject_(r,old,deviceId);obj.STATUS=String(old.STATUS)==='RETIFICACAO_SOLICITADA'?'RETIFICACAO_SOLICITADA':'EM_SERVICO';
+  if(old.HEADER_EDIT_AUTH)obj.HEADER_EDIT_AUTH=old.HEADER_EDIT_AUTH;
+  if(old.HEADER_EDIT_AUTH_EM)obj.HEADER_EDIT_AUTH_EM=old.HEADER_EDIT_AUTH_EM;
+  if(old.HEADER_EDIT_AUTH_POR)obj.HEADER_EDIT_AUTH_POR=old.HEADER_EDIT_AUTH_POR;
   if(old.REVIEW_STATUS)obj.REVIEW_STATUS=old.REVIEW_STATUS;if(old.REVIEW_MOTIVO)obj.REVIEW_MOTIVO=old.REVIEW_MOTIVO;if(old.REVIEW_OBSERVACAO)obj.REVIEW_OBSERVACAO=old.REVIEW_OBSERVACAO;
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);
   return {ok:true,message:'Rascunho sincronizado.',reportId:reportId,serviceId:obj.SERVICE_ID,segmento:obj.SEGMENTO,draftRevision:obj.DRAFT_REVISION,status:obj.STATUS};
@@ -1175,6 +1295,7 @@ function rsdUpsert_(payload) {
   r=rsdApplyLockedCommanderToPayload_(r,old)||r;
   if(old&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD já não está disponível para finalização. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Consulte a devolutiva do Coordenador antes de qualquer nova ação.');
   assertLease_(old,deviceId,!!payload.forceTakeover);
+  r=rsdGuardExistingDraft_(r,old,payload)||r;
   var wasReturned=!!(old&&String(old.STATUS)==='RETIFICACAO_SOLICITADA'),version=Math.max(Number(r.versao||r.version||0),old?Number(old.VERSAO||0)+1:1);
   var u=r.unidade||{},g=r.guarnicao||{},lockedCmd=rsdLockedCommander_(old);
   var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
@@ -1416,6 +1537,8 @@ function rsdGet_(reportId) {
   var row=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',reportId);if(!row)throw new Error('RSD não localizado.');
   var p=loadJsonPayload_(row);if(!p||!Object.keys(p).length)throw new Error('Conteúdo do RSD indisponível.');
   p.versao=Number(row.VERSAO||1);p.serviceId=row.SERVICE_ID||p.serviceId||'';p.segmento=Number(row.SEGMENTO||p.segmento||1);p.rsdAnteriorId=row.RSD_ANTERIOR_ID||p.rsdAnteriorId||'';p.passagemOrigemId=row.PASSAGEM_ORIGEM_ID||p.passagemOrigemId||'';
+  p.draftRevision=Number(row.DRAFT_REVISION||0)||0;p.headerEditAuth=String(row.HEADER_EDIT_AUTH||'');
+  if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(row.STATUS||''))>=0)p.cloudRegistered=true;
   p.centralStatus=String(row.STATUS||'');p.revisaoCoordenador={status:row.REVIEW_STATUS||'',motivo:row.REVIEW_MOTIVO||'',observacao:row.REVIEW_OBSERVACAO||'',autorNome:row.REVIEW_AUTOR_NOME||'',autorMatricula:row.REVIEW_AUTOR_MATRICULA||'',em:row.REVIEW_EM||''};
   p.cancelamento={motivo:row.CANCELADO_MOTIVO||'',autorNome:row.CANCELADO_POR_NOME||'',autorMatricula:row.CANCELADO_POR_MATRICULA||'',perfil:row.CANCELADO_POR_PERFIL||'',em:row.CANCELADO_EM||''};
   p.finalizacaoCoordenador={forcada:String(row.FINALIZACAO_FORCADA||'').toUpperCase()==='SIM',motivo:row.FINALIZACAO_FORCADA_MOTIVO||'',autorNome:row.FINALIZACAO_FORCADA_POR_NOME||'',autorMatricula:row.FINALIZACAO_FORCADA_POR_MATRICULA||'',perfil:row.FINALIZACAO_FORCADA_POR_PERFIL||'',em:row.FINALIZACAO_FORCADA_EM||''};
