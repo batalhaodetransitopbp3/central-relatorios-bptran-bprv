@@ -597,16 +597,46 @@ function rsdAssertUnitLinePayloadParity_(row, payload){
   return {ok:true,code:''};
 }
 function parseJson_(v, fallback) { try { return JSON.parse(String(v||'')); } catch(_) { return fallback; } }
+/**
+ * Parse de data para leitura/filtro.
+ * NÃO usa s.slice(0,10) como fallback — esse padrão gera tokens como `"2026-09-3`.
+ */
 function dateText_(v) {
-  if (!v) return '';
-  if (Object.prototype.toString.call(v)==='[object Date]') return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
-  var s=String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  if (!v && v!==0) return '';
+  if (Object.prototype.toString.call(v)==='[object Date]') {
+    if(isNaN(v.getTime()))return '';
+    return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
+  }
+  var s=String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
+  if(!s)return '';
+  var m=s.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+  if(m)return m[1];
   try{
     var d=new Date(s);
     if(!isNaN(d.getTime()))return Utilities.formatDate(d, scriptTz_(),'yyyy-MM-dd');
   }catch(_){}
-  return s.slice(0,10);
+  return '';
+}
+/** Aceita somente YYYY-MM-DD canônico (ou Date de Sheets). Para novos writes de DATA_SERVICO. */
+function strictYmdDate_(v){
+  if(!v&&v!==0)return '';
+  if(Object.prototype.toString.call(v)==='[object Date]'){
+    if(isNaN(v.getTime()))return '';
+    return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
+  }
+  var s=String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  var m=s.match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
+  return m?m[1]:'';
+}
+/** Preserva token histórico de DATA_SERVICO (inclui aspas/truncados). Não sanitiza. */
+function preserveLegacyIdentityDate_(v){
+  if(typeof RsdStructuralIdentity!=='undefined'&&RsdStructuralIdentity&&typeof RsdStructuralIdentity.resolveIdentityDate==='function'){
+    return RsdStructuralIdentity.resolveIdentityDate(v).value;
+  }
+  if(v==null||v==='')return '';
+  if(Object.prototype.toString.call(v)==='[object Date]')return strictYmdDate_(v);
+  return String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
 }
 /** Fuso oficial da Central (Paraíba). */
 function scriptTz_(){return Session.getScriptTimeZone()||'America/Fortaleza'}
@@ -638,9 +668,13 @@ function getServiceWindow_(when){
   return {operationalDate:op,windowStart:op+'T07:00:00',windowEnd:addCalendarDaysYmd_(op,1)+'T07:00:00',cutoffHour:SERVICE_WINDOW_HOUR_,tz:tz};
 }
 function operationalServiceDate_(when){return getServiceWindow_(when).operationalDate}
-/** Resolve DATA_SERVICO canônica: prioriza data explícita yyyy-MM-dd; senão deriva de instante (INICIADO_EM/agora). */
+/**
+ * Resolve DATA_SERVICO canônica para NOVOS registros / derivações.
+ * Prioriza explícita estrita YYYY-MM-dd; senão deriva da janela 07h a partir do instante.
+ * Nunca trunca string inválida (sem s.slice(0,10)).
+ */
 function resolveOperationalServiceDate_(explicitDate, instant){
-  var d=dateText_(explicitDate);
+  var d=strictYmdDate_(explicitDate);
   if(d)return d;
   return operationalServiceDate_(instant||new Date());
 }
@@ -1334,11 +1368,27 @@ function rsdStart_(payload) {
   ensureHeaders_(s,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','DUPLICATE_OVERRIDE_JUSTIFICATIVA','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL','HEADER_EDIT_AUTH','HEADER_EDIT_AUTH_EM','HEADER_EDIT_AUTH_POR']);
   if(old&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD não está disponível para novo início/registro. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Use Continuar serviço para consultar a situação ou a devolutiva.');
 
-  var u0=r.unidade||{},g0=r.guarnicao||{},batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran'),
-      comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero),
-      data0=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date()),
-      mat0=normMat_(g0.matricula||r.matriculaResponsavel||''),tipo0=normGuarnicaoTipo_(g0.tipo||guarnicaoTipoFromNome_(g0.nome)),vtr0=rsdPrimaryVtr_(r),passagem0=!!(r.passagemOrigemId||(r.servico&&r.servico.passagemOrigemId)),guEscolhida0=normalizeGuarnicaoNome_(g0.nome,tipo0);
-  r.servico=r.servico||{};r.servico.data=data0;r.servico.operationalDate=data0;r.servico.serviceWindow=getServiceWindow_(data0);
+  var u0=r.unidade||{},g0=r.guarnicao||{};
+  var batt0,comp0,data0;
+  var mat0=normMat_(g0.matricula||r.matriculaResponsavel||''),tipo0=normGuarnicaoTipo_(g0.tipo||guarnicaoTipoFromNome_(g0.nome)),vtr0=rsdPrimaryVtr_(r),passagem0=!!(r.passagemOrigemId||(r.servico&&r.servico.passagemOrigemId)),guEscolhida0=normalizeGuarnicaoNome_(g0.nome,tipo0);
+  r.servico=r.servico||{};
+  if(old){
+    // RSD existente: NÃO normalizar DATA_SERVICO nem calcular serviceWindow aqui.
+    // rsdDraftObject_ resolve identidade (incl. LEGACY_DATE_CORRUPTION) e canoniza.
+    batt0=normBattalion_(old.BATALHAO||u0.batalhao||u0.batalhaoSigla||'')||normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran');
+    comp0=String(old.COMPANHIA||u0.companhia||normCompany_(batt0,u0.companhiaNumero)||'');
+    data0='';
+  }else{
+    batt0=normBattalion_(u0.batalhao||u0.batalhaoSigla||'BPTran');
+    comp0=u0.companhia||normCompany_(batt0,u0.companhiaNumero);
+    var explicitNew=(r.servico&&r.servico.data)||'';
+    if(String(explicitNew||'').replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'')&&!strictYmdDate_(explicitNew)){
+      throw new Error('DATA_SERVICO inválida para novo RSD. Informe a data no formato AAAA-MM-DD.');
+    }
+    data0=resolveOperationalServiceDate_(explicitNew,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date());
+    if(!strictYmdDate_(data0))throw new Error('Não foi possível determinar a data operacional do novo RSD.');
+    r.servico.data=data0;r.servico.operationalDate=data0;r.servico.serviceWindow=getServiceWindow_(data0);
+  }
   if(!tipo0)throw new Error('Selecione o tipo da guarnição: BST, BASE, GTTRAN, TOR ou REBOQUE.');
   if(!vtr0)throw new Error('Informe a VTR principal da guarnição.');
   var mainVtrMap=rsdMainVtrMap_();
@@ -2039,7 +2089,9 @@ function passagemPublicar_(payload) {
   if(p.rsdOrigemId){src=findOne_(rs,'REPORT_ID',String(p.rsdOrigemId));if(!src||['AGUARDANDO_ANALISE','FINALIZADO','DEFERIDO','DEFERIDO_COM_RESSALVAS'].indexOf(String(src.STATUS))<0)throw new Error('Finalize o segmento do comandante que está saindo antes de disponibilizar a passagem.');if(!p.serviceId)p.serviceId=src.SERVICE_ID||'';if(!p.segmentoOrigem)p.segmentoOrigem=Number(src.SEGMENTO||1);}
   var ps=sheet_(P3_SHEET_ID,'PASSAGENS_SERVICO');ensureHeaders_(ps,['CANCELADA_EM','CANCELADA_MOTIVO','CANCELADA_POR_MATRICULA','CANCELADA_POR_NOME','RETIFICADA_EM','RETIFICADA_MOTIVO','ANULADA_EM','ANULADA_MOTIVO']);
   var u=p.unidade||{}, batt=normBattalion_(u.batalhao), comp=u.companhia||normCompany_(batt,u.companhiaNumero);
-  var obj={PASSAGEM_ID:id,RSD_ORIGEM_ID:p.rsdOrigemId||'',RSD_DESTINO_ID:'',DATA_SERVICO:dateText_(p.dataServico),BATALHAO:batt,COMPANHIA:comp,
+  var dataPass=strictYmdDate_(p.dataServico)||(src?preserveLegacyIdentityDate_(src.DATA_SERVICO):'');
+  if(!dataPass)throw new Error('DATA_SERVICO inválida na passagem de serviço.');
+  var obj={PASSAGEM_ID:id,RSD_ORIGEM_ID:p.rsdOrigemId||'',RSD_DESTINO_ID:'',DATA_SERVICO:dataPass,BATALHAO:batt,COMPANHIA:comp,
     GUARNICAO:(p.guarnicao||{}).nome||p.guarnicao||'',TURNO_ORIGEM:p.turnoOrigem||'',ENTREGUE_POR_MATRICULA:normMat_(p.entreguePorMatricula||(p.entreguePor||{}).matricula||''),
     ENTREGUE_POR_NOME:p.entreguePorNome||(p.entreguePor||{}).nome||'',DISPONIBILIZADA_EM:nowIso_(),STATUS:'AGUARDANDO_RECEBIMENTO',
     RECEBIDA_POR_MATRICULA:'',RECEBIDA_POR_NOME:'',RECEBIDA_EM:'',VTRS_JSON:JSON.stringify(p.viaturas||[]),
@@ -3023,11 +3075,11 @@ function masterEmptyProduction_(){
   };
 }
 function masterRsdCreate_(payload){
-  payload=payload||{};var data=dateText_(payload.data||''),batt=normBattalion_(payload.batalhao||'BPTran'),
+  payload=payload||{};var data=strictYmdDate_(payload.data||''),batt=normBattalion_(payload.batalhao||'BPTran'),
       comp=String(payload.companhia||normCompany_(batt,payload.companhiaNumero)),tipo=normGuarnicaoTipo_(payload.tipo||''),
       vtr=normVtrPrefix_(payload.vtr||payload.vtrPrincipal||''),mat=normMat_(payload.matricula||''),nome=String(payload.nome||'').trim(),
       posto=String(payload.postoGrad||'').trim(),turno=String(payload.turno||'').trim(),motivo=String(payload.motivo||'').trim();
-  if(!data)throw new Error('Informe a data do serviço.');if(!tipo)throw new Error('Informe o tipo da guarnição.');if(!vtr)throw new Error('Informe a VTR principal.');
+  if(!data)throw new Error('Informe a data do serviço no formato AAAA-MM-DD.');if(!tipo)throw new Error('Informe o tipo da guarnição.');if(!vtr)throw new Error('Informe a VTR principal.');
   if(!/^\d{3}\.\d{3}-\d$/.test(mat))throw new Error('Informe uma matrícula válida.');if(!nome)throw new Error('Informe o responsável pela guarnição.');
   if(!motivo)throw new Error('Informe o motivo da inclusão administrativa.');
   var now=nowIso_(),reportId=uid_('sd-master'),serviceId=uid_('svc'),n=Number(String(comp).match(/\d+/)&&String(comp).match(/\d+/)[0]||1);
@@ -3123,8 +3175,9 @@ function rcoDraftUpsert_(payload){
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId),createLock=null;
   if(!old){createLock=LockService.getScriptLock();createLock.waitLock(15000);old=findOne_(s,'RCO_REPORT_ID',reportId);}
   try{
-  var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero),data=dateText_((r.periodo||{}).inicio||r.data||'');
-  if(!old&&!data)throw new Error('Informe a data do serviço para iniciar o RCO.');
+  var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
+  var data=old?preserveLegacyIdentityDate_(old.DATA_SERVICO)||strictYmdDate_((r.periodo||{}).inicio||r.data||''):strictYmdDate_((r.periodo||{}).inicio||r.data||'');
+  if(!old&&!data)throw new Error('Informe a data do serviço para iniciar o RCO (AAAA-MM-DD).');
 
   // Um único RCO em andamento por unidade/data. Em colisão, devolve o canônico (idempotente).
   if(!old&&data){

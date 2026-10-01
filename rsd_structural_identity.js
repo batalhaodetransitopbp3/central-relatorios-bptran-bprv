@@ -310,6 +310,37 @@
     return { ok: true, code: '' };
   }
 
+  /**
+   * Simula o trecho crítico rsdStart_(old existente) → rsdDraftObject_:
+   * NÃO deve chamar getServiceWindow com DATA_SERVICO legada.
+   */
+  function simulateRsdStartExistingThenDraft(old, incomingPayload, opts) {
+    opts = opts || {};
+    var counters = {
+      getServiceWindow_called: 0,
+      saveJsonPayload_called: 0,
+      setContent_called: 0,
+      createFile_called: 0,
+      upsert_called: 0
+    };
+    var r = incomingPayload || {};
+    r.servico = r.servico || {};
+    // Espelha rsdStart_ corrigido: ramo old — não preenche data/serviceWindow.
+    // (criação nova não é este helper)
+    var out = draftPersistPipeline(old, r, {
+      counters: counters,
+      getServiceWindow: function (d) {
+        counters.getServiceWindow_called += 1;
+        if (typeof opts.getServiceWindow === 'function') return opts.getServiceWindow(d);
+        return { operationalDate: d, from: 'getServiceWindow' };
+      },
+      doUpsert: !!opts.doUpsert,
+      existingFileId: opts.existingFileId
+    });
+    out.counters = counters;
+    return out;
+  }
+
   function draftPersistPipeline(old, payload, opts) {
     opts = opts || {};
     var counters = opts.counters || {
@@ -409,10 +440,51 @@
     };
   }
 
+  /** Espelho de strictYmdDate_ do GAS — apenas YYYY-MM-DD / prefixo ISO. */
+  function strictYmdDate(v) {
+    if (v == null || v === '') return '';
+    if (Object.prototype.toString.call(v) === '[object Date]') {
+      if (isNaN(v.getTime())) return '';
+      var y = v.getFullYear();
+      var m = ('0' + (v.getMonth() + 1)).slice(-2);
+      var d = ('0' + v.getDate()).slice(-2);
+      return y + '-' + m + '-' + d;
+    }
+    var s = trimPreservingContent(v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var mIso = s.match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
+    return mIso ? mIso[1] : '';
+  }
+
+  /**
+   * Comportamento seguro pós-fix do dateText_ GAS (sem s.slice(0,10)).
+   * Usado nos testes para provar que `"2026-09-30` não vira `"2026-09-3`.
+   */
+  function safeDateTextNoSlice(v) {
+    if (v == null || v === '') return '';
+    if (Object.prototype.toString.call(v) === '[object Date]') return strictYmdDate(v);
+    var s = trimPreservingContent(v);
+    if (!s) return '';
+    var m = s.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+    if (m) return m[1];
+    return '';
+  }
+
+  /** Antigo fallback inseguro — só para testes de regressão do padrão histórico. */
+  function unsafeDateTextSliceFallback(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    return s.slice(0, 10);
+  }
+
   return {
     dateText: dateText,
     identityDate: identityDate,
     resolveIdentityDate: resolveIdentityDate,
+    strictYmdDate: strictYmdDate,
+    safeDateTextNoSlice: safeDateTextNoSlice,
+    unsafeDateTextSliceFallback: unsafeDateTextSliceFallback,
     normBattalion: normBattalion,
     normCompany: normCompany,
     extractPayloadUnit: extractPayloadUnit,
@@ -421,6 +493,7 @@
     applyCanonicalIdentityToPayload: applyCanonicalIdentityToPayload,
     assertLinePayloadUnitParity: assertLinePayloadUnitParity,
     draftPersistPipeline: draftPersistPipeline,
+    simulateRsdStartExistingThenDraft: simulateRsdStartExistingThenDraft,
     isVisibleInRco: isVisibleInRco,
     rcoLifecycleFlags: rcoLifecycleFlags
   };

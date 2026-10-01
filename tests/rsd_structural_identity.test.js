@@ -449,4 +449,82 @@ test('rsdUpsert_ lock: região crítica documentada (estimativa)', function () {
   console.log('    lock-upsert:', JSON.stringify(est));
 });
 
+test('rsdStart_→rsdDraftObject_ (old DATE_CORRUPTION): getServiceWindow=0', function () {
+  const old = oldRow({ DATA_SERVICO: CORRUPT_A, BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv' });
+  const out = I.simulateRsdStartExistingThenDraft(old, { unidade: {}, servico: {}, guarnicao: { nome: 'BASE 01' } }, { doUpsert: true });
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.counters.getServiceWindow_called, 0);
+  assert.strictEqual(out.persistedPayload.servico.data, CORRUPT_A);
+  assert.strictEqual(out.persistedPayload.servico.operationalDate, CORRUPT_A);
+  assert.ok(
+    out.persistedPayload.servico.serviceWindow == null ||
+      out.persistedPayload.servico.serviceWindow === undefined ||
+      !out.persistedPayload.servico.serviceWindow.from
+  );
+  assert.notStrictEqual(
+    out.persistedPayload.servico.serviceWindow && out.persistedPayload.servico.serviceWindow.operationalDate,
+    new Date().toISOString().slice(0, 10)
+  );
+});
+
+test('GAS rsdStart_ não chama getServiceWindow_ no ramo old', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  const start = src.indexOf('function rsdStart_');
+  const end = src.indexOf('\nfunction rsdDraftSync_', start);
+  const fn = src.slice(start, end > start ? end : start + 8000);
+  assert.ok(fn.indexOf('if(old){') >= 0);
+  assert.ok(fn.indexOf('LEGACY_DATE_CORRUPTION') >= 0 || fn.indexOf('NÃO normalizar DATA_SERVICO') >= 0 || fn.indexOf('nao normalizar') >= 0 || fn.indexOf('rsdDraftObject_ resolve identidade') >= 0);
+  // getServiceWindow_ só no ramo de criação (!old / else)
+  const elseBlock = fn.slice(fn.indexOf('}else{'));
+  assert.ok(elseBlock.indexOf('getServiceWindow_') >= 0);
+  const oldBlock = fn.slice(fn.indexOf('if(old){'), fn.indexOf('}else{'));
+  assert.ok(oldBlock.indexOf('getServiceWindow_') < 0, 'ramo old sem getServiceWindow_');
+  assert.ok(oldBlock.indexOf('dateText_(old.DATA_SERVICO)') < 0, 'ramo old sem dateText_ em DATA_SERVICO');
+});
+
+test('padrão histórico: `"2026-09-30` NÃO vira `"2026-09-3`', function () {
+  const input = '"2026-09-30';
+  assert.strictEqual(I.unsafeDateTextSliceFallback(input), '"2026-09-3'); // prova do bug antigo
+  assert.strictEqual(I.safeDateTextNoSlice(input), '');
+  assert.strictEqual(I.strictYmdDate(input), '');
+  assert.strictEqual(I.resolveIdentityDate(input).value, input); // raw preservado
+});
+
+test('padrão histórico: `"2026-09-29` NÃO vira `"2026-09-2`', function () {
+  const input = '"2026-09-29';
+  assert.strictEqual(I.unsafeDateTextSliceFallback(input), '"2026-09-2');
+  assert.strictEqual(I.safeDateTextNoSlice(input), '');
+  assert.strictEqual(I.strictYmdDate(input), '');
+  assert.strictEqual(I.resolveIdentityDate(input).value, input);
+});
+
+test('não regressão date helpers', function () {
+  assert.strictEqual(I.strictYmdDate('2026-09-30'), '2026-09-30');
+  assert.strictEqual(I.safeDateTextNoSlice('2026-09-30'), '2026-09-30');
+  assert.strictEqual(I.safeDateTextNoSlice('2026-09-30T12:30:00.000Z'), '2026-09-30');
+  assert.strictEqual(I.strictYmdDate('lixo-qualquer'), '');
+  assert.strictEqual(I.safeDateTextNoSlice('lixo-qualquer'), '');
+  const d = new Date(2026, 8, 30); // month 0-based
+  assert.strictEqual(I.strictYmdDate(d), '2026-09-30');
+});
+
+test('GAS dateText_ sem fallback s.slice(0,10)', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  const start = src.indexOf('function dateText_');
+  const end = src.indexOf('\nfunction strictYmdDate_', start);
+  const fn = src.slice(start, end > start ? end : start + 800);
+  assert.ok(fn.indexOf('return s.slice(0,10)') < 0);
+  assert.ok(fn.indexOf("return '';") >= 0 || fn.indexOf('return "";') >= 0);
+});
+
+test('auditoria writes DATA_SERVICO: strictYmdDate_/preserveLegacy presentes', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  assert.ok(src.indexOf('function strictYmdDate_') >= 0);
+  assert.ok(src.indexOf('function preserveLegacyIdentityDate_') >= 0);
+  assert.ok(src.indexOf('resolveOperationalServiceDate_') >= 0);
+  // master/passagem/rco create usam strict
+  assert.ok(src.indexOf('strictYmdDate_(payload.data') >= 0 || src.indexOf('strictYmdDate_(payload.data||') >= 0);
+  console.log('    CAN_UNSAFE_DATETEXT_CREATE_NEW_CORRUPTION=FALSE (dateText_ sem slice; writes RSD/new usam strictYmdDate_)');
+});
+
 console.log('\nPASSED', passed);
