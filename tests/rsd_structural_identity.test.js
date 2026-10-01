@@ -539,6 +539,32 @@ test('NEW vs EXISTING: corrupt não vira hoje; empty+INICIADO deriva', function 
   assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(I.resolveNewOperationalDate('', new Date('2026-10-01T12:00:00-03:00'))));
 });
 
+test('EXISTING INICIADO_EM: A–F parse seguro + janela 07h (nunca hoje)', function () {
+  // A) 10:00 → mesmo dia operacional
+  assert.strictEqual(I.resolveExistingOperationalDate('', '2026-09-28T10:00:00-03:00'), '2026-09-28');
+  // B) 06:30 → dia anterior
+  assert.strictEqual(I.resolveExistingOperationalDate('', '2026-09-28T06:30:00-03:00'), '2026-09-27');
+  // C) lixo
+  assert.strictEqual(I.resolveExistingOperationalDate('', 'lixo'), '');
+  assert.strictEqual(I.parseExistingServiceInstant('lixo'), null);
+  // D) token corrompido estilo DATE_CORRUPTION
+  assert.strictEqual(I.resolveExistingOperationalDate('', '"2026-09-2'), '');
+  assert.strictEqual(I.parseExistingServiceInstant('"2026-09-2'), null);
+  // E) objeto / Invalid Date
+  assert.strictEqual(I.resolveExistingOperationalDate('', {}), '');
+  assert.strictEqual(I.parseExistingServiceInstant({}), null);
+  assert.strictEqual(I.resolveExistingOperationalDate('', new Date(NaN)), '');
+  assert.strictEqual(I.parseExistingServiceInstant(new Date(NaN)), null);
+  // F) DATA corrompida prevalece fail-closed mesmo com INICIADO válido
+  assert.strictEqual(
+    I.resolveExistingOperationalDate('"2026-09-2', '2026-09-28T10:00:00-03:00'),
+    ''
+  );
+  // vazio + vazio
+  assert.strictEqual(I.resolveExistingOperationalDate('', ''), '');
+  assert.strictEqual(I.resolveExistingOperationalDate('', null), '');
+});
+
 test('serviceKey fail-closed + SERVICE_ID fallback — sem colisão com hoje', function () {
   const legacy = {
     BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', GUARNICAO: 'BST 01',
@@ -603,6 +629,7 @@ test('rsdIdentYmd_ GAS sem slice; helper Node sem slice', function () {
   assert.strictEqual(I.rsdIdentYmd('"2026-09-2'), '"2026-09-2');
   assert.strictEqual(I.rsdIdentYmd('2026-10-01'), '2026-10-01');
   console.log('    CAN_CORRUPT_EXISTING_DATE_FALLBACK_TO_TODAY=FALSE');
+  console.log('    CAN_INVALID_EXISTING_STARTED_AT_FALLBACK_TO_TODAY=FALSE');
   console.log('    CAN_CORRUPT_ROW_COLLIDE_WITH_CURRENT_SERVICE_KEY=FALSE');
   console.log('    CAN_CORRUPT_ROW_ENTER_CURRENT_RCO_BY_NOW_FALLBACK=FALSE');
   console.log('    UNSAFE_RSDIDENTYMD_SLICE_PRESENT=FALSE');
@@ -612,7 +639,14 @@ test('GAS: existing-row call sites usam resolveExistingOperationalDate_', functi
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf('function resolveExistingOperationalDate_') >= 0);
   assert.ok(src.indexOf('function resolveNewOperationalDate_') >= 0);
+  assert.ok(src.indexOf('function parseExistingServiceInstant_') >= 0);
   assert.ok(src.indexOf('function rsdGroupKeyFromRow_') >= 0);
+  // resolveExisting usa parse — não passa iniciadoEm cru a getServiceWindow_
+  const exStart = src.indexOf('function resolveExistingOperationalDate_');
+  const exEnd = src.indexOf('\nfunction ', exStart + 10);
+  const exFn = src.slice(exStart, exEnd > exStart ? exEnd : exStart + 600);
+  assert.ok(exFn.indexOf('parseExistingServiceInstant_') >= 0);
+  assert.ok(exFn.indexOf('if(!instant)return') >= 0 || exFn.indexOf('if(!instant) return') >= 0);
   // serviceKey fail-closed
   const skStart = src.indexOf('function serviceKeyRsd_');
   const skEnd = src.indexOf('\nfunction ', skStart + 10);

@@ -30,8 +30,30 @@
     return mIso ? mIso[1] : '';
   }
 
+  /** Parse seguro de INICIADO_EM — sem fallback para agora. */
+  function parseExistingServiceInstant(v) {
+    if (v == null || v === '') return null;
+    if (Object.prototype.toString.call(v) === '[object Date]') {
+      return isNaN(v.getTime()) ? null : v;
+    }
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return null;
+      const dn = new Date(v);
+      return isNaN(dn.getTime()) ? null : dn;
+    }
+    if (typeof v !== 'string') return null;
+    const s = trimPreserving(v);
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (!/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(s)) {
+      return null;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   /**
-   * EXISTING_ROW: DATA válida → usa; vazia + INICIADO_EM → helper/ISO;
+   * EXISTING_ROW: DATA válida → usa; vazia + INICIADO_EM válido → helper/ISO;
    * não vazia inválida → '' (LEGACY_DATE_CORRUPTION). Nunca “hoje”.
    */
   function resolveExistingOperationalDate(dataServico, iniciadoEm, helper) {
@@ -40,18 +62,20 @@
       if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
       return '';
     }
-    if (iniciadoEm != null && iniciadoEm !== '') {
-      if (typeof helper === 'function') {
-        try {
-          const op = helper('', iniciadoEm);
-          if (op) return dateText(op) || String(op);
-        } catch (_) {}
-      }
-      const s = trimPreserving(iniciadoEm);
-      const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
-      return m ? m[1] : '';
+    const instant = parseExistingServiceInstant(iniciadoEm);
+    if (!instant) return '';
+    if (typeof helper === 'function') {
+      try {
+        // Helper recebe o valor original (já validado) para aplicar janela 07h.
+        const op = helper('', iniciadoEm);
+        if (op) return dateText(op) || String(op);
+      } catch (_) {}
     }
-    return '';
+    if (typeof instant === 'string') return instant;
+    // Fallback sem helper/TZ: não inventa “hoje”; usa civil UTC do instante parseado.
+    const iso = instant.toISOString();
+    const m = iso.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
   }
 
   /** Allowlist estrita. Desconhecido → '' (nunca inventa BPTran). */
@@ -288,6 +312,7 @@
   const api = {
     filled: filled,
     dateText: dateText,
+    parseExistingServiceInstant: parseExistingServiceInstant,
     resolveExistingOperationalDate: resolveExistingOperationalDate,
     normBattalion: normBattalion,
     normCompany: normCompany,

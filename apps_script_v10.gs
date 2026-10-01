@@ -684,20 +684,46 @@ function resolveNewOperationalDate_(explicitDate, instant){
   return operationalServiceDate_(instant==null||instant===''?new Date():instant);
 }
 /**
+ * Parse seguro de INICIADO_EM para EXISTING ROW.
+ * Aceita Date válido, epoch finito, YYYY-MM-DD ou ISO datetime comprovável.
+ * Rejeita lixo / objetos / Invalid Date. Nunca new Date() como fallback.
+ * @returns {Date|string|null} Date, ou string YYYY-MM-DD, ou null
+ */
+function parseExistingServiceInstant_(v){
+  if(v==null||v==='')return null;
+  if(Object.prototype.toString.call(v)==='[object Date]'){
+    return isNaN(v.getTime())?null:v;
+  }
+  if(typeof v==='number'){
+    if(!isFinite(v))return null;
+    var dn=new Date(v);
+    return isNaN(dn.getTime())?null:dn;
+  }
+  if(typeof v!=='string')return null;
+  var s=String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
+  if(!s)return null;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  // ISO-8601 datetime estrito o bastante para não “corrigir” lixo via Date.parse.
+  if(!/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(s))return null;
+  var d=new Date(s);
+  return isNaN(d.getTime())?null:d;
+}
+/**
  * EXISTING_ROW_DATE_RESOLUTION — linha RSD já persistida.
  * 1) DATA válida → retorna.
- * 2) DATA vazia + INICIADO_EM → deriva 07h.
- * 3) DATA não vazia inválida → '' (LEGACY_DATE_CORRUPTION). NUNCA new Date().
+ * 2) DATA vazia + INICIADO_EM válido → deriva 07h.
+ * 3) DATA não vazia inválida → '' (LEGACY_DATE_CORRUPTION).
+ * 4) DATA vazia + INICIADO_EM inválido/vazio → ''.
+ * NUNCA new Date() / hoje.
  */
 function resolveExistingOperationalDate_(dataServico, iniciadoEm){
   if(rsdDateTokenFilled_(dataServico)){
     var d=strictYmdDate_(dataServico);
     return d||'';
   }
-  if(iniciadoEm!=null&&iniciadoEm!==''){
-    return operationalServiceDate_(iniciadoEm);
-  }
-  return '';
+  var instant=parseExistingServiceInstant_(iniciadoEm);
+  if(!instant)return '';
+  return operationalServiceDate_(instant);
 }
 /** @deprecated Preferir resolveNewOperationalDate_ / resolveExistingOperationalDate_. Alias NEW. */
 function resolveOperationalServiceDate_(explicitDate, instant){

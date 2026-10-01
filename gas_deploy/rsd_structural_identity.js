@@ -490,22 +490,47 @@
   }
 
   /**
+   * Parse seguro de INICIADO_EM (EXISTING). Sem fallback para agora.
+   * @returns {Date|string|null}
+   */
+  function parseExistingServiceInstant(v) {
+    if (v == null || v === '') return null;
+    if (Object.prototype.toString.call(v) === '[object Date]') {
+      return isNaN(v.getTime()) ? null : v;
+    }
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return null;
+      var dn = new Date(v);
+      return isNaN(dn.getTime()) ? null : dn;
+    }
+    if (typeof v !== 'string') return null;
+    var s = trimPreservingContent(v);
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (!/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?$/.test(s)) {
+      return null;
+    }
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  /**
    * Janela 07h America/Recife (espelho aproximado do GAS getServiceWindow_).
-   * EXISTING: instant vazio → '' (nunca new Date()).
+   * allowNow=false: instant inválido/vazio → '' (nunca new Date()).
    */
   function operationalDateFromInstant(instant, allowNow) {
-    var now = instant;
-    if (now == null || now === '') {
-      if (!allowNow) return '';
-      now = new Date();
+    var parsed = parseExistingServiceInstant(instant);
+    if (!parsed) {
+      if (allowNow && (instant == null || instant === '')) {
+        parsed = new Date();
+      } else if (allowNow && Object.prototype.toString.call(instant) === '[object Date]' && !isNaN(instant.getTime())) {
+        parsed = instant;
+      } else {
+        return '';
+      }
     }
-    if (typeof now === 'string') {
-      var s = trimPreservingContent(now);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-      now = new Date(s);
-    } else if (typeof now === 'number') {
-      now = new Date(now);
-    }
+    if (typeof parsed === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed)) return parsed;
+    var now = parsed;
     if (Object.prototype.toString.call(now) !== '[object Date]' || isNaN(now.getTime())) {
       return allowNow ? operationalDateFromInstant(new Date(), false) : '';
     }
@@ -545,18 +570,22 @@
     if (dateTokenFilled(explicitDate)) {
       return strictYmdDate(explicitDate) || '';
     }
-    return operationalDateFromInstant(instant == null || instant === '' ? new Date() : instant, true);
+    if (instant == null || instant === '') {
+      return operationalDateFromInstant(new Date(), true);
+    }
+    var parsed = parseExistingServiceInstant(instant);
+    if (!parsed) return '';
+    return operationalDateFromInstant(parsed, false);
   }
 
-  /** EXISTING_ROW_DATE_RESOLUTION — nunca new Date() em DATE_CORRUPTION. */
+  /** EXISTING_ROW_DATE_RESOLUTION — nunca new Date(). */
   function resolveExistingOperationalDate(dataServico, iniciadoEm) {
     if (dateTokenFilled(dataServico)) {
       return strictYmdDate(dataServico) || '';
     }
-    if (iniciadoEm != null && iniciadoEm !== '') {
-      return operationalDateFromInstant(iniciadoEm, false);
-    }
-    return '';
+    var instant = parseExistingServiceInstant(iniciadoEm);
+    if (!instant) return '';
+    return operationalDateFromInstant(instant, false);
   }
 
   /** serviceKey fail-closed (sem inventar data). */
@@ -593,6 +622,7 @@
     preserveLegacyIdentityDate: preserveLegacyIdentityDate,
     resolveNewOperationalDate: resolveNewOperationalDate,
     resolveExistingOperationalDate: resolveExistingOperationalDate,
+    parseExistingServiceInstant: parseExistingServiceInstant,
     operationalDateFromInstant: operationalDateFromInstant,
     serviceKeyRsd: serviceKeyRsd,
     rsdGroupKeyFromRow: rsdGroupKeyFromRow,
