@@ -1,0 +1,18 @@
+# Artefatos forenses / diagnósticos locais (nunca publicar)
+preview_assets/_forensic*
+preview_assets/_dedupe*
+preview_assets/_sanitize*
+preview_assets/_rsd_*
+preview_assets/_run_*
+preview_assets/_smoke_*
+preview_assets/_check_*
+auditoria_dados/
+
+# Tokens / clasp local
+gas_deploy/.clasp.json
+gas_deploy/_set_token.js
+gas_deploy/_pull_check/
+
+# Contingência exportada no cliente (se salva em disco do repo)
+**/rsd-local-contingency-*.json
+**/*contingencia*local*.json

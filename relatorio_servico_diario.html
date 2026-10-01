@@ -714,6 +714,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
 <script>window.CENTRAL_V10_ENABLED=false;</script>
 <script src="central_cloud.js?v=10.8.31"></script>
 <script src="rsd_hydration_guard.js?v=10.8.31"></script>
+<script src="rsd_local_draft_diag.js?v=10.8.34"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -784,7 +785,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     if(h==='DEGRADED'){
       show=true;
       const tip=fb?(' Referência da aba (somente leitura): '+[fb.nome,fb.vtr&&('VTR '+fb.vtr),fb.responsavel].filter(Boolean).join(' · ')+'.'):'';
-      html='<strong>Serviço com payload estrutural incompleto</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.DEGRADED_MSG||'A sincronização automática está bloqueada até a recuperação controlada.')+tip+'</div>';
+      html='<strong>Serviço com payload estrutural incompleto</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.DEGRADED_MSG||'A sincronização automática está bloqueada até a recuperação controlada.')+tip+'</div><div class="actions" style="margin-top:8px"><button type="button" class="secondary" id="rsdLocalDiagBtn">Diagnóstico local (somente leitura)</button><button type="button" class="secondary" id="rsdLocalContingencyBtn">Exportar JSON de contingência local</button></div><pre id="rsdLocalDiagOut" style="display:none;margin-top:8px;white-space:pre-wrap;font-size:12px"></pre>';
     }else if(s==='LEGACY_CLIENT'){
       show=true;
       html='<strong>Versão antiga da Central</strong><div style="margin-top:4px">'+(window.RsdHydrationGuard?.LEGACY_CLIENT_MSG||rsdHydration.syncMessage())+'</div><div class="actions" style="margin-top:8px"><button type="button" class="ok" id="rsdLegacyReloadBtn">Atualizar / reabrir serviço</button></div>';
@@ -798,6 +799,33 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     el.hidden=!show;el.innerHTML=show?html:'';
     el.querySelector('#rsdLegacyReloadBtn')?.addEventListener('click',()=>location.reload());
     el.querySelector('#rsdConflictReloadBtn')?.addEventListener('click',()=>reloadRsdFromCentralSafe());
+    el.querySelector('#rsdLocalDiagBtn')?.addEventListener('click',()=>runRsdLocalDraftDiag());
+    el.querySelector('#rsdLocalContingencyBtn')?.addEventListener('click',()=>exportRsdLocalContingency());
+  }
+  function runRsdLocalDraftDiag(){
+    const api=window.RsdLocalDraftDiag;if(!api){alert('Diagnóstico local indisponível nesta versão.');return}
+    let live=null;try{live=typeof payloadV2==='function'?payloadV2():null}catch(_){}
+    const known={reportId,serviceId,draftRevision:rsdHydration.getKnownDraftRevision?.(),operationalDate:val('data')};
+    const d=api.diagnoseLocalDraft({knownServer:known,livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
+    const rel=api.evaluateOperatorRelease(d,{localContingencyExportPreserved:!!window.__rsdLocalContingencyExported});
+    const out=document.getElementById('rsdLocalDiagOut');
+    const summary={classification:d.classification,reportId:d.reportId,serviceId:d.serviceId,deviceId:d.deviceId,localDraftRevision:d.localDraftRevision,localTimestamp:d.localTimestamp,sections:d.sections,substantiveContent:d.substantiveContent,operatorRelease:rel,note:'Somente leitura. Nada foi enviado à nuvem. DEGRADED_CLOUD_SYNC_BLOCKED=TRUE.'};
+    if(out){out.style.display='block';out.textContent=JSON.stringify(summary,null,2)}
+    else alert(d.classification+'\n'+rel.reason);
+    return {diag:d,release:rel};
+  }
+  function exportRsdLocalContingency(){
+    const api=window.RsdLocalDraftDiag;if(!api){alert('Exportação local indisponível nesta versão.');return}
+    let live=null;try{live=typeof payloadV2==='function'?payloadV2():null}catch(_){}
+    const d=api.diagnoseLocalDraft({knownServer:{reportId,serviceId,draftRevision:rsdHydration.getKnownDraftRevision?.()},livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
+    let draft=null;try{draft=JSON.parse(localStorage.getItem(api.DRAFT_KEY||'pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
+    const payload=draft||live;if(!payload){alert('Nenhum rascunho local para exportar.');return}
+    const pack=api.buildContingencyExport(payload,{reportId:d.reportId,serviceId:d.serviceId,deviceId:d.deviceId,classification:d.classification,localFingerprint:d.localFingerprint});
+    const name='RSD-contingencia-local-'+(d.reportId||'sem-id')+'-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'')+'.json';
+    if(typeof dlJSON==='function')dlJSON(name,pack);
+    else{const blob=new Blob([JSON.stringify(pack,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+    window.__rsdLocalContingencyExported=true;
+    alert('JSON de contingência gerado NESTE aparelho. Não foi enviado à Central.');
   }
   window.addEventListener('rsd-guard-change',()=>renderRsdSyncBanner());
   async function reloadRsdFromCentralSafe(){

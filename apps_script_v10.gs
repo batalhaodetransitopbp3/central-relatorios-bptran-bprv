@@ -3982,3 +3982,125 @@ function audit_(tipo,id,versao,acao,mat,nome,batt,comp,snapshot) {
     RESPONSAVEL_MATRICULA:normMat_(mat||''),RESPONSAVEL_NOME:nome||'',BATALHAO:batt||'',COMPANHIA:comp||'',SNAPSHOT_JSON:JSON.stringify(snapshot||{}).slice(0,45000),
     HASH:hash_(JSON.stringify(snapshot||{})),ORIGEM:'CENTRAL_V10'});
 }
+
+/* =========================
+   RSD selective header recovery (INTERNAL ONLY — FASE 2A)
+   - NÃO ligado a doGet/doPost / action pública.
+   - Motor puro: RsdSelectiveHeaderRecovery (rsd_selective_header_recovery.js).
+   - Invocação futura (editor Apps Script / trigger privilegiado):
+       rsdSelectiveHeaderRecoveryDryRun_(manifest)
+       rsdSelectiveHeaderRecoveryApply_(manifest)  // só após FASE 2B autorizada
+   - NÃO usar token operacional comum; não expor via JSONP.
+   ========================= */
+function rsdSelectiveHeaderRecoveryEngine_(){
+  if(typeof RsdSelectiveHeaderRecovery==='undefined'||!RsdSelectiveHeaderRecovery){
+    throw new Error('HEADER_RECOVERY_ENGINE_MISSING: inclua rsd_selective_header_recovery.js no projeto Apps Script.');
+  }
+  return RsdSelectiveHeaderRecovery;
+}
+function rsdSelectiveHeaderRecoveryRowState_(row){
+  row=row||{};
+  return {
+    reportId:String(row.REPORT_ID||''),
+    serviceId:String(row.SERVICE_ID||''),
+    draftRevision:Number(row.DRAFT_REVISION||0)||0,
+    payloadHash:String(row.PAYLOAD_HASH||''),
+    versao:row.VERSAO,
+    status:String(row.STATUS||''),
+    dataServico:row.DATA_SERVICO,
+    editDeviceId:String(row.EDIT_DEVICE_ID||''),
+    editLeaseUntil:String(row.EDIT_LEASE_UNTIL||''),
+    payloadFileId:String(row.PAYLOAD_FILE_ID||''),
+    payload:loadJsonPayload_(row)
+  };
+}
+/** Dry-run administrativo interno — zero escrita. */
+function rsdSelectiveHeaderRecoveryDryRun_(manifest){
+  var eng=rsdSelectiveHeaderRecoveryEngine_();
+  var reportId=String((manifest||{}).reportId||'');
+  if(!reportId)throw new Error('Informe reportId no manifesto.');
+  var row=findOne_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',reportId);
+  if(!row)throw new Error('RSD não localizado.');
+  var state=rsdSelectiveHeaderRecoveryRowState_(row);
+  var tech=eng.applySelectiveHeaderPatch(state,manifest,{mode:'dryRun',skipEditorGate:true,hashFn:hash_,nowMs:Date.now()});
+  var gated=eng.applySelectiveHeaderPatch(state,manifest,{mode:'dryRun',skipEditorGate:false,hashFn:hash_,nowMs:Date.now()});
+  var editor=eng.classifyEditorState({
+    editDeviceId:state.editDeviceId,editLeaseUntil:state.editLeaseUntil,status:state.status,
+    activePeriodRecoveryCaution:!!(manifest&&manifest.activePeriodRecoveryCaution),
+    recoveryBlockedDateVerification:!!(manifest&&manifest.recoveryBlockedDateVerification)
+  },Date.now());
+  return {ok:true,mode:'dryRun',written:false,editor:editor,technical:tech,gated:gated,serverNow:nowIso_()};
+}
+/**
+ * APPLY interno com lock + PRE_RECOVERY_SNAPSHOT.
+ * FASE 2A: disponível no runtime, mas NÃO deve ser chamado em produção sem autorização 2B.
+ * Não limpa EDIT_DEVICE_ID; não altera DATA_SERVICO.
+ */
+function rsdSelectiveHeaderRecoveryApply_(manifest){
+  var eng=rsdSelectiveHeaderRecoveryEngine_();
+  var reportId=String((manifest||{}).reportId||'');
+  if(!reportId)throw new Error('Informe reportId no manifesto.');
+  var lock=LockService.getScriptLock();
+  lock.waitLock(30000);
+  try{
+    var s=sheet_(P3_SHEET_ID,'RSD');
+    var row=findOne_(s,'REPORT_ID',reportId);
+    if(!row)throw new Error('RSD não localizado.');
+    // Releitura pós-lock
+    row=findOne_(s,'REPORT_ID',reportId);
+    var state=rsdSelectiveHeaderRecoveryRowState_(row);
+    var frozenDataServico=row.DATA_SERVICO;
+    var result=eng.applySelectiveHeaderPatch(state,manifest,{
+      mode:'apply',
+      skipEditorGate:false,
+      hashFn:hash_,
+      nowMs:Date.now(),
+      persistSnapshot:function(snap){
+        try{
+          audit_('RSD',reportId,Number(row.DRAFT_REVISION||0)||0,'PRE_RECOVERY_SNAPSHOT',
+            (manifest&&manifest.actorMatricula)||'',(manifest&&manifest.actorNome)||'',
+            row.BATALHAO||'',row.COMPANHIA||'',snap);
+          return {ok:true};
+        }catch(e){return {ok:false,error:String(e&&e.message||e)};}
+      }
+    });
+    if(!result.ok)return Object.assign({written:false},result);
+    if(result.code==='NO_OP_ALREADY_RECOVERED')return Object.assign({written:false},result);
+    // Integridade de data da linha
+    if(String(row.DATA_SERVICO)!==String(frozenDataServico)){
+      return {ok:false,code:'DATA_SERVICO_MUTATION',written:false};
+    }
+    var json=result.payloadJson||JSON.stringify(result.payload||{});
+    var saved=saveJsonPayload_(reportId,'hdr-'+Number(result.draftRevision||0),json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',row.PAYLOAD_FILE_ID||'');
+    row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;
+    row.PAYLOAD_HASH=result.payloadHash;row.DRAFT_REVISION=Number(result.draftRevision||0);
+    row.ULTIMO_RASCUNHO_EM=nowIso_();row.SINCRONIZADO_EM=nowIso_();
+    var sheetPatch=result.sheetColumnPatch||{};
+    Object.keys(sheetPatch).forEach(function(k){row[k]=sheetPatch[k];});
+    // NÃO alterar DATA_SERVICO / STATUS / EDIT_DEVICE_ID / SERVICE_ID
+    row.DATA_SERVICO=frozenDataServico;
+    upsert_(s,'REPORT_ID',reportId,row);
+    var readBack=findOne_(s,'REPORT_ID',reportId);
+    var rbPayload=loadJsonPayload_(readBack);
+    var diff=eng.collectDiffPaths(result.payload,rbPayload);
+    var unexpected=diff.filter(function(p){
+      return !eng.HEADER_ALLOWLIST[eng.normalizePath(p)] && p.indexOf('guarnicao.')!==0 && p!=='viaturas' && p!=='matriculaResponsavel' && p.indexOf('viaturas.')!==0;
+    });
+    audit_('RSD',reportId,Number(result.draftRevision||0),'HEADER_RECOVERY_APPLIED',
+      (manifest&&manifest.actorMatricula)||'',(manifest&&manifest.actorNome)||'',
+      row.BATALHAO||'',row.COMPANHIA||'',{
+        beforeDraftRevision:manifest.expectedDraftRevision,
+        afterDraftRevision:result.draftRevision,
+        beforeHash:manifest.expectedPayloadHash,
+        afterHash:result.payloadHash,
+        fieldResults:result.fieldResults,
+        unexpectedReadback:unexpected
+      });
+    if(unexpected.length){
+      return {ok:false,code:'UNEXPECTED_PAYLOAD_DIFF',phase:'readback',unexpected:unexpected,written:true,draftRevision:result.draftRevision,payloadHash:result.payloadHash};
+    }
+    return {ok:true,code:'HEADER_RECOVERY_APPLIED',written:true,draftRevision:result.draftRevision,payloadHash:result.payloadHash,fieldResults:result.fieldResults};
+  }finally{
+    try{lock.releaseLock();}catch(_){}
+  }
+}
