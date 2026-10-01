@@ -2,7 +2,8 @@
  * Diagnóstico LOCAL read-only + preservação pré-hydration (FASE 2B-0 / revisão).
  *
  * - NÃO envia ao backend.
- * - Captura PRE_HYDRATION_DRAFT antes de applyPayload/salvarRascunho.
+ * - Captura PRE_HYDRATION_DRAFT por reportId antes de applyPayload/salvarRascunho.
+ * - Path B só com igualdade positiva de fingerprint semântico local × servidor.
  * - Identidade: LOCAL_DRAFT_FOREIGN se reportId/serviceId divergirem.
  */
 (function (root, factory) {
@@ -15,10 +16,21 @@
   'use strict';
 
   var DRAFT_KEY = 'pmpb-transito-servico-diario-v2-draft';
-  var PRE_HYDRATION_KEY = 'pmpb-transito-servico-diario-v2-pre-hydration-draft';
-  var REPORT_ID_KEY = 'pmpb-transito-servico-diario-v2-report-id';
-  var SERVICE_ID_KEY = 'pmpb-transito-servico-diario-v2-service-id';
+  /** @deprecated chave global legada — só leitura/migração segura */
+  var PRE_HYDRATION_KEY_LEGACY = 'pmpb-transito-servico-diario-v2-pre-hydration-draft';
+  var PRE_HYDRATION_KEY_PREFIX = 'pmpb-transito-servico-diario-v2-pre-hydration-draft::';
   var DEVICE_ID_KEY = 'pmpb-device-id';
+
+  /** Metadados server-only / voláteis excluídos da projeção de recovery. */
+  var SERVER_ONLY_META_KEYS = {
+    sheetStructuralFallback: true,
+    structuralDegraded: true,
+    centralStatus: true,
+    _hydration: true,
+    _cloudMeta: true,
+    syncState: true,
+    hydrationState: true
+  };
 
   function filled(v) {
     if (v == null) return false;
@@ -71,15 +83,75 @@
   function hasSubstantiveContent(flags) {
     return !!(flags.ocorrencias || flags.operacoes || flags.cirvc || flags.tcos ||
       flags.veiculos || flags.fiscoAcionamentos || flags.observacoes || flags.assinatura ||
-      flags.anexos || flags.headerNome || flags.headerVtr || flags.headerResponsavel);
+      flags.anexos || flags.headerNome || flags.headerVtr || flags.headerResponsavel ||
+      flags.producaoKeys);
   }
 
+  function stableStringify(value) {
+    if (value == null) return 'null';
+    if (typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) {
+      return '[' + value.map(stableStringify).join(',') + ']';
+    }
+    var keys = Object.keys(value).sort();
+    var parts = [];
+    for (var i = 0; i < keys.length; i++) {
+      parts.push(JSON.stringify(keys[i]) + ':' + stableStringify(value[keys[i]]));
+    }
+    return '{' + parts.join(',') + '}';
+  }
+
+  function hashString(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return 'fp-' + (h >>> 0).toString(16) + '-' + s.length;
+  }
+
+  /**
+   * Projeção semântica do conteúdo que precisa ser preservado no recovery.
+   * Exclui apenas metadados server-only / voláteis do rsd-get.
+   */
+  function recoveryRelevantProjection(payload) {
+    payload = payload && typeof payload === 'object' ? payload : {};
+    var out = {};
+    var keys = Object.keys(payload);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (SERVER_ONLY_META_KEYS[k]) continue;
+      // Metadados de revisão/sync não provam conteúdo; excluir da igualdade B.
+      if (k === 'draftRevision' || k === 'payloadHash' || k === 'versao' ||
+          k === 'savedAt' || k === 'updatedAt' || k === 'ultimoRascunhoEm' ||
+          k === 'sincronizadoEm' || k === 'schema' || k === 'origem') continue;
+      out[k] = payload[k];
+    }
+    // Garantir presença explícita dos campos operacionais (mesmo vazios) para estabilidade.
+    var ensure = [
+      'reportId', 'serviceId', 'guarnicao', 'ocorrencias', 'operacoes', 'operacoesAcumuladas',
+      'veiculos', 'veiculosRecuperados', 'cirvc', 'arvc', 'tcos', 'tco', 'fisco',
+      'observacoes', 'anexos', 'assinatura', 'assinaturas', 'producao', 'alteracoes',
+      'viaturas', 'matriculaResponsavel', 'unidade', 'servico', 'bo', 'bopm', 'passagens'
+    ];
+    for (var j = 0; j < ensure.length; j++) {
+      var ek = ensure[j];
+      if (!Object.prototype.hasOwnProperty.call(out, ek) && Object.prototype.hasOwnProperty.call(payload, ek)) {
+        out[ek] = payload[ek];
+      }
+    }
+    return out;
+  }
+
+  function recoveryFingerprint(payload) {
+    try {
+      return hashString(stableStringify(recoveryRelevantProjection(payload)));
+    } catch (_) {
+      return 'fp-unknown';
+    }
+  }
+
+  /** Alias legado — fingerprint de objeto já projetado. */
   function simpleFingerprint(obj) {
     try {
-      var s = JSON.stringify(obj || {});
-      var h = 0;
-      for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-      return 'fp-' + (h >>> 0).toString(16) + '-' + s.length;
+      return hashString(stableStringify(obj || {}));
     } catch (_) {
       return 'fp-unknown';
     }
@@ -100,13 +172,95 @@
     var ls = String(localId.serviceId || '');
     if (er && lr && er !== lr) return false;
     if (es && ls && es !== ls) return false;
-    if (er && !lr) return false; // draft sem reportId não conta para o RSD atual
+    if (er && !lr) return false;
     return true;
+  }
+
+  function preHydrationKeyFor(reportId) {
+    var id = String(reportId || '').trim();
+    if (!id) return PRE_HYDRATION_KEY_LEGACY;
+    return PRE_HYDRATION_KEY_PREFIX + id;
+  }
+
+  function ensureServerFpStore(mem) {
+    if (!mem.__rsdServerRecoveryFingerprint) mem.__rsdServerRecoveryFingerprint = {};
+    return mem.__rsdServerRecoveryFingerprint;
+  }
+
+  function serverFpKey(reportId, serviceId) {
+    return String(reportId || '') + '::' + String(serviceId || '');
+  }
+
+  /**
+   * Guarda fingerprint do payload servidor ANTES de applyPayload.
+   */
+  function rememberServerRecoveryFingerprint(serverPayload, opts) {
+    opts = opts || {};
+    var mem = opts.memoryStore || (typeof globalThis !== 'undefined' ? globalThis : {});
+    var store = ensureServerFpStore(mem);
+    var id = draftIdentity(serverPayload || {});
+    var reportId = String(opts.reportId || id.reportId || '');
+    var serviceId = String(opts.serviceId || id.serviceId || '');
+    if (!reportId) return { ok: false, reason: 'MISSING_REPORT_ID' };
+    var fp = recoveryFingerprint(serverPayload || {});
+    var entry = {
+      reportId: reportId,
+      serviceId: serviceId,
+      fingerprint: fp,
+      capturedAt: new Date().toISOString()
+    };
+    store[reportId] = entry;
+    store[serverFpKey(reportId, serviceId)] = entry;
+    if (typeof window !== 'undefined') {
+      if (!window.__rsdServerRecoveryFingerprint) window.__rsdServerRecoveryFingerprint = {};
+      window.__rsdServerRecoveryFingerprint[reportId] = entry;
+      window.__rsdServerRecoveryFingerprint[serverFpKey(reportId, serviceId)] = entry;
+    }
+    return { ok: true, fingerprint: fp, reportId: reportId, serviceId: serviceId };
+  }
+
+  function getServerRecoveryFingerprint(opts) {
+    opts = opts || {};
+    var mem = opts.memoryStore || (typeof globalThis !== 'undefined' ? globalThis : {});
+    var store = ensureServerFpStore(mem);
+    var reportId = String(opts.reportId || '');
+    var serviceId = String(opts.serviceId || '');
+    if (opts.fingerprint) return String(opts.fingerprint);
+    if (serviceId && store[serverFpKey(reportId, serviceId)]) {
+      return store[serverFpKey(reportId, serviceId)].fingerprint;
+    }
+    if (reportId && store[reportId]) return store[reportId].fingerprint;
+    if (typeof window !== 'undefined' && window.__rsdServerRecoveryFingerprint) {
+      var w = window.__rsdServerRecoveryFingerprint;
+      if (serviceId && w[serverFpKey(reportId, serviceId)]) return w[serverFpKey(reportId, serviceId)].fingerprint;
+      if (reportId && w[reportId]) return w[reportId].fingerprint;
+    }
+    return opts.knownServer && (opts.knownServer.recoveryFingerprint || opts.knownServer.fingerprint) || null;
+  }
+
+  /**
+   * Migração segura da chave global legada → chave por reportId.
+   * Nunca atribui draft de um RSD a outro; nunca apaga silenciosamente.
+   */
+  function migrateLegacyPreHydration(ls, expectedReportId) {
+    var legacyRaw = readStorage(ls, PRE_HYDRATION_KEY_LEGACY);
+    var legacy = safeParse(legacyRaw);
+    if (!legacy || !legacy.draft) return null;
+    var legId = String(legacy.reportId || draftIdentity(legacy.draft).reportId || '');
+    if (!legId) return null;
+    var specificKey = preHydrationKeyFor(legId);
+    var existingSpecific = safeParse(readStorage(ls, specificKey));
+    if (!existingSpecific || !existingSpecific.draft) {
+      writeStorage(ls, specificKey, JSON.stringify(legacy));
+    }
+    // Só devolve se for o RSD esperado.
+    if (expectedReportId && legId !== String(expectedReportId)) return null;
+    return legacy;
   }
 
   /**
    * Captura o DRAFT_KEY atual ANTES de applyPayload/salvarRascunho da hidratação.
-   * Não sobrescreve PRE_HYDRATION existente do mesmo reportId.
+   * Persiste em chave por reportId. Não sobrescreve cópia existente do mesmo reportId.
    */
   function capturePreHydrationDraft(opts) {
     opts = opts || {};
@@ -115,6 +269,15 @@
     var expectedServiceId = String(opts.serviceId || '');
     var mem = opts.memoryStore || (typeof globalThis !== 'undefined' ? globalThis : {});
     if (!mem.__rsdPreHydrationMem) mem.__rsdPreHydrationMem = {};
+
+    // Se caller passar serverPayload, registrar fingerprint servidor no mesmo momento.
+    if (opts.serverPayload) {
+      rememberServerRecoveryFingerprint(opts.serverPayload, {
+        reportId: expectedReportId,
+        serviceId: expectedServiceId,
+        memoryStore: mem
+      });
+    }
 
     var raw = readStorage(ls, DRAFT_KEY);
     var draft = safeParse(raw);
@@ -134,25 +297,45 @@
       };
     }
 
+    var reportId = id.reportId || expectedReportId;
     var bundle = {
       schema: 'pmpb-transito-rsd-pre-hydration-v1',
       capturedAt: new Date().toISOString(),
-      reportId: id.reportId || expectedReportId,
+      reportId: reportId,
       serviceId: id.serviceId || expectedServiceId,
-      draft: draft
+      draft: draft,
+      recoveryFingerprint: recoveryFingerprint(draft)
     };
 
-    var existingRaw = readStorage(ls, PRE_HYDRATION_KEY);
-    var existing = safeParse(existingRaw);
-    if (existing && existing.reportId && String(existing.reportId) === String(bundle.reportId) && existing.draft) {
-      // Não substituir cópia pré-hydration existente do mesmo serviço.
-      mem.__rsdPreHydrationMem[bundle.reportId] = existing;
-      return { captured: true, reused: true, reason: 'EXISTING_PRE_HYDRATION_KEPT', source: 'PRE_HYDRATION_DRAFT', bundle: existing };
+    var specificKey = preHydrationKeyFor(reportId);
+    var existing = safeParse(readStorage(ls, specificKey));
+    if (!existing || !existing.draft) {
+      // Tentar migrar legada se for o mesmo reportId
+      var migrated = migrateLegacyPreHydration(ls, reportId);
+      if (migrated && migrated.draft) existing = migrated;
+    }
+    if (existing && existing.draft && String(existing.reportId || draftIdentity(existing.draft).reportId) === String(reportId)) {
+      mem.__rsdPreHydrationMem[reportId] = existing;
+      return {
+        captured: true,
+        reused: true,
+        reason: 'EXISTING_PRE_HYDRATION_KEPT',
+        source: 'PRE_HYDRATION_DRAFT',
+        key: specificKey,
+        bundle: existing
+      };
     }
 
-    writeStorage(ls, PRE_HYDRATION_KEY, JSON.stringify(bundle));
-    mem.__rsdPreHydrationMem[bundle.reportId] = bundle;
-    return { captured: true, reused: false, reason: 'CAPTURED', source: 'PRE_HYDRATION_DRAFT', bundle: bundle };
+    writeStorage(ls, specificKey, JSON.stringify(bundle));
+    mem.__rsdPreHydrationMem[reportId] = bundle;
+    return {
+      captured: true,
+      reused: false,
+      reason: 'CAPTURED',
+      source: 'PRE_HYDRATION_DRAFT',
+      key: specificKey,
+      bundle: bundle
+    };
   }
 
   function getPreHydrationDraft(opts) {
@@ -162,9 +345,59 @@
     var mem = opts.memoryStore || (typeof globalThis !== 'undefined' ? globalThis : {});
     var fromMem = mem.__rsdPreHydrationMem && expectedReportId ? mem.__rsdPreHydrationMem[expectedReportId] : null;
     if (fromMem && fromMem.draft) return fromMem;
-    var existing = safeParse(readStorage(ls, PRE_HYDRATION_KEY));
-    if (existing && existing.draft && (!expectedReportId || String(existing.reportId) === expectedReportId)) return existing;
+
+    if (expectedReportId) {
+      var specific = safeParse(readStorage(ls, preHydrationKeyFor(expectedReportId)));
+      if (specific && specific.draft && String(specific.reportId || draftIdentity(specific.draft).reportId) === expectedReportId) {
+        return specific;
+      }
+      var migrated = migrateLegacyPreHydration(ls, expectedReportId);
+      if (migrated && migrated.draft) return migrated;
+      return null;
+    }
+
+    // Sem reportId: não inventar identidade a partir da chave legada.
     return null;
+  }
+
+  function classifyAgainstServer(localPayload, localFp, serverFp, known) {
+    known = known || {};
+    var localRev = localPayload && localPayload.draftRevision != null ? Number(localPayload.draftRevision) : null;
+    var serverRev = known.draftRevision != null ? Number(known.draftRevision) : null;
+    var localTs = localPayload && (localPayload.savedAt || localPayload.updatedAt ||
+      (localPayload.servico && localPayload.servico.atualizadoEm) || localPayload.ultimoRascunhoEm) || null;
+    var serverTs = known.sincronizadoEm || known.ultimoRascunhoEm || known.serverTimestamp || null;
+
+    var fpComparable = !!(localFp && serverFp && localFp !== 'fp-unknown' && serverFp !== 'fp-unknown');
+    if (fpComparable && localFp === serverFp) {
+      return {
+        classification: 'LOCAL_DRAFT_PRESENT',
+        fingerprintsMatch: true,
+        comparableToServer: true
+      };
+    }
+    if (fpComparable && localFp !== serverFp) {
+      // Evidência temporal inequívoca opcional (não libera Path B).
+      var newer = false;
+      if (localRev != null && serverRev != null && localRev > serverRev) newer = true;
+      else if (localTs && serverTs) {
+        var lt = Date.parse(String(localTs));
+        var st = Date.parse(String(serverTs));
+        // Só aceitar timestamps ISO parseáveis e local claramente posterior.
+        if (isFinite(lt) && isFinite(st) && lt > st) newer = true;
+      }
+      return {
+        classification: newer ? 'LOCAL_DRAFT_NEWER_THAN_SERVER' : 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER',
+        fingerprintsMatch: false,
+        comparableToServer: true
+      };
+    }
+    // Sem fingerprint servidor: não há comparação segura → UNKNOWN
+    return {
+      classification: 'LOCAL_DRAFT_UNKNOWN',
+      fingerprintsMatch: false,
+      comparableToServer: false
+    };
   }
 
   function diagnoseLocalDraft(opts) {
@@ -237,40 +470,30 @@
     var localTs = localPayload && (localPayload.savedAt || localPayload.updatedAt ||
       (localPayload.servico && localPayload.servico.atualizadoEm) || localPayload.ultimoRascunhoEm) || null;
     var localRev = localPayload && localPayload.draftRevision != null ? Number(localPayload.draftRevision) : null;
-    var localFp = localPayload ? simpleFingerprint({
-      reportId: draftIdentity(localPayload).reportId,
-      serviceId: draftIdentity(localPayload).serviceId,
-      guarnicao: localPayload.guarnicao,
-      ocorrencias: localPayload.ocorrencias,
-      operacoes: localPayload.operacoes,
-      observacoes: localPayload.observacoes,
-      cirvc: localPayload.cirvc || localPayload.arvc,
-      tcos: localPayload.tcos || localPayload.tco
-    }) : null;
+    var localFp = localPayload ? recoveryFingerprint(localPayload) : null;
 
-    var serverRev = known.draftRevision != null ? Number(known.draftRevision) : null;
-    var serverTs = known.sincronizadoEm || known.ultimoRascunhoEm || known.serverTimestamp || null;
-    var serverFp = known.fingerprint || known.payloadHash || null;
-    var comparable = (localRev != null && serverRev != null) ||
-      (localTs && serverTs) ||
-      (localFp && serverFp);
+    var serverFp = getServerRecoveryFingerprint({
+      reportId: expectedReportId,
+      serviceId: expectedServiceId,
+      memoryStore: opts.memoryStore,
+      knownServer: known,
+      fingerprint: opts.serverFingerprint || known.recoveryFingerprint || null
+    });
+    // Também aceitar serverPayload passado no diagnóstico
+    if (!serverFp && opts.serverPayload) {
+      serverFp = recoveryFingerprint(opts.serverPayload);
+    }
 
     var classification = 'LOCAL_DRAFT_UNKNOWN';
-    if (!localPayload) {
+    var fingerprintsMatch = false;
+    var comparable = false;
+    if (!localPayload || !substantive) {
       classification = 'LOCAL_DRAFT_EMPTY';
-    } else if (!substantive) {
-      classification = 'LOCAL_DRAFT_EMPTY';
-    } else if (!comparable) {
-      classification = 'LOCAL_DRAFT_UNKNOWN';
     } else {
-      classification = 'LOCAL_DRAFT_PRESENT';
-      if (localRev != null && serverRev != null && localRev > serverRev) {
-        classification = 'LOCAL_DRAFT_NEWER_THAN_SERVER';
-      } else if (localTs && serverTs) {
-        var lt = Date.parse(String(localTs));
-        var st = Date.parse(String(serverTs));
-        if (isFinite(lt) && isFinite(st) && lt > st) classification = 'LOCAL_DRAFT_NEWER_THAN_SERVER';
-      }
+      var cmp = classifyAgainstServer(localPayload, localFp, serverFp, known);
+      classification = cmp.classification;
+      fingerprintsMatch = !!cmp.fingerprintsMatch;
+      comparable = !!cmp.comparableToServer;
     }
 
     return {
@@ -284,22 +507,26 @@
       localTimestamp: localTs,
       localDraftRevision: localRev,
       localFingerprint: localFp,
-      comparableToServer: !!comparable,
+      serverRecoveryFingerprint: serverFp || null,
+      fingerprintsMatch: fingerprintsMatch,
+      comparableToServer: comparable,
       operationalDate: (localPayload && localPayload.servico && (localPayload.servico.data || localPayload.servico.operationalDate)) || known.operationalDate || '',
       sections: flags,
       substantiveContent: substantive,
       knownServer: {
-        draftRevision: serverRev,
+        draftRevision: known.draftRevision != null ? Number(known.draftRevision) : null,
         payloadHash: known.payloadHash || null,
         sincronizadoEm: known.sincronizadoEm || null,
         ultimoRascunhoEm: known.ultimoRascunhoEm || null,
-        fingerprint: serverFp
+        fingerprint: serverFp || null,
+        recoveryFingerprint: serverFp || null
       },
       diagnosedAt: new Date().toISOString(),
       notes: [
         'Nenhum dado foi enviado ao backend.',
         'DEGRADED_CLOUD_SYNC_BLOCKED=TRUE enquanto hydration=DEGRADED.',
-        'Fonte analisada: ' + (localSource || 'NONE')
+        'Fonte analisada: ' + (localSource || 'NONE'),
+        'Path B exige fingerprint semântico local === servidor (revision sozinha NÃO libera).'
       ]
     };
   }
@@ -323,43 +550,39 @@
         reason: 'Aparelho examinado: LOCAL_DRAFT_EMPTY.'
       };
     }
-    if (diag.classification === 'LOCAL_DRAFT_NEWER_THAN_SERVER') {
+    if (diag.classification === 'LOCAL_DRAFT_PRESENT') {
+      var sr = diag.knownServer || {};
+      var localFp = diag.localFingerprint;
+      var serverFp = diag.serverRecoveryFingerprint || sr.recoveryFingerprint || sr.fingerprint;
+      var idOk = !!(diag.reportId && (!sr.reportId || String(diag.reportId) === String(sr.reportId)));
+      // Path B: SOMENTE igualdade positiva de fingerprint. Revision/timestamp NÃO liberam.
+      if (idOk && localFp && serverFp && localFp !== 'fp-unknown' && serverFp !== 'fp-unknown' &&
+          localFp === serverFp && diag.fingerprintsMatch !== false) {
+        return {
+          operatorReleaseConfirmed: true,
+          path: 'B',
+          reason: 'Fingerprint semântico local === servidor (conteúdo recovery-relevante idêntico).'
+        };
+      }
+      return {
+        operatorReleaseConfirmed: false,
+        path: null,
+        reason: 'LOCAL_DRAFT_PRESENT sem igualdade de fingerprint → não liberar Path B (revision sozinha é insuficiente).'
+      };
+    }
+    if (diag.classification === 'LOCAL_DRAFT_NEWER_THAN_SERVER' ||
+        diag.classification === 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER') {
       if (exportPreserved) {
         return {
           operatorReleaseConfirmed: true,
           path: 'C',
-          reason: 'Conteúdo local adicional exportado e preservado para merge posterior.'
+          reason: 'Conteúdo local diferente/adicional exportado e preservado para merge posterior.'
         };
       }
       return {
         operatorReleaseConfirmed: false,
         path: null,
-        reason: 'LOCAL_DRAFT_NEWER_THAN_SERVER sem contingência preservada.'
-      };
-    }
-    if (diag.classification === 'LOCAL_DRAFT_PRESENT') {
-      // Path B exige evidência positiva de que NÃO é posterior ao servidor.
-      var sr = diag.knownServer || {};
-      var revOk = diag.localDraftRevision != null && sr.draftRevision != null &&
-        Number(diag.localDraftRevision) <= Number(sr.draftRevision);
-      var tsOk = false;
-      if (diag.localTimestamp && (sr.sincronizadoEm || sr.ultimoRascunhoEm)) {
-        var lt = Date.parse(String(diag.localTimestamp));
-        var st = Date.parse(String(sr.sincronizadoEm || sr.ultimoRascunhoEm));
-        tsOk = isFinite(lt) && isFinite(st) && lt <= st;
-      }
-      var fpOk = !!(diag.localFingerprint && sr.fingerprint && diag.localFingerprint === sr.fingerprint);
-      if (revOk || tsOk || fpOk) {
-        return {
-          operatorReleaseConfirmed: true,
-          path: 'B',
-          reason: 'Evidência positiva de que draft local não é posterior ao servidor (rev/ts/fp).'
-        };
-      }
-      return {
-        operatorReleaseConfirmed: false,
-        path: null,
-        reason: 'LOCAL_DRAFT_PRESENT sem evidência positiva comparável → tratar como UNKNOWN.'
+        reason: diag.classification + ' sem contingência preservada. Exportar JSON local antes de qualquer release.'
       };
     }
     return {
@@ -381,10 +604,17 @@
         serviceId: meta.serviceId || (localPayload && localPayload.serviceId) || '',
         deviceId: meta.deviceId || '',
         classification: meta.classification || '',
-        localFingerprint: meta.localFingerprint || '',
+        localFingerprint: meta.localFingerprint || (localPayload ? recoveryFingerprint(localPayload) : ''),
         source: meta.source || ''
       },
       relatorio: localPayload || null
+    };
+  }
+
+  function pathCClassifications() {
+    return {
+      LOCAL_DRAFT_NEWER_THAN_SERVER: true,
+      LOCAL_DRAFT_DIFFERENT_FROM_SERVER: true
     };
   }
 
@@ -411,7 +641,7 @@
       return { ok: false, code: 'OPERATOR_RELEASE_INVALID', detail: 'localClassification ausente' };
     }
     if (path === 'C' && !operatorRelease.contingencyPreserved) {
-      return { ok: false, code: 'OPERATOR_RELEASE_INVALID', detail: 'path C exige contingencyPreserved' };
+      return { ok: false, code: 'OPERATOR_RELEASE_INVALID', detail: 'contingencyPreserved' };
     }
     if (String(operatorRelease.localClassification) === 'LOCAL_DRAFT_FOREIGN') {
       return { ok: false, code: 'LOCAL_DRAFT_FOREIGN', detail: 'release impossível para draft estrangeiro' };
@@ -422,15 +652,26 @@
     if (path === 'B' && String(operatorRelease.localClassification) !== 'LOCAL_DRAFT_PRESENT') {
       return { ok: false, code: 'OPERATOR_RELEASE_INVALID', detail: 'path B exige LOCAL_DRAFT_PRESENT' };
     }
-    if (path === 'C' && String(operatorRelease.localClassification) !== 'LOCAL_DRAFT_NEWER_THAN_SERVER') {
-      return { ok: false, code: 'OPERATOR_RELEASE_INVALID', detail: 'path C exige LOCAL_DRAFT_NEWER_THAN_SERVER' };
+    if (path === 'C' && !pathCClassifications()[String(operatorRelease.localClassification)]) {
+      return {
+        ok: false,
+        code: 'OPERATOR_RELEASE_INVALID',
+        detail: 'path C exige LOCAL_DRAFT_NEWER_THAN_SERVER ou LOCAL_DRAFT_DIFFERENT_FROM_SERVER'
+      };
     }
     return { ok: true, path: path };
   }
 
   return {
     DRAFT_KEY: DRAFT_KEY,
-    PRE_HYDRATION_KEY: PRE_HYDRATION_KEY,
+    PRE_HYDRATION_KEY: PRE_HYDRATION_KEY_LEGACY,
+    PRE_HYDRATION_KEY_LEGACY: PRE_HYDRATION_KEY_LEGACY,
+    PRE_HYDRATION_KEY_PREFIX: PRE_HYDRATION_KEY_PREFIX,
+    preHydrationKeyFor: preHydrationKeyFor,
+    recoveryRelevantProjection: recoveryRelevantProjection,
+    recoveryFingerprint: recoveryFingerprint,
+    rememberServerRecoveryFingerprint: rememberServerRecoveryFingerprint,
+    getServerRecoveryFingerprint: getServerRecoveryFingerprint,
     capturePreHydrationDraft: capturePreHydrationDraft,
     getPreHydrationDraft: getPreHydrationDraft,
     diagnoseLocalDraft: diagnoseLocalDraft,

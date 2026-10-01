@@ -349,7 +349,7 @@ test('local diag: EMPTY → OPERATOR_RELEASE path A', function () {
   assert.strictEqual(rel.path, 'A');
 });
 
-test('local diag: NEWER without export → release false; with export → path C', function () {
+test('local diag: NEWER/DIFFERENT without export → release false; with export → path C', function () {
   const draft = {
     reportId: 'sd-test-001',
     serviceId: 'svc-test-001',
@@ -357,6 +357,14 @@ test('local diag: NEWER without export → release false; with export → path C
     savedAt: '2026-01-15T18:00:00.000Z',
     guarnicao: { nome: 'BST TEST 01' },
     ocorrencias: [{ id: 'oc-test-001' }],
+    servico: { data: '2026-01-10' }
+  };
+  const serverPayload = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 4,
+    guarnicao: { nome: '' },
+    ocorrencias: [],
     servico: { data: '2026-01-10' }
   };
   const mem = {
@@ -369,9 +377,17 @@ test('local diag: NEWER without export → release false; with export → path C
     localStorage: mem,
     reportId: 'sd-test-001',
     serviceId: 'svc-test-001',
-    knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' }
+    serverPayload: serverPayload,
+    knownServer: {
+      draftRevision: 4,
+      sincronizadoEm: '2026-01-15T10:00:00.000Z',
+      recoveryFingerprint: localDiag.recoveryFingerprint(serverPayload)
+    }
   });
-  assert.strictEqual(d.classification, 'LOCAL_DRAFT_NEWER_THAN_SERVER');
+  assert.ok(
+    d.classification === 'LOCAL_DRAFT_NEWER_THAN_SERVER' ||
+    d.classification === 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER'
+  );
   assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
   assert.strictEqual(localDiag.evaluateOperatorRelease(d, { localContingencyExportPreserved: true }).path, 'C');
 });
@@ -668,26 +684,235 @@ test('O) segundo apply idempotente → NO_OP_ALREADY_RECOVERED', function () {
   assert.strictEqual(r2.written, false);
 });
 
-test('Path B exige evidência positiva (rev local <= servidor)', function () {
-  const draft = {
+// --- Revisão tip a722c70: Path B fingerprint + PRE_HYDRATION por reportId ---
+
+test('fpA) alteração local não sync + draftRevision==serverRevision → NÃO libera Path B', function () {
+  const local = {
     reportId: 'sd-test-001',
     serviceId: 'svc-test-001',
-    draftRevision: 3,
-    savedAt: '2026-01-14T10:00:00.000Z',
-    guarnicao: { nome: 'BST TEST 01' },
-    ocorrencias: [{ id: 'oc-1' }]
+    draftRevision: 4,
+    guarnicao: { nome: 'BST LOCAL EDIT' },
+    ocorrencias: [{ id: 'oc-unsynced' }],
+    observacoes: 'editado localmente'
   };
-  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(draft) });
+  const server = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 4,
+    guarnicao: { nome: '' },
+    ocorrencias: [],
+    observacoes: ''
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(local) });
   const d = localDiag.diagnoseLocalDraft({
     localStorage: ls,
     reportId: 'sd-test-001',
     serviceId: 'svc-test-001',
-    knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' }
+    serverPayload: server,
+    knownServer: { draftRevision: 4, recoveryFingerprint: localDiag.recoveryFingerprint(server) }
+  });
+  assert.notStrictEqual(d.classification, 'LOCAL_DRAFT_PRESENT');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+  assert.notStrictEqual(localDiag.evaluateOperatorRelease(d).path, 'B');
+});
+
+test('fpB) revision local menor + conteúdo diferente → NÃO libera Path B', function () {
+  const local = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 2,
+    guarnicao: { nome: 'BST LOCAL' },
+    ocorrencias: [{ id: 'oc-local' }]
+  };
+  const server = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 5,
+    guarnicao: { nome: '' },
+    ocorrencias: []
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(local) });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    serverPayload: server,
+    knownServer: { draftRevision: 5, recoveryFingerprint: localDiag.recoveryFingerprint(server) }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+});
+
+test('fpC) fingerprint local == servidor → Path B permitido', function () {
+  const payload = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 4,
+    guarnicao: { nome: 'BST TEST 01', vtrPrincipal: '9999' },
+    ocorrencias: [{ id: 'oc-shared' }],
+    observacoes: 'mesmo conteudo'
+  };
+  const server = JSON.parse(JSON.stringify(payload));
+  server.draftRevision = 4;
+  server.sheetStructuralFallback = { nome: 'X' }; // server-only — não altera fp
+  server.structuralDegraded = true;
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(payload) });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    serverPayload: server,
+    knownServer: { draftRevision: 4, recoveryFingerprint: localDiag.recoveryFingerprint(server) }
   });
   assert.strictEqual(d.classification, 'LOCAL_DRAFT_PRESENT');
+  assert.strictEqual(d.fingerprintsMatch, true);
   const rel = localDiag.evaluateOperatorRelease(d);
   assert.strictEqual(rel.operatorReleaseConfirmed, true);
   assert.strictEqual(rel.path, 'B');
+});
+
+test('fpD) fingerprint diferente → DIFFERENT + release false sem contingência', function () {
+  const local = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001', draftRevision: 4,
+    guarnicao: { nome: 'A' }, ocorrencias: [{ id: 'oc-1' }]
+  };
+  const server = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001', draftRevision: 4,
+    guarnicao: { nome: 'A' }, ocorrencias: []
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(local) });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls, reportId: 'sd-test-001', serviceId: 'svc-test-001',
+    serverPayload: server,
+    knownServer: { draftRevision: 4, recoveryFingerprint: localDiag.recoveryFingerprint(server) }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+});
+
+test('fpE) fingerprint diferente + contingência → Path C', function () {
+  const local = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001', draftRevision: 4,
+    guarnicao: { nome: 'A' }, ocorrencias: [{ id: 'oc-1' }]
+  };
+  const server = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001', draftRevision: 4,
+    guarnicao: { nome: 'A' }, ocorrencias: []
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(local) });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls, reportId: 'sd-test-001', serviceId: 'svc-test-001',
+    serverPayload: server,
+    knownServer: { draftRevision: 4, recoveryFingerprint: localDiag.recoveryFingerprint(server) }
+  });
+  const rel = localDiag.evaluateOperatorRelease(d, { localContingencyExportPreserved: true });
+  assert.strictEqual(rel.operatorReleaseConfirmed, true);
+  assert.strictEqual(rel.path, 'C');
+});
+
+test('fpF/G/H/I) PRE_HYDRATION por reportId: A e B coexistentes', function () {
+  const ls = makeLs({});
+  const mem = {};
+  ls.setItem('pmpb-transito-servico-diario-v2-draft', JSON.stringify({
+    reportId: 'sd-A', serviceId: 'svc-A', ocorrencias: [{ id: 'oc-A' }], guarnicao: { nome: 'A' }
+  }));
+  const capA = localDiag.capturePreHydrationDraft({
+    localStorage: ls, reportId: 'sd-A', serviceId: 'svc-A', memoryStore: mem
+  });
+  assert.strictEqual(capA.captured, true);
+  assert.ok(ls.getItem(localDiag.preHydrationKeyFor('sd-A')));
+
+  ls.setItem('pmpb-transito-servico-diario-v2-draft', JSON.stringify({
+    reportId: 'sd-B', serviceId: 'svc-B', ocorrencias: [{ id: 'oc-B' }], guarnicao: { nome: 'B' }
+  }));
+  const capB = localDiag.capturePreHydrationDraft({
+    localStorage: ls, reportId: 'sd-B', serviceId: 'svc-B', memoryStore: mem
+  });
+  assert.strictEqual(capB.captured, true);
+
+  // Reabrir A / B (sem memória → só storage)
+  const mem2 = {};
+  const preA = localDiag.getPreHydrationDraft({ localStorage: ls, reportId: 'sd-A', memoryStore: mem2 });
+  const preB = localDiag.getPreHydrationDraft({ localStorage: ls, reportId: 'sd-B', memoryStore: mem2 });
+  assert.strictEqual(preA.draft.ocorrencias[0].id, 'oc-A');
+  assert.strictEqual(preB.draft.ocorrencias[0].id, 'oc-B');
+});
+
+test('fpJ) draft estrangeiro não sobrescreve PRE_HYDRATION do RSD atual', function () {
+  const ls = makeLs({});
+  const mem = {};
+  ls.setItem('pmpb-transito-servico-diario-v2-draft', JSON.stringify({
+    reportId: 'sd-A', serviceId: 'svc-A', ocorrencias: [{ id: 'oc-A' }], guarnicao: { nome: 'A' }
+  }));
+  localDiag.capturePreHydrationDraft({
+    localStorage: ls, reportId: 'sd-A', serviceId: 'svc-A', memoryStore: mem
+  });
+  ls.setItem('pmpb-transito-servico-diario-v2-draft', JSON.stringify({
+    reportId: 'sd-FOREIGN', serviceId: 'svc-X', ocorrencias: [{ id: 'oc-F' }], guarnicao: { nome: 'F' }
+  }));
+  const cap = localDiag.capturePreHydrationDraft({
+    localStorage: ls, reportId: 'sd-A', serviceId: 'svc-A', memoryStore: mem
+  });
+  assert.strictEqual(cap.captured, false);
+  assert.strictEqual(cap.reason, 'LOCAL_DRAFT_FOREIGN');
+  const preA = localDiag.getPreHydrationDraft({ localStorage: ls, reportId: 'sd-A', memoryStore: {} });
+  assert.strictEqual(preA.draft.ocorrencias[0].id, 'oc-A');
+});
+
+test('fpK) fingerprint muda com conteúdo operacional', function () {
+  const base = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001',
+    guarnicao: { nome: 'BST' }, ocorrencias: [], operacoes: [], cirvc: [], tcos: [],
+    veiculos: [], fisco: { acionamentos: [] }, observacoes: '', producao: {},
+    assinatura: null, anexos: []
+  };
+  const fp0 = localDiag.recoveryFingerprint(base);
+  const mutations = [
+    { ocorrencias: [{ id: 'oc-1' }] },
+    { operacoes: [{ id: 'op-1' }] },
+    { cirvc: [{ id: 'c-1' }] },
+    { tcos: [{ id: 't-1' }] },
+    { veiculos: [{ placa: 'ABC1D23' }] },
+    { fisco: { acionamentos: [{ id: 'f-1' }] } },
+    { observacoes: 'nova obs' },
+    { producao: { tco: 1 } },
+    { assinatura: { dataUrl: 'x' } },
+    { anexos: [{ name: 'a.pdf' }] }
+  ];
+  mutations.forEach(function (m) {
+    const p = Object.assign({}, base, m);
+    assert.notStrictEqual(localDiag.recoveryFingerprint(p), fp0, 'mutation ' + Object.keys(m)[0]);
+  });
+});
+
+test('fpL) metadado server-only não altera fingerprint semântico', function () {
+  const base = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001',
+    guarnicao: { nome: 'BST' }, ocorrencias: [{ id: 'oc-1' }]
+  };
+  const withMeta = Object.assign({}, base, {
+    sheetStructuralFallback: { nome: 'FROM_SHEET', vtr: '0000' },
+    structuralDegraded: true,
+    centralStatus: 'EM_SERVICO',
+    draftRevision: 99,
+    payloadHash: 'hash-other'
+  });
+  assert.strictEqual(localDiag.recoveryFingerprint(base), localDiag.recoveryFingerprint(withMeta));
+});
+
+test('revision sozinha NUNCA libera Path B mesmo com PRESENT falso-positivo antigo', function () {
+  const local = {
+    reportId: 'sd-test-001', serviceId: 'svc-test-001', draftRevision: 3,
+    guarnicao: { nome: 'X' }, ocorrencias: [{ id: 'oc-1' }]
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(local) });
+  // Sem fingerprint servidor — UNKNOWN; com rev menor não basta
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls, reportId: 'sd-test-001', serviceId: 'svc-test-001',
+    knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_UNKNOWN');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
 });
 
 console.log('\nPASSED', passed);

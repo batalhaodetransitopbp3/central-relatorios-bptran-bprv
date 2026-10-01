@@ -430,7 +430,9 @@
       if (path === 'B' && String(rel.localClassification) !== 'LOCAL_DRAFT_PRESENT') {
         return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path B' };
       }
-      if (path === 'C' && String(rel.localClassification) !== 'LOCAL_DRAFT_NEWER_THAN_SERVER') {
+      if (path === 'C' &&
+          String(rel.localClassification) !== 'LOCAL_DRAFT_NEWER_THAN_SERVER' &&
+          String(rel.localClassification) !== 'LOCAL_DRAFT_DIFFERENT_FROM_SERVER') {
         return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path C' };
       }
       return { ok: true, editor: editor, operatorReleasePath: path };
