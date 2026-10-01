@@ -143,8 +143,11 @@
     }
   }
 
-  /** Projeção de escrita (espelha rcoConsolidateProjectWrites_ forFingerprint). */
-  function projectWrites(pkg, reportId) {
+  /** Projeção do pacote (espelha rcoConsolidateProjectWrites_). opts.forFingerprint ordena. */
+  function projectWrites(pkg, reportId, opts) {
+    opts = opts || {};
+    var forFp = opts.forFingerprint !== false; // default ordena (FP); forFingerprint:false = ordem do pacote
+    if (opts.forWrite) forFp = false;
     pkg = pkg || {};
     var rco = pkg.rco || pkg || {};
     var stat = pkg.estatisticaP3 || rco.estatisticaP3 || { producao: [], veiculos: [], podExecucao: [] };
@@ -233,6 +236,9 @@
     function sortBy(arr, k) {
       return arr.slice().sort(function (a, b) { return String(a[k] || '').localeCompare(String(b[k] || '')); });
     }
+    if (!forFp) {
+      return { rco: rcoRow, producao: producao, veiculos: veiculos, origens: origens, pod: pod, operacoes: operacoes };
+    }
     return {
       rco: rcoRow,
       producao: sortBy(producao, 'REGISTRO_ID'),
@@ -243,7 +249,50 @@
     };
   }
 
-  function fingerprint(pkg, reportId) { return hash(JSON.stringify(projectWrites(pkg, reportId))); }
+  /** Merge POD 10.8.36: incoming || oldPod || ''. */
+  function mergePodRow(oldPod, x, reportId, batt, comp, dataServico) {
+    oldPod = oldPod || {}; x = x || {};
+    var rid = String(x.registroId || x.REGISTRO_ID || x.origemRegistroId || oldPod.REGISTRO_ID || 'pod-x');
+    return {
+      REGISTRO_ID: rid, REPORT_ID: oldPod.REPORT_ID || rid, RCO_REPORT_ID: reportId,
+      DATA: dateText(x.data || x.DATA || dataServico), BATALHAO: batt, COMPANHIA: comp,
+      GUARNICAO: x.guarnicao || x.GUARNICAO || oldPod.GUARNICAO || '',
+      OPERACAO: x.operacao || x.OPERACAO || oldPod.OPERACAO || '',
+      TURNO: x.turno || x.TURNO || oldPod.TURNO || '',
+      STATUS_CUMPRIMENTO: x.statusCumprimento || x.STATUS_CUMPRIMENTO || oldPod.STATUS_CUMPRIMENTO || '',
+      LOCAL_PREVISTO: x.localPrevisto || x.LOCAL_PREVISTO || oldPod.LOCAL_PREVISTO || '',
+      LOCAL_EXECUTADO: x.localExecutado || x.LOCAL_EXECUTADO || oldPod.LOCAL_EXECUTADO || '',
+      COORDENADAS_EXECUTADAS: x.coordenadasExecutadas || x.COORDENADAS_EXECUTADAS || oldPod.COORDENADAS_EXECUTADAS || '',
+      HORA_INICIO: x.horaInicio || x.HORA_INICIO || oldPod.HORA_INICIO || '',
+      HORA_FIM: x.horaFim || x.HORA_FIM || oldPod.HORA_FIM || '',
+      HOUVE_ALTERACAO: (x.houveAlteracao === true || String(x.houveAlteracao || x.HOUVE_ALTERACAO || '').toUpperCase() === 'SIM') ? 'SIM' : 'NÃO',
+      MOTIVO_ALTERACAO: x.motivoAlteracao || x.MOTIVO_ALTERACAO || oldPod.MOTIVO_ALTERACAO || '',
+      ORIGEM_RELATORIO: x.origemRelatorio || x.ORIGEM_RELATORIO || oldPod.ORIGEM_RELATORIO || 'RCO',
+      ORIGEM_REGISTRO_ID: x.origemRegistroId || x.ORIGEM_REGISTRO_ID || oldPod.ORIGEM_REGISTRO_ID || rid
+    };
+  }
+  /** Merge OPERACOES 10.8.36: existing || incoming. */
+  function mergeOpRow(row, o, reportId, batt, comp, dataServico) {
+    row = Object.assign({}, row || {}); o = o || {};
+    var id = String(o.reportId || o.id || row.REGISTRO_ID || 'op-x');
+    row.REGISTRO_ID = id;
+    row.REPORT_ID = row.REPORT_ID || id;
+    row.RCO_REPORT_ID = reportId;
+    row.RSD_REPORT_ID = row.RSD_REPORT_ID || o.rsdReportId || '';
+    row.DATA = row.DATA || dateText(dataServico);
+    row.BATALHAO = batt; row.COMPANHIA = comp;
+    row.GUARNICAO_RESPONSAVEL = row.GUARNICAO_RESPONSAVEL || o.guarnicao || '';
+    row.OPERACAO = row.OPERACAO || ((o.operacao || {}).nome) || o.nome || '';
+    row.TURNO = row.TURNO || ((o.operacao || {}).turno) || o.turno || '';
+    row.LOCAL = row.LOCAL || ((o.local || {}).descricao) || o.local || '';
+    row.LATITUDE = row.LATITUDE || ((o.local || {}).latitude) || '';
+    row.LONGITUDE = row.LONGITUDE || ((o.local || {}).longitude) || '';
+    row.STATUS_REGISTRO = 'CONSOLIDADO';
+    row.VERSAO_ORIGEM = Number(row.VERSAO_ORIGEM || 1);
+    return row;
+  }
+
+  function fingerprint(pkg, reportId) { return hash(JSON.stringify(projectWrites(pkg, reportId, { forFingerprint: true }))); }
   function draftFingerprint(rco, reportId) { return fingerprint({ rco: rco || {} }, reportId); }
 
   function integrityOk(db, reportId, pkg) {
@@ -401,8 +450,15 @@
       RSD: new FakeSheet('RSD', ['REPORT_ID', 'STATUS', 'RCO_REPORT_ID', 'BATALHAO', 'COMPANHIA', 'DATA_SERVICO'], rsdRows),
       PRISOES: new FakeSheet('PRISOES', ['PRISAO_ID', 'RSD_REPORT_ID', 'RCO_REPORT_ID'], pris),
       CIRVC: new FakeSheet('CIRVC', ['CIRVC_ID', 'RSD_REPORT_ID', 'RCO_REPORT_ID'], []),
-      POD: new FakeSheet('POD', ['REGISTRO_ID', 'RCO_REPORT_ID', 'OPERACAO', 'COORDENADAS_EXECUTADAS', 'HORA_INICIO', 'HORA_FIM'], []),
-      OPERACOES: new FakeSheet('OPERACOES', ['REGISTRO_ID', 'RCO_REPORT_ID', 'STATUS_REGISTRO', 'REPORT_ID', 'OPERACAO', 'LATITUDE', 'LONGITUDE', 'RSD_REPORT_ID'], ops),
+      POD: new FakeSheet('POD', [
+        'REGISTRO_ID', 'REPORT_ID', 'RCO_REPORT_ID', 'DATA', 'BATALHAO', 'COMPANHIA', 'GUARNICAO', 'OPERACAO', 'TURNO',
+        'STATUS_CUMPRIMENTO', 'LOCAL_PREVISTO', 'LOCAL_EXECUTADO', 'COORDENADAS_EXECUTADAS', 'HORA_INICIO', 'HORA_FIM',
+        'HOUVE_ALTERACAO', 'MOTIVO_ALTERACAO', 'ORIGEM_RELATORIO', 'ORIGEM_REGISTRO_ID'
+      ], opts.existingPod || []),
+      OPERACOES: new FakeSheet('OPERACOES', [
+        'REGISTRO_ID', 'REPORT_ID', 'RCO_REPORT_ID', 'RSD_REPORT_ID', 'DATA', 'BATALHAO', 'COMPANHIA',
+        'GUARNICAO_RESPONSAVEL', 'OPERACAO', 'TURNO', 'LOCAL', 'LATITUDE', 'LONGITUDE', 'STATUS_REGISTRO', 'VERSAO_ORIGEM'
+      ], (opts.existingOps || []).concat(ops)),
       AUDITORIA: new FakeSheet('AUDITORIA', ['AUDITORIA_ID', 'ACAO', 'ENTIDADE_ID', 'VERSAO'], [])
     };
   }
@@ -495,16 +551,21 @@
     });
     mark('pod', function () {
       (pkg.estatisticaP3.podExecucao || []).forEach(function (x) {
-        db.POD.append({ REGISTRO_ID: x.registroId, RCO_REPORT_ID: reportId, OPERACAO: x.operacao, COORDENADAS_EXECUTADAS: x.coordenadasExecutadas, HORA_INICIO: x.horaInicio, HORA_FIM: x.horaFim });
+        var rid = String(x.registroId || '');
+        var oldPod = null;
+        for (var i = 0; i < db.POD.rows.length; i++) if (String(db.POD.rows[i].REGISTRO_ID) === rid) { oldPod = db.POD.rows[i]; break; }
+        var merged = mergePodRow(oldPod || {}, x, reportId, 'BPTran', '1ª CPTran', '2026-09-30');
+        db.POD.upsert('REGISTRO_ID', merged.REGISTRO_ID, merged);
       });
     });
     mark('operacoes', function () {
       db.OPERACOES.fullRead();
       (pkg.operacoesCompletas || []).forEach(function (o) {
-        db.OPERACOES.append({
-          REGISTRO_ID: o.reportId, RCO_REPORT_ID: reportId, STATUS_REGISTRO: 'CONSOLIDADO', REPORT_ID: o.reportId,
-          OPERACAO: o.nome, LATITUDE: (o.local && o.local.latitude) || '', LONGITUDE: (o.local && o.local.longitude) || '', RSD_REPORT_ID: o.rsdReportId
-        });
+        var id = String(o.reportId || o.id);
+        var row = null;
+        for (var i = 0; i < db.OPERACOES.rows.length; i++) if (String(db.OPERACOES.rows[i].REGISTRO_ID) === id) { row = db.OPERACOES.rows[i]; break; }
+        var merged = mergeOpRow(row || {}, o, reportId, 'BPTran', '1ª CPTran', '2026-09-30');
+        db.OPERACOES.upsert('REGISTRO_ID', merged.REGISTRO_ID, merged);
       });
     });
     var proj = projectWrites(pkg, reportId);
@@ -583,10 +644,10 @@
     mark('pod', function () {
       var idx = db.POD.loadIndex('REGISTRO_ID');
       (pkg.estatisticaP3.podExecucao || []).forEach(function (x) {
-        indexUpsert(idx, String(x.registroId), {
-          REGISTRO_ID: x.registroId, RCO_REPORT_ID: reportId, OPERACAO: x.operacao,
-          COORDENADAS_EXECUTADAS: x.coordenadasExecutadas, HORA_INICIO: x.horaInicio, HORA_FIM: x.horaFim
-        });
+        var rid = String(x.registroId || '');
+        var oldPod = idx.byKey[rid] || {};
+        var merged = mergePodRow(oldPod, x, reportId, 'BPTran', '1ª CPTran', '2026-09-30');
+        indexUpsert(idx, merged.REGISTRO_ID, merged);
       });
       indexFlush(idx);
     });
@@ -594,11 +655,9 @@
       var idx = db.OPERACOES.loadIndex('REGISTRO_ID');
       (pkg.operacoesCompletas || []).forEach(function (o) {
         var id = String(o.reportId || o.id);
-        indexUpsert(idx, id, {
-          REGISTRO_ID: id, RCO_REPORT_ID: reportId, STATUS_REGISTRO: 'CONSOLIDADO', REPORT_ID: id,
-          OPERACAO: o.nome, LATITUDE: (o.local && o.local.latitude) || '', LONGITUDE: (o.local && o.local.longitude) || '',
-          RSD_REPORT_ID: o.rsdReportId || ''
-        });
+        var existing = idx.byKey[id] || {};
+        var merged = mergeOpRow(existing, o, reportId, 'BPTran', '1ª CPTran', '2026-09-30');
+        indexUpsert(idx, merged.REGISTRO_ID, merged);
       });
       indexFlush(idx);
     });
@@ -639,6 +698,31 @@
     };
   }
 
+  var POD_FIELDS = [
+    'REGISTRO_ID', 'REPORT_ID', 'RCO_REPORT_ID', 'DATA', 'BATALHAO', 'COMPANHIA', 'GUARNICAO', 'OPERACAO', 'TURNO',
+    'STATUS_CUMPRIMENTO', 'LOCAL_PREVISTO', 'LOCAL_EXECUTADO', 'COORDENADAS_EXECUTADAS', 'HORA_INICIO', 'HORA_FIM',
+    'HOUVE_ALTERACAO', 'MOTIVO_ALTERACAO', 'ORIGEM_RELATORIO', 'ORIGEM_REGISTRO_ID'
+  ];
+  var OP_FIELDS = [
+    'REGISTRO_ID', 'REPORT_ID', 'RCO_REPORT_ID', 'RSD_REPORT_ID', 'DATA', 'BATALHAO', 'COMPANHIA',
+    'GUARNICAO_RESPONSAVEL', 'OPERACAO', 'TURNO', 'LOCAL', 'LATITUDE', 'LONGITUDE', 'STATUS_REGISTRO', 'VERSAO_ORIGEM'
+  ];
+
+  function snapshotPodOps(db, reportId) {
+    function pick(row, fields) {
+      var o = {};
+      fields.forEach(function (f) { o[f] = row[f] != null ? row[f] : ''; });
+      return o;
+    }
+    function byId(rows, key) {
+      return rows.slice().sort(function (a, b) { return String(a[key]).localeCompare(String(b[key])); });
+    }
+    return {
+      pod: byId(db.POD.rows.filter(function (r) { return String(r.RCO_REPORT_ID) === reportId; }), 'REGISTRO_ID').map(function (r) { return pick(r, POD_FIELDS); }),
+      operacoes: byId(db.OPERACOES.rows.filter(function (r) { return String(r.RCO_REPORT_ID) === reportId; }), 'REGISTRO_ID').map(function (r) { return pick(r, OP_FIELDS); })
+    };
+  }
+
   function groupContiguous(rows) {
     if (!rows.length) return [];
     var blocks = [], bStart = rows[0], bEnd = rows[0];
@@ -652,9 +736,11 @@
 
   return {
     hash: hash, FakeSheet: FakeSheet, fingerprint: fingerprint, draftFingerprint: draftFingerprint,
-    projectWrites: projectWrites, integrityOk: integrityOk, buildPkg: buildPkg, seedDb: seedDb,
+    projectWrites: projectWrites, mergePodRow: mergePodRow, mergeOpRow: mergeOpRow,
+    integrityOk: integrityOk, buildPkg: buildPkg, seedDb: seedDb,
     totals: totals, draftUpsert: draftUpsert, withScriptLock: withScriptLock,
     indexUpsert: indexUpsert, indexFlush: indexFlush, groupContiguous: groupContiguous,
-    runLegacy: runLegacy, runOptimized: runOptimized, snapshotBusiness: snapshotBusiness
+    runLegacy: runLegacy, runOptimized: runOptimized, snapshotBusiness: snapshotBusiness,
+    snapshotPodOps: snapshotPodOps, POD_FIELDS: POD_FIELDS, OP_FIELDS: OP_FIELDS
   };
 });

@@ -3243,7 +3243,12 @@ function masterPassagemAnular_(payload){
    ========================= */
 function rcoDraftUpsert_(payload){
   var r=payload.rco||payload||{},reportId=String((r.state||{}).reportId||r.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId)throw new Error('RCO sem REPORT_ID.');
-  // Mesmo ScriptLock que rcoConsolidateFinal_/mark-pdf/encerrar — serializa draft×consolidate no mesmo RCO.
+  // ScriptLock GLOBAL (mesmo de rcoConsolidateFinal_). Serializa draft×consolidate.
+  // Impacto: consolidação de outra companhia pode atrasar autosave deste RCO até waitLock.
+  // Tipicamente draft-upsert no lock: saveJson+upsert <1–3s; consolidate pode ocupar 5–15s.
+  // Se waitLock(20000) expira → exception (autosave falha e o cliente reintenta).
+  // Granularidade por REPORT_ID exigiria LockService.getDocumentLock inexistente por chave;
+  // ScriptLock global é a proteção simples/segura sem arquitetura extra.
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId);
@@ -4203,19 +4208,73 @@ function rcoConsolidateProjectWrites_(pkg,reportId,opts){
     if(!fp)row.ENVIADO_EM=agora;
     return row;
   });
+  // Ordenação só no fingerprint (estável). Escrita preserva ordem do pacote (10.8.36).
   function sortById(arr,k){
     return arr.slice().sort(function(a,b){return String(a[k]||'').localeCompare(String(b[k]||''));});
   }
+  if(fp){
+    return {
+      rco:rcoRow,
+      producao:sortById(producao,'REGISTRO_ID'),
+      veiculos:sortById(veiculos,'REGISTRO_ID'),
+      origens:sortById(origens,'RSD_REPORT_ID'),
+      pod:sortById(pod,'REGISTRO_ID'),
+      operacoes:sortById(operacoes,'REGISTRO_ID')
+    };
+  }
+  return {rco:rcoRow,producao:producao,veiculos:veiculos,origens:origens,pod:pod,operacoes:operacoes};
+}
+/**
+ * Merge POD 10.8.36: incoming || oldPod.FIELD || ''.
+ * Projeção do pacote NÃO pode sobrescrever com '' campos já persistidos.
+ */
+function rcoConsolidateMergePodRow_(oldPod,x,reportId,batt,comp,dataServico){
+  oldPod=oldPod||{};x=x||{};
+  var rid=String(x.registroId||x.REGISTRO_ID||x.origemRegistroId||x.ORIGEM_REGISTRO_ID||oldPod.REGISTRO_ID||uid_('pod'));
   return {
-    rco:rcoRow,
-    producao:sortById(producao,'REGISTRO_ID'),
-    veiculos:sortById(veiculos,'REGISTRO_ID'),
-    origens:sortById(origens,'RSD_REPORT_ID'),
-    pod:sortById(pod,'REGISTRO_ID'),
-    operacoes:sortById(operacoes,'REGISTRO_ID')
+    REGISTRO_ID:rid,REPORT_ID:oldPod.REPORT_ID||rid,RCO_REPORT_ID:reportId,
+    DATA:dateText_(x.data||x.DATA||dataServico),BATALHAO:batt,COMPANHIA:comp,
+    GUARNICAO:x.guarnicao||x.GUARNICAO||oldPod.GUARNICAO||'',
+    OPERACAO:x.operacao||x.OPERACAO||oldPod.OPERACAO||'',
+    TURNO:x.turno||x.TURNO||oldPod.TURNO||'',
+    STATUS_CUMPRIMENTO:x.statusCumprimento||x.STATUS_CUMPRIMENTO||oldPod.STATUS_CUMPRIMENTO||'',
+    LOCAL_PREVISTO:x.localPrevisto||x.LOCAL_PREVISTO||oldPod.LOCAL_PREVISTO||'',
+    LOCAL_EXECUTADO:x.localExecutado||x.LOCAL_EXECUTADO||oldPod.LOCAL_EXECUTADO||'',
+    COORDENADAS_EXECUTADAS:x.coordenadasExecutadas||x.COORDENADAS_EXECUTADAS||oldPod.COORDENADAS_EXECUTADAS||'',
+    HORA_INICIO:x.horaInicio||x.HORA_INICIO||oldPod.HORA_INICIO||'',
+    HORA_FIM:x.horaFim||x.HORA_FIM||oldPod.HORA_FIM||'',
+    HOUVE_ALTERACAO:(x.houveAlteracao===true||String(x.houveAlteracao||x.HOUVE_ALTERACAO||'').toUpperCase()==='SIM')?'SIM':'NÃO',
+    MOTIVO_ALTERACAO:x.motivoAlteracao||x.MOTIVO_ALTERACAO||oldPod.MOTIVO_ALTERACAO||'',
+    ORIGEM_RELATORIO:x.origemRelatorio||x.ORIGEM_RELATORIO||oldPod.ORIGEM_RELATORIO||'RCO',
+    ORIGEM_REGISTRO_ID:x.origemRegistroId||x.ORIGEM_REGISTRO_ID||oldPod.ORIGEM_REGISTRO_ID||rid,
+    ENVIADO_EM:nowIso_()
   };
 }
-/** Canon = projeção de escrita sem voláteis (fonte única com supplemental). */
+/**
+ * Merge OPERACOES 10.8.36: campos existentes têm prioridade (row || incoming).
+ * BATALHAO/COMPANHIA/STATUS_REGISTRO/RCO_REPORT_ID sempre do pacote/consolidação.
+ */
+function rcoConsolidateMergeOpRow_(row,o,reportId,batt,comp,dataServico){
+  row=Object.assign({},row||{});o=o||{};
+  var id=String(o.reportId||o.id||row.REGISTRO_ID||uid_('op'));
+  row.REGISTRO_ID=id;
+  row.REPORT_ID=row.REPORT_ID||id;
+  row.RCO_REPORT_ID=reportId;
+  row.RSD_REPORT_ID=row.RSD_REPORT_ID||o.rsdReportId||'';
+  row.DATA=row.DATA||dateText_(dataServico);
+  row.BATALHAO=batt;row.COMPANHIA=comp;
+  row.GUARNICAO_RESPONSAVEL=row.GUARNICAO_RESPONSAVEL||o.guarnicao||'';
+  row.OPERACAO=row.OPERACAO||((o.operacao||{}).nome)||o.nome||'';
+  row.TURNO=row.TURNO||((o.operacao||{}).turno)||o.turno||'';
+  row.LOCAL=row.LOCAL||((o.local||{}).descricao)||o.local||'';
+  row.LATITUDE=row.LATITUDE||((o.local||{}).latitude)||'';
+  row.LONGITUDE=row.LONGITUDE||((o.local||{}).longitude)||'';
+  row.STATUS_REGISTRO='CONSOLIDADO';
+  row.VERSAO_ORIGEM=Number(row.VERSAO_ORIGEM||1);
+  row.ENVIADO_EM=nowIso_();
+  return row;
+}
+/** Canon = projeção do PACOTE (sem merge de abas) ordenada — só para FP. */
 function rcoConsolidateSubstantiveCanon_(pkg,reportId){
   return rcoConsolidateProjectWrites_(pkg,reportId,{forFingerprint:true});
 }
@@ -4631,12 +4690,16 @@ function rcoSupplementalUpsertBody_(payload,opts) {
       rcoIndexUpsert_(podIdx,String(priorPod.REGISTRO_ID),Object.assign({},priorPod,{RCO_REPORT_ID:''}));
     }
   });
-  (proj.pod||[]).forEach(function(row){
-    var oldPod=rcoIndexGet_(podIdx,row.REGISTRO_ID)||{};
-    rcoIndexUpsert_(podIdx,row.REGISTRO_ID,Object.assign({},oldPod,row,{
-      REPORT_ID:oldPod.REPORT_ID||row.REPORT_ID||row.REGISTRO_ID
-    }));
-  });
+  // Merge 10.8.36 a partir do pacote bruto + oldPod (não Object.assign com projeção vazia).
+  var podSrc=pkg.estatisticaP3&&pkg.estatisticaP3.podExecucao||pkg.podExecucao||[];
+  if(Array.isArray(podSrc)){
+    podSrc.forEach(function(x){
+      var rid=String(x.registroId||x.REGISTRO_ID||x.origemRegistroId||x.ORIGEM_REGISTRO_ID||uid_('pod'));
+      var oldPod=rcoIndexGet_(podIdx,rid)||{};
+      var merged=rcoConsolidateMergePodRow_(oldPod,x,reportId,batt,comp,obj.DATA_SERVICO);
+      rcoIndexUpsert_(podIdx,merged.REGISTRO_ID,merged);
+    });
+  }
   rcoIndexFlush_(podIdx,perf);
   rcoPerfEnd_(perf,'pod');
 
@@ -4650,20 +4713,13 @@ function rcoSupplementalUpsertBody_(payload,opts) {
       rcoIndexUpsert_(opIdx,String(priorOp.REGISTRO_ID),next);
     }
   });
-  (proj.operacoes||[]).forEach(function(prow){
-    var row=rcoIndexGet_(opIdx,prow.REGISTRO_ID)||{};
-    rcoIndexUpsert_(opIdx,prow.REGISTRO_ID,Object.assign({},row,prow,{
-      REPORT_ID:row.REPORT_ID||prow.REPORT_ID||prow.REGISTRO_ID,
-      RSD_REPORT_ID:prow.RSD_REPORT_ID||row.RSD_REPORT_ID||'',
-      DATA:row.DATA||prow.DATA,
-      GUARNICAO_RESPONSAVEL:prow.GUARNICAO_RESPONSAVEL||row.GUARNICAO_RESPONSAVEL||'',
-      OPERACAO:prow.OPERACAO||row.OPERACAO||'',
-      TURNO:prow.TURNO||row.TURNO||'',
-      LOCAL:prow.LOCAL||row.LOCAL||'',
-      LATITUDE:prow.LATITUDE||row.LATITUDE||'',
-      LONGITUDE:prow.LONGITUDE||row.LONGITUDE||'',
-      VERSAO_ORIGEM:Number(row.VERSAO_ORIGEM||1)
-    }));
+  // Precedência 10.8.36: campos existentes vencem incoming vazio/ausente.
+  var opsSrc=pkg.operacoesCompletas||rco.operacoes||[];
+  (opsSrc||[]).forEach(function(o){
+    var id=String(o.reportId||o.id||uid_('op'));
+    var existing=rcoIndexGet_(opIdx,id)||{};
+    var merged=rcoConsolidateMergeOpRow_(existing,o,reportId,batt,comp,obj.DATA_SERVICO);
+    rcoIndexUpsert_(opIdx,merged.REGISTRO_ID,merged);
   });
   rcoIndexFlush_(opIdx,perf);
   rcoPerfEnd_(perf,'operacoes');

@@ -258,24 +258,153 @@ test('TEST_DUPLICATE_POD_ID / OPERATION_ID', function () {
   const db = P.seedDb(p, { noiseRsd: 2, noiseOps: 2, noisePris: 2 });
   P.runOptimized(db, p);
   assert.strictEqual(db.POD.rows.filter(function (r) { return r.REGISTRO_ID === 'pod-dup'; }).length, 1);
+  // POD: incoming || old → segundo vence
   assert.strictEqual(db.POD.rows.filter(function (r) { return r.REGISTRO_ID === 'pod-dup'; })[0].OPERACAO, 'NEW');
   assert.strictEqual(db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; }).length, 1);
-  assert.strictEqual(db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; })[0].OPERACAO, 'NEW');
+  // OPERACOES 10.8.36: existing || incoming → primeiro grava OLD e segundo não sobrescreve
+  assert.strictEqual(db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; })[0].OPERACAO, 'OLD');
 });
 
-test('GAS helpers + ScriptLock draft + write projection + deleteRows', function () {
+test('TEST_POD_EXISTING_FALLBACK_EQUIVALENCE', function () {
+  const oldPod = {
+    REGISTRO_ID: 'pod-1', REPORT_ID: 'pod-1', RCO_REPORT_ID: '',
+    GUARNICAO: 'G OLD', OPERACAO: 'OP OLD', TURNO: 'T OLD', STATUS_CUMPRIMENTO: 'ST OLD',
+    LOCAL_PREVISTO: 'PREV OLD', LOCAL_EXECUTADO: 'LOCAL ANTIGO', COORDENADAS_EXECUTADAS: 'COORD OLD',
+    HORA_INICIO: '07:00', HORA_FIM: '08:00', MOTIVO_ALTERACAO: 'MOT OLD',
+    ORIGEM_RELATORIO: 'RSD', ORIGEM_REGISTRO_ID: 'orig-old'
+  };
+  // incoming sem localExecutado / coords / horas / etc.
+  const incoming = { registroId: 'pod-1', statusCumprimento: 'CUMPRIDO' };
+  const merged = P.mergePodRow(oldPod, incoming, 'rco-bench-1', 'BPTran', '1ª CPTran', '2026-09-30');
+  assert.strictEqual(merged.LOCAL_EXECUTADO, 'LOCAL ANTIGO');
+  assert.strictEqual(merged.GUARNICAO, 'G OLD');
+  assert.strictEqual(merged.OPERACAO, 'OP OLD');
+  assert.strictEqual(merged.TURNO, 'T OLD');
+  assert.strictEqual(merged.LOCAL_PREVISTO, 'PREV OLD');
+  assert.strictEqual(merged.COORDENADAS_EXECUTADAS, 'COORD OLD');
+  assert.strictEqual(merged.HORA_INICIO, '07:00');
+  assert.strictEqual(merged.HORA_FIM, '08:00');
+  assert.strictEqual(merged.MOTIVO_ALTERACAO, 'MOT OLD');
+  assert.strictEqual(merged.ORIGEM_RELATORIO, 'RSD');
+  assert.strictEqual(merged.ORIGEM_REGISTRO_ID, 'orig-old');
+  assert.strictEqual(merged.STATUS_CUMPRIMENTO, 'CUMPRIDO'); // incoming vence quando presente
+  assert.strictEqual(merged.RCO_REPORT_ID, 'rco-bench-1');
+});
+
+test('TEST_OPERATION_EXISTING_PRECEDENCE_EQUIVALENCE', function () {
+  const existing = {
+    REGISTRO_ID: 'op-full-1', REPORT_ID: 'op-full-1', RSD_REPORT_ID: 'rsd-KEEP',
+    DATA: '2026-09-29', GUARNICAO_RESPONSAVEL: 'G KEEP', OPERACAO: 'OP KEEP',
+    TURNO: 'T KEEP', LOCAL: 'LOC KEEP', LATITUDE: '-1', LONGITUDE: '-2', VERSAO_ORIGEM: 3
+  };
+  const incoming = {
+    reportId: 'op-full-1', rsdReportId: 'rsd-NEW', guarnicao: 'G NEW', nome: 'OP NEW',
+    turno: 'T NEW', local: { descricao: 'LOC NEW', latitude: '-9', longitude: '-9' }
+  };
+  const merged = P.mergeOpRow(existing, incoming, 'rco-bench-1', 'BPTran', '1ª CPTran', '2026-09-30');
+  assert.strictEqual(merged.RSD_REPORT_ID, 'rsd-KEEP');
+  assert.strictEqual(merged.GUARNICAO_RESPONSAVEL, 'G KEEP');
+  assert.strictEqual(merged.OPERACAO, 'OP KEEP');
+  assert.strictEqual(merged.TURNO, 'T KEEP');
+  assert.strictEqual(merged.LOCAL, 'LOC KEEP');
+  assert.strictEqual(merged.LATITUDE, '-1');
+  assert.strictEqual(merged.LONGITUDE, '-2');
+  assert.strictEqual(merged.DATA, '2026-09-29');
+  assert.strictEqual(merged.VERSAO_ORIGEM, 3);
+  assert.strictEqual(merged.STATUS_REGISTRO, 'CONSOLIDADO');
+  assert.strictEqual(merged.RCO_REPORT_ID, 'rco-bench-1');
+  assert.strictEqual(merged.BATALHAO, 'BPTran');
+});
+
+test('TEST_GOLDEN_EXISTING_POD / TEST_GOLDEN_EXISTING_OPERATIONS', function () {
+  const p = P.buildPkg({ guarnicoes: 2, prodRows: 8, vehRows: 2 });
+  p.estatisticaP3.podExecucao = [
+    { registroId: 'pod-1', statusCumprimento: 'CUMPRIDO' } // sem LOCAL_EXECUTADO
+  ];
+  p.operacoesCompletas = [
+    { reportId: 'op-full-1', nome: 'INCOMING_NAME', rsdReportId: 'rsd-incoming',
+      local: { descricao: 'INCOMING_LOC', latitude: '99', longitude: '99' } }
+  ];
+  const existingPod = [{
+    REGISTRO_ID: 'pod-1', REPORT_ID: 'pod-1', RCO_REPORT_ID: '',
+    DATA: '2026-09-28', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran',
+    GUARNICAO: 'G OLD', OPERACAO: 'OP OLD', TURNO: 'T OLD', STATUS_CUMPRIMENTO: 'PENDENTE',
+    LOCAL_PREVISTO: 'PREV', LOCAL_EXECUTADO: 'LOCAL ANTIGO', COORDENADAS_EXECUTADAS: 'C-OLD',
+    HORA_INICIO: '06:00', HORA_FIM: '07:00', HOUVE_ALTERACAO: 'SIM', MOTIVO_ALTERACAO: 'chuva',
+    ORIGEM_RELATORIO: 'RSD', ORIGEM_REGISTRO_ID: 'pod-1'
+  }];
+  const existingOps = [{
+    REGISTRO_ID: 'op-full-1', REPORT_ID: 'op-full-1', RCO_REPORT_ID: '', RSD_REPORT_ID: 'rsd-KEEP',
+    DATA: '2026-09-28', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran',
+    GUARNICAO_RESPONSAVEL: 'G KEEP', OPERACAO: 'OP KEEP', TURNO: 'T KEEP',
+    LOCAL: 'LOC KEEP', LATITUDE: '-1.1', LONGITUDE: '-2.2',
+    STATUS_REGISTRO: 'OPERACAO_FINALIZADA', VERSAO_ORIGEM: 4
+  }];
+  const dbL = P.seedDb(p, { noiseRsd: 5, noiseOps: 0, noisePris: 2, existingPod: existingPod, existingOps: existingOps });
+  const dbO = P.seedDb(p, { noiseRsd: 5, noiseOps: 0, noisePris: 2, existingPod: existingPod, existingOps: existingOps });
+  P.runLegacy(dbL, p);
+  P.runOptimized(dbO, p);
+  const snapL = P.snapshotPodOps(dbL, p.rco.reportId);
+  const snapO = P.snapshotPodOps(dbO, p.rco.reportId);
+  assert.deepStrictEqual(snapO.pod, snapL.pod, 'POD golden legacy===optimized');
+  assert.deepStrictEqual(snapO.operacoes, snapL.operacoes, 'OPERACOES golden legacy===optimized');
+  assert.strictEqual(snapO.pod[0].LOCAL_EXECUTADO, 'LOCAL ANTIGO');
+  assert.strictEqual(snapO.operacoes[0].OPERACAO, 'OP KEEP');
+  assert.strictEqual(snapO.operacoes[0].LATITUDE, '-1.1');
+});
+
+test('TEST_WRITE_ORDER_PRODUCAO / VEICULOS / ORIGENS', function () {
+  const p = P.buildPkg({ guarnicoes: 3, prodRows: 5, vehRows: 3 });
+  // Ordem não-alfabética
+  p.estatisticaP3.producao = [
+    { registroId: 'prod-z', guarnicao: 'BST 1', grupoCodigo: 'G', indicadorCodigo: 'I', quantidade: 1 },
+    { registroId: 'prod-a', guarnicao: 'BST 1', grupoCodigo: 'G', indicadorCodigo: 'I', quantidade: 2 },
+    { registroId: 'prod-m', guarnicao: 'BST 1', grupoCodigo: 'G', indicadorCodigo: 'I', quantidade: 3 }
+  ];
+  p.estatisticaP3.veiculos = [
+    { registroId: 'veh-z', placaUf: 'ZZZ1PB', marca: 'A' },
+    { registroId: 'veh-a', placaUf: 'AAA1PB', marca: 'B' }
+  ];
+  p.rco.rcoOrigens = [
+    { rsdReportId: 'rsd-z', serviceId: 's1', guarnicao: 'BST 1', status: 'DEFERIDO' },
+    { rsdReportId: 'rsd-a', serviceId: 's2', guarnicao: 'BST 2', status: 'DEFERIDO' }
+  ];
+  const writeProj = P.projectWrites(p, p.rco.reportId, { forWrite: true });
+  assert.deepStrictEqual(writeProj.producao.map(function (r) { return r.REGISTRO_ID; }), ['prod-z', 'prod-a', 'prod-m']);
+  assert.deepStrictEqual(writeProj.veiculos.map(function (r) { return r.REGISTRO_ID; }), ['veh-z', 'veh-a']);
+  assert.deepStrictEqual(writeProj.origens.map(function (r) { return r.RSD_REPORT_ID; }), ['rsd-z', 'rsd-a']);
+  const fpProj = P.projectWrites(p, p.rco.reportId, { forFingerprint: true });
+  assert.deepStrictEqual(fpProj.producao.map(function (r) { return r.REGISTRO_ID; }), ['prod-a', 'prod-m', 'prod-z']);
+  const db = P.seedDb(p, { noiseRsd: 2, noiseOps: 0, noisePris: 0 });
+  // seed RSD for new origens
+  db.RSD.rows.push(
+    { REPORT_ID: 'rsd-z', STATUS: 'DEFERIDO', RCO_REPORT_ID: '', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' },
+    { REPORT_ID: 'rsd-a', STATUS: 'DEFERIDO', RCO_REPORT_ID: '', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' }
+  );
+  P.runOptimized(db, p);
+  const prodOrder = db.PRODUCAO.rows.filter(function (r) { return r.REPORT_ID === p.rco.reportId; }).map(function (r) { return r.REGISTRO_ID; });
+  const vehOrder = db.VEICULOS.rows.filter(function (r) { return r.REPORT_ID === p.rco.reportId; }).map(function (r) { return r.REGISTRO_ID; });
+  const origOrder = db.RCO_ORIGENS.rows.filter(function (r) { return r.RCO_REPORT_ID === p.rco.reportId; }).map(function (r) { return r.RSD_REPORT_ID; });
+  assert.deepStrictEqual(prodOrder, ['prod-z', 'prod-a', 'prod-m']);
+  assert.deepStrictEqual(vehOrder, ['veh-z', 'veh-a']);
+  assert.deepStrictEqual(origOrder, ['rsd-z', 'rsd-a']);
+});
+
+test('GAS helpers + ScriptLock draft + write projection + deleteRows + merge legado', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.37'") >= 0);
   assert.ok(src.indexOf('function rcoConsolidateProjectWrites_') >= 0);
+  assert.ok(src.indexOf('function rcoConsolidateMergePodRow_') >= 0);
+  assert.ok(src.indexOf('function rcoConsolidateMergeOpRow_') >= 0);
   assert.ok(src.indexOf('sheet.deleteRows') >= 0);
   assert.ok(src.indexOf('pendingAppendsByKey') >= 0);
   assert.ok(src.indexOf('trackedDeleteCalls') >= 0);
-  // draft sempre ScriptLock 20000
+  assert.ok(src.indexOf('Ordenação só no fingerprint') >= 0);
   const draftFn = src.slice(src.indexOf('function rcoDraftUpsert_'), src.indexOf('function rcoDraftList_'));
   assert.ok(draftFn.indexOf('LockService.getScriptLock()') >= 0);
   assert.ok(draftFn.indexOf('waitLock(20000)') >= 0);
   assert.ok(draftFn.indexOf('if(!old){createLock') < 0);
-  assert.ok(src.indexOf('RETRY integrity check') >= 0 || src.indexOf('retry integrity') >= 0 || src.indexOf('RETRY integrity') >= 0);
+  assert.ok(src.indexOf('RETRY integrity check') >= 0 || src.indexOf('RETRY integrity') >= 0);
 });
 
 test('3/4 guarnições + force-open + foreign company', function () {
