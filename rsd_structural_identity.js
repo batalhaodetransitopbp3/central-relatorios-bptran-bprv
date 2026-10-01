@@ -478,6 +478,111 @@
     return s.slice(0, 10);
   }
 
+  function dateTokenFilled(v) {
+    return trimPreservingContent(v) !== '';
+  }
+
+  /** Espelho preserveLegacyIdentityDate_ — token bruto sem slice. */
+  function preserveLegacyIdentityDate(v) {
+    if (v == null || v === '') return '';
+    if (Object.prototype.toString.call(v) === '[object Date]') return strictYmdDate(v);
+    return trimPreservingContent(v);
+  }
+
+  /**
+   * Janela 07h America/Recife (espelho aproximado do GAS getServiceWindow_).
+   * EXISTING: instant vazio → '' (nunca new Date()).
+   */
+  function operationalDateFromInstant(instant, allowNow) {
+    var now = instant;
+    if (now == null || now === '') {
+      if (!allowNow) return '';
+      now = new Date();
+    }
+    if (typeof now === 'string') {
+      var s = trimPreservingContent(now);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      now = new Date(s);
+    } else if (typeof now === 'number') {
+      now = new Date(now);
+    }
+    if (Object.prototype.toString.call(now) !== '[object Date]' || isNaN(now.getTime())) {
+      return allowNow ? operationalDateFromInstant(new Date(), false) : '';
+    }
+    var parts = {};
+    try {
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Recife',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', hourCycle: 'h23'
+      }).formatToParts(now).forEach(function (p) { parts[p.type] = p.value; });
+    } catch (e) {
+      var y = now.getFullYear();
+      var m = ('0' + (now.getMonth() + 1)).slice(-2);
+      var d = ('0' + now.getDate()).slice(-2);
+      var hh = now.getHours();
+      var ymd = y + '-' + m + '-' + d;
+      return hh < 7 ? addCalendarDaysYmd(ymd, -1) : ymd;
+    }
+    var ymd = parts.year + '-' + parts.month + '-' + parts.day;
+    var hh = Number(parts.hour) || 0;
+    return hh < 7 ? addCalendarDaysYmd(ymd, -1) : ymd;
+  }
+
+  function addCalendarDaysYmd(ymd, delta) {
+    var p = String(ymd || '').split('-');
+    if (p.length !== 3) return '';
+    var dt = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])));
+    dt.setUTCDate(dt.getUTCDate() + Number(delta || 0));
+    var y = dt.getUTCFullYear();
+    var m = ('0' + (dt.getUTCMonth() + 1)).slice(-2);
+    var d = ('0' + dt.getUTCDate()).slice(-2);
+    return y + '-' + m + '-' + d;
+  }
+
+  /** NEW_RECORD_DATE_RESOLUTION */
+  function resolveNewOperationalDate(explicitDate, instant) {
+    if (dateTokenFilled(explicitDate)) {
+      return strictYmdDate(explicitDate) || '';
+    }
+    return operationalDateFromInstant(instant == null || instant === '' ? new Date() : instant, true);
+  }
+
+  /** EXISTING_ROW_DATE_RESOLUTION — nunca new Date() em DATE_CORRUPTION. */
+  function resolveExistingOperationalDate(dataServico, iniciadoEm) {
+    if (dateTokenFilled(dataServico)) {
+      return strictYmdDate(dataServico) || '';
+    }
+    if (iniciadoEm != null && iniciadoEm !== '') {
+      return operationalDateFromInstant(iniciadoEm, false);
+    }
+    return '';
+  }
+
+  /** serviceKey fail-closed (sem inventar data). */
+  function serviceKeyRsd(batt, comp, data, guarnicaoNome) {
+    var gu = String(guarnicaoNome || '').replace(/\u00a0/g, ' ').trim();
+    if (!gu) return '';
+    var d = strictYmdDate(data);
+    if (!d) return '';
+    return [String(batt || ''), String(comp || ''), d, gu].join('|');
+  }
+
+  function rsdGroupKeyFromRow(x) {
+    x = x || {};
+    var k = serviceKeyRsd(x.BATALHAO, x.COMPANHIA, x.DATA_SERVICO, x.GUARNICAO);
+    if (k) return k;
+    var sid = String(x.SERVICE_ID || x.REPORT_ID || '');
+    return sid ? ('SERVICE|' + sid) : '';
+  }
+
+  /** Espelho rsdIdentYmd_ pós-fix (sem slice). */
+  function rsdIdentYmd(v) {
+    var d = strictYmdDate(v);
+    if (d) return d;
+    return preserveLegacyIdentityDate(v);
+  }
+
   return {
     dateText: dateText,
     identityDate: identityDate,
@@ -485,6 +590,13 @@
     strictYmdDate: strictYmdDate,
     safeDateTextNoSlice: safeDateTextNoSlice,
     unsafeDateTextSliceFallback: unsafeDateTextSliceFallback,
+    preserveLegacyIdentityDate: preserveLegacyIdentityDate,
+    resolveNewOperationalDate: resolveNewOperationalDate,
+    resolveExistingOperationalDate: resolveExistingOperationalDate,
+    operationalDateFromInstant: operationalDateFromInstant,
+    serviceKeyRsd: serviceKeyRsd,
+    rsdGroupKeyFromRow: rsdGroupKeyFromRow,
+    rsdIdentYmd: rsdIdentYmd,
     normBattalion: normBattalion,
     normCompany: normCompany,
     extractPayloadUnit: extractPayloadUnit,

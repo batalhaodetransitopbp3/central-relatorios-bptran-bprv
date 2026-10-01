@@ -10,17 +10,48 @@
     return String(v == null ? '' : v).replace(/\u00a0/g, ' ').trim() !== '';
   }
 
+  function trimPreserving(v) {
+    return String(v == null ? '' : v).replace(/\u00a0/g, ' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+  }
+
+  /** YYYY-MM-DD estrito (request/filter). Sem slice(0,10) em token inválido. */
   function dateText(v) {
-    if (!v) return '';
+    if (v == null || v === '') return '';
     if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime())) {
       const y = v.getFullYear();
       const m = String(v.getMonth() + 1).padStart(2, '0');
       const d = String(v.getDate()).padStart(2, '0');
       return y + '-' + m + '-' + d;
     }
-    const s = String(v).trim().replace(/^"+|"+$/g, '');
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    return s.slice(0, 10);
+    // Params de request podem vir com aspas acidentais — só aceita após strip se YYYY-MM-DD puro.
+    const s = trimPreserving(v).replace(/^"+|"+$/g, '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const mIso = s.match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
+    return mIso ? mIso[1] : '';
+  }
+
+  /**
+   * EXISTING_ROW: DATA válida → usa; vazia + INICIADO_EM → helper/ISO;
+   * não vazia inválida → '' (LEGACY_DATE_CORRUPTION). Nunca “hoje”.
+   */
+  function resolveExistingOperationalDate(dataServico, iniciadoEm, helper) {
+    const raw = trimPreserving(dataServico);
+    if (raw) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      return '';
+    }
+    if (iniciadoEm != null && iniciadoEm !== '') {
+      if (typeof helper === 'function') {
+        try {
+          const op = helper('', iniciadoEm);
+          if (op) return dateText(op) || String(op);
+        } catch (_) {}
+      }
+      const s = trimPreserving(iniciadoEm);
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : '';
+    }
+    return '';
   }
 
   /** Allowlist estrita. Desconhecido → '' (nunca inventa BPTran). */
@@ -133,16 +164,16 @@
 
   function operationalDateOf(row, helper) {
     row = row || {};
-    const data = row.DATA_SERVICO != null ? row.DATA_SERVICO : (row.data || row.operationalDate || '');
+    const data = row.DATA_SERVICO != null ? row.DATA_SERVICO : (row.data || '');
     const iniciado = row.INICIADO_EM != null ? row.INICIADO_EM : (row.iniciadoEm || '');
-    if (typeof helper === 'function') {
-      try {
-        const op = helper(data, iniciado);
-        if (op) return dateText(op);
-      } catch (_) {}
+    // Preferir semântica EXISTING (fail-closed) — helper só ajuda a derivar de INICIADO_EM.
+    const op = resolveExistingOperationalDate(data, iniciado, helper);
+    if (op) return op;
+    if (row.operationalDate) {
+      const od = dateText(row.operationalDate);
+      if (od) return od;
     }
-    if (row.operationalDate) return dateText(row.operationalDate);
-    return dateText(data);
+    return '';
   }
 
   function matchesRcoScope(row, scope, opDate, helper) {
@@ -166,9 +197,16 @@
         rejected.push({ row: row, reason: 'OTHER_UNIT' });
         return;
       }
-      if (wantDate && operationalDateOf(row, helper) !== wantDate) {
-        rejected.push({ row: row, reason: 'OTHER_DATE' });
-        return;
+      if (wantDate) {
+        const op = operationalDateOf(row, helper);
+        if (!op) {
+          rejected.push({ row: row, reason: 'LEGACY_DATE_CORRUPTION' });
+          return;
+        }
+        if (op !== wantDate) {
+          rejected.push({ row: row, reason: 'OTHER_DATE' });
+          return;
+        }
       }
       out.push(row);
     });
@@ -209,7 +247,10 @@
     if (!sameUnitScope(row, scope)) {
       return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
     }
-    const op = operationalDateOf(row, function (d) { return dateText(d); });
+    const op = operationalDateOf(row);
+    if (!op) {
+      return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'LEGACY_DATE_CORRUPTION', scope: scope, wantDate: wantDate };
+    }
     if (op !== wantDate) return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope, wantDate: wantDate };
     return { ok: true, path: 'RCO_SCOPED', scope: scope, wantDate: wantDate };
   }
@@ -225,7 +266,10 @@
     if (!sameUnitScope(row, scope)) {
       return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
     }
-    const rowDate = dateText(row.DATA_SERVICO != null ? row.DATA_SERVICO : (row.data || ''));
+    const rowDate = operationalDateOf(row);
+    if (!rowDate) {
+      return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'LEGACY_DATE_CORRUPTION', scope: scope, wantDate: wantDate };
+    }
     if (rowDate !== wantDate) {
       return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope, wantDate: wantDate };
     }
@@ -244,6 +288,7 @@
   const api = {
     filled: filled,
     dateText: dateText,
+    resolveExistingOperationalDate: resolveExistingOperationalDate,
     normBattalion: normBattalion,
     normCompany: normCompany,
     companyNumber: companyNumber,

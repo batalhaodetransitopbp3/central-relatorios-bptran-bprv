@@ -521,10 +521,109 @@ test('auditoria writes DATA_SERVICO: strictYmdDate_/preserveLegacy presentes', f
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf('function strictYmdDate_') >= 0);
   assert.ok(src.indexOf('function preserveLegacyIdentityDate_') >= 0);
-  assert.ok(src.indexOf('resolveOperationalServiceDate_') >= 0);
+  assert.ok(src.indexOf('resolveNewOperationalDate_') >= 0);
+  assert.ok(src.indexOf('resolveExistingOperationalDate_') >= 0);
   // master/passagem/rco create usam strict
   assert.ok(src.indexOf('strictYmdDate_(payload.data') >= 0 || src.indexOf('strictYmdDate_(payload.data||') >= 0);
   console.log('    CAN_UNSAFE_DATETEXT_CREATE_NEW_CORRUPTION=FALSE (dateText_ sem slice; writes RSD/new usam strictYmdDate_)');
+});
+
+test('NEW vs EXISTING: corrupt não vira hoje; empty+INICIADO deriva', function () {
+  const corrupt = '"2026-09-2';
+  assert.strictEqual(I.resolveExistingOperationalDate(corrupt, ''), '');
+  assert.strictEqual(I.resolveExistingOperationalDate(corrupt, '2026-09-28T10:00:00-03:00'), '');
+  assert.strictEqual(I.resolveExistingOperationalDate('2026-09-28', ''), '2026-09-28');
+  assert.strictEqual(I.resolveExistingOperationalDate('', '2026-09-28T10:00:00-03:00'), '2026-09-28');
+  assert.strictEqual(I.resolveNewOperationalDate('2026-10-01', ''), '2026-10-01');
+  assert.strictEqual(I.resolveNewOperationalDate('"2026-09-2', ''), '');
+  assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(I.resolveNewOperationalDate('', new Date('2026-10-01T12:00:00-03:00'))));
+});
+
+test('serviceKey fail-closed + SERVICE_ID fallback — sem colisão com hoje', function () {
+  const legacy = {
+    BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', GUARNICAO: 'BST 01',
+    DATA_SERVICO: '"2026-09-2', SERVICE_ID: 'SVC-LEGACY-CORRUPT', REPORT_ID: 'RSD-LEGACY'
+  };
+  const neu = {
+    BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', GUARNICAO: 'BST 01',
+    DATA_SERVICO: '2026-10-01', SERVICE_ID: 'SVC-NEW', REPORT_ID: 'RSD-NEW'
+  };
+  assert.strictEqual(I.serviceKeyRsd(legacy.BATALHAO, legacy.COMPANHIA, legacy.DATA_SERVICO, legacy.GUARNICAO), '');
+  assert.strictEqual(I.serviceKeyRsd(neu.BATALHAO, neu.COMPANHIA, neu.DATA_SERVICO, neu.GUARNICAO), 'BPRv|1ª CPRv|2026-10-01|BST 01');
+  const kLeg = I.rsdGroupKeyFromRow(legacy);
+  const kNew = I.rsdGroupKeyFromRow(neu);
+  assert.strictEqual(kLeg, 'SERVICE|SVC-LEGACY-CORRUPT');
+  assert.notStrictEqual(kLeg, kNew);
+  assert.ok(kNew.indexOf('2026-10-01') >= 0);
+});
+
+test('corrupt date + rsd-list / rsd-get / mark / RCO consolidate fail-closed', function () {
+  const corruptRow = {
+    REPORT_ID: 'RSD-CORRUPT', SERVICE_ID: 'SVC-C',
+    BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', GUARNICAO: 'BST 01',
+    DATA_SERVICO: '"2026-09-2', INICIADO_EM: '', STATUS: 'DEFERIDO'
+  };
+  const emptyWithIni = {
+    REPORT_ID: 'RSD-EMPTY', SERVICE_ID: 'SVC-E',
+    BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', GUARNICAO: 'BST 01',
+    DATA_SERVICO: '', INICIADO_EM: '2026-09-28T10:00:00-03:00', STATUS: 'DEFERIDO'
+  };
+  // list filter
+  assert.strictEqual(I.resolveExistingOperationalDate(corruptRow.DATA_SERVICO, corruptRow.INICIADO_EM), '');
+  assert.strictEqual(I.resolveExistingOperationalDate(emptyWithIni.DATA_SERVICO, emptyWithIni.INICIADO_EM), '2026-09-28');
+  // RCO filter 2026-10-01
+  const fr = G.filterRowsForRco([corruptRow], { batalhao: 'BPRv', companhia: '1ª CPRv' }, '2026-10-01', I.resolveExistingOperationalDate);
+  assert.strictEqual(fr.items.length, 0);
+  assert.ok(fr.rejected.some(function (x) { return x.reason === 'LEGACY_DATE_CORRUPTION'; }));
+  // corrupt + INICIADO válido ainda fail-closed (token não vazio)
+  const corruptIni = Object.assign({}, corruptRow, { INICIADO_EM: '2026-09-28T10:00:00-03:00' });
+  assert.strictEqual(I.resolveExistingOperationalDate(corruptIni.DATA_SERVICO, corruptIni.INICIADO_EM), '');
+  const fr2 = G.filterRowsForRco([corruptIni], { batalhao: 'BPRv', companhia: '1ª CPRv' }, '2026-09-28', I.resolveExistingOperationalDate);
+  assert.strictEqual(fr2.items.length, 0);
+  // rsd-get scoped
+  const getDec = G.rsdGetAccessDecision({
+    module: 'RCO', batalhao: 'BPRv', companhia: '1ª CPRv', data: '2026-10-01', _tokenKind: 'central'
+  }, corruptRow);
+  assert.strictEqual(getDec.ok, false);
+  assert.ok(String(getDec.reason || '').indexOf('LEGACY_DATE_CORRUPTION') >= 0 || getDec.code === 'OUT_OF_RCO_SCOPE');
+  // mark included: op !== want → skip
+  const want = '2026-10-01';
+  const opMark = I.resolveExistingOperationalDate(corruptRow.DATA_SERVICO, corruptRow.INICIADO_EM);
+  assert.ok(!opMark || opMark !== want);
+});
+
+test('rsdIdentYmd_ GAS sem slice; helper Node sem slice', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  const start = src.indexOf('function rsdIdentYmd_');
+  const end = src.indexOf('\nfunction ', start + 10);
+  const fn = src.slice(start, end > start ? end : start + 400);
+  assert.ok(fn.indexOf('slice(0,10)') < 0, 'rsdIdentYmd_ sem slice');
+  assert.ok(fn.indexOf('strictYmdDate_') >= 0);
+  assert.ok(fn.indexOf('preserveLegacyIdentityDate_') >= 0);
+  assert.strictEqual(I.rsdIdentYmd('"2026-09-2'), '"2026-09-2');
+  assert.strictEqual(I.rsdIdentYmd('2026-10-01'), '2026-10-01');
+  console.log('    CAN_CORRUPT_EXISTING_DATE_FALLBACK_TO_TODAY=FALSE');
+  console.log('    CAN_CORRUPT_ROW_COLLIDE_WITH_CURRENT_SERVICE_KEY=FALSE');
+  console.log('    CAN_CORRUPT_ROW_ENTER_CURRENT_RCO_BY_NOW_FALLBACK=FALSE');
+  console.log('    UNSAFE_RSDIDENTYMD_SLICE_PRESENT=FALSE');
+});
+
+test('GAS: existing-row call sites usam resolveExistingOperationalDate_', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  assert.ok(src.indexOf('function resolveExistingOperationalDate_') >= 0);
+  assert.ok(src.indexOf('function resolveNewOperationalDate_') >= 0);
+  assert.ok(src.indexOf('function rsdGroupKeyFromRow_') >= 0);
+  // serviceKey fail-closed
+  const skStart = src.indexOf('function serviceKeyRsd_');
+  const skEnd = src.indexOf('\nfunction ', skStart + 10);
+  const skFn = src.slice(skStart, skEnd > skStart ? skEnd : skStart + 500);
+  assert.ok(skFn.indexOf('strictYmdDate_(data)') >= 0);
+  assert.ok(skFn.indexOf('resolveOperationalServiceDate_') < 0);
+  assert.ok(skFn.indexOf('resolveNewOperationalDate_') < 0);
+  // list/get/mark/consolidate
+  assert.ok(src.indexOf('resolveExistingOperationalDate_(x.DATA_SERVICO,x.INICIADO_EM)') >= 0);
+  assert.ok(src.indexOf('resolveExistingOperationalDate_(row.DATA_SERVICO,row.INICIADO_EM)') >= 0);
+  assert.ok(src.indexOf('LEGACY_DATE_CORRUPTION') >= 0);
 });
 
 console.log('\nPASSED', passed);
