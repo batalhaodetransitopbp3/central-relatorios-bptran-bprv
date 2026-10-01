@@ -566,17 +566,28 @@ function rsdResolveStructuralIdentity_(old, payload){
   return RsdStructuralIdentity.resolveStructuralIdentity(old, payload, {});
 }
 function rsdApplyCanonicalIdentityToPayload_(payload, identity){
-  if(typeof RsdStructuralIdentity!=='undefined'&&RsdStructuralIdentity&&typeof RsdStructuralIdentity.applyCanonicalIdentityToPayload==='function'){
-    return RsdStructuralIdentity.applyCanonicalIdentityToPayload(payload, identity, getServiceWindow_(identity&&identity.dataServico));
-  }
   payload=payload||{};identity=identity||{};
+  var existingWindow=payload.servico&&payload.servico.serviceWindow;
+  if(typeof RsdStructuralIdentity!=='undefined'&&RsdStructuralIdentity&&typeof RsdStructuralIdentity.applyCanonicalIdentityToPayload==='function'){
+    return RsdStructuralIdentity.applyCanonicalIdentityToPayload(payload, identity, {
+      getServiceWindow:function(d){return getServiceWindow_(d);},
+      existingServiceWindow:existingWindow
+    });
+  }
+  // Fallback mínimo (runtime sem módulo): nunca calcular janela com data inválida.
   payload.unidade=payload.unidade||{};
   payload.unidade.batalhao=identity.batalhao;
   payload.unidade.companhia=identity.companhia;
   payload.servico=payload.servico||{};
   payload.servico.data=identity.dataServico;
   payload.servico.operationalDate=identity.dataServico;
-  payload.servico.serviceWindow=getServiceWindow_(identity.dataServico);
+  if(identity.dataServicoValid){
+    payload.servico.serviceWindow=getServiceWindow_(identity.dataServico);
+  }else if(existingWindow!=null&&existingWindow!==''){
+    payload.servico.serviceWindow=existingWindow;
+  }else{
+    try{delete payload.servico.serviceWindow;}catch(_){payload.servico.serviceWindow=undefined;}
+  }
   return payload;
 }
 function rsdAssertUnitLinePayloadParity_(row, payload){
@@ -1289,6 +1300,12 @@ function rsdDraftObject_(r,old,deviceId) {
     r.servico=r.servico||{};r.servico.data=dataServico;r.servico.operationalDate=dataServico;r.servico.serviceWindow=getServiceWindow_(dataServico);
   }
   var tipo=normGuarnicaoTipo_(g.tipo||guarnicaoTipoFromNome_(g.nome)||(old&&old.GUARNICAO_TIPO)||''),vtrPrincipal=rsdPrimaryVtr_(r)||normVtrPrefix_(old&&old.VTR_PRINCIPAL||''),ordem=Number(g.ordem||g.numero||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0;
+  // Paridade PRÉ-persistência (fail-closed): zero write se divergir.
+  var expectedIdentity={BATALHAO:batt,COMPANHIA:comp,DATA_SERVICO:dataServico};
+  var unitParity=rsdAssertUnitLinePayloadParity_(expectedIdentity,r);
+  if(!unitParity.ok){
+    throw new Error('LINE_PAYLOAD_DIVERGENCE: A sincronização foi recusada porque linha e payload divergem na identidade estrutural.');
+  }
   var json=JSON.stringify(r);
   var saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||'');
   var payloadHash=hash_(json);
@@ -1301,8 +1318,9 @@ function rsdDraftObject_(r,old,deviceId) {
     PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||(old&&old.PASSAGEM_ORIGEM_ID)||'',ULTIMO_RASCUNHO_EM:nowIso_(),
     EDIT_DEVICE_ID:String(deviceId||old&&old.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),DRAFT_REVISION:rev,
     HEADER_EDIT_AUTH:old&&old.HEADER_EDIT_AUTH||'',HEADER_EDIT_AUTH_EM:old&&old.HEADER_EDIT_AUTH_EM||'',HEADER_EDIT_AUTH_POR:old&&old.HEADER_EDIT_AUTH_POR||''};
-  var unitParity=rsdAssertUnitLinePayloadParity_(rowObj,r);
-  if(!unitParity.ok){
+  // Checagem defensiva pós-montagem (não substitui a pré-write).
+  var unitParity2=rsdAssertUnitLinePayloadParity_(rowObj,r);
+  if(!unitParity2.ok){
     throw new Error('LINE_PAYLOAD_DIVERGENCE: A sincronização foi recusada porque linha e payload divergem na identidade estrutural.');
   }
   return rowObj;
@@ -1494,6 +1512,10 @@ function rsdUpsert_(payload) {
   }
   var batt=idn.batalhao,comp=idn.companhia,dataFinal=idn.dataServico;
   r=rsdApplyCanonicalIdentityToPayload_(r,idn);
+  // Paridade PRÉ-persistência (fail-closed): zero write se divergir.
+  var expectedIdentity={BATALHAO:batt,COMPANHIA:comp,DATA_SERVICO:dataFinal};
+  var unitParity=rsdAssertUnitLinePayloadParity_(expectedIdentity,r);
+  if(!unitParity.ok)throw new Error('LINE_PAYLOAD_DIVERGENCE: Finalização recusada — linha e payload divergem na identidade estrutural.');
   var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json);
   var serviceId=String(old.SERVICE_ID||r.serviceId||(r.servico||{}).serviceId||uid_('svc')),seg=Number(old.SEGMENTO||r.segmento||(r.servico||{}).segmento||1)||1;
   var tipoFinal=normGuarnicaoTipo_(g.tipo||old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(g.nome||old.GUARNICAO)),ordemFinal=Number(g.ordem||old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0,vtrFinal=incomingVtr||oldVtr;
@@ -1509,8 +1531,6 @@ function rsdUpsert_(payload) {
     PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||old.PASSAGEM_ORIGEM_ID||'',ULTIMO_RASCUNHO_EM:nowIso_(),
     EDIT_DEVICE_ID:deviceId||old.EDIT_DEVICE_ID||'',EDIT_LEASE_UNTIL:'',DRAFT_REVISION:Number(old.DRAFT_REVISION||0),
     REVIEW_STATUS:'AGUARDANDO_ANALISE',REVIEW_MOTIVO:'',REVIEW_OBSERVACAO:'',REVIEW_AUTOR_MATRICULA:'',REVIEW_AUTOR_NOME:'',REVIEW_EM:''};
-  var unitParity=rsdAssertUnitLinePayloadParity_(obj,r);
-  if(!unitParity.ok)throw new Error('LINE_PAYLOAD_DIVERGENCE: Finalização recusada — linha e payload divergem na identidade estrutural.');
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);syncRsdOperations_(r,reportId,batt,comp,version);syncRsdOccurrences_(r,reportId,batt,comp);syncRsdCirvcs_(r,reportId,batt,comp,serviceId,seg);
   audit_('RSD',reportId,version,wasReturned?'REENVIADO_PARA_ANALISE':'AGUARDANDO_ANALISE',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,batt,comp,r);
   return {ok:true,message:wasReturned?'RSD retificado e reenviado para análise do Coordenador.':'RSD finalizado e enviado para análise do Coordenador.',reportId:reportId,serviceId:serviceId,segmento:seg,version:version,status:'AGUARDANDO_ANALISE'};

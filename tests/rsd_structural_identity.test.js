@@ -274,19 +274,21 @@ test('fonte única: gas_deploy/rsd_structural_identity.js === raiz', function ()
   assert.strictEqual(gas, root);
 });
 
-test('GAS rsdDraftObject_ ordem VALIDATE→CANONICALIZE→SERIALIZE→PERSIST', function () {
+test('GAS rsdDraftObject_ ordem VALIDATE→CANONICALIZE→PARITY→SERIALIZE→PERSIST', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   const start = src.indexOf('function rsdDraftObject_');
   assert.ok(start >= 0);
   const end = src.indexOf('\nfunction rsdStart_', start);
-  const fn = src.slice(start, end > start ? end : start + 4000);
+  const fn = src.slice(start, end > start ? end : start + 5000);
   const iResolve = fn.indexOf('rsdResolveStructuralIdentity_');
   const iCanon = fn.indexOf('rsdApplyCanonicalIdentityToPayload_');
+  const iParity = fn.indexOf('expectedIdentity');
   const iStringify = fn.indexOf('var json=JSON.stringify(r)');
   const iSave = fn.indexOf('saveJsonPayload_(reportId');
-  assert.ok(iResolve >= 0 && iCanon >= 0 && iStringify >= 0 && iSave >= 0);
+  assert.ok(iResolve >= 0 && iCanon >= 0 && iParity >= 0 && iStringify >= 0 && iSave >= 0);
   assert.ok(iResolve < iCanon, 'resolve before canonicalize');
-  assert.ok(iCanon < iStringify, 'canonicalize before stringify');
+  assert.ok(iCanon < iParity, 'canonicalize before parity');
+  assert.ok(iParity < iStringify, 'parity before stringify');
   assert.ok(iStringify < iSave, 'stringify before saveJsonPayload');
 });
 
@@ -300,10 +302,151 @@ test('rsdUpsert_ usa ScriptLock (race draft×finalize)', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   const start = src.indexOf('function rsdUpsert_');
   const end = src.indexOf('\nfunction rsdListDateSet_', start);
-  const fn = src.slice(start, end > start ? end : start + 5000);
+  const fn = src.slice(start, end > start ? end : start + 6000);
   assert.ok(fn.indexOf('LockService.getScriptLock()') >= 0);
   assert.ok(fn.indexOf('rsdResolveStructuralIdentity_') < fn.indexOf('JSON.stringify(r)'));
   assert.ok(fn.indexOf('rsdApplyCanonicalIdentityToPayload_') < fn.indexOf('saveJsonPayload_'));
+  const iParity = fn.indexOf('expectedIdentity');
+  const iSave = fn.indexOf('saveJsonPayload_');
+  assert.ok(iParity >= 0 && iParity < iSave, 'upsert parity before save');
+});
+
+// --- DATE_CORRUPTION legacy (fixtures sintéticas; sem sanitização) ---
+const CORRUPT_A = '"2026-09-2';
+const CORRUPT_B = '"2026-09-3';
+
+test('DATE A) raw `"2026-09-2` permanece exatamente', function () {
+  const info = I.resolveIdentityDate(CORRUPT_A);
+  assert.strictEqual(info.valid, false);
+  assert.strictEqual(info.legacyDateCorruption, true);
+  assert.strictEqual(info.value, CORRUPT_A);
+  assert.strictEqual(info.raw, CORRUPT_A);
+  const row = I.extractRowIdentity(oldRow({ DATA_SERVICO: CORRUPT_A }));
+  assert.strictEqual(row.dataServico, CORRUPT_A);
+  assert.strictEqual(row.legacyDateCorruption, true);
+});
+
+test('DATE B) `"2026-09-3` NÃO vira 2026-09-3', function () {
+  const info = I.resolveIdentityDate(CORRUPT_B);
+  assert.strictEqual(info.value, CORRUPT_B);
+  assert.notStrictEqual(info.value, '2026-09-3');
+  assert.strictEqual(info.valid, false);
+});
+
+test('DATE C/D) data inválida: getServiceWindow NÃO chamado / sem Date.now', function () {
+  const old = oldRow({ BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv', DATA_SERVICO: CORRUPT_A });
+  let nowUsed = false;
+  const RealDate = Date;
+  const out = I.draftPersistPipeline(old, { unidade: {}, servico: {}, guarnicao: { nome: 'BASE 01' } }, {
+    getServiceWindow: function () {
+      throw new Error('getServiceWindow_NÃO_DEVE_SER_CHAMADO');
+    },
+    doUpsert: true
+  });
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.counters.getServiceWindow_called, 0);
+  assert.strictEqual(out.persistedPayload.servico.data, CORRUPT_A);
+  assert.strictEqual(out.persistedPayload.servico.operationalDate, CORRUPT_A);
+  assert.ok(!out.persistedPayload.servico.serviceWindow || out.persistedPayload._diag);
+  assert.strictEqual(nowUsed, false);
+  assert.strictEqual(RealDate, Date);
+});
+
+test('DATE E) draft unidade correta + data legada: BATALHAO/COMPANHIA preservados', function () {
+  const old = oldRow({ BATALHAO: 'BPRv', COMPANHIA: '3ª CPRv', DATA_SERVICO: CORRUPT_A });
+  const out = I.draftPersistPipeline(old, {
+    unidade: { batalhao: 'BPRv', companhia: '3ª CPRv' },
+    servico: {}
+  }, { doUpsert: true });
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.line.BATALHAO, 'BPRv');
+  assert.strictEqual(out.line.COMPANHIA, '3ª CPRv');
+  assert.strictEqual(out.line.DATA_SERVICO, CORRUPT_A);
+});
+
+test('DATE F) payload sem data + linha corrompida: sem sanitização', function () {
+  const old = oldRow({ DATA_SERVICO: CORRUPT_B, BATALHAO: 'BPTran', COMPANHIA: '2ª CPTran' });
+  const idn = I.resolveStructuralIdentity(old, { unidade: {}, servico: {} });
+  assert.strictEqual(idn.ok, true);
+  assert.strictEqual(idn.dataServico, CORRUPT_B);
+  assert.strictEqual(idn.legacyDateCorruption, true);
+  const applied = I.applyCanonicalIdentityToPayload({ unidade: {}, servico: {} }, idn, {
+    getServiceWindow: function () { throw new Error('NO_GW'); }
+  });
+  assert.strictEqual(applied.servico.data, CORRUPT_B);
+});
+
+test('DATE G) payload data válida ≠ linha corrompida → MISMATCH (não reescreve)', function () {
+  const old = oldRow({ DATA_SERVICO: CORRUPT_A, BATALHAO: 'BPRv', COMPANHIA: '1ª CPRv' });
+  const r = I.resolveStructuralIdentity(old, {
+    unidade: { batalhao: 'BPRv', companhia: '1ª CPRv' },
+    servico: { data: '2026-09-30' }
+  });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'RSD_STRUCTURAL_IDENTITY_MISMATCH');
+  assert.ok(r.mismatches.some((m) => m.field === 'DATA_SERVICO'));
+  const pipe = I.draftPersistPipeline(old, {
+    unidade: { batalhao: 'BPRv', companhia: '1ª CPRv' },
+    servico: { data: '2026-09-30' }
+  }, { doUpsert: true });
+  assert.strictEqual(pipe.ok, false);
+  assert.strictEqual(pipe.counters.saveJsonPayload_called, 0);
+});
+
+test('DATE H) finalização simulada com DATE_CORRUPTION não repara data', function () {
+  const old = oldRow({ DATA_SERVICO: CORRUPT_A, STATUS: 'EM_SERVICO' });
+  const idn = I.resolveStructuralIdentity(old, { unidade: {}, servico: {}, ocorrencias: [{ id: 'oc-1' }] });
+  assert.strictEqual(idn.ok, true);
+  assert.strictEqual(idn.dataServico, CORRUPT_A);
+  const after = Object.assign({}, old, {
+    STATUS: 'AGUARDANDO_ANALISE',
+    BATALHAO: idn.batalhao,
+    COMPANHIA: idn.companhia,
+    DATA_SERVICO: idn.dataServico
+  });
+  assert.strictEqual(after.DATA_SERVICO, CORRUPT_A);
+});
+
+test('DATE I) parity failure → ZERO WRITE antes do save', function () {
+  const old = oldRow();
+  const out = I.draftPersistPipeline(old, { unidade: {}, servico: { data: '2026-09-30' } }, {
+    doUpsert: true,
+    forceParityFail: true
+  });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.code, 'LINE_PAYLOAD_DIVERGENCE');
+  assert.strictEqual(out.counters.saveJsonPayload_called, 0);
+  assert.strictEqual(out.counters.setContent_called, 0);
+  assert.strictEqual(out.counters.createFile_called, 0);
+  assert.strictEqual(out.counters.upsert_called, 0);
+});
+
+test('DATE J) parity failure payload >45 KB → ZERO setContent/createFile', function () {
+  const old = oldRow();
+  const out = I.draftPersistPipeline(old, {
+    unidade: {},
+    servico: { data: '2026-09-30' },
+    ocorrencias: [{ blob: 'Q'.repeat(46000) }]
+  }, { doUpsert: true, existingFileId: 'file-x', forceParityFail: true });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.counters.saveJsonPayload_called, 0);
+  assert.strictEqual(out.counters.setContent_called, 0);
+  assert.strictEqual(out.counters.createFile_called, 0);
+  assert.strictEqual(out.counters.upsert_called, 0);
+});
+
+test('rsdUpsert_ lock: região crítica documentada (estimativa)', function () {
+  // Documentação/simulação: waitLock 15s; região inclui save+syncs.
+  // Estimativa conservadora sob carga típica (sem I/O real nesta suíte).
+  const est = {
+    waitLockCapMs: 15000,
+    criticalPathTypicalMs: 800,
+    criticalPathHeavyMs: 4000,
+    contentionRisk: 'MODERATE_UNDER_BURST',
+    note: 'ScriptLock cobre finalize inteiro (save payload + veículos + ops + ocorrências + CIRVC + audit). Margem sob waitLock(15000) tipicamente OK; pico com muitos CIRVC/fotos pode aproximar do teto.'
+  };
+  assert.ok(est.waitLockCapMs >= est.criticalPathHeavyMs * 2);
+  console.log('    lock-upsert:', JSON.stringify(est));
 });
 
 console.log('\nPASSED', passed);

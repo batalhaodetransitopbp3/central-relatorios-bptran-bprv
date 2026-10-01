@@ -1,6 +1,8 @@
 /**
  * Identidade estrutural imutável de RSD existente.
  * Fonte única: Node tests + Apps Script (gas_deploy/rsd_structural_identity.js).
+ *
+ * 10.8.36: PREVENTIVA — não repara histórico, não sanitiza DATE_CORRUPTION.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -16,36 +18,51 @@
     return String(v).replace(/\u00a0/g, ' ').trim() !== '';
   }
 
-  function stripWrappingQuotes(s) {
-    s = String(s == null ? '' : s).replace(/\u00a0/g, ' ').trim();
-    if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
-      return s.slice(1, -1).trim();
-    }
-    if (s.charAt(0) === '"') return s.slice(1).trim();
-    return s;
+  /** Trim só de espaços/NBSP nas bordas — NÃO remove aspas nem reinterpreta. */
+  function trimPreservingContent(v) {
+    if (v == null) return '';
+    return String(v).replace(/\u00a0/g, ' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
   }
 
   /**
-   * Extrai YYYY-MM-DD quando possível.
-   * Não inventa dígitos para datas truncadas (DATE_CORRUPTION histórica).
+   * DATA VÁLIDA = exatamente YYYY-MM-DD (sem aspas, sem truncar/completar).
+   * Qualquer outro token não-vazio = LEGACY_DATE_CORRUPTION (raw preservado).
    */
-  function dateText(v) {
-    var s = stripWrappingQuotes(v);
-    if (!s) return '';
-    var m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return m[1] + '-' + m[2] + '-' + m[3];
-    var m2 = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (m2) {
-      return m2[3] + '-' + ('0' + m2[2]).slice(-2) + '-' + ('0' + m2[1]).slice(-2);
+  function resolveIdentityDate(v) {
+    if (v == null || v === '') {
+      return { value: '', valid: false, raw: '', legacyDateCorruption: false };
     }
-    return '';
+    // Date object (Sheets): calendário válido — formata YYYY-MM-DD sem “sanitizar string”.
+    if (Object.prototype.toString.call(v) === '[object Date]') {
+      if (isNaN(v.getTime())) {
+        return { value: '', valid: false, raw: '', legacyDateCorruption: false };
+      }
+      var y = v.getFullYear();
+      var m = ('0' + (v.getMonth() + 1)).slice(-2);
+      var d = ('0' + v.getDate()).slice(-2);
+      var iso = y + '-' + m + '-' + d;
+      return { value: iso, valid: true, raw: iso, legacyDateCorruption: false };
+    }
+    var raw = trimPreservingContent(v);
+    if (!raw) {
+      return { value: '', valid: false, raw: '', legacyDateCorruption: false };
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return { value: raw, valid: true, raw: raw, legacyDateCorruption: false };
+    }
+    // Token histórico corrompido: preservar BYTE/STRING equivalente (inclui aspas).
+    return { value: raw, valid: false, raw: raw, legacyDateCorruption: true };
   }
 
-  /** Identidade de data da linha: parseável ou token bruto (sem sanitizar truncadas). */
+  /** Compat: YYYY-MM-DD válido ou '' (nunca strip de aspas / nunca Date() em string). */
+  function dateText(v) {
+    var info = resolveIdentityDate(v);
+    return info.valid ? info.value : '';
+  }
+
+  /** Valor de identidade (string): válido ou raw corrompido — sem sanitizar. */
   function identityDate(v) {
-    var parsed = dateText(v);
-    if (parsed) return parsed;
-    return stripWrappingQuotes(v);
+    return resolveIdentityDate(v).value;
   }
 
   function normBattalion(v) {
@@ -91,23 +108,34 @@
     } else if (batt && (u.companhiaNumero != null && u.companhiaNumero !== '' || payload.companhiaNumero != null && payload.companhiaNumero !== '')) {
       comp = normCompany(batt, u.companhiaNumero != null ? u.companhiaNumero : payload.companhiaNumero);
     }
-    var data = identityDate(
+    var dateInfo = resolveIdentityDate(
       (payload.servico && (payload.servico.data || payload.servico.operationalDate)) ||
       payload.dataServico || payload.data || ''
     );
-    return { batalhao: batt, companhia: comp, dataServico: data };
+    return {
+      batalhao: batt,
+      companhia: comp,
+      dataServico: dateInfo.value,
+      dataServicoValid: dateInfo.valid,
+      legacyDateCorruption: dateInfo.legacyDateCorruption,
+      dataServicoRaw: dateInfo.raw
+    };
   }
 
   function extractRowIdentity(old) {
     old = old || {};
     var batt = normBattalion(old.BATALHAO || old.batalhao || '');
     var compRaw = old.COMPANHIA || old.companhia || '';
+    var dateInfo = resolveIdentityDate(old.DATA_SERVICO != null ? old.DATA_SERVICO : old.dataServico);
     return {
       reportId: String(old.REPORT_ID || old.reportId || ''),
       serviceId: String(old.SERVICE_ID || old.serviceId || ''),
       batalhao: batt,
       companhia: filled(compRaw) ? (normCompany(batt, compRaw) || String(compRaw).replace(/\u00a0/g, ' ').trim()) : '',
-      dataServico: identityDate(old.DATA_SERVICO || old.dataServico || '')
+      dataServico: dateInfo.value,
+      dataServicoValid: dateInfo.valid,
+      legacyDateCorruption: dateInfo.legacyDateCorruption,
+      dataServicoRaw: dateInfo.raw
     };
   }
 
@@ -125,6 +153,8 @@
         batalhao: battNew,
         companhia: compNew,
         dataServico: dataNew,
+        dataServicoValid: !!incoming.dataServicoValid,
+        legacyDateCorruption: false,
         reportId: String((payload && payload.reportId) || ''),
         serviceId: String((payload && (payload.serviceId || (payload.servico && payload.servico.serviceId))) || ''),
         mismatch: null
@@ -149,8 +179,15 @@
     if (filled(incoming.companhia) && String(incoming.companhia) !== String(row.companhia)) {
       mismatches.push({ field: 'COMPANHIA', old: row.companhia, incoming: incoming.companhia });
     }
-    if (filled(incoming.dataServico) && incoming.dataServico !== row.dataServico) {
-      mismatches.push({ field: 'DATA_SERVICO', old: row.dataServico, incoming: incoming.dataServico });
+    // Conservador: qualquer token de data explícito diferente do da linha → MISMATCH.
+    // Inclui payload com data válida vs linha LEGACY_DATE_CORRUPTION (não “consertar”).
+    if (filled(incoming.dataServico) && String(incoming.dataServico) !== String(row.dataServico)) {
+      mismatches.push({
+        field: 'DATA_SERVICO',
+        old: row.dataServico,
+        incoming: incoming.dataServico,
+        legacyDateCorruption: !!row.legacyDateCorruption
+      });
     }
 
     if (mismatches.length) {
@@ -160,7 +197,8 @@
         detail: 'Payload tenta alterar identidade estrutural imutável.',
         mismatches: mismatches,
         row: row,
-        incoming: incoming
+        incoming: incoming,
+        legacyDateCorruption: !!row.legacyDateCorruption
       };
     }
 
@@ -171,6 +209,9 @@
       batalhao: row.batalhao,
       companhia: row.companhia,
       dataServico: row.dataServico,
+      dataServicoValid: !!row.dataServicoValid,
+      legacyDateCorruption: !!row.legacyDateCorruption,
+      dataServicoRaw: row.dataServicoRaw,
       reportId: row.reportId,
       serviceId: row.serviceId || String((payload && (payload.serviceId || (payload.servico && payload.servico.serviceId))) || ''),
       mismatch: null,
@@ -178,10 +219,33 @@
     };
   }
 
-  /** Aplica identidade canônica ao payload ANTES de stringify/persist. */
-  function applyCanonicalIdentityToPayload(payload, identity, serviceWindow) {
+  /**
+   * Aplica identidade canônica ao payload ANTES de stringify/persist.
+   * 3º arg: serviceWindow (legado) OU opts { getServiceWindow, existingServiceWindow, getServiceWindowCalled }.
+   */
+  function applyCanonicalIdentityToPayload(payload, identity, serviceWindowOrOpts) {
     payload = payload || {};
     identity = identity || {};
+    var opts = {};
+    var legacyWindow = null;
+    if (serviceWindowOrOpts && typeof serviceWindowOrOpts === 'object' &&
+        (typeof serviceWindowOrOpts.getServiceWindow === 'function' ||
+          serviceWindowOrOpts.existingServiceWindow !== undefined ||
+          serviceWindowOrOpts.getServiceWindowCalled !== undefined ||
+          serviceWindowOrOpts.operationalDate !== undefined ||
+          Object.prototype.hasOwnProperty.call(serviceWindowOrOpts, 'cutoffHour'))) {
+      // Distinguir opts de um serviceWindow plain {operationalDate,...}
+      if (typeof serviceWindowOrOpts.getServiceWindow === 'function' ||
+          serviceWindowOrOpts.existingServiceWindow !== undefined ||
+          serviceWindowOrOpts.getServiceWindowCalled !== undefined) {
+        opts = serviceWindowOrOpts;
+      } else {
+        legacyWindow = serviceWindowOrOpts;
+      }
+    } else if (serviceWindowOrOpts != null) {
+      legacyWindow = serviceWindowOrOpts;
+    }
+
     payload.unidade = payload.unidade || {};
     payload.unidade.batalhao = identity.batalhao;
     payload.unidade.companhia = identity.companhia;
@@ -189,16 +253,37 @@
       payload.unidade.batalhaoSigla = identity.batalhao;
     }
     payload.servico = payload.servico || {};
+    var existingWindow = payload.servico.serviceWindow;
+    if (opts.existingServiceWindow != null) existingWindow = opts.existingServiceWindow;
+
+    // DATA: sempre o token da linha (válido ou raw corrompido). Nunca Date.now().
     payload.servico.data = identity.dataServico;
     payload.servico.operationalDate = identity.dataServico;
-    if (serviceWindow != null) payload.servico.serviceWindow = serviceWindow;
+
+    if (identity.dataServicoValid) {
+      if (typeof opts.getServiceWindow === 'function') {
+        if (opts.getServiceWindowCalled) opts.getServiceWindowCalled.n = (opts.getServiceWindowCalled.n || 0) + 1;
+        payload.servico.serviceWindow = opts.getServiceWindow(identity.dataServico);
+      } else if (legacyWindow != null) {
+        payload.servico.serviceWindow = legacyWindow;
+      }
+    } else {
+      // LEGACY_DATE_CORRUPTION: NÃO calcular serviceWindow; preservar existente se houver.
+      if (existingWindow != null && existingWindow !== '') {
+        payload.servico.serviceWindow = existingWindow;
+      } else if (payload.servico.serviceWindow) {
+        // keep
+      } else {
+        delete payload.servico.serviceWindow;
+      }
+      if (identity.legacyDateCorruption) {
+        payload._diag = payload._diag || {};
+        payload._diag.legacyDateCorruption = true;
+      }
+    }
     return payload;
   }
 
-  /**
-   * Paridade linha × payload após canonicalização.
-   * row pode ser objeto de linha (BATALHAO/…) ou identity {batalhao,…}.
-   */
   function assertLinePayloadUnitParity(rowOrIdentity, payload) {
     var row = rowOrIdentity || {};
     var expected = (row.BATALHAO != null || row.COMPANHIA != null || row.DATA_SERVICO != null)
@@ -225,29 +310,51 @@
     return { ok: true, code: '' };
   }
 
-  /**
-   * Pipeline instrumentável: VALIDATE → CANONICALIZE → SERIALIZE → PERSIST.
-   * Usado nos testes Node; espelha a ordem obrigatória do GAS rsdDraftObject_.
-   */
   function draftPersistPipeline(old, payload, opts) {
     opts = opts || {};
     var counters = opts.counters || {
       saveJsonPayload_called: 0,
       setContent_called: 0,
       createFile_called: 0,
-      upsert_called: 0
+      upsert_called: 0,
+      getServiceWindow_called: 0
     };
+    var gwCalled = { n: 0 };
     var idn = resolveStructuralIdentity(old, payload, opts);
     if (!idn.ok) {
       return { ok: false, code: idn.code, identity: idn, counters: counters, json: '', persistedPayload: null };
     }
-    var windowObj = typeof opts.getServiceWindow === 'function'
-      ? opts.getServiceWindow(idn.dataServico)
-      : { operationalDate: idn.dataServico };
-    var canonical = applyCanonicalIdentityToPayload(payload, idn, windowObj);
-    var parity = assertLinePayloadUnitParity(idn, canonical);
+    var existingWindow = payload && payload.servico && payload.servico.serviceWindow;
+    var canonical = applyCanonicalIdentityToPayload(payload, idn, {
+      getServiceWindow: typeof opts.getServiceWindow === 'function'
+        ? function (d) {
+            counters.getServiceWindow_called += 1;
+            gwCalled.n += 1;
+            return opts.getServiceWindow(d);
+          }
+        : null,
+      existingServiceWindow: existingWindow,
+      getServiceWindowCalled: gwCalled
+    });
+    // Paridade PRÉ-persistência (fail-closed).
+    var expectedLine = {
+      BATALHAO: idn.batalhao,
+      COMPANHIA: idn.companhia,
+      DATA_SERVICO: idn.dataServico
+    };
+    var parity = assertLinePayloadUnitParity(expectedLine, canonical);
     if (!parity.ok) {
       return { ok: false, code: parity.code, identity: idn, counters: counters, json: '', persistedPayload: null, parity: parity };
+    }
+    if (opts.forceParityFail) {
+      return {
+        ok: false,
+        code: 'LINE_PAYLOAD_DIVERGENCE',
+        identity: idn,
+        counters: counters,
+        json: '',
+        persistedPayload: null
+      };
     }
     var json = JSON.stringify(canonical);
     counters.saveJsonPayload_called += 1;
@@ -255,19 +362,13 @@
       if (opts.existingFileId) counters.setContent_called += 1;
       else counters.createFile_called += 1;
     }
-    if (opts.doUpsert) {
-      counters.upsert_called += 1;
-    }
+    if (opts.doUpsert) counters.upsert_called += 1;
     var line = {
       BATALHAO: idn.batalhao,
       COMPANHIA: idn.companhia,
       DATA_SERVICO: idn.dataServico,
       PAYLOAD_HASH: opts.hashFn ? opts.hashFn(json) : String(json.length)
     };
-    var lineParity = assertLinePayloadUnitParity(line, canonical);
-    if (!lineParity.ok) {
-      return { ok: false, code: 'LINE_PAYLOAD_DIVERGENCE', identity: idn, counters: counters, json: json, persistedPayload: canonical, parity: lineParity };
-    }
     return {
       ok: true,
       code: '',
@@ -276,7 +377,8 @@
       json: json,
       persistedPayload: canonical,
       line: line,
-      payloadHash: line.PAYLOAD_HASH
+      payloadHash: line.PAYLOAD_HASH,
+      getServiceWindow_called: counters.getServiceWindow_called
     };
   }
 
@@ -310,6 +412,7 @@
   return {
     dateText: dateText,
     identityDate: identityDate,
+    resolveIdentityDate: resolveIdentityDate,
     normBattalion: normBattalion,
     normCompany: normCompany,
     extractPayloadUnit: extractPayloadUnit,
