@@ -1,0 +1,23 @@
+{
+  "schema": "RSD_IDENTITY_REPAIR_MANIFEST_v1",
+  "mode": "READ_ONLY_TEMPLATE",
+  "note": "Manifesto real com reportIds/evidências fica FORA do Git (preview_assets/_audit_*). Este arquivo é só o contrato da fase futura de reparo seletivo.",
+  "caseFields": [
+    "reportId",
+    "serviceId",
+    "status",
+    "currentIdentity",
+    "expectedIdentity",
+    "evidence",
+    "expectedDraftRevision",
+    "expectedPayloadHash",
+    "dateCorruption",
+    "riskFlags"
+  ],
+  "identityShape": {
+    "batalhao": "string",
+    "companhia": "string",
+    "dataServico": "string"
+  },
+  "cases": []
+}

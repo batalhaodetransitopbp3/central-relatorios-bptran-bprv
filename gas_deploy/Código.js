@@ -125,9 +125,6 @@ function handleApiReadViaGet_(action, p) {
     } else if (action === 'rsd-service-dedupe-diagnose') {
       assertToken_(p.token, 'comando');
       out = rsdServiceDedupeDiagnose_(p);
-    } else if (action === 'audit-rsd-structural-identity-global') {
-      assertToken_(p.token, 'comando');
-      out = auditRsdStructuralIdentityGlobalRo();
     } else if (action === 'master-cadastros') {
       assertToken_(p.token, 'master-session');
       out = cadastroSearch_(p);
@@ -321,7 +318,7 @@ function doPost(e) {
     } else if (action === 'master-passagem-anular') {
       assertToken_(token, 'master-session');
       out = masterPassagemAnular_(payload);
-    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'sistema-auth' || action === 'rco-retification-list' || action === 'rco-draft-dedupe-diagnose' || action === 'rsd-service-dedupe-diagnose' || action === 'audit-rsd-structural-identity-global' || action === 'version') {
+    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'sistema-auth' || action === 'rco-retification-list' || action === 'rco-draft-dedupe-diagnose' || action === 'rsd-service-dedupe-diagnose' || action === 'version') {
       var q=Object.assign({},payload||{});
       q.token=token;
       out = handleApiReadViaGet_(action, q);
@@ -559,46 +556,34 @@ function sameUnitScope_(row,scope){
   return u.batalhao===scope.batalhao&&u.companhia===scope.companhia;
 }
 /**
- * Identidade estrutural imutável de RSD EXISTENTE.
- * payload vazio → preserva old; payload igual → aceita; payload diferente → aborta.
- * Nunca aplica fallback BPTran sobre linha existente.
+ * Wrapper da fonte única `RsdStructuralIdentity` (gas_deploy/rsd_structural_identity.js).
+ * Sem duplicar regra de imutabilidade neste arquivo.
  */
 function rsdResolveStructuralIdentity_(old, payload){
-  payload=payload||{};
-  var u=payload.unidade||{};
-  var battInRaw=u.batalhao||u.batalhaoSigla||payload.batalhao||payload.batalhaoSigla||'';
-  var battIn=String(battInRaw||'').replace(/\u00a0/g,' ').trim()?normBattalion_(battInRaw):'';
-  var compIn='';
-  if(String(u.companhia||payload.companhia||'').trim()){
-    compIn=normCompany_(battIn||battInRaw,u.companhia||payload.companhia);
-    // Se veio label explícito mas norm falhou por mismatch de tipo, ainda conta como divergência.
-    if(!compIn)compIn=String(u.companhia||payload.companhia||'').replace(/\u00a0/g,' ').trim();
-  }else if(battIn&&u.companhiaNumero!=null&&u.companhiaNumero!==''){
-    compIn=normCompany_(battIn,u.companhiaNumero);
+  if(typeof RsdStructuralIdentity==='undefined'||!RsdStructuralIdentity||typeof RsdStructuralIdentity.resolveStructuralIdentity!=='function'){
+    throw new Error('RSD_STRUCTURAL_IDENTITY_RUNTIME: módulo RsdStructuralIdentity indisponível no runtime Apps Script.');
   }
-  var dataIn=dateText_((payload.servico&&(payload.servico.data||payload.servico.operationalDate))||payload.dataServico||payload.data||'');
-
-  if(!old||!old.REPORT_ID){
-    return {ok:true,created:true,batalhao:battIn,companhia:compIn,dataServico:dataIn};
+  return RsdStructuralIdentity.resolveStructuralIdentity(old, payload, {});
+}
+function rsdApplyCanonicalIdentityToPayload_(payload, identity){
+  if(typeof RsdStructuralIdentity!=='undefined'&&RsdStructuralIdentity&&typeof RsdStructuralIdentity.applyCanonicalIdentityToPayload==='function'){
+    return RsdStructuralIdentity.applyCanonicalIdentityToPayload(payload, identity, getServiceWindow_(identity&&identity.dataServico));
   }
-  var battOld=normBattalion_(old.BATALHAO||'');
-  var compOld=normCompany_(battOld,old.COMPANHIA||'')||String(old.COMPANHIA||'').replace(/\u00a0/g,' ').trim();
-  var dataOld=dateText_(old.DATA_SERVICO||'');
-  if(!battOld||!compOld||!dataOld){
-    return {ok:false,code:'RSD_STRUCTURAL_IDENTITY_MISSING',detail:'Linha existente sem identidade estrutural completa.',
-      row:{batalhao:battOld,companhia:compOld,dataServico:dataOld},incoming:{batalhao:battIn,companhia:compIn,dataServico:dataIn}};
+  payload=payload||{};identity=identity||{};
+  payload.unidade=payload.unidade||{};
+  payload.unidade.batalhao=identity.batalhao;
+  payload.unidade.companhia=identity.companhia;
+  payload.servico=payload.servico||{};
+  payload.servico.data=identity.dataServico;
+  payload.servico.operationalDate=identity.dataServico;
+  payload.servico.serviceWindow=getServiceWindow_(identity.dataServico);
+  return payload;
+}
+function rsdAssertUnitLinePayloadParity_(row, payload){
+  if(typeof RsdStructuralIdentity!=='undefined'&&RsdStructuralIdentity&&typeof RsdStructuralIdentity.assertLinePayloadUnitParity==='function'){
+    return RsdStructuralIdentity.assertLinePayloadUnitParity(row, payload);
   }
-  var mismatches=[];
-  if(battIn&&battIn!==battOld)mismatches.push({field:'BATALHAO',old:battOld,incoming:battIn});
-  if(compIn&&String(compIn)!==String(compOld))mismatches.push({field:'COMPANHIA',old:compOld,incoming:compIn});
-  if(dataIn&&dataIn!==dataOld)mismatches.push({field:'DATA_SERVICO',old:dataOld,incoming:dataIn});
-  if(mismatches.length){
-    return {ok:false,code:'RSD_STRUCTURAL_IDENTITY_MISMATCH',detail:'Payload tenta alterar identidade estrutural imutável.',
-      mismatches:mismatches,row:{batalhao:battOld,companhia:compOld,dataServico:dataOld,reportId:String(old.REPORT_ID||''),serviceId:String(old.SERVICE_ID||'')},
-      incoming:{batalhao:battIn,companhia:compIn,dataServico:dataIn}};
-  }
-  return {ok:true,created:false,preserved:true,batalhao:battOld,companhia:compOld,dataServico:dataOld,
-    reportId:String(old.REPORT_ID||''),serviceId:String(old.SERVICE_ID||'')};
+  return {ok:true,code:''};
 }
 function parseJson_(v, fallback) { try { return JSON.parse(String(v||'')); } catch(_) { return fallback; } }
 function dateText_(v) {
@@ -1240,6 +1225,8 @@ function rsdAuditBlockedDraft_(old, r, payload, reason, extra){
 }
 function rsdAssertLinePayloadCoherence_(row, payload){
   row=row||{};payload=payload||{};
+  var unitParity=rsdAssertUnitLinePayloadParity_(row,payload);
+  if(!unitParity.ok)return {ok:false,reason:'LINE_PAYLOAD_DIVERGENCE',code:unitParity.code||'LINE_PAYLOAD_DIVERGENCE',divergences:unitParity.divergences||[]};
   var g=payload.guarnicao||{};
   var sheetNome=String(row.GUARNICAO||'').trim();
   var sheetVtr=rsdIdentPrimaryVtr_(row.VTR_PRINCIPAL||'');
@@ -1271,9 +1258,11 @@ function rsdGuardExistingDraft_(r, old, payload){
   return r;
 }
 function rsdDraftObject_(r,old,deviceId) {
+  // Ordem obrigatória (RSD existente): VALIDATE → CANONICALIZE → SERIALIZE → PERSIST.
+  // Nenhum persist/stringify antes de resolver identidade estrutural.
   rsdAssertCommanderImmutable_(r,old);
   r=rsdApplyLockedCommanderToPayload_(r,old)||r||{};
-  var reportId=String(r.reportId||''),u=r.unidade||{},g=r.guarnicao||{};
+  var reportId=String(r.reportId||''),g=r.guarnicao||{};
   var version=old?Number(old.VERSAO||1):1, rev=old?Number(old.DRAFT_REVISION||0)+1:1;
   var serviceId=String(r.serviceId||(r.servico||{}).serviceId||(old&&old.SERVICE_ID)||uid_('svc')),seg=Number(r.segmento||(r.servico||{}).segmento||(old&&old.SEGMENTO)||1)||1;
   r.serviceId=serviceId;r.segmento=seg;r.servico=r.servico||{};r.servico.serviceId=serviceId;r.servico.segmento=seg;
@@ -1281,7 +1270,6 @@ function rsdDraftObject_(r,old,deviceId) {
   var mat=locked?locked.matricula:normMat_(g.matricula||r.matriculaResponsavel||'');
   var nome=locked&&locked.nome?locked.nome:(g.responsavel||'');
   var posto=locked&&locked.postoGrad?locked.postoGrad:(g.postoGrad||'');
-  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||'');
   var batt,comp,dataServico;
   if(old){
     var idnDraft=rsdResolveStructuralIdentity_(old,r);
@@ -1291,23 +1279,33 @@ function rsdDraftObject_(r,old,deviceId) {
       throw new Error((idnDraft.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH')+': A unidade/data do RSD não pode ser alterada pelo rascunho. Recarregue o serviço.');
     }
     batt=idnDraft.batalhao;comp=idnDraft.companhia;dataServico=idnDraft.dataServico;
+    r=rsdApplyCanonicalIdentityToPayload_(r,idnDraft);
   }else{
-    batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran');
-    comp=u.companhia||normCompany_(batt,u.companhiaNumero);
+    var uNew=r.unidade||{};
+    batt=normBattalion_(uNew.batalhao||uNew.batalhaoSigla||'BPTran');
+    comp=uNew.companhia||normCompany_(batt,uNew.companhiaNumero);
     dataServico=resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date());
+    r.unidade=r.unidade||{};r.unidade.batalhao=batt;r.unidade.companhia=comp;
+    r.servico=r.servico||{};r.servico.data=dataServico;r.servico.operationalDate=dataServico;r.servico.serviceWindow=getServiceWindow_(dataServico);
   }
   var tipo=normGuarnicaoTipo_(g.tipo||guarnicaoTipoFromNome_(g.nome)||(old&&old.GUARNICAO_TIPO)||''),vtrPrincipal=rsdPrimaryVtr_(r)||normVtrPrefix_(old&&old.VTR_PRINCIPAL||''),ordem=Number(g.ordem||g.numero||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0;
-  r.servico=r.servico||{};r.servico.data=dataServico;r.servico.operationalDate=dataServico;r.servico.serviceWindow=getServiceWindow_(dataServico);
-  r.unidade=r.unidade||{};r.unidade.batalhao=batt;r.unidade.companhia=comp;
-  return {REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataServico,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||(old&&old.GUARNICAO)||'',GUARNICAO_TIPO:tipo,GUARNICAO_ORDEM:ordem,VTR_PRINCIPAL:vtrPrincipal,TURNO:'',
+  var json=JSON.stringify(r);
+  var saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||'');
+  var payloadHash=hash_(json);
+  var rowObj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataServico,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||(old&&old.GUARNICAO)||'',GUARNICAO_TIPO:tipo,GUARNICAO_ORDEM:ordem,VTR_PRINCIPAL:vtrPrincipal,TURNO:'',
     STATUS:'EM_SERVICO',RESPONSAVEL_MATRICULA:mat,RESPONSAVEL_POSTO_GRAD:posto,RESPONSAVEL_NOME:nome,
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||nowIso_(),FINALIZADO_EM:'',RETIFICADO_EM:'',CANCELADO_EM:'',
     RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',INCLUIDO_RCO_EM:old&&old.INCLUIDO_RCO_EM||'',PAYLOAD_JSON:saved.json,SCHEMA_VERSION:r.schemaVersion||2,SINCRONIZADO_EM:nowIso_(),
-    ORIGEM:r.origem||(old&&old.ORIGEM)||'RSD_WEB',OBSERVACOES:r.observacoes||'',PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),
+    ORIGEM:r.origem||(old&&old.ORIGEM)||'RSD_WEB',OBSERVACOES:r.observacoes||'',PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:payloadHash,
     SERVICE_ID:serviceId,SEGMENTO:seg,RSD_ANTERIOR_ID:r.rsdAnteriorId||(r.servico||{}).rsdAnteriorId||(old&&old.RSD_ANTERIOR_ID)||'',
     PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||(old&&old.PASSAGEM_ORIGEM_ID)||'',ULTIMO_RASCUNHO_EM:nowIso_(),
     EDIT_DEVICE_ID:String(deviceId||old&&old.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:deviceId?isoAfterMinutes_(3):(old&&old.EDIT_LEASE_UNTIL||''),DRAFT_REVISION:rev,
     HEADER_EDIT_AUTH:old&&old.HEADER_EDIT_AUTH||'',HEADER_EDIT_AUTH_EM:old&&old.HEADER_EDIT_AUTH_EM||'',HEADER_EDIT_AUTH_POR:old&&old.HEADER_EDIT_AUTH_POR||''};
+  var unitParity=rsdAssertUnitLinePayloadParity_(rowObj,r);
+  if(!unitParity.ok){
+    throw new Error('LINE_PAYLOAD_DIVERGENCE: A sincronização foi recusada porque linha e payload divergem na identidade estrutural.');
+  }
+  return rowObj;
 }
 function rsdStart_(payload) {
   var lock=LockService.getScriptLock();lock.waitLock(15000);
@@ -1470,16 +1468,23 @@ function rsdUpsert_(payload) {
   var r=payload.rsd||payload||{},reportId=String(r.reportId||''),deviceId=String(payload.deviceId||r.deviceId||'');
   if(!reportId)throw new Error('RSD sem REPORT_ID.');
   var s=sheet_(P3_SHEET_ID,'RSD');ensureHeaders_(s,['REVIEW_STATUS','REVIEW_MOTIVO','REVIEW_OBSERVACAO','REVIEW_AUTOR_MATRICULA','REVIEW_AUTOR_NOME','REVIEW_EM','CANCELADO_MOTIVO','CANCELADO_POR_MATRICULA','CANCELADO_POR_NOME','CANCELADO_POR_PERFIL','GUARNICAO_TIPO','GUARNICAO_ORDEM','VTR_PRINCIPAL']);
-  var old=findOne_(s,'REPORT_ID',reportId),newMat=normMat_((r.guarnicao||{}).matricula||r.matriculaResponsavel||''),incomingVtr=rsdPrimaryVtr_(r),oldVtr=old?normVtrPrefix_(old.VTR_PRINCIPAL||rsdMainVtrMap_()[reportId]||''):'',incomingTipo=normGuarnicaoTipo_((r.guarnicao||{}).tipo||guarnicaoTipoFromNome_((r.guarnicao||{}).nome)),oldTipo=old?normGuarnicaoTipo_(old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(old.GUARNICAO)):'';
+  // P0: mesma região crítica de rsdDraftSync_ — evita race draft↔finalize na mesma revisão/linha.
+  var lock=LockService.getScriptLock();
+  lock.waitLock(15000);
+  try{
+  var old=findOne_(s,'REPORT_ID',reportId);
   if(!old)throw new Error('Registre a guarnição no serviço antes de finalizar o RSD.');
+  var incomingVtr=rsdPrimaryVtr_(r),oldVtr=normVtrPrefix_(old.VTR_PRINCIPAL||rsdMainVtrMap_()[reportId]||'');
+  var incomingTipo=normGuarnicaoTipo_((r.guarnicao||{}).tipo||guarnicaoTipoFromNome_((r.guarnicao||{}).nome));
+  var oldTipo=normGuarnicaoTipo_(old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(old.GUARNICAO));
   if(oldTipo&&incomingTipo&&oldTipo!==incomingTipo)throw new Error('O tipo da guarnição já foi definido para este serviço e não pode ser alterado.');
+  if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD já não está disponível para finalização. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Consulte a devolutiva do Coordenador antes de qualquer nova ação.');
   rsdAssertCommanderImmutable_(r,old);
   r=rsdApplyLockedCommanderToPayload_(r,old)||r;
-  if(old&&['EM_SERVICO','RETIFICACAO_SOLICITADA'].indexOf(String(old.STATUS))<0)throw new Error('Este RSD já não está disponível para finalização. Situação atual: '+String(old.STATUS||'').replace(/_/g,' ')+'. Consulte a devolutiva do Coordenador antes de qualquer nova ação.');
   assertLease_(old,deviceId,!!payload.forceTakeover);
   r=rsdGuardExistingDraft_(r,old,payload)||r;
-  var wasReturned=!!(old&&String(old.STATUS)==='RETIFICACAO_SOLICITADA'),version=Math.max(Number(r.versao||r.version||0),old?Number(old.VERSAO||0)+1:1);
-  var u=r.unidade||{},g=r.guarnicao||{},lockedCmd=rsdLockedCommander_(old);
+  var wasReturned=String(old.STATUS)==='RETIFICACAO_SOLICITADA',version=Math.max(Number(r.versao||r.version||0),Number(old.VERSAO||0)+1);
+  var g=r.guarnicao||{},lockedCmd=rsdLockedCommander_(old);
   var idn=rsdResolveStructuralIdentity_(old,r);
   if(!idn.ok){
     audit_('RSD',reportId,Number(old.DRAFT_REVISION||old.VERSAO||0)||0,idn.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH',
@@ -1488,26 +1493,28 @@ function rsdUpsert_(payload) {
     throw new Error((idn.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH')+': A unidade/data do RSD não pode ser alterada na finalização. Recarregue o serviço e tente novamente.');
   }
   var batt=idn.batalhao,comp=idn.companhia,dataFinal=idn.dataServico;
-  r.unidade=r.unidade||{};r.unidade.batalhao=batt;r.unidade.companhia=comp;
-  r.servico=r.servico||{};r.servico.data=dataFinal;r.servico.operationalDate=dataFinal;r.servico.serviceWindow=getServiceWindow_(dataFinal);
+  r=rsdApplyCanonicalIdentityToPayload_(r,idn);
   var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json);
   var serviceId=String(old.SERVICE_ID||r.serviceId||(r.servico||{}).serviceId||uid_('svc')),seg=Number(old.SEGMENTO||r.segmento||(r.servico||{}).segmento||1)||1;
-  var tipoFinal=normGuarnicaoTipo_(g.tipo||old&&old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(g.nome||old&&old.GUARNICAO)),ordemFinal=Number(g.ordem||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0,vtrFinal=incomingVtr||oldVtr;
+  var tipoFinal=normGuarnicaoTipo_(g.tipo||old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(g.nome||old.GUARNICAO)),ordemFinal=Number(g.ordem||old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0,vtrFinal=incomingVtr||oldVtr;
   var matFinal=lockedCmd?lockedCmd.matricula:normMat_(g.matricula||r.matriculaResponsavel||'');
   var nomeFinal=lockedCmd&&lockedCmd.nome?lockedCmd.nome:(g.responsavel||'');
   var postoFinal=lockedCmd&&lockedCmd.postoGrad?lockedCmd.postoGrad:(g.postoGrad||'');
-  var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataFinal,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||old&&old.GUARNICAO||'',GUARNICAO_TIPO:tipoFinal,GUARNICAO_ORDEM:ordemFinal,VTR_PRINCIPAL:vtrFinal,TURNO:'',STATUS:'AGUARDANDO_ANALISE',
+  var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataFinal,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||old.GUARNICAO||'',GUARNICAO_TIPO:tipoFinal,GUARNICAO_ORDEM:ordemFinal,VTR_PRINCIPAL:vtrFinal,TURNO:'',STATUS:'AGUARDANDO_ANALISE',
     RESPONSAVEL_MATRICULA:matFinal,RESPONSAVEL_POSTO_GRAD:postoFinal,RESPONSAVEL_NOME:nomeFinal,
-    INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||'',FINALIZADO_EM:nowIso_(),RETIFICADO_EM:wasReturned?nowIso_():'',CANCELADO_EM:'',
-    RCO_REPORT_ID:old&&old.RCO_REPORT_ID||'',INCLUIDO_RCO_EM:old&&old.INCLUIDO_RCO_EM||'',PAYLOAD_JSON:saved.json,SCHEMA_VERSION:r.schemaVersion||2,SINCRONIZADO_EM:nowIso_(),
-    ORIGEM:r.origem||(old&&old.ORIGEM)||'RSD_WEB',OBSERVACOES:r.observacoes||'',PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),
-    SERVICE_ID:serviceId,SEGMENTO:seg,RSD_ANTERIOR_ID:r.rsdAnteriorId||(r.servico||{}).rsdAnteriorId||(old&&old.RSD_ANTERIOR_ID)||'',
-    PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||(old&&old.PASSAGEM_ORIGEM_ID)||'',ULTIMO_RASCUNHO_EM:nowIso_(),
-    EDIT_DEVICE_ID:deviceId||old&&old.EDIT_DEVICE_ID||'',EDIT_LEASE_UNTIL:'',DRAFT_REVISION:old?Number(old.DRAFT_REVISION||0):0,
+    INICIADO_EM:old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||'',FINALIZADO_EM:nowIso_(),RETIFICADO_EM:wasReturned?nowIso_():'',CANCELADO_EM:'',
+    RCO_REPORT_ID:old.RCO_REPORT_ID||'',INCLUIDO_RCO_EM:old.INCLUIDO_RCO_EM||'',PAYLOAD_JSON:saved.json,SCHEMA_VERSION:r.schemaVersion||2,SINCRONIZADO_EM:nowIso_(),
+    ORIGEM:r.origem||old.ORIGEM||'RSD_WEB',OBSERVACOES:r.observacoes||'',PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),
+    SERVICE_ID:serviceId,SEGMENTO:seg,RSD_ANTERIOR_ID:r.rsdAnteriorId||(r.servico||{}).rsdAnteriorId||old.RSD_ANTERIOR_ID||'',
+    PASSAGEM_ORIGEM_ID:r.passagemOrigemId||(r.servico||{}).passagemOrigemId||old.PASSAGEM_ORIGEM_ID||'',ULTIMO_RASCUNHO_EM:nowIso_(),
+    EDIT_DEVICE_ID:deviceId||old.EDIT_DEVICE_ID||'',EDIT_LEASE_UNTIL:'',DRAFT_REVISION:Number(old.DRAFT_REVISION||0),
     REVIEW_STATUS:'AGUARDANDO_ANALISE',REVIEW_MOTIVO:'',REVIEW_OBSERVACAO:'',REVIEW_AUTOR_MATRICULA:'',REVIEW_AUTOR_NOME:'',REVIEW_EM:''};
+  var unitParity=rsdAssertUnitLinePayloadParity_(obj,r);
+  if(!unitParity.ok)throw new Error('LINE_PAYLOAD_DIVERGENCE: Finalização recusada — linha e payload divergem na identidade estrutural.');
   upsert_(s,'REPORT_ID',reportId,obj);syncRsdVehicles_(r,reportId);syncRsdOperations_(r,reportId,batt,comp,version);syncRsdOccurrences_(r,reportId,batt,comp);syncRsdCirvcs_(r,reportId,batt,comp,serviceId,seg);
   audit_('RSD',reportId,version,wasReturned?'REENVIADO_PARA_ANALISE':'AGUARDANDO_ANALISE',obj.RESPONSAVEL_MATRICULA,obj.RESPONSAVEL_NOME,batt,comp,r);
   return {ok:true,message:wasReturned?'RSD retificado e reenviado para análise do Coordenador.':'RSD finalizado e enviado para análise do Coordenador.',reportId:reportId,serviceId:serviceId,segmento:seg,version:version,status:'AGUARDANDO_ANALISE'};
+  }finally{lock.releaseLock();}
 }
 /** Conjunto de datas para rsd-list: `data` (exata), `datas` (CSV/JSON) e/ou `dataInicio`+`dataFim` (intervalo inclusivo). */
 function rsdListDateSet_(p){
@@ -4221,7 +4228,8 @@ function rsdSelectiveHeaderRecoveryApply_(manifest){
 /**
  * AUDITORIA GLOBAL READ-ONLY — identidade estrutural RSD × RCO (todas as cias/datas).
  * NÃO muta linhas RSD/RCO. Pode gravar relatório JSON em pasta de snapshots (arquivo NOVO).
- * Uso: clasp run auditRsdStructuralIdentityGlobalRo
+ * Uso administrativo apenas: clasp run / editor Apps Script.
+ * NÃO expor como action web (doGet/doPost).
  */
 function auditRsdStructuralIdentityGlobalRo(){
   var visible=['EM_SERVICO','PASSAGEM_DISPONIVEL','ENCERRADO_PASSAGEM','AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','RETIFICACAO_SOLICITADA','INDEFERIDO','FINALIZADO','INCLUIDO_RCO'];

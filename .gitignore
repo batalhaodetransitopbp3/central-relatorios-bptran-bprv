@@ -7,6 +7,8 @@ preview_assets/_run_*
 preview_assets/_smoke_*
 preview_assets/_check_*
 preview_assets/_audit_*
+**/RSD_IDENTITY_REPAIR_MANIFEST.json
+**/_repair_manifest*.json
 auditoria_dados/
 
 # Tokens / clasp local
