@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.35';
+var CENTRAL_V10_VERSION = '10.8.36';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -554,6 +554,48 @@ function sameUnitScope_(row,scope){
   var u=sheetUnitCanon_(row);
   if(!u.valid||!scope||!scope.batalhao||!scope.companhia)return false;
   return u.batalhao===scope.batalhao&&u.companhia===scope.companhia;
+}
+/**
+ * Identidade estrutural imutável de RSD EXISTENTE.
+ * payload vazio → preserva old; payload igual → aceita; payload diferente → aborta.
+ * Nunca aplica fallback BPTran sobre linha existente.
+ */
+function rsdResolveStructuralIdentity_(old, payload){
+  payload=payload||{};
+  var u=payload.unidade||{};
+  var battInRaw=u.batalhao||u.batalhaoSigla||payload.batalhao||payload.batalhaoSigla||'';
+  var battIn=String(battInRaw||'').replace(/\u00a0/g,' ').trim()?normBattalion_(battInRaw):'';
+  var compIn='';
+  if(String(u.companhia||payload.companhia||'').trim()){
+    compIn=normCompany_(battIn||battInRaw,u.companhia||payload.companhia);
+    // Se veio label explícito mas norm falhou por mismatch de tipo, ainda conta como divergência.
+    if(!compIn)compIn=String(u.companhia||payload.companhia||'').replace(/\u00a0/g,' ').trim();
+  }else if(battIn&&u.companhiaNumero!=null&&u.companhiaNumero!==''){
+    compIn=normCompany_(battIn,u.companhiaNumero);
+  }
+  var dataIn=dateText_((payload.servico&&(payload.servico.data||payload.servico.operationalDate))||payload.dataServico||payload.data||'');
+
+  if(!old||!old.REPORT_ID){
+    return {ok:true,created:true,batalhao:battIn,companhia:compIn,dataServico:dataIn};
+  }
+  var battOld=normBattalion_(old.BATALHAO||'');
+  var compOld=normCompany_(battOld,old.COMPANHIA||'')||String(old.COMPANHIA||'').replace(/\u00a0/g,' ').trim();
+  var dataOld=dateText_(old.DATA_SERVICO||'');
+  if(!battOld||!compOld||!dataOld){
+    return {ok:false,code:'RSD_STRUCTURAL_IDENTITY_MISSING',detail:'Linha existente sem identidade estrutural completa.',
+      row:{batalhao:battOld,companhia:compOld,dataServico:dataOld},incoming:{batalhao:battIn,companhia:compIn,dataServico:dataIn}};
+  }
+  var mismatches=[];
+  if(battIn&&battIn!==battOld)mismatches.push({field:'BATALHAO',old:battOld,incoming:battIn});
+  if(compIn&&String(compIn)!==String(compOld))mismatches.push({field:'COMPANHIA',old:compOld,incoming:compIn});
+  if(dataIn&&dataIn!==dataOld)mismatches.push({field:'DATA_SERVICO',old:dataOld,incoming:dataIn});
+  if(mismatches.length){
+    return {ok:false,code:'RSD_STRUCTURAL_IDENTITY_MISMATCH',detail:'Payload tenta alterar identidade estrutural imutável.',
+      mismatches:mismatches,row:{batalhao:battOld,companhia:compOld,dataServico:dataOld,reportId:String(old.REPORT_ID||''),serviceId:String(old.SERVICE_ID||'')},
+      incoming:{batalhao:battIn,companhia:compIn,dataServico:dataIn}};
+  }
+  return {ok:true,created:false,preserved:true,batalhao:battOld,companhia:compOld,dataServico:dataOld,
+    reportId:String(old.REPORT_ID||''),serviceId:String(old.SERVICE_ID||'')};
 }
 function parseJson_(v, fallback) { try { return JSON.parse(String(v||'')); } catch(_) { return fallback; } }
 function dateText_(v) {
@@ -1236,11 +1278,24 @@ function rsdDraftObject_(r,old,deviceId) {
   var mat=locked?locked.matricula:normMat_(g.matricula||r.matriculaResponsavel||'');
   var nome=locked&&locked.nome?locked.nome:(g.responsavel||'');
   var posto=locked&&locked.postoGrad?locked.postoGrad:(g.postoGrad||'');
-  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||''),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
+  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RSD_PAYLOAD_FOLDER_ID','Central RSD - Payloads',old&&old.PAYLOAD_FILE_ID||'');
+  var batt,comp,dataServico;
+  if(old){
+    var idnDraft=rsdResolveStructuralIdentity_(old,r);
+    if(!idnDraft.ok){
+      audit_('RSD',reportId,Number(old.DRAFT_REVISION||0)||0,idnDraft.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH',
+        (g&&g.matricula)||'',(g&&g.responsavel)||'',old.BATALHAO||'',old.COMPANHIA||'',{mismatches:idnDraft.mismatches||[],incoming:idnDraft.incoming||{}});
+      throw new Error((idnDraft.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH')+': A unidade/data do RSD não pode ser alterada pelo rascunho. Recarregue o serviço.');
+    }
+    batt=idnDraft.batalhao;comp=idnDraft.companhia;dataServico=idnDraft.dataServico;
+  }else{
+    batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran');
+    comp=u.companhia||normCompany_(batt,u.companhiaNumero);
+    dataServico=resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date());
+  }
   var tipo=normGuarnicaoTipo_(g.tipo||guarnicaoTipoFromNome_(g.nome)||(old&&old.GUARNICAO_TIPO)||''),vtrPrincipal=rsdPrimaryVtr_(r)||normVtrPrefix_(old&&old.VTR_PRINCIPAL||''),ordem=Number(g.ordem||g.numero||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0;
-  // DATA_SERVICO = data operacional (janela 07h→07h). Histórico com DATA_SERVICO já gravada é preservado.
-  var dataServico=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||new Date());
   r.servico=r.servico||{};r.servico.data=dataServico;r.servico.operationalDate=dataServico;r.servico.serviceWindow=getServiceWindow_(dataServico);
+  r.unidade=r.unidade||{};r.unidade.batalhao=batt;r.unidade.companhia=comp;
   return {REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataServico,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||(old&&old.GUARNICAO)||'',GUARNICAO_TIPO:tipo,GUARNICAO_ORDEM:ordem,VTR_PRINCIPAL:vtrPrincipal,TURNO:'',
     STATUS:'EM_SERVICO',RESPONSAVEL_MATRICULA:mat,RESPONSAVEL_POSTO_GRAD:posto,RESPONSAVEL_NOME:nome,
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||nowIso_(),FINALIZADO_EM:'',RETIFICADO_EM:'',CANCELADO_EM:'',
@@ -1422,14 +1477,22 @@ function rsdUpsert_(payload) {
   r=rsdGuardExistingDraft_(r,old,payload)||r;
   var wasReturned=!!(old&&String(old.STATUS)==='RETIFICACAO_SOLICITADA'),version=Math.max(Number(r.versao||r.version||0),old?Number(old.VERSAO||0)+1:1);
   var u=r.unidade||{},g=r.guarnicao||{},lockedCmd=rsdLockedCommander_(old);
-  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json),batt=normBattalion_(u.batalhao||u.batalhaoSigla||'BPTran'),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
-  var serviceId=String(r.serviceId||(r.servico||{}).serviceId||(old&&old.SERVICE_ID)||uid_('svc')),seg=Number(r.segmento||(r.servico||{}).segmento||(old&&old.SEGMENTO)||1)||1;
+  var idn=rsdResolveStructuralIdentity_(old,r);
+  if(!idn.ok){
+    audit_('RSD',reportId,Number(old.DRAFT_REVISION||old.VERSAO||0)||0,idn.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH',
+      (g&&g.matricula)||r.matriculaResponsavel||'',(g&&g.responsavel)||'',old.BATALHAO||'',old.COMPANHIA||'',
+      {mismatches:idn.mismatches||[],incoming:idn.incoming||{},context:'rsdUpsert_'});
+    throw new Error((idn.code||'RSD_STRUCTURAL_IDENTITY_MISMATCH')+': A unidade/data do RSD não pode ser alterada na finalização. Recarregue o serviço e tente novamente.');
+  }
+  var batt=idn.batalhao,comp=idn.companhia,dataFinal=idn.dataServico;
+  r.unidade=r.unidade||{};r.unidade.batalhao=batt;r.unidade.companhia=comp;
+  r.servico=r.servico||{};r.servico.data=dataFinal;r.servico.operationalDate=dataFinal;r.servico.serviceWindow=getServiceWindow_(dataFinal);
+  var json=JSON.stringify(r),saved=saveJsonPayload_(reportId,version,json);
+  var serviceId=String(old.SERVICE_ID||r.serviceId||(r.servico||{}).serviceId||uid_('svc')),seg=Number(old.SEGMENTO||r.segmento||(r.servico||{}).segmento||1)||1;
   var tipoFinal=normGuarnicaoTipo_(g.tipo||old&&old.GUARNICAO_TIPO||guarnicaoTipoFromNome_(g.nome||old&&old.GUARNICAO)),ordemFinal=Number(g.ordem||old&&old.GUARNICAO_ORDEM||0)||Number((String(g.nome||old&&old.GUARNICAO||'').match(/(\d+)\s*$/)||[])[1]||0)||0,vtrFinal=incomingVtr||oldVtr;
   var matFinal=lockedCmd?lockedCmd.matricula:normMat_(g.matricula||r.matriculaResponsavel||'');
   var nomeFinal=lockedCmd&&lockedCmd.nome?lockedCmd.nome:(g.responsavel||'');
   var postoFinal=lockedCmd&&lockedCmd.postoGrad?lockedCmd.postoGrad:(g.postoGrad||'');
-  var dataFinal=old&&old.DATA_SERVICO?dateText_(old.DATA_SERVICO):resolveOperationalServiceDate_((r.servico||{}).data,(r.servico||{}).iniciadoEm||r.iniciadoEm||old&&old.INICIADO_EM||new Date());
-  r.servico=r.servico||{};r.servico.data=dataFinal;r.servico.operationalDate=dataFinal;r.servico.serviceWindow=getServiceWindow_(dataFinal);
   var obj={REPORT_ID:reportId,VERSAO:version,DATA_SERVICO:dataFinal,BATALHAO:batt,COMPANHIA:comp,GUARNICAO:g.nome||old&&old.GUARNICAO||'',GUARNICAO_TIPO:tipoFinal,GUARNICAO_ORDEM:ordemFinal,VTR_PRINCIPAL:vtrFinal,TURNO:'',STATUS:'AGUARDANDO_ANALISE',
     RESPONSAVEL_MATRICULA:matFinal,RESPONSAVEL_POSTO_GRAD:postoFinal,RESPONSAVEL_NOME:nomeFinal,
     INICIADO_EM:old&&old.INICIADO_EM||r.iniciadoEm||(r.servico||{}).iniciadoEm||'',FINALIZADO_EM:nowIso_(),RETIFICADO_EM:wasReturned?nowIso_():'',CANCELADO_EM:'',

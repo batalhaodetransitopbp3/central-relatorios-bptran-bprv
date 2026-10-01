@@ -6,6 +6,7 @@ preview_assets/_rsd_*
 preview_assets/_run_*
 preview_assets/_smoke_*
 preview_assets/_check_*
+preview_assets/_audit_*
 auditoria_dados/
 
 # Tokens / clasp local
