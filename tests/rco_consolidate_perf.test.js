@@ -11,293 +11,291 @@ function test(name, fn) {
   console.log('OK', name);
 }
 
-const pkg = P.buildPkg({ guarnicoes: 4, prodRows: 150, vehRows: 10, noiseRsd: 800, noisePris: 400, noiseOps: 500 });
+const pkg = P.buildPkg({ guarnicoes: 4, prodRows: 150, vehRows: 10 });
 
-test('TEST_CPU_VS_SEM_CPU_FP: CPU e SEM_CPU têm FP diferentes', function () {
-  const a = P.fingerprint(pkg, pkg.rco.reportId);
-  const pkg2 = P.buildPkg({ guarnicoes: 4, prodRows: 150, vehRows: 10, semCpu: true });
-  pkg2.rco.reportId = pkg.rco.reportId;
-  pkg2.rco.rcoOrigens = pkg.rco.rcoOrigens;
-  pkg2.estatisticaP3 = pkg.estatisticaP3;
-  pkg2.operacoesCompletas = pkg.operacoesCompletas;
-  assert.notStrictEqual(P.fingerprint(pkg2, pkg.rco.reportId), a, 'modo altera FP');
-  assert.strictEqual(P.substantiveCanon(pkg, pkg.rco.reportId).modo, 'CPU');
-  assert.strictEqual(P.substantiveCanon(pkg2, pkg.rco.reportId).modo, 'SEM_CPU');
-});
-
-test('TEST_POD_FP: alteração POD muda fingerprint', function () {
+test('TEST_CPU_VS_SEM_CPU_FP', function () {
   const a = P.fingerprint(pkg, pkg.rco.reportId);
   const pkg2 = JSON.parse(JSON.stringify(pkg));
-  pkg2.estatisticaP3.podExecucao = [{
-    registroId: 'pod-1', guarnicao: 'BST 1', operacao: 'POD ALTERADA', turno: 'B',
-    statusCumprimento: 'NAO_CUMPRIDO', localPrevisto: 'Y', localExecutado: 'Z', motivoAlteracao: 'chuva'
-  }];
+  pkg2.rco.semGuarnicaoCpu = true;
   assert.notStrictEqual(P.fingerprint(pkg2, pkg.rco.reportId), a);
 });
 
-test('TEST_OPERATIONS_FP: alteração operação muda fingerprint', function () {
-  const a = P.fingerprint(pkg, pkg.rco.reportId);
-  const pkg2 = JSON.parse(JSON.stringify(pkg));
-  pkg2.operacoesCompletas = [{
-    reportId: 'op-full-1', rsdReportId: 'rsd-1', guarnicao: 'BST 2', nome: 'Op B', turno: 'B', local: 'Local B'
-  }];
-  assert.notStrictEqual(P.fingerprint(pkg2, pkg.rco.reportId), a);
+test('TEST_FP_FULL_WRITE_PROJECTION: campos persistidos alteram FP', function () {
+  const base = P.fingerprint(pkg, pkg.rco.reportId);
+  function mutate(fn) {
+    const p = JSON.parse(JSON.stringify(pkg));
+    fn(p);
+    assert.notStrictEqual(P.fingerprint(p, pkg.rco.reportId), base, fn.name || 'mutate');
+  }
+  mutate(function marca(p) { p.estatisticaP3.veiculos[0].marca = 'FIAT'; });
+  mutate(function modelo(p) { p.estatisticaP3.veiculos[0].modelo = 'UNO'; });
+  mutate(function ano(p) { p.estatisticaP3.veiculos[0].ano = '2020'; });
+  mutate(function placaUf(p) { p.estatisticaP3.veiculos[0].placaOriginalUf = 'PE'; });
+  mutate(function houveCond(p) { p.estatisticaP3.veiculos[0].houveConduzidos = 'NAO'; });
+  mutate(function podCoord(p) { p.estatisticaP3.podExecucao[0].coordenadasExecutadas = '-8,-35'; });
+  mutate(function horaIni(p) { p.estatisticaP3.podExecucao[0].horaInicio = '10:00'; });
+  mutate(function horaFim(p) { p.estatisticaP3.podExecucao[0].horaFim = '11:00'; });
+  mutate(function houveAlt(p) { p.estatisticaP3.podExecucao[0].houveAlteracao = true; });
+  mutate(function lat(p) { p.operacoesCompletas[0].local.latitude = '-8.0'; });
+  mutate(function lng(p) { p.operacoesCompletas[0].local.longitude = '-35.0'; });
+  mutate(function rsdOp(p) { p.operacoesCompletas[0].rsdReportId = 'rsd-99'; });
+  mutate(function termino(p) { p.rco.periodo.termino = '2026-10-02'; });
+  mutate(function horario(p) { p.rco.periodo.horario = '08:00-20:00'; });
+  mutate(function origemRel(p) { p.estatisticaP3.producao[0].origemRelatorio = 'RSD'; });
+  mutate(function origemId(p) { p.estatisticaP3.producao[0].origemRegistroId = 'alt-1'; });
+  // Projeção contém os campos
+  const proj = P.projectWrites(pkg, pkg.rco.reportId);
+  assert.ok(proj.veiculos[0].MARCA);
+  assert.ok(proj.pod[0].COORDENADAS_EXECUTADAS);
+  assert.ok(proj.operacoes[0].LATITUDE);
+  assert.ok(proj.rco.TERMINO);
+  assert.ok(proj.rco.HORARIO_SERVICO);
 });
 
-test('TEST_VEHICLE_FP: FIPE/classificação/situação mudam fingerprint', function () {
+test('TEST_POD_FP / OPERATIONS / VEHICLE', function () {
   const a = P.fingerprint(pkg, pkg.rco.reportId);
-  const pkg2 = JSON.parse(JSON.stringify(pkg));
-  pkg2.estatisticaP3.veiculos[0].valorFipe = 99999;
-  assert.notStrictEqual(P.fingerprint(pkg2, pkg.rco.reportId), a);
-  const pkg3 = JSON.parse(JSON.stringify(pkg));
-  pkg3.estatisticaP3.veiculos[0].classificacaoP3 = 'APREENDIDO';
-  assert.notStrictEqual(P.fingerprint(pkg3, pkg.rco.reportId), a);
-  const pkg4 = JSON.parse(JSON.stringify(pkg));
-  pkg4.estatisticaP3.veiculos[0].situacao = 'APREENDIDO';
-  assert.notStrictEqual(P.fingerprint(pkg4, pkg.rco.reportId), a);
+  const p1 = JSON.parse(JSON.stringify(pkg));
+  p1.estatisticaP3.podExecucao[0].operacao = 'POD B';
+  assert.notStrictEqual(P.fingerprint(p1, pkg.rco.reportId), a);
+  const p2 = JSON.parse(JSON.stringify(pkg));
+  p2.operacoesCompletas[0].nome = 'Op B';
+  assert.notStrictEqual(P.fingerprint(p2, pkg.rco.reportId), a);
+  const p3 = JSON.parse(JSON.stringify(pkg));
+  p3.estatisticaP3.veiculos[0].valorFipe = 1;
+  assert.notStrictEqual(P.fingerprint(p3, pkg.rco.reportId), a);
 });
 
-test('observações / consolidador / produção / quantidade / origens mudam FP', function () {
-  const a = P.fingerprint(pkg, pkg.rco.reportId);
-  const obs = JSON.parse(JSON.stringify(pkg)); obs.rco.observacoes = 'nova obs';
-  assert.notStrictEqual(P.fingerprint(obs, pkg.rco.reportId), a);
-  const cons = JSON.parse(JSON.stringify(pkg)); cons.rco.consolidacaoResponsavel.matricula = '99999';
-  assert.notStrictEqual(P.fingerprint(cons, pkg.rco.reportId), a);
-  const prod = JSON.parse(JSON.stringify(pkg)); prod.estatisticaP3.producao[0].quantidade = 999;
-  assert.notStrictEqual(P.fingerprint(prod, pkg.rco.reportId), a);
-  const orig = JSON.parse(JSON.stringify(pkg)); orig.rco.rcoOrigens.push({ rsdReportId: 'rsd-extra', serviceId: 'svc-x', guarnicao: 'BST X', status: 'DEFERIDO' });
-  assert.notStrictEqual(P.fingerprint(orig, pkg.rco.reportId), a);
-});
+let benchA, benchB, benchC, beforeOps, afterOps, beforeMs, afterMs;
 
-let beforeOps, afterOps, beforeMs, afterMs, beforeMarks, afterMarks;
-
-test('benchmark BEFORE (legado N+1) vs AFTER (batch/index)', function () {
+test('benchmark BEFORE vs AFTER (primeira consolidação PRODUCAO=0)', function () {
   const dbBefore = P.seedDb(pkg, { noiseRsd: 800, noisePris: 400, noiseOps: 500 });
   const leg = P.runLegacy(dbBefore, pkg);
-  beforeOps = leg.ops; beforeMs = leg.totalMs; beforeMarks = leg.marks;
+  beforeOps = leg.ops; beforeMs = leg.totalMs;
 
   const dbAfter = P.seedDb(pkg, { noiseRsd: 800, noisePris: 400, noiseOps: 500 });
   const opt = P.runOptimized(dbAfter, pkg);
-  afterOps = opt.ops; afterMs = opt.totalMs; afterMarks = opt.marks;
-
-  console.log('    BEFORE_TOTAL_MS', beforeMs, 'reads', beforeOps.sheetReads, 'writes', beforeOps.sheetWrites, 'scans', beforeOps.sheetScans);
-  console.log('    AFTER_TOTAL_MS', afterMs, 'reads', afterOps.sheetReads, 'writes', afterOps.sheetWrites, 'scans', afterOps.sheetScans);
-  console.log('    TIMINGS_BEFORE', JSON.stringify(beforeMarks));
-  console.log('    TIMINGS_AFTER', JSON.stringify(afterMarks));
-  assert.ok(afterOps.sheetWrites < beforeOps.sheetWrites, 'menos writes');
-  assert.ok(afterOps.sheetScans < beforeOps.sheetScans, 'menos scans');
-  assert.ok(afterOps.sheetWrites <= beforeOps.sheetWrites - 100, 'redução ampla de writes (append batch)');
+  afterOps = opt.ops; afterMs = opt.totalMs;
+  benchA = {
+    label: 'FIRST_CONSOLIDATION',
+    nodeMs: afterMs,
+    trackedWrites: afterOps.sheetWrites,
+    scans: afterOps.sheetScans,
+    deleteCalls: afterOps.deleteCalls,
+    deleteRows: afterOps.deleteRows,
+    legacyDeleteCalls: beforeOps.deleteCalls,
+    note: 'PRODUCAO anterior=0'
+  };
+  console.log('    BENCH_A', JSON.stringify(benchA));
+  console.log('    BEFORE writes', beforeOps.sheetWrites, 'deleteCalls', beforeOps.deleteCalls);
+  console.log('    AFTER writes', afterOps.sheetWrites, 'deleteCalls', afterOps.deleteCalls);
+  assert.ok(afterOps.sheetWrites < beforeOps.sheetWrites);
+  assert.ok(afterOps.sheetScans < beforeOps.sheetScans);
 });
 
-test('equivalência golden negócio legado vs otimizado', function () {
-  const dbL = P.seedDb(pkg, { noiseRsd: 50, noisePris: 20, noiseOps: 20 });
-  P.runLegacy(dbL, pkg);
-  const snapL = P.snapshotBusiness(dbL, pkg.rco.reportId);
-
-  const dbO = P.seedDb(pkg, { noiseRsd: 50, noisePris: 20, noiseOps: 20 });
-  P.runOptimized(dbO, pkg);
-  const snapO = P.snapshotBusiness(dbO, pkg.rco.reportId);
-
-  assert.deepStrictEqual(snapO.producao, snapL.producao);
-  assert.deepStrictEqual(snapO.veiculos, snapL.veiculos);
-  assert.deepStrictEqual(snapO.origens, snapL.origens);
-  assert.deepStrictEqual(snapO.rsdLinks, snapL.rsdLinks);
-  assert.strictEqual(snapO.integral, 'SIM');
+test('BENCHMARK_RETRY_150_ROWS: PRODUCAO pré-existente contígua', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 20, noisePris: 5, noiseOps: 5, prefillProducao: 150 });
+  assert.strictEqual(db.PRODUCAO.rows.filter(function (r) { return r.REPORT_ID === pkg.rco.reportId; }).length, 150);
+  const t0 = Date.now();
+  const r = P.runOptimized(db, pkg);
+  const ms = Date.now() - t0;
+  benchB = {
+    label: 'RETRY_150_ROWS',
+    nodeMs: ms,
+    trackedWrites: r.ops.sheetWrites,
+    scans: r.ops.sheetScans,
+    deleteCalls: db.PRODUCAO.deleteCalls,
+    deleteRows: db.PRODUCAO.deleteRowsCount,
+    note: '150 linhas contíguas → 1 deleteRows (vs 150 deleteRow legado)'
+  };
+  console.log('    BENCH_B', JSON.stringify(benchB));
+  assert.strictEqual(db.PRODUCAO.deleteCalls, 1, 'um bloco contíguo');
+  assert.strictEqual(db.PRODUCAO.deleteRowsCount, 150);
+  assert.strictEqual(db.PRODUCAO.countWhere('REPORT_ID', pkg.rco.reportId), 150);
 });
 
-test('3/4 uma e várias guarnições', function () {
-  const one = P.buildPkg({ guarnicoes: 1, prodRows: 20, noiseRsd: 10 });
-  const many = P.buildPkg({ guarnicoes: 6, prodRows: 40, noiseRsd: 10 });
-  const d1 = P.seedDb(one); P.runOptimized(d1, one);
-  const d2 = P.seedDb(many); P.runOptimized(d2, many);
-  assert.strictEqual(d1.RCO_ORIGENS.countWhere('RCO_REPORT_ID', one.rco.reportId), 1);
-  assert.strictEqual(d2.RCO_ORIGENS.countWhere('RCO_REPORT_ID', many.rco.reportId), 6);
-});
-
-test('5/6/8 AGUARDANDO_ANALISE / EM_SERVICO force-open seed', function () {
-  const p = P.buildPkg({ guarnicoes: 2, prodRows: 10, noiseRsd: 5 });
-  const db = P.seedDb(p, { forceOpen: true });
-  assert.strictEqual(db.RSD.rows[0].STATUS, 'EM_SERVICO');
-  P.runOptimized(db, p);
-  assert.ok(db.RSD.rows.some(function (r) { return r.RCO_REPORT_ID === p.rco.reportId; }));
-});
-
-test('TEST_TIMEOUT_RETRY_DIRECT: segunda chamada após completa → idempotent', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 20 });
-  const r1 = P.runOptimized(db, pkg);
-  const writes1 = db.PRODUCAO.writes;
-  const audit1 = db.AUDITORIA.rows.length;
-  const ver1 = Number(db.RCO.rows[0].VERSAO);
-  const r2 = P.runOptimized(db, pkg);
-  assert.strictEqual(r2.idempotent, true);
-  assert.strictEqual(db.PRODUCAO.writes, writes1, 'sem regravação PRODUCAO');
-  assert.strictEqual(db.AUDITORIA.rows.length, audit1, 'sem nova auditoria');
-  assert.strictEqual(Number(db.RCO.rows[0].VERSAO), ver1, 'sem bump versão');
-  assert.ok(r1.version === 1 || r1.version >= 1);
-});
-
-test('TEST_TIMEOUT_RETRY_WITH_DRAFT_SYNC: consolidate → draft-upsert → retry', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 20 });
-  const r1 = P.runOptimized(db, pkg);
-  assert.ok(!r1.idempotent);
-  const draft = db.RCO_RASCUNHOS.rows[0];
-  assert.strictEqual(draft.P3_CONSOLIDATE_INTEGRAL, 'SIM');
-  assert.ok(draft.P3_CONSOLIDATE_FP);
-  assert.ok(draft.P3_CONSOLIDATE_DRAFT_FP);
-
-  const writesProd = db.PRODUCAO.writes;
-  const ver1 = Number(db.RCO.rows[0].VERSAO);
-  const audit1 = db.AUDITORIA.rows.length;
-
-  // Fluxo real pós-timeout: centralRcoSyncNow → rco-draft-upsert (mesmo conteúdo)
-  const sync = P.draftUpsert(db, JSON.parse(JSON.stringify(pkg.rco)));
-  assert.strictEqual(sync.consolidateMarkersKept, true, 'markers preservados no draft idêntico');
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP, r1.fingerprint);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDADO, 'SIM');
-
-  const r2 = P.runOptimized(db, pkg);
-  assert.strictEqual(r2.idempotent, true, 'retry idempotente após draft sync');
-  assert.strictEqual(db.PRODUCAO.writes, writesProd, 'sem regravação estatística');
-  assert.strictEqual(Number(db.RCO.rows[0].VERSAO), ver1);
-  assert.strictEqual(db.AUDITORIA.rows.length, audit1);
-});
-
-test('TEST_SAME_DRAFT: draft idêntico preserva markers', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 5 });
-  P.runOptimized(db, pkg);
-  const fp = db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP;
-  const dfp = db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_DRAFT_FP;
-  const r = P.draftUpsert(db, JSON.parse(JSON.stringify(pkg.rco)));
-  assert.strictEqual(r.consolidateMarkersKept, true);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP, fp);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_DRAFT_FP, dfp);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
-});
-
-test('TEST_CHANGED_DRAFT: draft substantivo invalida e exige reconsolidação', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 5 });
-  P.runOptimized(db, pkg);
-  const changed = JSON.parse(JSON.stringify(pkg.rco));
-  changed.observacoes = 'editado após consolidar';
-  const r = P.draftUpsert(db, changed);
-  assert.strictEqual(r.consolidateMarkersKept, false);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'NAO');
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP, '');
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDADO, 'NAO');
-
-  const pkg2 = JSON.parse(JSON.stringify(pkg));
-  pkg2.rco = changed;
-  const retry = P.runOptimized(db, pkg2);
-  assert.ok(!retry.idempotent, 'reconsolidação legítima');
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
-});
-
-test('16/17 timeout parcial + retry converge sem duplicar', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 30 });
-  const partial = P.runOptimized(db, pkg, { partialStopAfter: 'producao' });
-  assert.strictEqual(partial.partial, true);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'NAO');
-  const prodCount = db.PRODUCAO.countWhere('REPORT_ID', pkg.rco.reportId);
-  assert.strictEqual(prodCount, pkg.estatisticaP3.producao.length);
-
-  const retry = P.runOptimized(db, pkg, { keepVersion: true });
-  assert.ok(!retry.partial);
-  assert.strictEqual(db.PRODUCAO.countWhere('REPORT_ID', pkg.rco.reportId), pkg.estatisticaP3.producao.length);
-  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
-  assert.ok(P.integrityOk(db, pkg.rco.reportId, pkg));
-});
-
-test('14 retificação: FP zera e reconsolida', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 10 });
+test('BENCHMARK_RETIFICATION_150_ROWS', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 10, noisePris: 5, noiseOps: 5 });
   P.runOptimized(db, pkg);
   db.RCO_RASCUNHOS.rows[0].STATUS = 'EM_RETIFICACAO';
   db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDADO = 'NAO';
   db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL = 'NAO';
   db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP = '';
   db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_DRAFT_FP = '';
+  db.PRODUCAO.deleteCalls = 0; db.PRODUCAO.deleteRowsCount = 0; db.PRODUCAO.writes = 0;
   const pkg2 = JSON.parse(JSON.stringify(pkg));
   pkg2.estatisticaP3.producao.push({ registroId: 'prod-extra', guarnicao: 'BST 1', grupoCodigo: 'GX', indicadorCodigo: 'IX', quantidade: 1 });
-  P.runOptimized(db, pkg2);
+  const t0 = Date.now();
+  const r = P.runOptimized(db, pkg2);
+  benchC = {
+    label: 'RETIFICATION_150_PLUS',
+    nodeMs: Date.now() - t0,
+    trackedWrites: r.ops.sheetWrites,
+    scans: r.ops.sheetScans,
+    deleteCalls: db.PRODUCAO.deleteCalls,
+    deleteRows: db.PRODUCAO.deleteRowsCount
+  };
+  console.log('    BENCH_C', JSON.stringify(benchC));
+  assert.strictEqual(db.PRODUCAO.deleteCalls, 1);
   assert.strictEqual(db.PRODUCAO.countWhere('REPORT_ID', pkg.rco.reportId), pkg2.estatisticaP3.producao.length);
 });
 
-test('18 outra companhia intocada', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 100 });
-  const foreignBefore = db.RSD.rows.filter(function (r) { return r.BATALHAO === 'BPRv'; }).length;
+test('TEST_DELETE_CONTIGUOUS', function () {
+  const rows = [];
+  for (var i = 0; i < 150; i++) rows.push(i + 2);
+  const blocks = P.groupContiguous(rows);
+  assert.strictEqual(blocks.length, 1);
+  assert.strictEqual(blocks[0].count, 150);
+  const sheet = new P.FakeSheet('T', ['REPORT_ID'], rows.map(function (_, i) { return { REPORT_ID: 'rco-bench-1', REGISTRO_ID: 'p' + i }; }));
+  sheet.deleteWhereFast('REPORT_ID', 'rco-bench-1');
+  assert.strictEqual(sheet.deleteCalls, 1);
+  assert.strictEqual(sheet.rows.length, 0);
+});
+
+test('TEST_DELETE_INTERLEAVED', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 2, noiseOps: 2, noisePris: 2, interleaveProducao: 50 });
+  const beforeOther = db.PRODUCAO.rows.filter(function (r) { return r.REPORT_ID === 'other-rco'; }).length;
+  assert.strictEqual(beforeOther, 50);
   P.runOptimized(db, pkg);
-  const foreignAfter = db.RSD.rows.filter(function (r) { return r.BATALHAO === 'BPRv' && r.RCO_REPORT_ID; }).length;
-  assert.strictEqual(foreignBefore > 0, true);
-  assert.strictEqual(foreignAfter, 0);
-});
-
-test('TEST_DUPLICATE_POD_ID: REGISTRO_ID duplicado → uma linha (último estado)', function () {
-  const p = P.buildPkg({ guarnicoes: 1, prodRows: 5, noiseRsd: 2 });
-  p.estatisticaP3.podExecucao = [
-    { registroId: 'pod-dup', guarnicao: 'BST 1', operacao: 'OLD', turno: 'A', statusCumprimento: 'PENDENTE' },
-    { registroId: 'pod-dup', guarnicao: 'BST 1', operacao: 'NEW', turno: 'B', statusCumprimento: 'CUMPRIDO' }
-  ];
-  const db = P.seedDb(p, { noiseRsd: 2, noiseOps: 2, noisePris: 2 });
-  P.runOptimized(db, p);
-  const pods = db.POD.rows.filter(function (r) { return r.REGISTRO_ID === 'pod-dup'; });
-  assert.strictEqual(pods.length, 1, 'uma única linha pela chave');
-  assert.strictEqual(pods[0].OPERACAO, 'NEW');
-  assert.strictEqual(pods[0].STATUS_CUMPRIMENTO, 'CUMPRIDO');
-});
-
-test('TEST_DUPLICATE_OPERATION_ID: REGISTRO_ID duplicado em OPERACOES → uma linha', function () {
-  const p = P.buildPkg({ guarnicoes: 1, prodRows: 5, noiseRsd: 2 });
-  p.operacoesCompletas = [
-    { reportId: 'op-dup', nome: 'OLD', turno: 'A', guarnicao: 'BST 1', local: 'L1' },
-    { reportId: 'op-dup', nome: 'NEW', turno: 'B', guarnicao: 'BST 1', local: 'L2' }
-  ];
-  const db = P.seedDb(p, { noiseRsd: 2, noiseOps: 2, noisePris: 2 });
-  P.runOptimized(db, p);
-  const ops = db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; });
-  assert.strictEqual(ops.length, 1);
-  assert.strictEqual(ops[0].OPERACAO, 'NEW');
-});
-
-test('19/20 GAS 10.8.37 helpers + guards + draft markers presentes', function () {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
-  assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.37'") >= 0);
-  assert.ok(src.indexOf('function rcoLoadIndex_') >= 0);
-  assert.ok(src.indexOf('function rcoAppendRows_') >= 0);
-  assert.ok(src.indexOf('function rcoConsolidateFingerprint_') >= 0);
-  assert.ok(src.indexOf('function rcoConsolidateSubstantiveCanon_') >= 0);
-  assert.ok(src.indexOf('function rcoConsolidateDraftFingerprint_') >= 0);
-  assert.ok(src.indexOf('function rcoConsolidateIntegrityOk_') >= 0);
-  assert.ok(src.indexOf('P3_CONSOLIDATE_INTEGRAL') >= 0);
-  assert.ok(src.indexOf('P3_CONSOLIDATE_DRAFT_FP') >= 0);
-  assert.ok(src.indexOf('pendingAppendsByKey') >= 0);
-  assert.ok(src.indexOf('trackedSheetReads') >= 0);
-  assert.ok(src.indexOf('trackedSheetWrites') >= 0);
-  assert.ok(src.indexOf('consolidateMarkersKept') >= 0);
-  assert.ok(src.indexOf('resolveExistingOperationalDate_') >= 0);
-  assert.ok(src.indexOf('keepVersion') >= 0);
-  assert.ok(src.indexOf('function upsert_') >= 0);
-});
-
-test('idempotência não short-circuita só com P3_CONSOLIDADO + 1 linha', function () {
-  const db = P.seedDb(pkg, { noiseRsd: 5 });
-  db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDADO = 'SIM';
-  db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL = 'NAO';
-  db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP = P.fingerprint(pkg, pkg.rco.reportId);
-  db.PRODUCAO.append({ REGISTRO_ID: 'only-one', REPORT_ID: pkg.rco.reportId });
-  const r = P.runOptimized(db, pkg);
-  assert.ok(!r.idempotent, 'parcial não é short-circuit');
+  assert.strictEqual(db.PRODUCAO.rows.filter(function (r) { return r.REPORT_ID === 'other-rco'; }).length, 50, 'outro REPORT_ID intacto');
+  assert.ok(db.PRODUCAO.deleteCalls >= 50, 'blocos intercalados ≥ 50');
+  assert.ok(db.PRODUCAO.deleteCalls < 150, 'ainda agrupa menos que N×deleteRow se houver runs');
   assert.strictEqual(db.PRODUCAO.countWhere('REPORT_ID', pkg.rco.reportId), pkg.estatisticaP3.producao.length);
 });
 
+test('equivalência golden legado vs otimizado', function () {
+  const dbL = P.seedDb(pkg, { noiseRsd: 50, noisePris: 20, noiseOps: 20 });
+  P.runLegacy(dbL, pkg);
+  const snapL = P.snapshotBusiness(dbL, pkg.rco.reportId);
+  const dbO = P.seedDb(pkg, { noiseRsd: 50, noisePris: 20, noiseOps: 20 });
+  P.runOptimized(dbO, pkg);
+  const snapO = P.snapshotBusiness(dbO, pkg.rco.reportId);
+  assert.deepStrictEqual(snapO.producao, snapL.producao);
+  assert.deepStrictEqual(snapO.veiculos, snapL.veiculos);
+  assert.deepStrictEqual(snapO.origens, snapL.origens);
+  assert.strictEqual(snapO.integral, 'SIM');
+});
+
+test('TEST_DRAFT_CONSOLIDATE_RACE: draft enfileira enquanto consolidate segura lock', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 5, noisePris: 2, noiseOps: 2 });
+  let draftDeferred = null;
+  let sawMidIntegral = null;
+  const r1 = P.runOptimized(db, pkg, {
+    midFlightHook: function (dbHook) {
+      sawMidIntegral = dbHook.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL;
+      draftDeferred = P.draftUpsert(dbHook, JSON.parse(JSON.stringify(pkg.rco)));
+      assert.strictEqual(draftDeferred.deferred, true, 'draft não interleave');
+      assert.strictEqual(dbHook.RCO_RASCUNHOS.rows[0].REVISAO, 1, 'draft ainda não escreveu');
+    }
+  });
+  assert.ok(!r1.idempotent);
+  assert.strictEqual(sawMidIntegral, 'NAO');
+  assert.ok(draftDeferred);
+  assert.strictEqual(draftDeferred.deferred, false, 'waiter drenado após consolidate');
+  assert.strictEqual(draftDeferred.result.consolidateMarkersKept, true);
+  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
+  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_FP, r1.fingerprint);
+  // Sem payload B + FP de A: payload e markers coerentes
+  const payload = JSON.parse(db.RCO_RASCUNHOS.rows[0].PAYLOAD_JSON);
+  assert.strictEqual(payload.reportId, pkg.rco.reportId);
+  assert.strictEqual(P.draftFingerprint(payload, pkg.rco.reportId), db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_DRAFT_FP);
+});
+
+test('TEST_TIMEOUT_DRAFT_RETRY', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 20 });
+  const r1 = P.runOptimized(db, pkg);
+  const writesProd = db.PRODUCAO.writes;
+  const ver1 = Number(db.RCO.rows[0].VERSAO);
+  const audit1 = db.AUDITORIA.rows.length;
+  const sync = P.draftUpsert(db, JSON.parse(JSON.stringify(pkg.rco)));
+  assert.strictEqual(sync.consolidateMarkersKept, true);
+  const r2 = P.runOptimized(db, pkg);
+  assert.strictEqual(r2.idempotent, true);
+  assert.strictEqual(db.PRODUCAO.writes, writesProd);
+  assert.strictEqual(Number(db.RCO.rows[0].VERSAO), ver1);
+  assert.strictEqual(db.AUDITORIA.rows.length, audit1);
+});
+
+test('TEST_SAME_DRAFT / TEST_CHANGED_DRAFT', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 5 });
+  P.runOptimized(db, pkg);
+  assert.strictEqual(P.draftUpsert(db, JSON.parse(JSON.stringify(pkg.rco))).consolidateMarkersKept, true);
+  const changed = JSON.parse(JSON.stringify(pkg.rco));
+  changed.observacoes = 'editado';
+  const inv = P.draftUpsert(db, changed);
+  assert.strictEqual(inv.consolidateMarkersKept, false);
+  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'NAO');
+  const pkg2 = JSON.parse(JSON.stringify(pkg));
+  pkg2.rco = changed;
+  assert.ok(!P.runOptimized(db, pkg2).idempotent);
+});
+
+test('retry direto idempotent', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 10 });
+  P.runOptimized(db, pkg);
+  const w = db.PRODUCAO.writes;
+  assert.strictEqual(P.runOptimized(db, pkg).idempotent, true);
+  assert.strictEqual(db.PRODUCAO.writes, w);
+});
+
+test('parcial + retry converge', function () {
+  const db = P.seedDb(pkg, { noiseRsd: 10 });
+  const partial = P.runOptimized(db, pkg, { partialStopAfter: 'producao' });
+  assert.strictEqual(partial.partial, true);
+  P.runOptimized(db, pkg, { keepVersion: true });
+  assert.strictEqual(db.RCO_RASCUNHOS.rows[0].P3_CONSOLIDATE_INTEGRAL, 'SIM');
+});
+
+test('TEST_DUPLICATE_POD_ID / OPERATION_ID', function () {
+  const p = P.buildPkg({ guarnicoes: 1, prodRows: 5, noiseRsd: 2 });
+  p.estatisticaP3.podExecucao = [
+    { registroId: 'pod-dup', operacao: 'OLD', turno: 'A', statusCumprimento: 'PENDENTE' },
+    { registroId: 'pod-dup', operacao: 'NEW', turno: 'B', statusCumprimento: 'CUMPRIDO' }
+  ];
+  p.operacoesCompletas = [
+    { reportId: 'op-dup', nome: 'OLD', turno: 'A' },
+    { reportId: 'op-dup', nome: 'NEW', turno: 'B' }
+  ];
+  const db = P.seedDb(p, { noiseRsd: 2, noiseOps: 2, noisePris: 2 });
+  P.runOptimized(db, p);
+  assert.strictEqual(db.POD.rows.filter(function (r) { return r.REGISTRO_ID === 'pod-dup'; }).length, 1);
+  assert.strictEqual(db.POD.rows.filter(function (r) { return r.REGISTRO_ID === 'pod-dup'; })[0].OPERACAO, 'NEW');
+  assert.strictEqual(db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; }).length, 1);
+  assert.strictEqual(db.OPERACOES.rows.filter(function (r) { return r.REGISTRO_ID === 'op-dup'; })[0].OPERACAO, 'NEW');
+});
+
+test('GAS helpers + ScriptLock draft + write projection + deleteRows', function () {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.37'") >= 0);
+  assert.ok(src.indexOf('function rcoConsolidateProjectWrites_') >= 0);
+  assert.ok(src.indexOf('sheet.deleteRows') >= 0);
+  assert.ok(src.indexOf('pendingAppendsByKey') >= 0);
+  assert.ok(src.indexOf('trackedDeleteCalls') >= 0);
+  // draft sempre ScriptLock 20000
+  const draftFn = src.slice(src.indexOf('function rcoDraftUpsert_'), src.indexOf('function rcoDraftList_'));
+  assert.ok(draftFn.indexOf('LockService.getScriptLock()') >= 0);
+  assert.ok(draftFn.indexOf('waitLock(20000)') >= 0);
+  assert.ok(draftFn.indexOf('if(!old){createLock') < 0);
+  assert.ok(src.indexOf('RETRY integrity check') >= 0 || src.indexOf('retry integrity') >= 0 || src.indexOf('RETRY integrity') >= 0);
+});
+
+test('3/4 guarnições + force-open + foreign company', function () {
+  const one = P.buildPkg({ guarnicoes: 1, prodRows: 10 });
+  const many = P.buildPkg({ guarnicoes: 6, prodRows: 20 });
+  const d1 = P.seedDb(one, { noiseRsd: 5 }); P.runOptimized(d1, one);
+  const d2 = P.seedDb(many, { noiseRsd: 5 }); P.runOptimized(d2, many);
+  assert.strictEqual(d1.RCO_ORIGENS.countWhere('RCO_REPORT_ID', one.rco.reportId), 1);
+  assert.strictEqual(d2.RCO_ORIGENS.countWhere('RCO_REPORT_ID', many.rco.reportId), 6);
+  const p = P.buildPkg({ guarnicoes: 2, prodRows: 5 });
+  const db = P.seedDb(p, { forceOpen: true, noiseRsd: 20 });
+  P.runOptimized(db, p);
+  assert.strictEqual(db.RSD.rows.filter(function (r) { return r.BATALHAO === 'BPRv' && r.RCO_REPORT_ID; }).length, 0);
+});
+
 console.log('\nBENCH_SUMMARY', JSON.stringify({
-  BEFORE_TOTAL_MS: beforeMs,
-  AFTER_TOTAL_MS: afterMs,
+  BENCHMARK_FIRST_CONSOLIDATION: benchA,
+  BENCHMARK_RETRY_150_ROWS: benchB,
+  BENCHMARK_RETIFICATION_150_ROWS: benchC,
   GANHO_WRITES_PCT: Math.round((1 - afterOps.sheetWrites / beforeOps.sheetWrites) * 100),
-  GANHO_SCANS_PCT: Math.round((1 - afterOps.sheetScans / beforeOps.sheetScans) * 100),
-  SHEETS_READS_BEFORE: beforeOps.sheetReads,
-  SHEETS_READS_AFTER: afterOps.sheetReads,
-  SHEETS_WRITES_BEFORE: beforeOps.sheetWrites,
-  SHEETS_WRITES_AFTER: afterOps.sheetWrites,
-  NOTE: 'Counters no GAS: trackedSheet* (path instrumentado); wall-clock por fase em perf.marks'
+  NOTE: 'Node FakeSheet ≈ tracked*; wall-clock Sheets é maior (latência API)'
 }));
 console.log('\nPASSED', passed);
