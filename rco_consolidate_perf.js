@@ -1,6 +1,7 @@
 /**
  * Simulação de custo I/O da consolidação P3 — Node (benchmark / equivalência).
- * Espelha a estratégia 10.8.37: índice em memória + append/delete em lote.
+ * Espelha a estratégia 10.8.37+: índice em memória + append/delete em lote +
+ * fingerprint substantivo + draft-upsert que preserva/invalida markers.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -12,6 +13,10 @@
     var h = 0, str = String(s || '');
     for (var i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
     return 'h' + (h >>> 0).toString(16);
+  }
+
+  function fpStr(v) {
+    return String(v == null ? '' : v).replace(/\u00a0/g, ' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
   }
 
   function FakeSheet(name, headers, rows) {
@@ -38,7 +43,11 @@
     for (var i = 0; i < this.rows.length; i++) {
       if (String(this.rows[i][keyField] || '') === key) { idx = i; break; }
     }
-    var next = Object.assign({}, obj); next[keyField] = key;
+    // Espelha rowFor_: campos ausentes viram '' (risco de apagar markers se omitidos).
+    var next = {};
+    (this.headers || []).forEach(function (h) { next[h] = obj[h] != null ? obj[h] : ''; });
+    Object.keys(obj || {}).forEach(function (k) { next[k] = obj[k]; });
+    next[keyField] = key;
     if (idx >= 0) this.rows[idx] = next; else this.rows.push(next);
     this.writes++;
   };
@@ -72,30 +81,170 @@
   FakeSheet.prototype.loadIndex = function (keyField) {
     var list = this.fullRead();
     var byKey = {};
-    list.forEach(function (r) {
+    list.forEach(function (r, i) {
       var k = String(r[keyField] || '');
-      if (k) byKey[k] = r;
+      if (k) {
+        r._row = i + 2;
+        byKey[k] = r;
+      }
     });
-    return { list: list, byKey: byKey, keyField: keyField, sheet: this, pending: {} };
+    return {
+      list: list, byKey: byKey, keyField: keyField, sheet: this,
+      pendingUpserts: {}, pendingAppendsByKey: {}, pendingAppends: []
+    };
   };
 
-  function fingerprint(pkg, reportId) {
-    var rco = pkg.rco || pkg || {};
-    var stat = pkg.estatisticaP3 || {};
-    var origins = (rco.rcoOrigens || []).map(function (o) { return String(o.rsdReportId || ''); }).filter(Boolean).sort();
+  function indexUpsert(idx, key, obj) {
+    key = String(key || '');
+    var next = {};
+    Object.keys(obj || {}).forEach(function (k) { if (k !== '_row') next[k] = obj[k]; });
+    next[idx.keyField] = key;
+    var prev = idx.byKey[key];
+    if (prev && prev._row) {
+      next._row = prev._row;
+      idx.byKey[key] = next;
+      idx.pendingUpserts[key] = next;
+    } else if (prev && idx.pendingAppendsByKey && idx.pendingAppendsByKey[key] != null) {
+      next._pendingNew = true;
+      idx.byKey[key] = next;
+      idx.pendingAppendsByKey[key] = next;
+    } else {
+      next._pendingNew = true;
+      idx.byKey[key] = next;
+      if (!idx.pendingAppendsByKey) idx.pendingAppendsByKey = {};
+      idx.pendingAppendsByKey[key] = next;
+    }
+    return next;
+  }
+
+  function indexFlush(idx) {
+    var sheet = idx.sheet;
+    Object.keys(idx.pendingUpserts || {}).forEach(function (k) {
+      var obj = idx.pendingUpserts[k];
+      if (!obj || !obj._row) return;
+      var rowIdx = obj._row - 2;
+      var clean = Object.assign({}, obj);
+      delete clean._row; delete clean._pendingNew;
+      sheet.rows[rowIdx] = clean;
+      sheet.writes++;
+    });
+    idx.pendingUpserts = {};
+    var addKeys = Object.keys(idx.pendingAppendsByKey || {});
+    if (addKeys.length) {
+      addKeys.forEach(function (k) {
+        var o = Object.assign({}, idx.pendingAppendsByKey[k]);
+        delete o._pendingNew; delete o._row;
+        sheet.rows.push(o);
+      });
+      sheet.writes++;
+      idx.pendingAppendsByKey = {};
+    }
+    idx.pendingAppends = [];
+  }
+
+  function deriveStat(rco) {
+    rco = rco || {};
+    var producao = [], gs = (rco.state && rco.state.guarnicoes) || {};
+    Object.keys(gs).forEach(function (gid) {
+      var g = gs[gid] || {}, metrics = g.metrics || {};
+      Object.keys(metrics).forEach(function (mk) {
+        var parts = String(mk).split('::');
+        producao.push({
+          guarnicao: fpStr(g.nome || gid), grupoCodigo: fpStr(parts[0] || ''), indicadorCodigo: fpStr(parts[1] || ''),
+          grupoNome: '', indicadorNome: '', quantidade: Number(metrics[mk] || 0)
+        });
+      });
+    });
+    var veiculos = (rco.veiculosRecuperados || []).map(function (v) {
+      v = v || {};
+      return {
+        placaUf: String(v.placaUf || '').toUpperCase(), tipo: fpStr(v.tipo), marcaModelo: fpStr(v.marcaModelo),
+        situacao: fpStr(v.situacao), classificacaoP3: fpStr(v.classificacaoP3),
+        tipoRecuperacaoDetalhada: fpStr(v.tipoRecuperacaoDetalhada),
+        contaComoRecuperado: v.contaComoRecuperado === true || v.contaComoRecuperado === 'SIM' || v.contaComoRecuperado === 1 ? 'SIM' : 'NAO',
+        valorFipe: Number(v.valorFipe || 0), guarnicao: fpStr(v.guarnicao),
+        placaOriginalIdentificada: fpStr(v.placaOriginalIdentificada), restricaoOriginal: fpStr(v.restricaoOriginal),
+        local: fpStr(v.local), quantidadeConduzidos: Number(v.quantidadeConduzidos || 0)
+      };
+    });
+    var pod = (rco.operacoes || []).map(function (o) {
+      o = o || {};
+      return {
+        id: fpStr(o.id || o.reportId), guarnicao: fpStr(o.guarnicao), operacao: fpStr(o.nome || o.operacao),
+        turno: fpStr(o.turno), statusCumprimento: fpStr(o.statusCumprimento),
+        localPrevisto: fpStr(o.localPrevisto), localExecutado: fpStr(o.local || o.localExecutado),
+        motivoAlteracao: fpStr(o.motivoAlteracao)
+      };
+    });
+    return { producao: producao, veiculos: veiculos, podExecucao: pod };
+  }
+
+  /** Canon substantivo — espelha rcoConsolidateSubstantiveCanon_. */
+  function substantiveCanon(pkg, reportId) {
+    var rco = pkg.rco || pkg || {}, u = pkg.unidade || rco.unidade || {}, cons = rco.consolidacaoResponsavel || {};
+    var stat = pkg.estatisticaP3 || rco.estatisticaP3 || null;
+    if (!stat || !Array.isArray(stat.producao)) stat = deriveStat(rco);
+    var modo = rco.semGuarnicaoCpu ? 'SEM_CPU' : 'CPU';
+    var origins = (rco.rcoOrigens || []).map(function (o) {
+      return [fpStr(o.rsdReportId), fpStr(o.serviceId), fpStr(o.guarnicao), fpStr(o.status), String(o.versao || '')].join('|');
+    }).filter(function (x) { return x.split('|')[0]; }).sort();
     var prod = (stat.producao || []).map(function (x) {
-      return [x.guarnicao || '', x.grupoCodigo || '', x.indicadorCodigo || '', String(x.quantidade || 0)].join(':');
+      return [fpStr(x.guarnicao || x.GUARNICAO), fpStr(x.grupoCodigo || x.GRUPO_CODIGO), fpStr(x.indicadorCodigo || x.INDICADOR_CODIGO),
+        fpStr(x.grupoNome || x.GRUPO_NOME), fpStr(x.indicadorNome || x.INDICADOR_NOME),
+        String(Number(x.quantidade != null ? x.quantidade : (x.QUANTIDADE || 0)))].join('|');
     }).sort();
-    var veh = (stat.veiculos || []).map(function (x) { return String(x.placaUf || '').toUpperCase(); }).sort();
-    return hash([reportId, origins.join(','), prod.join('|'), veh.join(','), String((rco.periodo || {}).inicio || '')].join('#'));
+    var veh = (stat.veiculos || []).map(function (x) {
+      return [String(x.placaUf || x.PLACA_UF || '').toUpperCase(), fpStr(x.tipo || x.TIPO), fpStr(x.marcaModelo || x.MARCA_MODELO),
+        fpStr(x.situacao || x.SITUACAO), fpStr(x.classificacaoP3 || x.CLASSIFICACAO_P3),
+        fpStr(x.tipoRecuperacaoDetalhada || x.TIPO_RECUPERACAO_DETALHADA),
+        (x.contaComoRecuperado === true || x.contaComoRecuperado === 'SIM' || x.CONTA_COMO_RECUPERADO === 'SIM') ? 'SIM' : 'NAO',
+        String(Number(x.valorFipe != null ? x.valorFipe : (x.VALOR_FIPE || 0))), fpStr(x.guarnicao || x.GUARNICAO),
+        fpStr(x.placaOriginalIdentificada || x.PLACA_ORIGINAL_IDENTIFICADA), fpStr(x.restricaoOriginal || x.RESTRICAO_ORIGINAL),
+        fpStr(x.local || x.LOCAL), String(Number(x.quantidadeConduzidos != null ? x.quantidadeConduzidos : (x.QUANTIDADE_CONDUZIDOS || 0)))].join('|');
+    }).sort();
+    var pod = (stat.podExecucao || pkg.podExecucao || []).map(function (x) {
+      return [fpStr(x.registroId || x.REGISTRO_ID || x.id || x.origemRegistroId), fpStr(x.guarnicao || x.GUARNICAO),
+        fpStr(x.operacao || x.OPERACAO || x.nome), fpStr(x.turno || x.TURNO),
+        fpStr(x.statusCumprimento || x.STATUS_CUMPRIMENTO), fpStr(x.localPrevisto || x.LOCAL_PREVISTO),
+        fpStr(x.localExecutado || x.LOCAL_EXECUTADO || x.local), fpStr(x.motivoAlteracao || x.MOTIVO_ALTERACAO)].join('|');
+    }).sort();
+    var opsSrc = pkg.operacoesCompletas || rco.operacoes || [];
+    var ops = opsSrc.map(function (o) {
+      o = o || {};
+      var nome = ((o.operacao || {}).nome) || o.nome || '';
+      var turno = ((o.operacao || {}).turno) || o.turno || '';
+      var local = ((o.local || {}).descricao) || o.local || '';
+      return [fpStr(o.reportId || o.id), fpStr(o.rsdReportId), fpStr(o.guarnicao || ((o.operacao || {}).guarnicoes)), fpStr(nome), fpStr(turno), fpStr(local)].join('|');
+    }).sort();
+    return {
+      reportId: String(reportId || ''),
+      data: fpStr((rco.periodo || {}).inicio || rco.data || pkg.data || ''),
+      batt: fpStr(u.batalhao || pkg.batalhao || ''),
+      comp: fpStr(u.companhia || pkg.companhia || ''),
+      modo: modo,
+      cons: [String(cons.matricula || ''), fpStr(cons.nome), fpStr(cons.postoGrad), fpStr(cons.turno)].join('|'),
+      obs: fpStr(rco.observacoes),
+      origins: origins, producao: prod, veiculos: veh, pod: pod, ops: ops
+    };
+  }
+
+  function fingerprint(pkg, reportId) {
+    return hash(JSON.stringify(substantiveCanon(pkg, reportId)));
+  }
+  function draftFingerprint(rco, reportId) {
+    return fingerprint({ rco: rco || {} }, reportId);
   }
 
   function integrityOk(db, reportId, pkg) {
-    var expectProd = (pkg.estatisticaP3.producao || []).length;
-    var expectOrig = (pkg.rco.rcoOrigens || []).length;
+    var rco = pkg.rco || {};
+    var expectProd = ((pkg.estatisticaP3 && pkg.estatisticaP3.producao) || []).length;
+    var expectOrig = (rco.rcoOrigens || []).length;
+    var expectModo = rco.semGuarnicaoCpu ? 'SEM_CPU' : 'CPU';
+    var rcoRow = db.RCO.rows.filter(function (r) { return String(r.REPORT_ID) === reportId; })[0];
+    if (!rcoRow) return false;
+    if (rcoRow.MODO_CONSOLIDACAO && rcoRow.MODO_CONSOLIDACAO !== expectModo) return false;
     return db.PRODUCAO.countWhere('REPORT_ID', reportId) === expectProd &&
-      db.RCO_ORIGENS.countWhere('RCO_REPORT_ID', reportId) === expectOrig &&
-      db.RCO.rows.some(function (r) { return String(r.REPORT_ID) === reportId; });
+      db.RCO_ORIGENS.countWhere('RCO_REPORT_ID', reportId) === expectOrig;
   }
 
   function buildPkg(opts) {
@@ -104,29 +253,63 @@
     var nProd = opts.prodRows || 120;
     var origins = [];
     for (var g = 1; g <= nGu; g++) {
-      origins.push({ rsdReportId: 'rsd-' + g, serviceId: 'svc-' + g, guarnicao: 'BST ' + g, status: opts.rsdStatus || 'DEFERIDO' });
+      origins.push({ rsdReportId: 'rsd-' + g, serviceId: 'svc-' + g, guarnicao: 'BST ' + g, status: opts.rsdStatus || 'DEFERIDO', versao: 1 });
     }
     var producao = [];
     for (var i = 0; i < nProd; i++) {
       producao.push({
         registroId: 'prod-' + i, guarnicao: 'BST ' + ((i % nGu) + 1),
-        grupoCodigo: 'G' + (i % 10), indicadorCodigo: 'I' + i, quantidade: i % 5
+        grupoCodigo: 'G' + (i % 10), indicadorCodigo: 'I' + i,
+        grupoNome: 'Grupo ' + (i % 10), indicadorNome: 'Indicador ' + i,
+        quantidade: i % 5
       });
     }
     var veiculos = [];
     for (var v = 0; v < (opts.vehRows || 8); v++) {
-      veiculos.push({ registroId: 'veh-' + v, placaUf: 'ABC' + v + 'PB', guarnicao: 'BST 1' });
+      veiculos.push({
+        registroId: 'veh-' + v, placaUf: 'ABC' + v + 'PB', guarnicao: 'BST 1',
+        tipo: 'AUTO', marcaModelo: 'VW/GOL', situacao: 'RECUPERADO',
+        classificacaoP3: 'RECUPERADO', valorFipe: 10000 + v, contaComoRecuperado: true
+      });
     }
+    var pod = opts.pod || [
+      { registroId: 'pod-1', guarnicao: 'BST 1', operacao: 'POD A', turno: 'A', statusCumprimento: 'CUMPRIDO', localPrevisto: 'X', localExecutado: 'X' }
+    ];
+    var ops = opts.ops || [
+      { reportId: 'op-full-1', rsdReportId: 'rsd-1', guarnicao: 'BST 1', nome: 'Op A', turno: 'A', local: 'Local A' }
+    ];
     return {
       rco: {
         reportId: opts.reportId || 'rco-bench-1',
         periodo: { inicio: '2026-09-30' },
         unidade: { batalhao: 'BPTran', companhia: '1ª CPTran' },
         rcoOrigens: origins,
-        semGuarnicaoCpu: !!opts.semCpu
+        semGuarnicaoCpu: !!opts.semCpu,
+        observacoes: opts.observacoes || '',
+        consolidacaoResponsavel: opts.cons || { matricula: '12345', nome: 'CPU Teste', postoGrad: 'SD', turno: 'A' },
+        veiculosRecuperados: veiculos.map(function (x) {
+          return {
+            placaUf: x.placaUf, tipo: x.tipo, marcaModelo: x.marcaModelo, situacao: x.situacao,
+            classificacaoP3: x.classificacaoP3, valorFipe: x.valorFipe, contaComoRecuperado: true, guarnicao: x.guarnicao
+          };
+        }),
+        operacoes: ops.map(function (o) {
+          return { id: o.reportId, reportId: o.reportId, guarnicao: o.guarnicao, nome: o.nome, turno: o.turno, local: o.local, statusCumprimento: 'CUMPRIDO' };
+        }),
+        state: {
+          guarnicoes: origins.reduce(function (acc, o, idx) {
+            var metrics = {};
+            producao.filter(function (p) { return p.guarnicao === o.guarnicao; }).slice(0, 3).forEach(function (p) {
+              metrics[p.grupoCodigo + '::' + p.indicadorCodigo] = p.quantidade;
+            });
+            acc['g' + (idx + 1)] = { nome: o.guarnicao, metrics: metrics };
+            return acc;
+          }, {})
+        }
       },
-      estatisticaP3: { producao: producao, veiculos: veiculos, podExecucao: opts.pod || [] },
-      operacoesCompletas: opts.ops || []
+      estatisticaP3: { producao: producao, veiculos: veiculos, podExecucao: pod },
+      operacoesCompletas: ops,
+      podExecucao: pod
     };
   }
 
@@ -139,7 +322,6 @@
         RCO_REPORT_ID: '', VERSAO: 1, REVIEW_STATUS: 'DEFERIDO'
       };
     });
-    // noise rows to simulate base growth
     for (var n = 0; n < (opts.noiseRsd || 500); n++) {
       rsdRows.push({
         REPORT_ID: 'noise-' + n, SERVICE_ID: 'ns-' + n, STATUS: 'DEFERIDO',
@@ -155,18 +337,25 @@
       ops.push({ REGISTRO_ID: 'op-' + o, RCO_REPORT_ID: '', STATUS_REGISTRO: 'OPERACAO_FINALIZADA', REPORT_ID: 'op-' + o });
     }
     return {
-      RCO: new FakeSheet('RCO', ['REPORT_ID', 'VERSAO', 'DATA_SERVICO', 'BATALHAO', 'COMPANHIA'], []),
-      RCO_RASCUNHOS: new FakeSheet('RCO_RASCUNHOS', ['RCO_REPORT_ID', 'STATUS', 'P3_CONSOLIDADO', 'P3_CONSOLIDATE_FP', 'P3_CONSOLIDATE_INTEGRAL'], [
-        { RCO_REPORT_ID: pkg.rco.reportId, STATUS: opts.draftStatus || 'EM_ANDAMENTO', P3_CONSOLIDADO: 'NAO', P3_CONSOLIDATE_FP: '', P3_CONSOLIDATE_INTEGRAL: 'NAO' }
-      ]),
+      RCO: new FakeSheet('RCO', ['REPORT_ID', 'VERSAO', 'DATA_SERVICO', 'BATALHAO', 'COMPANHIA', 'MODO_CONSOLIDACAO', 'OBSERVACOES', 'CONSOLIDADOR_MATRICULA'], []),
+      RCO_RASCUNHOS: new FakeSheet('RCO_RASCUNHOS', [
+        'RCO_REPORT_ID', 'STATUS', 'P3_CONSOLIDADO', 'P3_CONSOLIDADO_EM',
+        'P3_CONSOLIDATE_FP', 'P3_CONSOLIDATE_DRAFT_FP', 'P3_CONSOLIDATE_INTEGRAL', 'REVISAO', 'PAYLOAD_JSON'
+      ], [{
+        RCO_REPORT_ID: pkg.rco.reportId, STATUS: opts.draftStatus || 'EM_ANDAMENTO',
+        P3_CONSOLIDADO: 'NAO', P3_CONSOLIDADO_EM: '',
+        P3_CONSOLIDATE_FP: '', P3_CONSOLIDATE_DRAFT_FP: '', P3_CONSOLIDATE_INTEGRAL: 'NAO',
+        REVISAO: 1, PAYLOAD_JSON: JSON.stringify(pkg.rco)
+      }]),
       PRODUCAO: new FakeSheet('PRODUCAO', ['REGISTRO_ID', 'REPORT_ID'], []),
-      VEICULOS: new FakeSheet('VEICULOS', ['REGISTRO_ID', 'REPORT_ID', 'PLACA_UF'], []),
+      VEICULOS: new FakeSheet('VEICULOS', ['REGISTRO_ID', 'REPORT_ID', 'PLACA_UF', 'CLASSIFICACAO_P3', 'VALOR_FIPE'], []),
       RCO_ORIGENS: new FakeSheet('RCO_ORIGENS', ['REGISTRO_ID', 'RCO_REPORT_ID', 'RSD_REPORT_ID'], []),
       RSD: new FakeSheet('RSD', ['REPORT_ID', 'STATUS', 'RCO_REPORT_ID', 'BATALHAO', 'COMPANHIA', 'DATA_SERVICO'], rsdRows),
       PRISOES: new FakeSheet('PRISOES', ['PRISAO_ID', 'RSD_REPORT_ID', 'RCO_REPORT_ID'], pris),
       CIRVC: new FakeSheet('CIRVC', ['CIRVC_ID', 'RSD_REPORT_ID', 'RCO_REPORT_ID'], []),
-      POD: new FakeSheet('POD', ['REGISTRO_ID', 'RCO_REPORT_ID'], []),
-      OPERACOES: new FakeSheet('OPERACOES', ['REGISTRO_ID', 'RCO_REPORT_ID', 'STATUS_REGISTRO', 'REPORT_ID'], ops)
+      POD: new FakeSheet('POD', ['REGISTRO_ID', 'RCO_REPORT_ID', 'OPERACAO', 'STATUS_CUMPRIMENTO'], []),
+      OPERACOES: new FakeSheet('OPERACOES', ['REGISTRO_ID', 'RCO_REPORT_ID', 'STATUS_REGISTRO', 'REPORT_ID', 'OPERACAO'], ops),
+      AUDITORIA: new FakeSheet('AUDITORIA', ['AUDITORIA_ID', 'ACAO', 'ENTIDADE_ID', 'VERSAO'], [])
     };
   }
 
@@ -179,7 +368,45 @@
     return { sheetReads: reads, sheetWrites: writes, sheetScans: scans, deletes: deletes };
   }
 
-  /** Algoritmo legado (N+1) — custo simulado. */
+  /** Simula rco-draft-upsert: preserva markers só se draft FP inalterado. */
+  function draftUpsert(db, rcoPayload) {
+    var reportId = String((rcoPayload && rcoPayload.reportId) || '');
+    var sheet = db.RCO_RASCUNHOS;
+    var old = sheet.rows.filter(function (r) { return String(r.RCO_REPORT_ID) === reportId; })[0] || null;
+    var priorPkgFp = old ? String(old.P3_CONSOLIDATE_FP || '') : '';
+    var priorDraftFp = old ? String(old.P3_CONSOLIDATE_DRAFT_FP || '') : '';
+    var priorIntegral = old && String(old.P3_CONSOLIDATE_INTEGRAL || '').toUpperCase() === 'SIM';
+    var incomingDraftFp = draftFingerprint(rcoPayload, reportId);
+    var outPkgFp = '', outDraftFp = '', outIntegral = 'NAO', p3 = 'NAO', p3Em = '';
+    var kept = false;
+    if (priorIntegral && priorPkgFp && priorDraftFp && incomingDraftFp === priorDraftFp) {
+      kept = true;
+      outPkgFp = priorPkgFp; outDraftFp = priorDraftFp; outIntegral = 'SIM';
+      p3 = 'SIM'; p3Em = old.P3_CONSOLIDADO_EM || '2026-09-30T12:00:00Z';
+    } else if (priorIntegral && priorDraftFp && incomingDraftFp !== priorDraftFp) {
+      outPkgFp = ''; outDraftFp = ''; outIntegral = 'NAO'; p3 = 'NAO'; p3Em = '';
+    } else if (priorPkgFp && !priorIntegral && (!priorDraftFp || incomingDraftFp === priorDraftFp)) {
+      outPkgFp = priorPkgFp; outDraftFp = priorDraftFp || incomingDraftFp; outIntegral = 'NAO';
+      p3 = old ? String(old.P3_CONSOLIDADO || 'NAO') : 'NAO';
+      p3Em = old ? String(old.P3_CONSOLIDADO_EM || '') : '';
+    }
+    var rev = old ? Number(old.REVISAO || 0) + 1 : 1;
+    // Objeto SEM markers implícitos — só os que setamos (prova o bug se omitidos).
+    var obj = {
+      RCO_REPORT_ID: reportId,
+      STATUS: old ? old.STATUS : 'EM_ANDAMENTO',
+      P3_CONSOLIDADO: p3,
+      P3_CONSOLIDADO_EM: p3Em,
+      P3_CONSOLIDATE_FP: outPkgFp,
+      P3_CONSOLIDATE_DRAFT_FP: outDraftFp,
+      P3_CONSOLIDATE_INTEGRAL: outIntegral,
+      REVISAO: rev,
+      PAYLOAD_JSON: JSON.stringify(rcoPayload || {})
+    };
+    sheet.upsert('RCO_REPORT_ID', reportId, obj);
+    return { ok: true, consolidateMarkersKept: kept, revision: rev, draftFp: incomingDraftFp };
+  }
+
   function runLegacy(db, pkg) {
     var t0 = Date.now();
     var reportId = pkg.rco.reportId;
@@ -187,13 +414,12 @@
     function mark(n, fn) { var a = Date.now(); fn(); marks[n] = Date.now() - a; }
 
     mark('resolveRsd', function () {
-      (pkg.rco.rcoOrigens || []).forEach(function (o) {
+      (pkg.rco.rcoOrigens || []).forEach(function () {
         db.RSD.scanKey('REPORT_ID');
-        db.RSD.reads++; // row fetch
+        db.RSD.reads++;
       });
       db.RSD.fullRead();
     });
-
     mark('producao', function () {
       db.PRODUCAO.deleteWhere('REPORT_ID', reportId);
       (pkg.estatisticaP3.producao || []).forEach(function (x) {
@@ -203,7 +429,7 @@
     mark('veiculos', function () {
       db.VEICULOS.deleteWhere('REPORT_ID', reportId);
       (pkg.estatisticaP3.veiculos || []).forEach(function (x) {
-        db.VEICULOS.append({ REGISTRO_ID: x.registroId, REPORT_ID: reportId, PLACA_UF: x.placaUf });
+        db.VEICULOS.append({ REGISTRO_ID: x.registroId, REPORT_ID: reportId, PLACA_UF: x.placaUf, CLASSIFICACAO_P3: x.classificacaoP3, VALOR_FIPE: x.valorFipe });
       });
     });
     mark('rcoOrigens', function () {
@@ -229,39 +455,53 @@
         if (ch) db.PRISOES.upsert('PRISAO_ID', pr.PRISAO_ID, next);
       });
     });
+    mark('pod', function () {
+      (pkg.estatisticaP3.podExecucao || []).forEach(function (x) {
+        db.POD.append({ REGISTRO_ID: x.registroId, RCO_REPORT_ID: reportId, OPERACAO: x.operacao, STATUS_CUMPRIMENTO: x.statusCumprimento });
+      });
+    });
     mark('operacoes', function () {
       db.OPERACOES.fullRead().forEach(function () { /* scan */ });
+      (pkg.operacoesCompletas || []).forEach(function (o) {
+        db.OPERACOES.append({ REGISTRO_ID: o.reportId || o.id, RCO_REPORT_ID: reportId, STATUS_REGISTRO: 'CONSOLIDADO', REPORT_ID: o.reportId || o.id, OPERACAO: o.nome });
+      });
     });
-    db.RCO.upsert('REPORT_ID', reportId, { REPORT_ID: reportId, VERSAO: 1, DATA_SERVICO: '2026-09-30', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran' });
+    db.RCO.upsert('REPORT_ID', reportId, {
+      REPORT_ID: reportId, VERSAO: 1, DATA_SERVICO: '2026-09-30', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran',
+      MODO_CONSOLIDACAO: pkg.rco.semGuarnicaoCpu ? 'SEM_CPU' : 'CPU', OBSERVACOES: pkg.rco.observacoes || '',
+      CONSOLIDADOR_MATRICULA: (pkg.rco.consolidacaoResponsavel || {}).matricula || ''
+    });
     var draft = db.RCO_RASCUNHOS.rows[0];
+    var fp = fingerprint(pkg, reportId);
+    var dfp = draftFingerprint(pkg.rco, reportId);
     draft.P3_CONSOLIDADO = 'SIM'; draft.P3_CONSOLIDATE_INTEGRAL = 'SIM';
-    draft.P3_CONSOLIDATE_FP = fingerprint(pkg, reportId);
+    draft.P3_CONSOLIDATE_FP = fp; draft.P3_CONSOLIDATE_DRAFT_FP = dfp;
+    draft.P3_CONSOLIDADO_EM = '2026-09-30T12:00:00Z';
     db.RCO_RASCUNHOS.upsert('RCO_REPORT_ID', reportId, draft);
+    db.AUDITORIA.append({ AUDITORIA_ID: 'a1', ACAO: 'CONSOLIDADO', ENTIDADE_ID: reportId, VERSAO: 1 });
 
-    var tot = totals(db);
-    return { totalMs: Date.now() - t0, marks: marks, ops: tot, db: db };
+    return { totalMs: Date.now() - t0, marks: marks, ops: totals(db), db: db };
   }
 
-  /** Algoritmo 10.8.37 — índice + batch. */
   function runOptimized(db, pkg, opts) {
     opts = opts || {};
     var t0 = Date.now();
     var reportId = pkg.rco.reportId;
     var marks = {};
     var fp = fingerprint(pkg, reportId);
+    var draftFp = draftFingerprint(pkg.rco, reportId);
     function mark(n, fn) { var a = Date.now(); fn(); marks[n] = (marks[n] || 0) + (Date.now() - a); }
 
-    var draft = db.RCO_RASCUNHOS.rows[0];
-    if (!opts.skipIdempotency && draft.P3_CONSOLIDADO === 'SIM' && draft.P3_CONSOLIDATE_INTEGRAL === 'SIM' && draft.P3_CONSOLIDATE_FP === fp && integrityOk(db, reportId, pkg)) {
-      return { totalMs: Date.now() - t0, marks: { idempotent: Date.now() - t0 }, ops: totals(db), db: db, idempotent: true };
+    var draft = db.RCO_RASCUNHOS.rows.filter(function (r) { return String(r.RCO_REPORT_ID) === reportId; })[0];
+    if (!opts.skipIdempotency && draft && draft.P3_CONSOLIDADO === 'SIM' && draft.P3_CONSOLIDATE_INTEGRAL === 'SIM' &&
+        draft.P3_CONSOLIDATE_FP === fp && integrityOk(db, reportId, pkg)) {
+      return { totalMs: Date.now() - t0, marks: { idempotent: Date.now() - t0 }, ops: totals(db), db: db, idempotent: true, fingerprint: fp, version: Number((db.RCO.rows[0] && db.RCO.rows[0].VERSAO) || 1) };
     }
 
-    draft.P3_CONSOLIDATE_INTEGRAL = 'NAO'; draft.P3_CONSOLIDATE_FP = fp;
+    draft.P3_CONSOLIDATE_INTEGRAL = 'NAO'; draft.P3_CONSOLIDATE_FP = fp; draft.P3_CONSOLIDATE_DRAFT_FP = draftFp;
     db.RCO_RASCUNHOS.upsert('RCO_REPORT_ID', reportId, draft);
 
-    mark('resolveRsd', function () {
-      db.RSD.loadIndex('REPORT_ID');
-    });
+    mark('resolveRsd', function () { db.RSD.loadIndex('REPORT_ID'); });
 
     mark('producao', function () {
       db.PRODUCAO.deleteWhereFast('REPORT_ID', reportId);
@@ -272,7 +512,7 @@
     mark('veiculos', function () {
       db.VEICULOS.deleteWhereFast('REPORT_ID', reportId);
       db.VEICULOS.appendBatch((pkg.estatisticaP3.veiculos || []).map(function (x) {
-        return { REGISTRO_ID: x.registroId, REPORT_ID: reportId, PLACA_UF: x.placaUf };
+        return { REGISTRO_ID: x.registroId, REPORT_ID: reportId, PLACA_UF: x.placaUf, CLASSIFICACAO_P3: x.classificacaoP3, VALOR_FIPE: x.valorFipe };
       }));
     });
     mark('rcoOrigens', function () {
@@ -285,16 +525,15 @@
       var idx = db.RSD.loadIndex('REPORT_ID');
       var set = {};
       (pkg.rco.rcoOrigens || []).forEach(function (o) { set[o.rsdReportId] = true; });
-      var dirty = [];
       idx.list.forEach(function (rr) {
         if (set[rr.REPORT_ID] && ['DEFERIDO', 'DEFERIDO_COM_RESSALVAS', 'INCLUIDO_RCO', 'FINALIZADO'].indexOf(rr.STATUS) >= 0) {
-          dirty.push(Object.assign({}, rr, { STATUS: 'INCLUIDO_RCO', RCO_REPORT_ID: reportId }));
-        }
-      });
-      // batch: one write per dirty row without re-scan (row known)
-      dirty.forEach(function (d) {
-        for (var i = 0; i < db.RSD.rows.length; i++) {
-          if (db.RSD.rows[i].REPORT_ID === d.REPORT_ID) { db.RSD.rows[i] = d; db.RSD.writes++; break; }
+          for (var i = 0; i < db.RSD.rows.length; i++) {
+            if (db.RSD.rows[i].REPORT_ID === rr.REPORT_ID) {
+              db.RSD.rows[i] = Object.assign({}, rr, { STATUS: 'INCLUIDO_RCO', RCO_REPORT_ID: reportId });
+              db.RSD.writes++;
+              break;
+            }
+          }
         }
       });
     });
@@ -312,23 +551,49 @@
         }
       });
     });
+    mark('pod', function () {
+      var idx = db.POD.loadIndex('REGISTRO_ID');
+      (pkg.estatisticaP3.podExecucao || []).forEach(function (x) {
+        var rid = String(x.registroId || x.id);
+        indexUpsert(idx, rid, {
+          REGISTRO_ID: rid, RCO_REPORT_ID: reportId, OPERACAO: x.operacao || x.OPERACAO || '',
+          STATUS_CUMPRIMENTO: x.statusCumprimento || ''
+        });
+      });
+      indexFlush(idx);
+    });
     mark('operacoes', function () {
-      db.OPERACOES.loadIndex('REGISTRO_ID');
+      var idx = db.OPERACOES.loadIndex('REGISTRO_ID');
+      (pkg.operacoesCompletas || []).forEach(function (o) {
+        var id = String(o.reportId || o.id);
+        indexUpsert(idx, id, {
+          REGISTRO_ID: id, RCO_REPORT_ID: reportId, STATUS_REGISTRO: 'CONSOLIDADO',
+          REPORT_ID: id, OPERACAO: o.nome || ((o.operacao || {}).nome) || ''
+        });
+      });
+      indexFlush(idx);
     });
 
     var ver = 1;
     if (db.RCO.rows.length) ver = opts.keepVersion ? Number(db.RCO.rows[0].VERSAO || 1) : Number(db.RCO.rows[0].VERSAO || 1) + 1;
-    db.RCO.upsert('REPORT_ID', reportId, { REPORT_ID: reportId, VERSAO: ver, DATA_SERVICO: '2026-09-30', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran' });
+    db.RCO.upsert('REPORT_ID', reportId, {
+      REPORT_ID: reportId, VERSAO: ver, DATA_SERVICO: '2026-09-30', BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran',
+      MODO_CONSOLIDACAO: pkg.rco.semGuarnicaoCpu ? 'SEM_CPU' : 'CPU', OBSERVACOES: pkg.rco.observacoes || '',
+      CONSOLIDADOR_MATRICULA: (pkg.rco.consolidacaoResponsavel || {}).matricula || ''
+    });
 
     if (opts.partialStopAfter === 'producao') {
-      return { totalMs: Date.now() - t0, marks: marks, ops: totals(db), db: db, partial: true };
+      return { totalMs: Date.now() - t0, marks: marks, ops: totals(db), db: db, partial: true, fingerprint: fp };
     }
 
-    draft = db.RCO_RASCUNHOS.rows[0];
-    draft.P3_CONSOLIDADO = 'SIM'; draft.P3_CONSOLIDATE_INTEGRAL = 'SIM'; draft.P3_CONSOLIDATE_FP = fp;
+    draft = db.RCO_RASCUNHOS.rows.filter(function (r) { return String(r.RCO_REPORT_ID) === reportId; })[0];
+    draft.P3_CONSOLIDADO = 'SIM'; draft.P3_CONSOLIDATE_INTEGRAL = 'SIM';
+    draft.P3_CONSOLIDATE_FP = fp; draft.P3_CONSOLIDATE_DRAFT_FP = draftFp;
+    draft.P3_CONSOLIDADO_EM = '2026-09-30T12:00:00Z';
     db.RCO_RASCUNHOS.upsert('RCO_REPORT_ID', reportId, draft);
+    db.AUDITORIA.append({ AUDITORIA_ID: 'a-' + ver, ACAO: 'CONSOLIDADO', ENTIDADE_ID: reportId, VERSAO: ver });
 
-    return { totalMs: Date.now() - t0, marks: marks, ops: totals(db), db: db, version: ver, fingerprint: fp };
+    return { totalMs: Date.now() - t0, marks: marks, ops: totals(db), db: db, version: ver, fingerprint: fp, draftFingerprint: draftFp };
   }
 
   function snapshotBusiness(db, reportId) {
@@ -348,10 +613,15 @@
     hash: hash,
     FakeSheet: FakeSheet,
     fingerprint: fingerprint,
+    draftFingerprint: draftFingerprint,
+    substantiveCanon: substantiveCanon,
     integrityOk: integrityOk,
     buildPkg: buildPkg,
     seedDb: seedDb,
     totals: totals,
+    draftUpsert: draftUpsert,
+    indexUpsert: indexUpsert,
+    indexFlush: indexFlush,
     runLegacy: runLegacy,
     runOptimized: runOptimized,
     snapshotBusiness: snapshotBusiness

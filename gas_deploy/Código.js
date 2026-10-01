@@ -3277,6 +3277,31 @@ function rcoDraftUpsert_(payload){
   ensureHeaders_(s,['RESPONSAVEL_POSTO_GRAD','PASSAGEM_PENDENTE','PASSAGEM_ID','PASSAGEM_DE','PASSAGEM_EM','PASSAGEM_OBSERVACAO'].concat(RCO_CLOSURE_HEADERS_));
   var closure=rcoMergeClosureFromClient_(old,r);
   r=rcoApplyClosureFlagsToPayload_(r,closure);
+  // Markers de consolidação: preservar só se o conteúdo substantivo do rascunho não mudou.
+  var priorPkgFp=old?String(old.P3_CONSOLIDATE_FP||''):'';
+  var priorDraftFp=old?String(old.P3_CONSOLIDATE_DRAFT_FP||''):'';
+  var priorIntegral=old&&String(old.P3_CONSOLIDATE_INTEGRAL||'').toUpperCase()==='SIM';
+  var incomingDraftFp=rcoConsolidateDraftFingerprint_(r,reportId);
+  var keepConsolidateMarkers=false;
+  var outPkgFp='',outDraftFp='',outIntegral='NAO';
+  if(priorIntegral&&priorPkgFp&&priorDraftFp&&incomingDraftFp===priorDraftFp){
+    // Mesmo conteúdo substantivo → mantém validade da consolidação (retry pós-timeout seguro).
+    keepConsolidateMarkers=true;
+    outPkgFp=priorPkgFp;outDraftFp=priorDraftFp;outIntegral='SIM';
+    closure.p3Consolidado=true;
+    if(!closure.p3ConsolidadoEm)closure.p3ConsolidadoEm=String(old.P3_CONSOLIDADO_EM||nowIso_());
+    r=rcoApplyClosureFlagsToPayload_(r,closure);
+  }else if(priorIntegral&&priorDraftFp&&incomingDraftFp!==priorDraftFp){
+    // Alteração substantiva → invalida conclusão; exige reconsolidação.
+    outPkgFp='';outDraftFp='';outIntegral='NAO';
+    closure.p3Consolidado=false;closure.p3ConsolidadoEm='';
+    r=rcoApplyClosureFlagsToPayload_(r,closure);
+  }else if(priorPkgFp&&!priorIntegral&&(!priorDraftFp||incomingDraftFp===priorDraftFp)){
+    // Consolidação parcial em voo (INTEGRAL=NAO, FP set): preserva FP para repairSameFp.
+    outPkgFp=priorPkgFp;outDraftFp=priorDraftFp||incomingDraftFp;outIntegral='NAO';
+  }else{
+    outPkgFp='';outDraftFp='';outIntegral='NAO';
+  }
   var rev=old?Number(old.REVISAO||0)+1:1,json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',old&&old.PAYLOAD_FILE_ID||'');
   var obj={RCO_REPORT_ID:reportId,DATA_SERVICO:data,BATALHAO:batt,COMPANHIA:comp,STATUS:draftStatus,
     RESPONSAVEL_MATRICULA:normMat_(respRco.matricula||cons.matricula||cpu.matricula||''),RESPONSAVEL_NOME:respRco.nome||cons.nome||cpu.nome||'',RESPONSAVEL_POSTO_GRAD:respRco.postoGrad||cons.postoGrad||cpu.graduacao||cpu.postoGrad||'',REVISAO:rev,ULTIMO_SYNC_EM:nowIso_(),
@@ -3284,9 +3309,10 @@ function rcoDraftUpsert_(payload){
     PASSAGEM_PENDENTE:passPending?'SIM':'NAO',PASSAGEM_ID:lastPass&&lastPass.id||'',PASSAGEM_DE:lastPass&&lastPass.de||'',PASSAGEM_EM:lastPass&&lastPass.em||'',PASSAGEM_OBSERVACAO:lastPass&&lastPass.observacao||'',
     PDF_GERADO:closure.pdfGerado?'SIM':'NAO',PDF_GERADO_EM:closure.pdfGeradoEm||'',
     P3_CONSOLIDADO:closure.p3Consolidado?'SIM':'NAO',P3_CONSOLIDADO_EM:closure.p3ConsolidadoEm||'',
+    P3_CONSOLIDATE_FP:outPkgFp,P3_CONSOLIDATE_DRAFT_FP:outDraftFp,P3_CONSOLIDATE_INTEGRAL:outIntegral,
     ENCERRADO:closure.encerrado?'SIM':'NAO',ENCERRADO_EM:closure.encerradoEm||'',
     PAYLOAD_JSON:saved.json,PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),ATUALIZADO_EM:nowIso_(),ORIGEM:'RCO_WEB'};
-  upsert_(s,'RCO_REPORT_ID',reportId,obj);return {ok:true,message:'RCO sincronizado na nuvem.',reportId:reportId,revision:rev,status:draftStatus,pdfGerado:!!closure.pdfGerado,p3Consolidado:!!closure.p3Consolidado,encerrado:!!closure.encerrado};
+  upsert_(s,'RCO_REPORT_ID',reportId,obj);return {ok:true,message:'RCO sincronizado na nuvem.',reportId:reportId,revision:rev,status:draftStatus,pdfGerado:!!closure.pdfGerado,p3Consolidado:!!closure.p3Consolidado,encerrado:!!closure.encerrado,consolidateMarkersKept:keepConsolidateMarkers};
   }finally{if(createLock)createLock.releaseLock();}
 }
 function rcoDraftList_(p){
@@ -3362,11 +3388,11 @@ function rcoRetificationOpenInternal_(opts){
   row.STATUS='EM_RETIFICACAO';row.RETIFICACAO_MOTIVO=motivo;row.RETIFICACAO_ABERTA_EM=nowIso_();row.RETIFICACAO_ABERTA_POR=autorTexto;row.RETIFICACAO_ABERTA_POR_MATRICULA=mat;row.RETIFICACAO_ABERTA_POR_PERFIL=perfil;
   row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();
   // Nova versão de trabalho: PDF/P3 precisam ser refeitos; histórico anterior permanece nas estatísticas (VERSAO++).
-  row.PDF_GERADO='NAO';row.PDF_GERADO_EM='';row.P3_CONSOLIDADO='NAO';row.P3_CONSOLIDADO_EM='';row.P3_CONSOLIDATE_FP='';row.P3_CONSOLIDATE_INTEGRAL='NAO';row.ENCERRADO='NAO';row.ENCERRADO_EM='';
+  row.PDF_GERADO='NAO';row.PDF_GERADO_EM='';row.P3_CONSOLIDADO='NAO';row.P3_CONSOLIDADO_EM='';row.P3_CONSOLIDATE_FP='';row.P3_CONSOLIDATE_DRAFT_FP='';row.P3_CONSOLIDATE_INTEGRAL='NAO';row.ENCERRADO='NAO';row.ENCERRADO_EM='';
   try{
     var p=loadJsonPayload_(row)||{};
     p=rcoApplyClosureFlagsToPayload_(p,{pdfGerado:false,pdfGeradoEm:'',p3Consolidado:false,p3ConsolidadoEm:'',encerrado:false,encerradoEm:''});
-    p.p3ConsolidateFp='';p.p3ConsolidateIntegral=false;
+    p.p3ConsolidateFp='';p.p3ConsolidateDraftFp='';p.p3ConsolidateIntegral=false;
     var json=JSON.stringify(p),saved=saveJsonPayload_(reportId,'retif-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
     row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
   }catch(_){}
@@ -3730,7 +3756,7 @@ function closeRcoDraft_(reportId){
 }
 
 /* Flags de encerramento do RCO: PDF + P3 + confirmação do usuário. */
-var RCO_CLOSURE_HEADERS_=['PDF_GERADO','PDF_GERADO_EM','P3_CONSOLIDADO','P3_CONSOLIDADO_EM','P3_CONSOLIDATE_FP','P3_CONSOLIDATE_INTEGRAL','ENCERRADO','ENCERRADO_EM'];
+var RCO_CLOSURE_HEADERS_=['PDF_GERADO','PDF_GERADO_EM','P3_CONSOLIDADO','P3_CONSOLIDADO_EM','P3_CONSOLIDATE_FP','P3_CONSOLIDATE_DRAFT_FP','P3_CONSOLIDATE_INTEGRAL','ENCERRADO','ENCERRADO_EM'];
 function rcoTruthyFlag_(v){
   if(v===true||v===1)return true;
   var s=String(v==null?'':v).trim().toUpperCase();
@@ -3862,7 +3888,9 @@ var RCO_CONSOLIDATE_AUTO_REASON_='ENCERRAMENTO AUTOMÁTICO NA CONSOLIDAÇÃO DO 
 
 /* ---- 10.8.37: batch/index ONLY no path rco-consolidate-final (não altera upsert_ global) ---- */
 function rcoPerfNew_(){
-  return {t0:Date.now(),marks:{},sheetReads:0,sheetWrites:0,sheetScans:0,driveOps:0,_starts:{}};
+  // Contadores tracked* cobrem só helpers batch da consolidação (rcoLoadIndex_/Append/DeleteWhereFast_/Flush).
+  // Não incluem findOne_/upsert_/audit_/ensureHeaders_/syncRsd* — ver trackedScope.
+  return {t0:Date.now(),marks:{},trackedSheetReads:0,trackedSheetWrites:0,trackedSheetScans:0,trackedDriveOps:0,_starts:{}};
 }
 function rcoPerfStart_(perf,name){if(!perf)return;(perf._starts=perf._starts||{})[name]=Date.now();}
 function rcoPerfEnd_(perf,name){
@@ -3875,19 +3903,20 @@ function rcoPerfSnap_(perf){
   return {
     totalMs:Date.now()-perf.t0,
     marks:perf.marks||{},
-    sheetReads:perf.sheetReads||0,
-    sheetWrites:perf.sheetWrites||0,
-    sheetScans:perf.sheetScans||0,
-    driveOps:perf.driveOps||0
+    trackedSheetReads:perf.trackedSheetReads||0,
+    trackedSheetWrites:perf.trackedSheetWrites||0,
+    trackedSheetScans:perf.trackedSheetScans||0,
+    trackedDriveOps:perf.trackedDriveOps||0,
+    trackedScope:'rcoLoadIndex_/rcoIndexFlush_/rcoAppendRows_/rcoDeleteWhereFast_/rcoCountWhere_/loadJsonPayload_/saveJsonPayload_ no path consolidate'
   };
 }
 /** Uma leitura integral → índice por chave. Escopo consolidação. */
 function rcoLoadIndex_(sheet,keyField,perf){
-  var h=headers_(sheet);if(perf){perf.sheetReads++;}
+  var h=headers_(sheet);if(perf){perf.trackedSheetReads++;}
   var lastRow=sheet.getLastRow(),lastCol=sheet.getLastColumn();
   var byKey={},list=[];
-  if(lastRow<2||lastCol<1)return {sheet:sheet,headers:h,keyField:keyField,byKey:byKey,list:list,pendingUpserts:{},pendingAppends:[]};
-  if(perf){perf.sheetReads++;perf.sheetScans++;}
+  if(lastRow<2||lastCol<1)return {sheet:sheet,headers:h,keyField:keyField,byKey:byKey,list:list,pendingUpserts:{},pendingAppendsByKey:{},pendingAppends:[]};
+  if(perf){perf.trackedSheetReads++;perf.trackedSheetScans++;}
   var vals=sheet.getRange(2,1,lastRow-1,lastCol).getValues();
   var keyIdx=h.indexOf(keyField);
   for(var i=0;i<vals.length;i++){
@@ -3899,7 +3928,7 @@ function rcoLoadIndex_(sheet,keyField,perf){
       if(k)byKey[k]=o;
     }
   }
-  return {sheet:sheet,headers:h,keyField:keyField,byKey:byKey,list:list,pendingUpserts:{},pendingAppends:[]};
+  return {sheet:sheet,headers:h,keyField:keyField,byKey:byKey,list:list,pendingUpserts:{},pendingAppendsByKey:{},pendingAppends:[]};
 }
 function rcoIndexGet_(idx,key){return idx&&idx.byKey?idx.byKey[String(key||'')]:null;}
 function rcoIndexUpsert_(idx,key,obj){
@@ -3908,12 +3937,20 @@ function rcoIndexUpsert_(idx,key,obj){
   next[idx.keyField]=key;
   var prev=idx.byKey[key];
   if(prev&&prev._row){
+    // Linha já persistida: atualiza pending upsert (sem duplicar).
     next._row=prev._row;
     idx.byKey[key]=next;
     idx.pendingUpserts[key]=next;
-  }else{
-    idx.pendingAppends.push(next);
+  }else if(prev&&idx.pendingAppendsByKey&&idx.pendingAppendsByKey[key]!=null){
+    // Mesma chave ainda não flushada: substitui o append pendente (semântica upsert_).
+    next._pendingNew=true;
     idx.byKey[key]=next;
+    idx.pendingAppendsByKey[key]=next;
+  }else{
+    next._pendingNew=true;
+    idx.byKey[key]=next;
+    if(!idx.pendingAppendsByKey)idx.pendingAppendsByKey={};
+    idx.pendingAppendsByKey[key]=next;
   }
   return next;
 }
@@ -3923,32 +3960,35 @@ function rcoIndexFlush_(idx,perf){
   for(var i=0;i<keys.length;i++){
     var obj=idx.pendingUpserts[keys[i]];if(!obj||!obj._row)continue;
     sheet.getRange(obj._row,1,1,h.length).setValues([rowFor_(h,obj)]);
-    if(perf)perf.sheetWrites++;
+    if(perf)perf.trackedSheetWrites++;
   }
   idx.pendingUpserts={};
-  var adds=idx.pendingAppends||[];
-  if(adds.length){
+  var addKeys=Object.keys(idx.pendingAppendsByKey||{});
+  if(addKeys.length){
+    var adds=addKeys.map(function(k){return idx.pendingAppendsByKey[k];});
     var start=sheet.getLastRow()+1;
     var block=adds.map(function(o){return rowFor_(h,o);});
     sheet.getRange(start,1,block.length,h.length).setValues(block);
-    if(perf)perf.sheetWrites++;
+    if(perf)perf.trackedSheetWrites++;
     for(var a=0;a<adds.length;a++){
+      delete adds[a]._pendingNew;
       adds[a]._row=start+a;
       var kk=String(adds[a][idx.keyField]||'');
       if(kk)idx.byKey[kk]=adds[a];
     }
-    idx.pendingAppends=[];
+    idx.pendingAppendsByKey={};
   }
+  idx.pendingAppends=[];
 }
 /** Delete por valor: 1 scan + deleteRow de baixo p/ cima. */
 function rcoDeleteWhereFast_(sheet,field,value,perf){
   var h=headers_(sheet),idx=h.indexOf(field);
   if(idx<0||sheet.getLastRow()<2)return 0;
-  if(perf){perf.sheetReads++;perf.sheetScans++;}
+  if(perf){perf.trackedSheetReads++;perf.trackedSheetScans++;}
   var vals=sheet.getRange(2,idx+1,sheet.getLastRow()-1,1).getDisplayValues();
   var rows=[];
   for(var i=0;i<vals.length;i++){if(String(vals[i][0])===String(value))rows.push(i+2);}
-  for(var j=rows.length-1;j>=0;j--){sheet.deleteRow(rows[j]);if(perf)perf.sheetWrites++;}
+  for(var j=rows.length-1;j>=0;j--){sheet.deleteRow(rows[j]);if(perf)perf.trackedSheetWrites++;}
   return rows.length;
 }
 /** Append em bloco (1 setValues). */
@@ -3957,41 +3997,138 @@ function rcoAppendRows_(sheet,objs,perf){
   var h=headers_(sheet),start=sheet.getLastRow()+1;
   var block=objs.map(function(o){return rowFor_(h,o);});
   sheet.getRange(start,1,block.length,h.length).setValues(block);
-  if(perf)perf.sheetWrites++;
+  if(perf)perf.trackedSheetWrites++;
 }
 function rcoCountWhere_(sheet,field,value,perf){
   var h=headers_(sheet),idx=h.indexOf(field);
   if(idx<0||sheet.getLastRow()<2)return 0;
-  if(perf){perf.sheetReads++;perf.sheetScans++;}
+  if(perf){perf.trackedSheetReads++;perf.trackedSheetScans++;}
   var vals=sheet.getRange(2,idx+1,sheet.getLastRow()-1,1).getDisplayValues(),n=0,v=String(value);
   for(var i=0;i<vals.length;i++){if(String(vals[i][0])===v)n++;}
   return n;
 }
-/** Fingerprint do pacote — short-circuit só com FP+INTEGRAL+integridade. */
-function rcoConsolidateFingerprint_(pkg,reportId){
-  var rco=pkg.rco||pkg||{},stat=pkg.estatisticaP3||rco.estatisticaP3||{};
-  var origins=(rco.rcoOrigens||[]).map(function(o){return String(o.rsdReportId||'');}).filter(Boolean).sort();
-  var prod=(stat.producao||pkg.producao||[]).map(function(x){
-    return [String(x.guarnicao||x.GUARNICAO||''),String(x.grupoCodigo||x.GRUPO_CODIGO||''),String(x.indicadorCodigo||x.INDICADOR_CODIGO||''),String(Number(x.quantidade!=null?x.quantidade:(x.QUANTIDADE||0)))].join(':');
-  }).sort();
-  var veh=(stat.veiculos||pkg.veiculos||[]).map(function(x){return String(x.placaUf||x.PLACA_UF||'').toUpperCase();}).sort();
-  var u=pkg.unidade||rco.unidade||{};
-  var raw=[String(reportId||''),String((rco.periodo||{}).inicio||rco.data||pkg.data||''),String(u.batalhao||pkg.batalhao||''),String(u.companhia||pkg.companhia||''),origins.join(','),String(prod.length),prod.join('|'),String(veh.length),veh.join(',')].join('#');
-  return hash_(raw);
+function rcoFpStr_(v){return String(v==null?'':v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');}
+/** Projeção de estatística a partir do rascunho RCO (sem SOMATORIO no servidor). */
+function rcoConsolidateDeriveStatFromRco_(rco){
+  rco=rco||{};
+  var producao=[],gs=(rco.state&&rco.state.guarnicoes)||{};
+  Object.keys(gs).forEach(function(gid){
+    var g=gs[gid]||{},metrics=g.metrics||{};
+    Object.keys(metrics).forEach(function(mk){
+      var parts=String(mk).split('::');
+      producao.push({
+        guarnicao:rcoFpStr_(g.nome||gid),grupoCodigo:rcoFpStr_(parts[0]||''),indicadorCodigo:rcoFpStr_(parts[1]||''),
+        grupoNome:'',indicadorNome:'',quantidade:Number(metrics[mk]||0)
+      });
+    });
+  });
+  var veiculos=(rco.veiculosRecuperados||[]).map(function(v){
+    v=v||{};
+    return {
+      placaUf:String(v.placaUf||'').toUpperCase(),tipo:rcoFpStr_(v.tipo),marcaModelo:rcoFpStr_(v.marcaModelo),
+      situacao:rcoFpStr_(v.situacao),classificacaoP3:rcoFpStr_(v.classificacaoP3),
+      tipoRecuperacaoDetalhada:rcoFpStr_(v.tipoRecuperacaoDetalhada),
+      contaComoRecuperado:v.contaComoRecuperado===true||v.contaComoRecuperado==='SIM'||v.contaComoRecuperado===1?'SIM':'NAO',
+      valorFipe:Number(v.valorFipe||0),guarnicao:rcoFpStr_(v.guarnicao),
+      placaOriginalIdentificada:rcoFpStr_(v.placaOriginalIdentificada),restricaoOriginal:rcoFpStr_(v.restricaoOriginal),
+      local:rcoFpStr_(v.local),quantidadeConduzidos:Number(v.quantidadeConduzidos||0)
+    };
+  });
+  var pod=(rco.operacoes||[]).map(function(o){
+    o=o||{};
+    return {
+      id:rcoFpStr_(o.id||o.reportId),guarnicao:rcoFpStr_(o.guarnicao),operacao:rcoFpStr_(o.nome||o.operacao),
+      turno:rcoFpStr_(o.turno),statusCumprimento:rcoFpStr_(o.statusCumprimento),
+      localPrevisto:rcoFpStr_(o.localPrevisto),localExecutado:rcoFpStr_(o.local||o.localExecutado),
+      motivoAlteracao:rcoFpStr_(o.motivoAlteracao)
+    };
+  });
+  return {producao:producao,veiculos:veiculos,podExecucao:pod};
 }
 /**
- * Integridade pós-consolidação: PRODUCAO e RCO_ORIGENS batem com o pacote; RCO existe.
- * Não basta P3_CONSOLIDADO+alguma linha PRODUCAO.
+ * Canon substantivo do RESULTADO LÓGICO da consolidação.
+ * Inclui tudo que altera escritas em RCO/PRODUCAO/VEICULOS/ORIGENS/POD/OPERACOES/modo/consolidador/obs.
+ * Exclui metadados voláteis (generatedAt, sentAt, device, lease, flags PDF).
+ */
+function rcoConsolidateSubstantiveCanon_(pkg,reportId){
+  var rco=pkg.rco||pkg||{},u=pkg.unidade||rco.unidade||{},cons=rco.consolidacaoResponsavel||{};
+  var stat=pkg.estatisticaP3||rco.estatisticaP3||null;
+  if(!stat||!Array.isArray(stat.producao))stat=rcoConsolidateDeriveStatFromRco_(rco);
+  var modo=rco.semGuarnicaoCpu?'SEM_CPU':'CPU';
+  var origins=(rco.rcoOrigens||[]).map(function(o){
+    return [rcoFpStr_(o.rsdReportId),rcoFpStr_(o.serviceId),rcoFpStr_(o.guarnicao),rcoFpStr_(o.status),String(o.versao||'')].join('|');
+  }).filter(function(x){return x.split('|')[0];}).sort();
+  var prod=(stat.producao||[]).map(function(x){
+    return [rcoFpStr_(x.guarnicao||x.GUARNICAO),rcoFpStr_(x.grupoCodigo||x.GRUPO_CODIGO),rcoFpStr_(x.indicadorCodigo||x.INDICADOR_CODIGO),
+      rcoFpStr_(x.grupoNome||x.GRUPO_NOME),rcoFpStr_(x.indicadorNome||x.INDICADOR_NOME),
+      String(Number(x.quantidade!=null?x.quantidade:(x.QUANTIDADE||0)))].join('|');
+  }).sort();
+  var veh=(stat.veiculos||[]).map(function(x){
+    return [String(x.placaUf||x.PLACA_UF||'').toUpperCase(),rcoFpStr_(x.tipo||x.TIPO),rcoFpStr_(x.marcaModelo||x.MARCA_MODELO),
+      rcoFpStr_(x.situacao||x.SITUACAO),rcoFpStr_(x.classificacaoP3||x.CLASSIFICACAO_P3),
+      rcoFpStr_(x.tipoRecuperacaoDetalhada||x.TIPO_RECUPERACAO_DETALHADA),
+      (x.contaComoRecuperado===true||x.contaComoRecuperado==='SIM'||x.CONTA_COMO_RECUPERADO==='SIM')?'SIM':'NAO',
+      String(Number(x.valorFipe!=null?x.valorFipe:(x.VALOR_FIPE||0))),rcoFpStr_(x.guarnicao||x.GUARNICAO),
+      rcoFpStr_(x.placaOriginalIdentificada||x.PLACA_ORIGINAL_IDENTIFICADA),rcoFpStr_(x.restricaoOriginal||x.RESTRICAO_ORIGINAL),
+      rcoFpStr_(x.local||x.LOCAL),String(Number(x.quantidadeConduzidos!=null?x.quantidadeConduzidos:(x.QUANTIDADE_CONDUZIDOS||0)))].join('|');
+  }).sort();
+  var pod=(stat.podExecucao||pkg.podExecucao||[]).map(function(x){
+    return [rcoFpStr_(x.registroId||x.REGISTRO_ID||x.id||x.origemRegistroId),rcoFpStr_(x.guarnicao||x.GUARNICAO),
+      rcoFpStr_(x.operacao||x.OPERACAO||x.nome),rcoFpStr_(x.turno||x.TURNO),
+      rcoFpStr_(x.statusCumprimento||x.STATUS_CUMPRIMENTO),rcoFpStr_(x.localPrevisto||x.LOCAL_PREVISTO),
+      rcoFpStr_(x.localExecutado||x.LOCAL_EXECUTADO||x.local),rcoFpStr_(x.motivoAlteracao||x.MOTIVO_ALTERACAO)].join('|');
+  }).sort();
+  var opsSrc=pkg.operacoesCompletas||rco.operacoes||[];
+  var ops=opsSrc.map(function(o){
+    o=o||{};
+    var nome=((o.operacao||{}).nome)||o.nome||'';
+    var turno=((o.operacao||{}).turno)||o.turno||'';
+    var local=((o.local||{}).descricao)||o.local||'';
+    return [rcoFpStr_(o.reportId||o.id),rcoFpStr_(o.rsdReportId),rcoFpStr_(o.guarnicao||((o.operacao||{}).guarnicoes)),rcoFpStr_(nome),rcoFpStr_(turno),rcoFpStr_(local)].join('|');
+  }).sort();
+  return {
+    reportId:String(reportId||''),
+    data:rcoFpStr_((rco.periodo||{}).inicio||rco.data||pkg.data||''),
+    batt:rcoFpStr_(u.batalhao||pkg.batalhao||''),
+    comp:rcoFpStr_(u.companhia||pkg.companhia||''),
+    modo:modo,
+    cons:[normMat_(cons.matricula||''),rcoFpStr_(cons.nome),rcoFpStr_(cons.postoGrad),rcoFpStr_(cons.turno)].join('|'),
+    obs:rcoFpStr_(rco.observacoes),
+    origins:origins,producao:prod,veiculos:veh,pod:pod,ops:ops
+  };
+}
+/** FP do pacote de consolidação (short-circuit de rco-consolidate-final). */
+function rcoConsolidateFingerprint_(pkg,reportId){
+  return hash_(JSON.stringify(rcoConsolidateSubstantiveCanon_(pkg,reportId)));
+}
+/**
+ * FP âncora do rascunho — compara no rco-draft-upsert se o conteúdo substantivo
+ * ainda corresponde ao que foi consolidado (sem exigir estatisticaP3 no draft).
+ */
+function rcoConsolidateDraftFingerprint_(rco,reportId){
+  return rcoConsolidateFingerprint_({rco:rco||{}},reportId);
+}
+/**
+ * Integridade: contagens PRODUCAO/ORIGENS + RCO + MODO_CONSOLIDACAO do pacote.
+ * Modelo de ameaça: detecta consolidação parcial (delete sem append completo) e
+ * RCO header ausente. Não revarre VEICULOS/POD/OPS (custo); INTEGRAL=SIM só é
+ * gravado após todas as etapas do path — markers + contagens cobrem o retry.
  */
 function rcoConsolidateIntegrityOk_(reportId,pkg,perf){
-  var rco=pkg.rco||pkg||{},stat=pkg.estatisticaP3||rco.estatisticaP3||{};
-  var expectProd=(stat.producao||pkg.producao||[]).length;
+  var rco=pkg.rco||pkg||{},stat=pkg.estatisticaP3||rco.estatisticaP3||null;
+  if(!stat||!Array.isArray(stat.producao))stat=rcoConsolidateDeriveStatFromRco_(rco);
+  var expectProd=(stat.producao||[]).length;
   var expectOrig=(rco.rcoOrigens||[]).length;
   var gotProd=rcoCountWhere_(sheet_(P3_SHEET_ID,'PRODUCAO'),'REPORT_ID',reportId,perf);
   var gotOrig=rcoCountWhere_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'),'RCO_REPORT_ID',reportId,perf);
   if(gotProd!==expectProd)return {ok:false,reason:'PRODUCAO_COUNT',gotProd:gotProd,expectProd:expectProd};
   if(gotOrig!==expectOrig)return {ok:false,reason:'ORIGENS_COUNT',gotOrig:gotOrig,expectOrig:expectOrig};
-  if(!findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId))return {ok:false,reason:'RCO_MISSING'};
+  var rcoRow=findOne_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId);
+  if(!rcoRow)return {ok:false,reason:'RCO_MISSING'};
+  var expectModo=rco.semGuarnicaoCpu?'SEM_CPU':'CPU';
+  if(String(rcoRow.MODO_CONSOLIDACAO||'')&&String(rcoRow.MODO_CONSOLIDACAO)!==expectModo){
+    return {ok:false,reason:'MODO_MISMATCH',got:rcoRow.MODO_CONSOLIDACAO,expect:expectModo};
+  }
   return {ok:true};
 }
 function rcoConsolidateIsIntegralComplete_(draft,pkg,reportId,fp,perf){
@@ -4039,7 +4176,7 @@ function rcoConsolidateCancelPendingPassagens_(rsdRow,autor,rcoReportId,passIdx,
 }
 function rcoConsolidateForceFinalizeRow_(row,autor,rcoReportId,statusAnterior,rsdIdx,perf){
   var reportId=String(row.REPORT_ID||''),s=rsdIdx?rsdIdx.sheet:sheet_(P3_SHEET_ID,'RSD');
-  if(perf)perf.driveOps++;
+  if(perf)perf.trackedDriveOps++;
   var p=loadJsonPayload_(row)||{};
   var autorMatricula=normMat_((autor||{}).matricula||''),autorNome=String((autor||{}).nome||''),perfil=String((autor||{}).perfil||'CPU'),agora=nowIso_();
   var version=Math.max(Number(row.VERSAO||1)+1,Number(p.versao||p.version||0)+1);
@@ -4050,7 +4187,7 @@ function rcoConsolidateForceFinalizeRow_(row,autor,rcoReportId,statusAnterior,rs
     p.finalizacaoCoordenador={forcada:true,motivo:RCO_CONSOLIDATE_AUTO_REASON_,autorMatricula:autorMatricula,autorNome:autorNome,perfil:perfil,em:agora,rcoReportId:rcoReportId,automaticoConsolidacao:true};
   }
   var json=JSON.stringify(p||{}),saved=saveJsonPayload_(reportId,version,json);
-  if(saved&&saved.fileId&&perf)perf.driveOps++;
+  if(saved&&saved.fileId&&perf)perf.trackedDriveOps++;
   ensureHeaders_(s,['FINALIZACAO_FORCADA','FINALIZACAO_FORCADA_MOTIVO','FINALIZACAO_FORCADA_POR_MATRICULA','FINALIZACAO_FORCADA_POR_NOME','FINALIZACAO_FORCADA_POR_PERFIL','FINALIZACAO_FORCADA_EM','REVIEW_STATUS']);
   row=Object.assign({},row);
   row.VERSAO=version;row.STATUS='AGUARDANDO_ANALISE';row.FINALIZADO_EM=agora;row.ULTIMO_RASCUNHO_EM=agora;row.SINCRONIZADO_EM=agora;row.EDIT_LEASE_UNTIL='';
@@ -4193,7 +4330,7 @@ function rcoConsolidateFinal_(payload) {
     var draftStatus=String(draft.STATUS||'');
     var rcoSheet=sheet_(P3_SHEET_ID,'RCO');ensureHeaders_(rcoSheet,['VERSAO']);
     var existing=findOne_(rcoSheet,'REPORT_ID',reportId);
-    if(perf)perf.driveOps++;
+    if(perf)perf.trackedDriveOps++;
     var flags=rcoMergeClosureFromClient_(draft,Object.assign({},loadJsonPayload_(draft)||{},rco||{},pkg||{}));
     var fp=rcoConsolidateFingerprint_(pkg,reportId);
     rcoPerfEnd_(perf,'prepare');
@@ -4235,7 +4372,8 @@ function rcoConsolidateFinal_(payload) {
     var repairSameFp=draftStatus!=='EM_RETIFICACAO'&&!!existing&&priorFp===fp&&!priorIntegral;
 
     // Marca não-integral no início da escrita (falha parcial ≠ short-circuit)
-    draft.P3_CONSOLIDATE_INTEGRAL='NAO';draft.P3_CONSOLIDATE_FP=fp;
+    var draftFp=rcoConsolidateDraftFingerprint_(rco,reportId);
+    draft.P3_CONSOLIDATE_INTEGRAL='NAO';draft.P3_CONSOLIDATE_FP=fp;draft.P3_CONSOLIDATE_DRAFT_FP=draftFp;
     upsert_(draftSheet,'RCO_REPORT_ID',reportId,draft);
 
     var shared={};
@@ -4257,7 +4395,7 @@ function rcoConsolidateFinal_(payload) {
     // Só após writes + flags: marca conclusão integral inequívoca
     var draft2=findOne_(draftSheet,'RCO_REPORT_ID',reportId)||draft;
     draft2.P3_CONSOLIDADO='SIM';draft2.P3_CONSOLIDADO_EM=flags.p3ConsolidadoEm||nowIso_();
-    draft2.P3_CONSOLIDATE_FP=fp;draft2.P3_CONSOLIDATE_INTEGRAL='SIM';
+    draft2.P3_CONSOLIDATE_FP=fp;draft2.P3_CONSOLIDATE_DRAFT_FP=draftFp;draft2.P3_CONSOLIDATE_INTEGRAL='SIM';
     upsert_(draftSheet,'RCO_REPORT_ID',reportId,draft2);
     rcoPerfEnd_(perf,'closureFlags');
 
