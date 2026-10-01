@@ -811,9 +811,9 @@ window.importarPassagemServicoManual=window.importarPassagemServico;
 window.importarServicoManualmente=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const bruto=JSON.parse(await f.text()),pacote=normalizarRelatorioRecebidoRsd(bruto),p=pacote.relatorio;p.origem='CONTINGENCIA_JSON';if(!p.reportId)p.reportId=uid('sd');reportId=p.reportId;localStorage.setItem(REPORT_ID_KEY,reportId);applyPayload(p);salvarOperacoesRecebidasRsd(pacote.operacoesDetalhadas);salvarRascunhoGuarnicao(true);alert('Serviço carregado manualmente em modo de contingência. Confira os dados antes de registrar/finalizar.')}catch(e){console.error(e);alert('Arquivo de RSD incompatível ou inválido. Nenhum dado foi apagado.')}};
 </script>
 <script>window.CENTRAL_V10_ENABLED=false;</script>
-<script src="central_cloud.js?v=10.8.31"></script>
-<script src="rsd_hydration_guard.js?v=10.8.31"></script>
-<script src="rsd_local_draft_diag.js?v=10.8.34"></script>
+<script src="central_cloud.js?v=10.8.35"></script>
+<script src="rsd_hydration_guard.js?v=10.8.35"></script>
+<script src="rsd_local_draft_diag.js?v=10.8.35"></script>
 <script id="rsd-cloud-v10-script">
 (function(){
   const basePayload=window.payloadV2,baseApply=window.applyPayload,baseFinalize=window.finalizarServico,basePass=window.gerarPassagemServico;
@@ -907,13 +907,16 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     const known={
       reportId,serviceId,
       draftRevision:rsdHydration.getKnownDraftRevision?.(),
-      operationalDate:val('data')
+      operationalDate:val('data'),
+      payloadHash:window.__rsdLastKnownPayloadHash||null,
+      sincronizadoEm:window.__rsdLastKnownSincronizadoEm||null,
+      ultimoRascunhoEm:window.__rsdLastKnownUltimoRascunhoEm||null
     };
-    const d=api.diagnoseLocalDraft({knownServer:known,livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
+    const d=api.diagnoseLocalDraft({reportId,serviceId,knownServer:known,livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
     const rel=api.evaluateOperatorRelease(d,{localContingencyExportPreserved:!!window.__rsdLocalContingencyExported});
     const out=document.getElementById('rsdLocalDiagOut');
     const summary={
-      classification:d.classification,
+      classification:d.classification,localSource:d.localSource,
       reportId:d.reportId,serviceId:d.serviceId,deviceId:d.deviceId,
       localDraftRevision:d.localDraftRevision,localTimestamp:d.localTimestamp,
       sections:d.sections,substantiveContent:d.substantiveContent,
@@ -927,9 +930,11 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
   function exportRsdLocalContingency(){
     const api=window.RsdLocalDraftDiag;if(!api){alert('Exportação local indisponível nesta versão.');return}
     let live=null;try{live=typeof payloadV2==='function'?payloadV2():null}catch(_){}
-    const d=api.diagnoseLocalDraft({knownServer:{reportId,serviceId,draftRevision:rsdHydration.getKnownDraftRevision?.()},livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
+    const d=api.diagnoseLocalDraft({reportId,serviceId,knownServer:{reportId,serviceId,draftRevision:rsdHydration.getKnownDraftRevision?.()},livePayload:live,deviceId:(typeof deviceId!=='undefined'?deviceId:undefined)});
+    if(d.classification==='LOCAL_DRAFT_FOREIGN'){alert('Existe rascunho local de OUTRO serviço (reportId/serviceId divergentes). Não será exportado como se fosse o RSD atual. O rascunho NÃO foi apagado.');return}
+    const pre=api.getPreHydrationDraft?.({reportId,serviceId});
     let draft=null;try{draft=JSON.parse(localStorage.getItem(api.DRAFT_KEY||'pmpb-transito-servico-diario-v2-draft')||'null')}catch(_){}
-    const payload=draft||live;if(!payload){alert('Nenhum rascunho local para exportar.');return}
+    const payload=(pre&&pre.draft)||draft||live;if(!payload){alert('Nenhum rascunho local para exportar.');return}
     const pack=api.buildContingencyExport(payload,{reportId:d.reportId,serviceId:d.serviceId,deviceId:d.deviceId,classification:d.classification,localFingerprint:d.localFingerprint});
     const name='RSD-contingencia-local-'+(d.reportId||'sem-id')+'-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'')+'.json';
     if(typeof dlJSON==='function')dlJSON(name,pack);
@@ -1444,7 +1449,7 @@ window.importarServicoManualmente=async function(files){const f=Array.from(files
     const token=String(providedToken||CentralCloud.getToken('central')||requireOperationalToken()).trim();if(!token)return false;
     if(providedToken){CentralCloud.setToken(token,'central');try{sessionStorage.setItem('central-module-auth-rsd-v1','1')}catch(_){}}
     const mat=CentralCloud.formatMatricula(autorMatricula||val('matriculaResponsavel')||item?.matricula||'');
-    try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force,autorMatricula:mat},token,{popup:false});rsdHydration.markLoading();serviceRegistered=true;window.__rsdContextAbandoned=false;cloudConflictNotified=false;const rp=r.rsd||{};window.applyPayload(rp);rememberDraftRevision(r);const sheetFb=rp.sheetStructuralFallback||null;const degraded=!!(rp.structuralDegraded||window.RsdHydrationGuard?.isDegradedPayload?.(rp,sheetFb));if(degraded){rsdHydration.markDegraded(r.meta?.draftRevision??rp.draftRevision,sheetFb);renderReviewBanner(rp);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}renderRsdSyncBanner();alert(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage());return true}if(!confirmHydratedIdentity(rp)){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true);alert(rsdHydration.errorMessage());return false}rsdHydration.clearCloudSuspension?.();rsdHydration.markHydrated(r.meta?.draftRevision??rp.draftRevision);renderReviewBanner(rp);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);window.dispatchEvent(new CustomEvent('central-rsd-registered',{detail:{reportId,serviceId,segmento,guarnicao:val('guarnicao'),continued:true}}));renderRsdSyncBanner();alert(r.message||'Serviço carregado da nuvem neste aparelho.');return true}
+    try{const r=await CentralCloud.submitForm('rsd-claim',{reportId:item.reportId,deviceId,forceTakeover:force,autorMatricula:mat},token,{popup:false});rsdHydration.markLoading();serviceRegistered=true;window.__rsdContextAbandoned=false;cloudConflictNotified=false;const rp=r.rsd||{};try{window.RsdLocalDraftDiag?.capturePreHydrationDraft?.({reportId:item.reportId||rp.reportId||reportId,serviceId:rp.serviceId||rp.servico?.serviceId||serviceId})}catch(_){}window.applyPayload(rp);rememberDraftRevision(r);const sheetFb=rp.sheetStructuralFallback||null;const degraded=!!(rp.structuralDegraded||window.RsdHydrationGuard?.isDegradedPayload?.(rp,sheetFb));if(degraded){rsdHydration.markDegraded(r.meta?.draftRevision??rp.draftRevision,sheetFb);renderReviewBanner(rp);saveIdentity();saveActiveContext();renderRsdSyncBanner();alert(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage());return true}if(!confirmHydratedIdentity(rp)){rsdHydration.markError();showRsdHydrationStatus(rsdHydration.errorMessage(),true);alert(rsdHydration.errorMessage());return false}rsdHydration.clearCloudSuspension?.();rsdHydration.markHydrated(r.meta?.draftRevision??rp.draftRevision);renderReviewBanner(rp);saveIdentity();saveActiveContext();try{salvarRascunhoGuarnicao(true)}catch(_){}await fetchCloudOperations(true);await carregarRemocoesDoDia(true);window.dispatchEvent(new CustomEvent('central-rsd-registered',{detail:{reportId,serviceId,segmento,guarnicao:val('guarnicao'),continued:true}}));renderRsdSyncBanner();alert(r.message||'Serviço carregado da nuvem neste aparelho.');return true}
     catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este serviço está aberto em outro aparelho. Deseja assumir a edição neste dispositivo? O aparelho anterior deixará de sincronizar.'))return claimCloudItem(item,true,mat,token)}alert('Não foi possível continuar o serviço: '+e.message);return false}
   }
   window.centralRsdClaimCloudItem=claimCloudItem;
@@ -1701,14 +1706,15 @@ async function publishPass(){
       if(['EM_SERVICO','RETIFICACAO_SOLICITADA'].includes(st)){
         const sheetFb=rp.sheetStructuralFallback||null;
         const degraded=!!(rp.structuralDegraded||window.RsdHydrationGuard?.isDegradedPayload?.(rp,sheetFb));
+        // Capturar DRAFT local ANTES de applyPayload/salvarRascunho (proteção DEGRADED).
+        try{window.RsdLocalDraftDiag?.capturePreHydrationDraft?.({reportId,serviceId:rp.serviceId||rp.servico?.serviceId||serviceId})}catch(_){}
         window.applyPayload(rp);
         serviceRegistered=true;cloudConflictNotified=false;
         serviceId=rp.serviceId||rp.servico?.serviceId||serviceId;segmento=Number(rp.segmento||rp.servico?.segmento||segmento||1)||1;
         saveIdentity();saveActiveContext();updateIdentityLock();updateFinalizeUi(st);
         if(degraded){
-          // NÃO preencher cabeçalho a partir da aba (evita recuperação silenciosa via autosave).
+          // NÃO sobrescrever DRAFT_KEY com payload DEGRADED da Central.
           rsdHydration.markDegraded(rp.draftRevision,sheetFb);
-          try{salvarRascunhoGuarnicao(true)}catch(_){}
           showRsdHydrationStatus(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage(),true);
           renderReviewBanner(rp);renderRsdSyncBanner();
           if(notify)alert(window.RsdHydrationGuard?.DEGRADED_MSG||rsdHydration.errorMessage());
@@ -1843,6 +1849,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.31"></script>
-<script src="service_flow.js?v=10.8.31"></script>
+<script src="service_access_layers.js?v=10.8.35"></script>
+<script src="service_flow.js?v=10.8.35"></script>
 </body></html>

@@ -341,21 +341,110 @@
     return false;
   }
 
+  /**
+   * Derivação conservadora: nunca apaga payload.viaturas/guarnicao.viaturas atuais.
+   * Nunca sobrescreve matriculaResponsavel preenchida com valor diferente.
+   * Retorna conflicts[] se houver DERIVED_FIELD_CONFLICT.
+   */
   function syncDerivedVtrFields(payload) {
+    var conflicts = [];
     var g = payload.guarnicao || (payload.guarnicao = {});
-    var vs = normalizeViaturas(g.viaturas);
-    if (filled(g.vtrPrincipal) && !vs.length) {
-      vs = [{ prefixo: String(g.vtrPrincipal), ordem: 1, origem: 'HEADER_RECOVERY' }];
-    }
-    if (vs.length) {
-      g.viaturas = vs;
-      if (!filled(g.vtrPrincipal)) g.vtrPrincipal = vs[0].prefixo;
-      g.viatura = vs.map(function (x) { return x.prefixo; }).join(', ');
+    var existingTop = Array.isArray(payload.viaturas) ? payload.viaturas : [];
+    var existingG = Array.isArray(g.viaturas) ? g.viaturas : [];
+    var existing = existingTop.length ? existingTop : existingG;
+
+    if (existing.length) {
+      // Preservar lista atual; só alinhar vtrPrincipal/viatura de exibição se vazio.
+      g.viaturas = normalizeViaturas(existing);
+      payload.viaturas = g.viaturas;
+      if (!filled(g.vtrPrincipal) && g.viaturas[0]) g.vtrPrincipal = g.viaturas[0].prefixo;
+      if (!filled(g.viatura)) {
+        g.viatura = g.viaturas.map(function (x) { return x.prefixo; }).join(', ');
+      }
     } else if (filled(g.vtrPrincipal)) {
+      var created = [{ prefixo: String(g.vtrPrincipal), ordem: 1, origem: 'HEADER_RECOVERY' }];
+      g.viaturas = created;
+      payload.viaturas = created;
       g.viatura = String(g.vtrPrincipal);
     }
-    payload.viaturas = g.viaturas || payload.viaturas || [];
-    if (filled(g.matricula)) payload.matriculaResponsavel = g.matricula;
+
+    if (filled(payload.matriculaResponsavel) && filled(g.matricula) &&
+        !valuesEqual(payload.matriculaResponsavel, g.matricula)) {
+      conflicts.push({
+        path: 'matriculaResponsavel',
+        action: 'DERIVED_FIELD_CONFLICT',
+        current: payload.matriculaResponsavel,
+        proposed: g.matricula
+      });
+    } else if (!filled(payload.matriculaResponsavel) && filled(g.matricula)) {
+      payload.matriculaResponsavel = g.matricula;
+    }
+    return conflicts;
+  }
+
+  function evaluateApplyEditorGate(rowState, manifest, nowMs) {
+    var editor = classifyEditorState({
+      editDeviceId: rowState.editDeviceId,
+      editLeaseUntil: rowState.editLeaseUntil,
+      status: rowState.status || manifest.currentStatus,
+      activePeriodRecoveryCaution: !!manifest.activePeriodRecoveryCaution,
+      recoveryBlockedDateVerification: !!(manifest.recoveryBlockedDateVerification ||
+        manifest.recoveryStatus === 'RECOVERY_BLOCKED_DATE_VERIFICATION' ||
+        manifest.recoveryStatus === 'BLOCKED')
+    }, nowMs);
+
+    if (editor.blockers.indexOf('RECOVERY_BLOCKED_DATE_VERIFICATION') >= 0 ||
+        manifest.recoveryStatus === 'BLOCKED' ||
+        manifest.recoveryBlockedDateVerification) {
+      return { ok: false, code: 'RECOVERY_BLOCKED_DATE_VERIFICATION', editor: editor };
+    }
+    if (editor.leaseActive || editor.blockers.indexOf('ACTIVE_EDIT_LEASE') >= 0) {
+      return { ok: false, code: 'ACTIVE_EDIT_LEASE', editor: editor };
+    }
+    if (editor.activePeriodRecoveryCaution || editor.blockers.indexOf('ACTIVE_PERIOD_RECOVERY_CAUTION') >= 0) {
+      return { ok: false, code: 'ACTIVE_PERIOD_RECOVERY_CAUTION', editor: editor };
+    }
+
+    if (editor.operatorReleaseRequired) {
+      var rel = manifest.operatorRelease || {};
+      if (!rel.confirmed) {
+        return { ok: false, code: 'OPERATOR_RELEASE_REQUIRED', editor: editor, detail: 'operatorRelease.confirmed required' };
+      }
+      // Validação embutida (espelha RsdLocalDraftDiag.validateManifestOperatorRelease)
+      var path = String(rel.path || '');
+      if (['A', 'B', 'C'].indexOf(path) < 0) {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path' };
+      }
+      if (!rel.inspectedAt || !rel.localClassification) {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'evidence incomplete' };
+      }
+      if (path === 'C' && !rel.contingencyPreserved) {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'contingencyPreserved' };
+      }
+      if (String(rel.localClassification) === 'LOCAL_DRAFT_FOREIGN') {
+        return { ok: false, code: 'LOCAL_DRAFT_FOREIGN', editor: editor };
+      }
+      if (path === 'A' && String(rel.localClassification) !== 'LOCAL_DRAFT_EMPTY') {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path A' };
+      }
+      if (path === 'B' && String(rel.localClassification) !== 'LOCAL_DRAFT_PRESENT') {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path B' };
+      }
+      if (path === 'C' && String(rel.localClassification) !== 'LOCAL_DRAFT_NEWER_THAN_SERVER') {
+        return { ok: false, code: 'OPERATOR_RELEASE_INVALID', editor: editor, detail: 'path C' };
+      }
+      return { ok: true, editor: editor, operatorReleasePath: path };
+    }
+
+    if (!editor.recoveryAllowed) {
+      return { ok: false, code: 'RECOVERY_NOT_ALLOWED', editor: editor };
+    }
+    return { ok: true, editor: editor };
+  }
+
+  function assertStrictPayloadEqual(expected, actual) {
+    var diffs = collectDiffPaths(expected || {}, actual || {});
+    return { ok: diffs.length === 0, diffs: diffs };
   }
 
   /**
@@ -375,18 +464,13 @@
     }
 
     if (!opts.skipEditorGate) {
-      var editor = classifyEditorState({
-        editDeviceId: rowState.editDeviceId,
-        editLeaseUntil: rowState.editLeaseUntil,
-        status: rowState.status || manifest.currentStatus,
-        activePeriodRecoveryCaution: !!manifest.activePeriodRecoveryCaution,
-        recoveryBlockedDateVerification: !!manifest.recoveryBlockedDateVerification
-      }, opts.nowMs);
-      if (!editor.recoveryAllowed) {
+      var gate = evaluateApplyEditorGate(rowState, manifest, opts.nowMs);
+      if (!gate.ok) {
         return {
           ok: false,
-          code: 'RECOVERY_NOT_ALLOWED',
-          editor: editor,
+          code: gate.code || 'RECOVERY_NOT_ALLOWED',
+          editor: gate.editor,
+          detail: gate.detail,
           mode: mode,
           written: false
         };
@@ -464,8 +548,18 @@
       };
     }
 
-    // Derived VTR string fields (still within allowlist)
-    syncDerivedVtrFields(afterPayload);
+    // Derived VTR string fields (still within allowlist) — conservador
+    var derivedConflicts = syncDerivedVtrFields(afterPayload);
+    if (derivedConflicts && derivedConflicts.length) {
+      return {
+        ok: false,
+        code: 'DERIVED_FIELD_CONFLICT',
+        conflicts: derivedConflicts,
+        fieldResults: fieldResults,
+        mode: mode,
+        written: false
+      };
+    }
 
     var diffPaths = collectDiffPaths(beforePayload, afterPayload);
     var unexpected = diffPaths.filter(function (p) { return !isAllowedDiffPath(p); });
@@ -679,13 +773,17 @@
     normalizePath: normalizePath,
     leaseActive: leaseActive,
     classifyEditorState: classifyEditorState,
+    evaluateApplyEditorGate: evaluateApplyEditorGate,
     validateManifest: validateManifest,
     checkPreconditions: checkPreconditions,
     applySelectiveHeaderPatch: applySelectiveHeaderPatch,
     manifestFromForensic: manifestFromForensic,
     collectDiffPaths: collectDiffPaths,
+    assertStrictPayloadEqual: assertStrictPayloadEqual,
     buildSheetColumnPatch: buildSheetColumnPatch,
+    syncDerivedVtrFields: syncDerivedVtrFields,
     deepClone: deepClone,
-    normalizeViaturas: normalizeViaturas
+    normalizeViaturas: normalizeViaturas,
+    valuesEqual: valuesEqual
   };
 });

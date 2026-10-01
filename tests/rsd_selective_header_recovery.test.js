@@ -325,7 +325,7 @@ test('dryRun inclui PRE_RECOVERY_SNAPSHOT sem escrita', function () {
   assert.strictEqual(r.preRecoverySnapshot.acao, 'PRE_RECOVERY_SNAPSHOT');
 });
 
-test('editor gate blocks open STALE without skipEditorGate', function () {
+test('editor gate blocks open STALE without operatorRelease', function () {
   const r = recovery.applySelectiveHeaderPatch(rowState(basePayload()), synthManifest(), {
     mode: 'apply',
     skipEditorGate: false,
@@ -333,7 +333,7 @@ test('editor gate blocks open STALE without skipEditorGate', function () {
     hashFn: md5,
     nowMs: Date.parse('2026-01-15T12:00:00.000Z')
   });
-  assert.strictEqual(r.code, 'RECOVERY_NOT_ALLOWED');
+  assert.strictEqual(r.code, 'OPERATOR_RELEASE_REQUIRED');
 });
 
 test('local diag: EMPTY → OPERATOR_RELEASE path A', function () {
@@ -367,11 +367,327 @@ test('local diag: NEWER without export → release false; with export → path C
   };
   const d = localDiag.diagnoseLocalDraft({
     localStorage: mem,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
     knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' }
   });
   assert.strictEqual(d.classification, 'LOCAL_DRAFT_NEWER_THAN_SERVER');
   assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
   assert.strictEqual(localDiag.evaluateOperatorRelease(d, { localContingencyExportPreserved: true }).path, 'C');
+});
+
+function makeLs(store) {
+  return {
+    store: store || {},
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(this.store, k) ? this.store[k] : null; },
+    setItem: function (k, v) { this.store[k] = String(v); },
+    removeItem: function (k) { delete this.store[k]; }
+  };
+}
+
+function releaseBlock(path, classification, extras) {
+  return Object.assign({
+    confirmed: true,
+    path: path,
+    inspectedAt: '2026-01-15T12:00:00.000Z',
+    deviceId: 'dev-test-001',
+    localClassification: classification,
+    localFingerprint: 'fp-test',
+    contingencyPreserved: path === 'C'
+  }, extras || {});
+}
+
+// --- Revisão remota af2f450: testes A–O ---
+
+test('A) draft local com ocorrência preservado após capture + overwrite DEGRADED', function () {
+  const localDraft = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 4,
+    ocorrencias: [{ id: 'oc-local-X', tipo: 'LOCAL_X' }],
+    observacoes: 'obs-local-Y',
+    guarnicao: { nome: 'BST LOCAL' }
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(localDraft) });
+  const memStore = {};
+  const cap = localDiag.capturePreHydrationDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    memoryStore: memStore
+  });
+  assert.strictEqual(cap.captured, true);
+  // Simula hidratação DEGRADED sobrescrevendo DRAFT_KEY
+  const degraded = basePayload();
+  degraded.ocorrencias = [];
+  degraded.observacoes = '';
+  ls.setItem('pmpb-transito-servico-diario-v2-draft', JSON.stringify(degraded));
+  const pre = localDiag.getPreHydrationDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    memoryStore: memStore
+  });
+  assert.ok(pre && pre.draft);
+  assert.strictEqual(pre.draft.ocorrencias[0].id, 'oc-local-X');
+  assert.strictEqual(pre.draft.observacoes, 'obs-local-Y');
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    memoryStore: memStore,
+    knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' },
+    livePayload: degraded
+  });
+  assert.strictEqual(d.localSource, 'PRE_HYDRATION_LOCAL_DRAFT');
+  assert.ok(d.sections.ocorrencias >= 1);
+});
+
+test('B) draft de outro REPORT_ID → LOCAL_DRAFT_FOREIGN + release FALSE', function () {
+  const ls = makeLs({
+    'pmpb-transito-servico-diario-v2-draft': JSON.stringify({
+      reportId: 'sd-OTHER',
+      serviceId: 'svc-test-001',
+      ocorrencias: [{ id: 'oc-1' }],
+      guarnicao: { nome: 'X' }
+    })
+  });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    knownServer: { draftRevision: 4 }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_FOREIGN');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+});
+
+test('C) draft de outro SERVICE_ID → release FALSE', function () {
+  const ls = makeLs({
+    'pmpb-transito-servico-diario-v2-draft': JSON.stringify({
+      reportId: 'sd-test-001',
+      serviceId: 'svc-OTHER',
+      ocorrencias: [{ id: 'oc-1' }],
+      guarnicao: { nome: 'X' }
+    })
+  });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    knownServer: { draftRevision: 4 }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_FOREIGN');
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+});
+
+test('D) LOCAL_DRAFT_PRESENT sem timestamps/revision/fingerprint → UNKNOWN + release FALSE', function () {
+  const ls = makeLs({
+    'pmpb-transito-servico-diario-v2-draft': JSON.stringify({
+      reportId: 'sd-test-001',
+      serviceId: 'svc-test-001',
+      ocorrencias: [{ id: 'oc-1' }],
+      guarnicao: { nome: 'BST LOCAL' }
+      // sem draftRevision / savedAt
+    })
+  });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    knownServer: { reportId: 'sd-test-001' } // sem rev/ts/fp do servidor
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_UNKNOWN');
+  assert.strictEqual(d.comparableToServer, false);
+  assert.strictEqual(localDiag.evaluateOperatorRelease(d).operatorReleaseConfirmed, false);
+});
+
+test('E) operatorRelease + lease stale + período antigo → apply passa editor gate', function () {
+  const manifest = synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  });
+  const r = recovery.applySelectiveHeaderPatch(rowState(basePayload()), manifest, {
+    mode: 'apply',
+    skipEditorGate: false,
+    snapshotOk: true,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z')
+  });
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.code, 'HEADER_RECOVERY_APPLIED');
+});
+
+test('F) operatorRelease + lease ativo → apply bloqueado', function () {
+  const manifest = synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  });
+  const row = rowState(basePayload(), { editLeaseUntil: '2099-01-01T00:00:00.000Z' });
+  const r = recovery.applySelectiveHeaderPatch(row, manifest, {
+    mode: 'apply',
+    skipEditorGate: false,
+    snapshotOk: true,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z')
+  });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'ACTIVE_EDIT_LEASE');
+});
+
+test('G) operatorRelease + ACTIVE_PERIOD → apply bloqueado', function () {
+  const manifest = synthManifest({
+    activePeriodRecoveryCaution: true,
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  });
+  const r = recovery.applySelectiveHeaderPatch(rowState(basePayload()), manifest, {
+    mode: 'apply',
+    skipEditorGate: false,
+    snapshotOk: true,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z')
+  });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'ACTIVE_PERIOD_RECOVERY_CAUTION');
+});
+
+test('H) PRE_RECOVERY_SNAPSHOT >45KB → backup integral recuperável e hash confere', function () {
+  const bigObs = 'X'.repeat(50000);
+  const payload = basePayload({ observacoes: bigObs });
+  const stored = {};
+  const r = recovery.applySelectiveHeaderPatch(rowState(payload), synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  }), {
+    mode: 'apply',
+    skipEditorGate: false,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z'),
+    persistSnapshot: function (snap) {
+      const json = JSON.stringify(snap);
+      assert.ok(json.length > 45000);
+      const fullHash = md5(json);
+      stored.json = json;
+      stored.hash = fullHash;
+      // simula create+readback
+      const rb = stored.json;
+      const rbHash = md5(rb);
+      if (rbHash !== fullHash) return { ok: false, code: 'SNAPSHOT_ABORT' };
+      return { ok: true, snapshotId: 'snap-test', fileId: 'file-new', fullHash: fullHash, size: rb.length };
+    }
+  });
+  assert.strictEqual(r.ok, true);
+  assert.ok(stored.json.length > 45000);
+  assert.strictEqual(md5(stored.json), stored.hash);
+  assert.ok(JSON.parse(stored.json).payload.observacoes.length === 50000);
+});
+
+test('I) falha ao criar snapshot → zero escrita', function () {
+  const r = recovery.applySelectiveHeaderPatch(rowState(basePayload()), synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  }), {
+    mode: 'apply',
+    skipEditorGate: false,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z'),
+    persistSnapshot: function () { return { ok: false, code: 'SNAPSHOT_ABORT', detail: 'create-failed' }; }
+  });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'SNAPSHOT_ABORT');
+  assert.strictEqual(r.written, false);
+});
+
+test('J) falha ao reler snapshot → zero escrita', function () {
+  const r = recovery.applySelectiveHeaderPatch(rowState(basePayload()), synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  }), {
+    mode: 'apply',
+    skipEditorGate: false,
+    hashFn: md5,
+    nowMs: Date.parse('2026-01-15T12:00:00.000Z'),
+    persistSnapshot: function () { return { ok: false, code: 'SNAPSHOT_ABORT', detail: 'readback-failed' }; }
+  });
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'SNAPSHOT_ABORT');
+  assert.strictEqual(r.written, false);
+});
+
+test('K) payload.viaturas atual com VTR adicional → recovery vtrPrincipal NÃO apaga', function () {
+  const payload = basePayload();
+  payload.viaturas = [
+    { prefixo: '1111', ordem: 1 },
+    { prefixo: '2222', ordem: 2, placa: 'ABC1D23' }
+  ];
+  payload.guarnicao.viaturas = payload.viaturas;
+  const r = recovery.applySelectiveHeaderPatch(rowState(payload), synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  }), applyOpts({ skipEditorGate: false }));
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.payload.viaturas.length, 2);
+  assert.strictEqual(r.payload.viaturas[1].prefixo, '2222');
+  assert.strictEqual(r.payload.guarnicao.vtrPrincipal, '9999');
+});
+
+test('L) matriculaResponsavel atual diferente → conflito, não sobrescrita', function () {
+  const payload = basePayload();
+  payload.matriculaResponsavel = '111.111-1';
+  const r = recovery.applySelectiveHeaderPatch(rowState(payload), synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  }), applyOpts({ skipEditorGate: false }));
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.code, 'DERIVED_FIELD_CONFLICT');
+  assert.strictEqual(payload.matriculaResponsavel, '111.111-1');
+});
+
+test('M) read-back com uma diferença em guarnicao.* → READBACK_MISMATCH', function () {
+  const expected = { guarnicao: { nome: 'BST TEST 01', vtrPrincipal: '9999' }, ocorrencias: [] };
+  const actual = { guarnicao: { nome: 'BST TEST 01', vtrPrincipal: '0000' }, ocorrencias: [] };
+  const rb = recovery.assertStrictPayloadEqual(expected, actual);
+  assert.strictEqual(rb.ok, false);
+  assert.ok(rb.diffs.some(function (d) { return d.indexOf('guarnicao') === 0; }));
+});
+
+test('N) read-back com diferença em ocorrência → READBACK_MISMATCH', function () {
+  const expected = { guarnicao: { nome: 'A' }, ocorrencias: [{ id: 'oc-1' }] };
+  const actual = { guarnicao: { nome: 'A' }, ocorrencias: [{ id: 'oc-2' }] };
+  const rb = recovery.assertStrictPayloadEqual(expected, actual);
+  assert.strictEqual(rb.ok, false);
+  assert.ok(rb.diffs.some(function (d) { return d.indexOf('ocorrencias') === 0; }));
+});
+
+test('O) segundo apply idempotente → NO_OP_ALREADY_RECOVERED', function () {
+  const manifest = synthManifest({
+    operatorRelease: releaseBlock('A', 'LOCAL_DRAFT_EMPTY')
+  });
+  const r1 = recovery.applySelectiveHeaderPatch(rowState(basePayload()), manifest, applyOpts({ skipEditorGate: false }));
+  assert.strictEqual(r1.ok, true);
+  const manifest2 = recovery.deepClone(manifest);
+  manifest2.expectedDraftRevision = r1.draftRevision;
+  manifest2.expectedPayloadHash = r1.payloadHash;
+  const r2 = recovery.applySelectiveHeaderPatch(rowState(r1.payload, {
+    draftRevision: r1.draftRevision,
+    payloadHash: r1.payloadHash
+  }), manifest2, applyOpts({ skipEditorGate: false }));
+  assert.strictEqual(r2.code, 'NO_OP_ALREADY_RECOVERED');
+  assert.strictEqual(r2.written, false);
+});
+
+test('Path B exige evidência positiva (rev local <= servidor)', function () {
+  const draft = {
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    draftRevision: 3,
+    savedAt: '2026-01-14T10:00:00.000Z',
+    guarnicao: { nome: 'BST TEST 01' },
+    ocorrencias: [{ id: 'oc-1' }]
+  };
+  const ls = makeLs({ 'pmpb-transito-servico-diario-v2-draft': JSON.stringify(draft) });
+  const d = localDiag.diagnoseLocalDraft({
+    localStorage: ls,
+    reportId: 'sd-test-001',
+    serviceId: 'svc-test-001',
+    knownServer: { draftRevision: 4, sincronizadoEm: '2026-01-15T10:00:00.000Z' }
+  });
+  assert.strictEqual(d.classification, 'LOCAL_DRAFT_PRESENT');
+  const rel = localDiag.evaluateOperatorRelease(d);
+  assert.strictEqual(rel.operatorReleaseConfirmed, true);
+  assert.strictEqual(rel.path, 'B');
 });
 
 console.log('\nPASSED', passed);
