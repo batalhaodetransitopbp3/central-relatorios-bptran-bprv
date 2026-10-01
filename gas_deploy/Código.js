@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.37';
+var CENTRAL_V10_VERSION = '10.8.38';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -125,6 +125,9 @@ function handleApiReadViaGet_(action, p) {
     } else if (action === 'rsd-service-dedupe-diagnose') {
       assertToken_(p.token, 'comando');
       out = rsdServiceDedupeDiagnose_(p);
+    } else if (action === 'audit-rco-quoted-iso-dates-ro') {
+      assertToken_(p.token, 'comando');
+      out = auditRcoQuotedIsoDatesRo();
     } else if (action === 'master-cadastros') {
       assertToken_(p.token, 'master-session');
       out = cadastroSearch_(p);
@@ -318,7 +321,7 @@ function doPost(e) {
     } else if (action === 'master-passagem-anular') {
       assertToken_(token, 'master-session');
       out = masterPassagemAnular_(payload);
-    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'sistema-auth' || action === 'rco-retification-list' || action === 'rco-draft-dedupe-diagnose' || action === 'rsd-service-dedupe-diagnose' || action === 'version') {
+    } else if (action === 'access-open-services' || action === 'access-check' || action === 'cadastros' || action === 'guarnicao-next' || action === 'rsd-list' || action === 'rsd-active' || action === 'rsd-get' || action === 'passagens-pendentes' || action === 'operation-list' || action === 'service-event-list' || action === 'rco-draft-list' || action === 'rco-draft-get' || action === 'reboque-list' || action === 'reboque-get' || action === 'cirvc-list' || action === 'cirvc-pending' || action === 'cirvc-transport-list' || action === 'cirvc-transport-get' || action === 'p3-query' || action === 'p3-analysis' || action === 'p3-analysis-compare' || action === 'p3-config' || action === 'motomecanizacao-list' || action === 'checklist-list' || action === 'master-overview' || action === 'master-cadastros' || action === 'sistema-feedback-list' || action === 'sistema-auth' || action === 'rco-retification-list' || action === 'rco-draft-dedupe-diagnose' || action === 'rsd-service-dedupe-diagnose' || action === 'audit-rco-quoted-iso-dates-ro' || action === 'version') {
       var q=Object.assign({},payload||{});
       q.token=token;
       out = handleApiReadViaGet_(action, q);
@@ -1121,6 +1124,35 @@ function rcoDraftPhysicalDuplicatePlan_(p){
 function writeSheetRowObject_(s,rowNum,obj){
   var h=headers_(s),n=Number(rowNum||0);if(n<2)throw new Error('Linha inválida.');
   s.getRange(n,1,1,h.length).setValues([rowFor_(h,obj)]);
+}
+/**
+ * 10.8.38 — PREVENÇÃO RCO_RASCUNHOS:
+ * findOne_/getValues pode devolver Date; rowFor_ faz JSON.stringify(object)
+ * e grava literal "2026-10-01T03:00:00.000Z" (com aspas) em DATA_SERVICO.
+ * Normaliza Date→YYYY-MM-DD (DATA_SERVICO) / ISO (demais timestamps).
+ * NÃO repara strings históricas já corrompidas (quoted ISO).
+ */
+function rcoDraftPrepareRowForWrite_(row){
+  if(!row)return row;
+  var keys=Object.keys(row);
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];
+    if(k==='_row')continue;
+    var v=row[k];
+    if(Object.prototype.toString.call(v)!=='[object Date]')continue;
+    if(isNaN(v.getTime())){row[k]='';continue;}
+    if(k==='DATA_SERVICO')row[k]=Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd');
+    else row[k]=Utilities.formatDate(v,scriptTz_(),"yyyy-MM-dd'T'HH:mm:ssXXX");
+  }
+  return row;
+}
+function rcoDraftUpsertRow_(s,reportId,row){
+  rcoDraftPrepareRowForWrite_(row);
+  return upsert_(s,'RCO_REPORT_ID',String(reportId||''),row);
+}
+function rcoDraftWriteRowObject_(s,rowNum,row){
+  rcoDraftPrepareRowForWrite_(row);
+  writeSheetRowObject_(s,rowNum,row);
 }
 function rsdPrimaryVtr_(r) {
   r=r||{};var g=r.guarnicao||{},vs=r.viaturas||g.viaturas||[];
@@ -3197,7 +3229,7 @@ function masterRsdReassign_(payload){
 function masterRcoUnlock_(payload){
   var id=String((payload||{}).reportId||''),motivo=String((payload||{}).motivo||'').trim(),s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',id);
   if(!row)throw new Error('RCO não localizado.');if(!motivo)throw new Error('Informe o motivo do destravamento.');
-  row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',id,row);
+  row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();rcoDraftUpsertRow_(s,id,row);
   audit_('RCO',id,Number(row.REVISAO||1),'MASTER_DESTRAVADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo});
   return {ok:true,message:'Trava do RCO removida. Outro coordenador poderá assumir o relatório.'};
 }
@@ -3205,7 +3237,7 @@ function masterRcoCancel_(payload){
   payload=payload||{};var id=String(payload.reportId||''),motivo=String(payload.motivo||'').trim(),s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),row=findOne_(s,'RCO_REPORT_ID',id);
   if(!row)throw new Error('RCO não localizado.');if(!motivo)throw new Error('Informe o motivo do cancelamento.');
   if(['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(row.STATUS||''))<0)throw new Error('Somente RCO em andamento ou em retificação pode ser cancelado administrativamente.');
-  row.STATUS='CANCELADO_ADMIN';row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',id,row);
+  row.STATUS='CANCELADO_ADMIN';row.EDIT_DEVICE_ID='';row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();rcoDraftUpsertRow_(s,id,row);
   audit_('RCO',id,Number(row.REVISAO||1),'MASTER_CANCELADO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo});
   return {ok:true,message:'RCO cancelado administrativamente e preservado para auditoria.'};
 }
@@ -3221,7 +3253,7 @@ function masterRcoReassign_(payload){
     var json=JSON.stringify(p),saved=saveJsonPayload_(id,'draft-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
     row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
   }catch(_){}
-  upsert_(s,'RCO_REPORT_ID',id,row);
+  rcoDraftUpsertRow_(s,id,row);
   audit_('RCO',id,Number(row.REVISAO||1),'MASTER_RESPONSAVEL_CORRIGIDO','', 'ADMINISTRADOR MESTRE',row.BATALHAO,row.COMPANHIA,{motivo:motivo,antes:before,depois:{nome:nome,matricula:mat,postoGrad:posto}});
   return {ok:true,message:'Responsável do RCO corrigido e trava liberada.'};
 }
@@ -3318,7 +3350,7 @@ function rcoDraftUpsert_(payload){
     P3_CONSOLIDATE_FP:outPkgFp,P3_CONSOLIDATE_DRAFT_FP:outDraftFp,P3_CONSOLIDATE_INTEGRAL:outIntegral,
     ENCERRADO:closure.encerrado?'SIM':'NAO',ENCERRADO_EM:closure.encerradoEm||'',
     PAYLOAD_JSON:saved.json,PAYLOAD_FILE_ID:saved.fileId,PAYLOAD_FILE_URL:saved.fileUrl,PAYLOAD_HASH:hash_(json),ATUALIZADO_EM:nowIso_(),ORIGEM:'RCO_WEB'};
-  upsert_(s,'RCO_REPORT_ID',reportId,obj);return {ok:true,message:'RCO sincronizado na nuvem.',reportId:reportId,revision:rev,status:draftStatus,pdfGerado:!!closure.pdfGerado,p3Consolidado:!!closure.p3Consolidado,encerrado:!!closure.encerrado,consolidateMarkersKept:keepConsolidateMarkers};
+  rcoDraftUpsertRow_(s,reportId,obj);return {ok:true,message:'RCO sincronizado na nuvem.',reportId:reportId,revision:rev,status:draftStatus,pdfGerado:!!closure.pdfGerado,p3Consolidado:!!closure.p3Consolidado,encerrado:!!closure.encerrado,consolidateMarkersKept:keepConsolidateMarkers};
   }finally{lock.releaseLock();}
 }
 function rcoDraftList_(p){
@@ -3364,7 +3396,7 @@ function rcoDraftClaim_(payload){
     if(!sameUnitScope_(row,claimScope))throw new Error('OUT_OF_RCO_SCOPE: RCO fora do escopo da companhia selecionada.');
     var wantDate=requireOperationalDate_(payload.unidade||payload);
     if(dateText_(row.DATA_SERVICO)!==wantDate)throw new Error('OUT_OF_RCO_SCOPE: RCO fora da data operacional solicitada.');
-    assertLease_(row,deviceId,!!payload.forceTakeover);row.EDIT_DEVICE_ID=deviceId;row.EDIT_LEASE_UNTIL=isoAfterMinutes_(3);row.ATUALIZADO_EM=nowIso_();upsert_(s,'RCO_REPORT_ID',reportId,row);
+    assertLease_(row,deviceId,!!payload.forceTakeover);row.EDIT_DEVICE_ID=deviceId;row.EDIT_LEASE_UNTIL=isoAfterMinutes_(3);row.ATUALIZADO_EM=nowIso_();rcoDraftUpsertRow_(s,reportId,row);
     audit_('RCO',reportId,Number(row.REVISAO||1),'ACESSO_CONTINUIDADE',row.RESPONSAVEL_MATRICULA||'',row.RESPONSAVEL_NOME||'',row.BATALHAO,row.COMPANHIA,{deviceId:deviceId,forceTakeover:!!payload.forceTakeover});
     var rco=rcoDraftGet_(reportId),resp=rco&&rco.responsavelRco||{};
     var mat=normMat_(resp.matricula||row.RESPONSAVEL_MATRICULA||'');
@@ -3402,7 +3434,7 @@ function rcoRetificationOpenInternal_(opts){
     var json=JSON.stringify(p),saved=saveJsonPayload_(reportId,'retif-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
     row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
   }catch(_){}
-  upsert_(s,'RCO_REPORT_ID',reportId,row);
+  rcoDraftUpsertRow_(s,reportId,row);
   audit_('RCO',reportId,Number(row.REVISAO||1),'RETIFICACAO_ABERTA',mat,nome,row.BATALHAO,row.COMPANHIA,{motivo:motivo,perfil:perfil,via:'GESTAO_SISTEMA'});
   return {ok:true,message:'RCO reaberto para retificação. O Coordenador poderá carregá-lo em “Continuar serviço”.',reportId:reportId,status:'EM_RETIFICACAO',autor:{perfil:perfil,matricula:mat,nome:nome,postoGrad:posto}};
 }
@@ -3595,7 +3627,7 @@ function rcoDraftDedupeSanitize_(p){
         if(['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(row.STATUS||''))<0)return;
         var prev=String(row.STATUS||'');
         row.STATUS='DUPLICADO_LEGADO';row.SUPERSEDED_BY=String(g.canonicalReportId||'');row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();
-        if(m.row&&Number(m.row)!==Number(row._row||0))writeSheetRowObject_(s,m.row,row);else upsert_(s,'RCO_REPORT_ID',m.reportId,row);
+        if(m.row&&Number(m.row)!==Number(row._row||0))rcoDraftWriteRowObject_(s,m.row,row);else rcoDraftUpsertRow_(s,m.reportId,row);
         audit_('RCO',m.reportId,Number(row.REVISAO||1),'DUPLICADO_LEGADO_MARCADO',mat,nome,row.BATALHAO,row.COMPANHIA,{
           statusAnterior:prev,statusResultante:'DUPLICADO_LEGADO',supersededBy:g.canonicalReportId,key:g.key,via:'rco-draft-dedupe-sanitize',kind:m.kind||'report_id'});
         marked++;
@@ -3608,7 +3640,7 @@ function rcoDraftDedupeSanitize_(p){
       if(String(row.STATUS||'')==='DUPLICADO_LEGADO')return;
       var prev=String(row.STATUS||'');
       row.STATUS='DUPLICADO_LEGADO';row.SUPERSEDED_BY=String(m.supersededBy||m.reportId||'');row.EDIT_LEASE_UNTIL='';row.ATUALIZADO_EM=nowIso_();
-      writeSheetRowObject_(s,m.row,row);
+      rcoDraftWriteRowObject_(s,m.row,row);
       audit_('RCO',m.reportId,Number(row.REVISAO||1),'DUPLICADO_LEGADO_MARCADO',mat,nome,row.BATALHAO,row.COMPANHIA,{
         statusAnterior:prev,statusResultante:'DUPLICADO_LEGADO',supersededBy:m.supersededBy,row:m.row,canonicalRow:m.canonicalRow,via:'rco-draft-dedupe-sanitize',kind:'physical_duplicate'});
       markedPhysical++;
@@ -3756,7 +3788,7 @@ function closeRcoDraft_(reportId){
       var json=JSON.stringify(p),saved=saveJsonPayload_(String(reportId),'close-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
       row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
     }catch(_){}
-    upsert_(s,'RCO_REPORT_ID',String(reportId),row);
+    rcoDraftUpsertRow_(s,String(reportId),row);
     if(wasRetificacao)rcoRetificationMarkConcluida_(reportId);
   }
 }
@@ -3836,7 +3868,7 @@ function rcoWriteClosureFlags_(reportId,flags,opts){
       row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
     }catch(_){}
   }
-  upsert_(s,'RCO_REPORT_ID',String(reportId),row);
+  rcoDraftUpsertRow_(s,String(reportId),row);
   return flags;
 }
 function rcoMarkPdf_(payload){
@@ -4555,7 +4587,7 @@ function rcoConsolidateFinal_(payload) {
     // Marca não-integral no início da escrita (falha parcial ≠ short-circuit)
     var draftFp=rcoConsolidateDraftFingerprint_(rco,reportId);
     draft.P3_CONSOLIDATE_INTEGRAL='NAO';draft.P3_CONSOLIDATE_FP=fp;draft.P3_CONSOLIDATE_DRAFT_FP=draftFp;
-    upsert_(draftSheet,'RCO_REPORT_ID',reportId,draft);
+    rcoDraftUpsertRow_(draftSheet,reportId,draft);
 
     var shared={};
     var resolved=rcoConsolidateResolveRsdStatuses_(pkg,reportId,cons,perf,shared);
@@ -4577,7 +4609,7 @@ function rcoConsolidateFinal_(payload) {
     var draft2=findOne_(draftSheet,'RCO_REPORT_ID',reportId)||draft;
     draft2.P3_CONSOLIDADO='SIM';draft2.P3_CONSOLIDADO_EM=flags.p3ConsolidadoEm||nowIso_();
     draft2.P3_CONSOLIDATE_FP=fp;draft2.P3_CONSOLIDATE_DRAFT_FP=draftFp;draft2.P3_CONSOLIDATE_INTEGRAL='SIM';
-    upsert_(draftSheet,'RCO_REPORT_ID',reportId,draft2);
+    rcoDraftUpsertRow_(draftSheet,reportId,draft2);
     rcoPerfEnd_(perf,'closureFlags');
 
     var ready=!!(flags.pdfGerado&&flags.p3Consolidado);
@@ -5225,5 +5257,114 @@ function auditRsdStructuralIdentityGlobalRo(){
     reportFileUrl:file.getUrl(),
     reportFileName:fileName,
     reportBytes:json.length
+  };
+}
+
+/**
+ * AUDITORIA READ-ONLY — DATA_SERVICO quoted-ISO em RCO_RASCUNHOS (corrupção rowFor_/Date).
+ * Zero writes. Uso: clasp run / editor. NÃO expor como action web nesta etapa.
+ */
+function auditRcoQuotedIsoDatesRo(){
+  function isQuotedIsoToken_(v){
+    if(v==null||v==='')return false;
+    if(Object.prototype.toString.call(v)==='[object Date]')return false;
+    return /^"\d{4}-\d{2}-\d{2}T/.test(String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,''));
+  }
+  function isYmd_(v){return /^\d{4}-\d{2}-\d{2}$/.test(String(v||'').trim());}
+  function ymdFromQuoted_(v){
+    var m=String(v||'').replace(/\u00a0/g,' ').trim().match(/^"?(\d{4}-\d{2}-\d{2})T/);
+    return m?m[1]:'';
+  }
+  function rawDateToken_(v){
+    if(v==null||v==='')return '';
+    if(Object.prototype.toString.call(v)==='[object Date]'){
+      if(isNaN(v.getTime()))return '';
+      return Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd')+' [Date]';
+    }
+    return String(v);
+  }
+  function classify_(draftRaw,payloadInicio,rcoData){
+    if(!isQuotedIsoToken_(draftRaw))return {class:'NOT_QUOTED_ISO',reason:'não é ISO com aspas'};
+    var fromDraft=ymdFromQuoted_(draftRaw);
+    if(isYmd_(payloadInicio)&&isYmd_(rcoData)&&payloadInicio===rcoData)
+      return {class:'SAFE_RECOVERY',reason:'payload.periodo.inicio === RCO.DATA_SERVICO'};
+    if(isYmd_(rcoData)&&fromDraft&&fromDraft===rcoData)
+      return {class:'SAFE_RECOVERY',reason:'aba RCO.DATA_SERVICO === YMD embutido no quoted-ISO do draft'};
+    if(isYmd_(payloadInicio)&&fromDraft&&payloadInicio===fromDraft&&!rcoData)
+      return {class:'SAFE_RECOVERY',reason:'payload.periodo.inicio === YMD embutido no quoted-ISO; sem conflito na aba RCO'};
+    if(isYmd_(payloadInicio)&&isYmd_(rcoData)&&payloadInicio!==rcoData)
+      return {class:'AMBIGUOUS',reason:'payload.periodo.inicio ≠ RCO.DATA_SERVICO'};
+    if(isYmd_(payloadInicio)&&!rcoData)
+      return {class:'AMBIGUOUS',reason:'payload canônico sem linha RCO'};
+    if(!isYmd_(payloadInicio)&&!isYmd_(rcoData))
+      return {class:'NO_EVIDENCE',reason:'sem periodo.inicio nem RCO.DATA_SERVICO canônicos'};
+    return {class:'AMBIGUOUS',reason:'evidência parcial'};
+  }
+  var draftSheet=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS');
+  var draftFields=['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS','REVISAO','ULTIMO_SYNC_EM','ATUALIZADO_EM','PAYLOAD_FILE_ID','PAYLOAD_HASH'];
+  var drafts=objectsFields_(draftSheet,draftFields);
+  var rcoRows=objectsFields_(sheet_(P3_SHEET_ID,'RCO'),['REPORT_ID','DATA_SERVICO','STATUS','VERSAO']);
+  var rcoById={};
+  rcoRows.forEach(function(r){rcoById[String(r.REPORT_ID||'')]=r;});
+  var active=['EM_ANDAMENTO','EM_RETIFICACAO'];
+  var quoted=[],canonical=0,other=0;
+  drafts.forEach(function(d){
+    var raw=d.DATA_SERVICO;
+    if(isQuotedIsoToken_(raw))quoted.push(d);
+    else if(isYmd_(raw)||(Object.prototype.toString.call(raw)==='[object Date]'&&!isNaN(raw.getTime())))canonical++;
+    else other++;
+  });
+  var items=quoted.map(function(d){
+    var rid=String(d.RCO_REPORT_ID||'');
+    var payloadInicio='',payloadTermino='',payloadErr='';
+    try{
+      var full=findOne_(draftSheet,'RCO_REPORT_ID',rid)||d;
+      var p=loadJsonPayload_(full)||{};
+      payloadInicio=String(((p.periodo||{}).inicio)||p.data||'').trim();
+      payloadTermino=String(((p.periodo||{}).termino)||'').trim();
+    }catch(e){payloadErr=String(e&&e.message||e);}
+    var rco=rcoById[rid]||null;
+    var rcoData=rco?(Object.prototype.toString.call(rco.DATA_SERVICO)==='[object Date]'?Utilities.formatDate(rco.DATA_SERVICO,scriptTz_(),'yyyy-MM-dd'):dateText_(rco.DATA_SERVICO)):'';
+    var cls=classify_(d.DATA_SERVICO,payloadInicio,rcoData);
+    return {
+      RCO_REPORT_ID:rid,
+      STATUS:String(d.STATUS||''),
+      BATALHAO:String(d.BATALHAO||''),
+      COMPANHIA:String(d.COMPANHIA||''),
+      DATA_SERVICO_ATUAL:rawDateToken_(d.DATA_SERVICO),
+      ymdEmbedded:ymdFromQuoted_(d.DATA_SERVICO),
+      payload_periodo_inicio:payloadInicio,
+      payload_periodo_termino:payloadTermino,
+      payloadError:payloadErr||undefined,
+      RCO_DATA_SERVICO:rcoData||'',
+      RCO_STATUS:rco?String(rco.STATUS||''):'',
+      RCO_VERSAO:rco?Number(rco.VERSAO||0):0,
+      activeOpen:active.indexOf(String(d.STATUS||''))>=0,
+      classification:cls.class,
+      classificationReason:cls.reason
+    };
+  });
+  var counts={SAFE_RECOVERY:0,AMBIGUOUS:0,NO_EVIDENCE:0};
+  items.forEach(function(it){counts[it.classification]=(counts[it.classification]||0)+1;});
+  var smokeId='cpu-7372448b-84ba-4b49-89f2-2248144f7b07';
+  var smoke=items.filter(function(it){return it.RCO_REPORT_ID===smokeId;})[0]||null;
+  return {
+    ok:true,
+    mode:'READ_ONLY',
+    mutatedProductionRows:false,
+    backendVersion:CENTRAL_V10_VERSION,
+    generatedAt:nowIso_(),
+    totals:{
+      TOTAL_RCO:drafts.length,
+      QUOTED_ISO:quoted.length,
+      CANONICAL_YMD_OR_DATE:canonical,
+      OTHER:other,
+      ACTIVE_QUOTED_ISO:items.filter(function(it){return it.activeOpen;}).length,
+      SAFE_RECOVERY:counts.SAFE_RECOVERY||0,
+      AMBIGUOUS:counts.AMBIGUOUS||0,
+      NO_EVIDENCE:counts.NO_EVIDENCE||0
+    },
+    smokeRco:smoke,
+    items:items
   };
 }
