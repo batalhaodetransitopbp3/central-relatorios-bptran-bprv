@@ -172,14 +172,14 @@ function rowsFixture() {
 
 (function I2_draft_get_other_company() {
   const row = { BATALHAO: 'BPRv', COMPANHIA: '4ª CPRv', DATA_SERVICO: '2026-09-30' };
-  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran' }, row);
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' }, row);
   assert.strictEqual(d.ok, false);
   assert.strictEqual(d.code, 'OUT_OF_RCO_SCOPE');
   ok('I2. rco-draft-get de outra companhia → rejeitado');
 })();
 
 (function J2_draft_get_no_scope() {
-  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran' };
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
   const d = G.rcoDraftAccessDecision({ reportId: 'rco-1' }, row);
   assert.strictEqual(d.ok, false);
   assert.strictEqual(d.code, 'MISSING_UNIT_SCOPE');
@@ -187,15 +187,15 @@ function rowsFixture() {
 })();
 
 (function K2_claim_other_company() {
-  const row = { BATALHAO: 'BPRv', COMPANHIA: '4ª CPRv' };
-  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran' }, row);
+  const row = { BATALHAO: 'BPRv', COMPANHIA: '4ª CPRv', DATA_SERVICO: '2026-09-30' };
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' }, row);
   assert.strictEqual(d.ok, false);
   assert.strictEqual(d.code, 'OUT_OF_RCO_SCOPE');
   ok('K2. rcoDraftClaim de outra companhia → rejeitado');
 })();
 
 (function L2_claim_no_scope() {
-  const d = G.rcoDraftAccessDecision({}, { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran' });
+  const d = G.rcoDraftAccessDecision({}, { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' });
   assert.strictEqual(d.ok, false);
   assert.strictEqual(d.code, 'MISSING_UNIT_SCOPE');
   ok('L2. rcoDraftClaim sem escopo → rejeitado');
@@ -215,10 +215,10 @@ function rowsFixture() {
 
 (function O2_4a_never_in_1a_paths() {
   const row4 = { REPORT_ID: 'd', BATALHAO: 'BPRv', COMPANHIA: '4ª CPRv', DATA_SERVICO: '2026-09-30' };
-  const scope1 = { batalhao: 'BPTran', companhia: '1ª CPTran' };
+  const scope1 = { batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' };
   const list = G.filterRowsForRco([row4], scope1, '2026-09-30', opHelper);
   assert.strictEqual(list.items.length, 0);
-  const get = G.rsdGetAccessDecision({ ...scope1, data: '2026-09-30' }, row4);
+  const get = G.rsdGetAccessDecision(scope1, row4);
   assert.strictEqual(get.ok, false);
   const draft = G.rcoDraftAccessDecision(scope1, row4);
   assert.strictEqual(draft.ok, false);
@@ -234,4 +234,89 @@ function rowsFixture() {
   ok('P2. caminho operacional RSD (module=RSD + central) permanece');
 })();
 
-console.log('\nTodos os testes de escopo RCO (incl. fail-closed) passaram.');
+// --- Data operacional fail-closed (10.8.34) ---
+
+(function A3_rsd_get_no_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rsdGetAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran' }, row);
+  assert.strictEqual(d.ok, false);
+  assert.strictEqual(d.code, 'MISSING_OPERATIONAL_DATE');
+  ok('A3. rsd-get unidade ok sem data → MISSING_OPERATIONAL_DATE');
+})();
+
+(function B3_rsd_get_wrong_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-29' };
+  const d = G.rsdGetAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' }, row);
+  assert.strictEqual(d.ok, false);
+  assert.strictEqual(d.code, 'OUT_OF_RCO_SCOPE');
+  ok('B3. rsd-get 30-09 pedindo RSD de 29-09 → OUT_OF_RCO_SCOPE');
+})();
+
+(function C3_rsd_list_no_period() {
+  assert.throws(() => G.requireRcoListScope({ batalhao: 'BPTran', companhia: '1ª CPTran' }), /MISSING_OPERATIONAL_DATE/);
+  ok('C3. rsd-list unidade sem período → rejeitado');
+})();
+
+(function D3_rsd_list_only_that_date() {
+  G.requireRcoListScope({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' });
+  const r = G.filterRowsForRco(rowsFixture(), { batalhao: 'BPTran', companhia: '1ª CPTran' }, '2026-09-30', opHelper);
+  assert.ok(r.items.every(x => G.dateText(x.DATA_SERVICO) === '2026-09-30'));
+  assert.strictEqual(r.items.length, 1);
+  ok('D3. rsd-list BPTran/1ª/30-09 → somente 30-09');
+})();
+
+(function E3_draft_get_no_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran' }, row);
+  assert.strictEqual(d.ok, false);
+  assert.strictEqual(d.code, 'MISSING_OPERATIONAL_DATE');
+  ok('E3. rco-draft-get unidade ok sem data → rejeitado');
+})();
+
+(function F3_draft_get_wrong_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-29' }, row);
+  assert.strictEqual(d.ok, false);
+  assert.strictEqual(d.code, 'OUT_OF_RCO_SCOPE');
+  ok('F3. rco-draft-get data diferente → rejeitado');
+})();
+
+(function G3_claim_correct_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' }, row);
+  assert.strictEqual(d.ok, true);
+  ok('G3. rco-draft-claim unidade+data corretas → permitido');
+})();
+
+(function H3_claim_wrong_date() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rcoDraftAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-28' }, row);
+  assert.strictEqual(d.ok, false);
+  assert.strictEqual(d.code, 'OUT_OF_RCO_SCOPE');
+  ok('H3. rco-draft-claim data incorreta → rejeitado');
+})();
+
+(function I3_continue_rco_shape() {
+  // Continuar RCO: claim com item.data da listagem access-open.
+  const item = { reportId: 'rco-1', batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30' };
+  const row = { BATALHAO: item.batalhao, COMPANHIA: item.companhia, DATA_SERVICO: item.data };
+  assert.strictEqual(G.rcoDraftAccessDecision(item, row).ok, true);
+  ok('I3. continuar RCO legítimo (shape claim) → ok');
+})();
+
+(function J3_receive_rco_shape() {
+  const item = { reportId: 'rco-2', batalhao: 'BPRv', companhia: '4ª CPRv', data: '2026-09-30', passagemPendente: true };
+  const row = { BATALHAO: item.batalhao, COMPANHIA: item.companhia, DATA_SERVICO: item.data };
+  assert.strictEqual(G.rcoDraftAccessDecision(item, row).ok, true);
+  ok('J3. receber RCO legítimo (shape claim) → ok');
+})();
+
+(function K3_view_include_rsd_shape() {
+  const row = { BATALHAO: 'BPTran', COMPANHIA: '1ª CPTran', DATA_SERVICO: '2026-09-30' };
+  const d = G.rsdGetAccessDecision({ batalhao: 'BPTran', companhia: '1ª CPTran', data: '2026-09-30', reportId: 'a' }, row);
+  assert.strictEqual(d.ok, true);
+  assert.strictEqual(d.path, 'RCO_SCOPED');
+  ok('K3. visualizar/incluir RSD no RCO (get scoped+data) → ok');
+})();
+
+console.log('\nTodos os testes de escopo RCO (incl. data fail-closed) passaram.');

@@ -82,6 +82,30 @@
     return s;
   }
 
+  function requireOperationalDate(p) {
+    p = p || {};
+    const d = dateText(p.data || p.operationalDate || '');
+    if (!d) throw new Error('MISSING_OPERATIONAL_DATE: Consulta de RCO exige data operacional.');
+    return d;
+  }
+
+  /** Espelha rsdListDateSet_: data/operationalDate, datas[], dataInicio/dataFim. */
+  function rsdListHasTemporalScope(p) {
+    p = p || {};
+    if (dateText(p.data || p.operationalDate || '')) return true;
+    if (p.datas != null && String(p.datas).trim() !== '') return true;
+    if (dateText(p.dataInicio || '') || dateText(p.dataFim || p.dataTermino || '')) return true;
+    return false;
+  }
+
+  function requireRcoListScope(p) {
+    requireUnitScope(p);
+    if (!rsdListHasTemporalScope(p)) {
+      throw new Error('MISSING_OPERATIONAL_DATE: Listagem RCO exige data/período operacional.');
+    }
+    return true;
+  }
+
   function sheetUnitCanon(row) {
     row = row || {};
     const battRaw = row.BATALHAO != null ? row.BATALHAO : (row.batalhao || '');
@@ -177,30 +201,35 @@
       }
       return { ok: true, path: 'COMANDO' };
     }
-    let scope;
+    let scope, wantDate;
     try { scope = requireUnitScope(p); }
     catch (e) { return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: String(e && e.message || e) }; }
+    try { wantDate = requireOperationalDate(p); }
+    catch (e) { return { ok: false, code: 'MISSING_OPERATIONAL_DATE', reason: String(e && e.message || e) }; }
     if (!sameUnitScope(row, scope)) {
       return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
     }
-    const wantDate = dateText(p.data || p.operationalDate || '');
-    if (wantDate) {
-      const op = operationalDateOf(row, function (d) { return dateText(d); });
-      if (op !== wantDate) return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope };
-    }
-    return { ok: true, path: 'RCO_SCOPED', scope: scope };
+    const op = operationalDateOf(row, function (d) { return dateText(d); });
+    if (op !== wantDate) return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope, wantDate: wantDate };
+    return { ok: true, path: 'RCO_SCOPED', scope: scope, wantDate: wantDate };
   }
 
   function rcoDraftAccessDecision(p, row) {
     p = p || {};
     row = row || {};
-    let scope;
+    let scope, wantDate;
     try { scope = requireUnitScope(p); }
     catch (e) { return { ok: false, code: 'MISSING_UNIT_SCOPE', reason: String(e && e.message || e) }; }
+    try { wantDate = requireOperationalDate(p); }
+    catch (e) { return { ok: false, code: 'MISSING_OPERATIONAL_DATE', reason: String(e && e.message || e) }; }
     if (!sameUnitScope(row, scope)) {
       return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'unit mismatch', scope: scope };
     }
-    return { ok: true, scope: scope };
+    const rowDate = dateText(row.DATA_SERVICO != null ? row.DATA_SERVICO : (row.data || ''));
+    if (rowDate !== wantDate) {
+      return { ok: false, code: 'OUT_OF_RCO_SCOPE', reason: 'date mismatch', scope: scope, wantDate: wantDate };
+    }
+    return { ok: true, scope: scope, wantDate: wantDate };
   }
 
   function payloadUnit(p) {
@@ -220,6 +249,9 @@
     companyNumber: companyNumber,
     resolveUnitScope: resolveUnitScope,
     requireUnitScope: requireUnitScope,
+    requireOperationalDate: requireOperationalDate,
+    rsdListHasTemporalScope: rsdListHasTemporalScope,
+    requireRcoListScope: requireRcoListScope,
     sheetUnitCanon: sheetUnitCanon,
     sameUnitScope: sameUnitScope,
     operationalDateOf: operationalDateOf,
