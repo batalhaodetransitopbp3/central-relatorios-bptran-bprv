@@ -413,6 +413,7 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApply_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyPilot_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyActiveAbcSerialFase3_') >= 0);
+  assert.ok(src.indexOf('function auditRcoActiveAbMissingForensicRo_') >= 0);
   assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0);
   assert.ok(src.indexOf('function rcoDraftPrepareRowForWrite_') >= 0);
   assert.ok(src.indexOf("action === 'rco-selective-date-recovery") < 0);
@@ -422,6 +423,9 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   // Commit final deve remover a action pública.
   if (!process.env.ALLOW_TEMP_SERIAL_ACTION) {
     assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-apply-active-abc-serial'") < 0);
+  }
+  if (!process.env.ALLOW_TEMP_FORENSIC_ACTION) {
+    assert.ok(src.indexOf("action === 'audit-rco-active-ab-missing-forensic-ro'") < 0);
   }
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf('PRE_RCO_DATE_RECOVERY') >= 0);
