@@ -6058,6 +6058,509 @@ function rcoSelectiveDateRecoveryApply_(opts){
   }
 }
 
+/**
+ * FASE 7A — APPLY CAUSAL dedicado (A=B / C ausente + assinatura JSON.stringify(Date)).
+ *
+ * IMPOSSÍVEL ativar sem:
+ *   opts.evidenceMode === 'CAUSAL_ROOT_SIGNATURE'
+ *
+ * NÃO altera a semântica de rcoSelectiveDateRecoveryApply_ / requireAbc.
+ * Timezone: SEMPRE scriptTz_() (Session.getScriptTimeZone) — sem offset manual.
+ * NÃO expor em doGet/doPost (exceto harness TEMP).
+ */
+function rcoSelectiveDateRecoveryCausalApply_(opts){
+  opts=opts||{};
+  if(String(opts.evidenceMode||'')!=='CAUSAL_ROOT_SIGNATURE'){
+    return {
+      ok:false,aborted:true,reasons:['EVIDENCE_MODE_NOT_CAUSAL_ROOT_SIGNATURE'],
+      code:'EVIDENCE_MODE_REQUIRED',safety:'UNSAFE',
+      mutatedDraftRow:false,mutatedProductionRows:false,publicActionExposed:false,
+      evidenceMode:String(opts.evidenceMode||''),backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_()
+    };
+  }
+  var reportId=String(opts.reportId||'').trim();
+  if(!reportId)throw new Error('Informe reportId.');
+  var lock=LockService.getScriptLock();
+  lock.waitLock(20000);
+  try{
+    function norm_(v){return String(v||'').replace(/\u00a0/g,' ').trim();}
+    function isYmd_(v){return /^\d{4}-\d{2}-\d{2}$/.test(String(v||'').trim());}
+    function isQuoted_(v){
+      if(v==null||v==='')return false;
+      if(Object.prototype.toString.call(v)==='[object Date]')return false;
+      return /^"\d{4}-\d{2}-\d{2}T/.test(String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,''));
+    }
+    function ymdQuoted_(v){
+      var m=String(v||'').replace(/\u00a0/g,' ').trim().match(/^"?(\d{4}-\d{2}-\d{2})T/);
+      return m?m[1]:'';
+    }
+    function rawToken_(v){
+      if(v==null||v==='')return '';
+      if(Object.prototype.toString.call(v)==='[object Date]'){
+        if(isNaN(v.getTime()))return '';
+        return Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd')+' [Date]';
+      }
+      return String(v);
+    }
+    function ymdAny_(v){
+      if(v==null||v==='')return '';
+      if(Object.prototype.toString.call(v)==='[object Date]'){
+        if(isNaN(v.getTime()))return '';
+        return Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd');
+      }
+      var s=String(v).replace(/\u00a0/g,' ').trim();
+      if(isYmd_(s))return s;
+      if(isQuoted_(s))return ymdQuoted_(s);
+      var t=dateText_(v);
+      return isYmd_(t)?t:'';
+    }
+    function serializeBugQuotedIsoFromYmd_(ymd){
+      if(!isYmd_(ymd))return {serialized:'',dateIso:'',ok:false,err:'B_NOT_YMD'};
+      var tz=scriptTz_();
+      try{
+        var dt=Utilities.parseDate(String(ymd).trim()+' 00:00:00',tz,'yyyy-MM-dd HH:mm:ss');
+        if(!dt||isNaN(dt.getTime()))return {serialized:'',dateIso:'',ok:false,err:'PARSE_FAILED'};
+        var back=Utilities.formatDate(dt,tz,'yyyy-MM-dd');
+        if(back!==String(ymd).trim())return {serialized:'',dateIso:'',ok:false,err:'ROUNDTRIP_MISMATCH:'+back};
+        return {serialized:JSON.stringify(dt),dateIso:dt.toISOString(),ok:true,err:''};
+      }catch(e){
+        return {serialized:'',dateIso:'',ok:false,err:String(e&&e.message||e)};
+      }
+    }
+    function projectDraftRow_(row){
+      var o={},keys=Object.keys(row||{}).sort();
+      for(var i=0;i<keys.length;i++){
+        var k=keys[i];
+        if(k==='_row')continue;
+        var v=row[k];
+        if(Object.prototype.toString.call(v)==='[object Date]'){
+          o[k]=isNaN(v.getTime())?null:Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd');
+        }else if(typeof v==='number'&&isFinite(v))o[k]=v;
+        else if(typeof v==='boolean')o[k]=v;
+        else o[k]=v==null?null:String(v);
+      }
+      return o;
+    }
+    function serializeDraftRow_(row){
+      var o={},keys=Object.keys(row||{});
+      for(var i=0;i<keys.length;i++){
+        var k=keys[i];
+        if(k==='_row'){o._row=row._row;continue;}
+        var v=row[k];
+        if(Object.prototype.toString.call(v)==='[object Date]'){
+          o[k]=isNaN(v.getTime())?null:v.toISOString();
+        }else o[k]=v;
+      }
+      return o;
+    }
+    function diffExcludingDate_(beforeProj,afterProj){
+      var changed=[],seen={};
+      Object.keys(beforeProj||{}).forEach(function(k){seen[k]=true;});
+      Object.keys(afterProj||{}).forEach(function(k){seen[k]=true;});
+      Object.keys(seen).forEach(function(k){
+        if(k==='DATA_SERVICO')return;
+        if(JSON.stringify(beforeProj[k])!==JSON.stringify(afterProj[k]))changed.push(k);
+      });
+      return changed.sort();
+    }
+    function collectContradictions_(reportId,B,draftBatt,draftComp,payload,origByRco,rsdById,audById,rcoCount){
+      var details=[];
+      var originIds={};
+      (origByRco[reportId]||[]).forEach(function(o){
+        var sid=String(o.RSD_REPORT_ID||'');
+        if(sid)originIds[sid]=true;
+        var oy=ymdAny_(o.DATA_SERVICO);
+        if(oy&&isYmd_(B)&&oy!==B)details.push('ORIGEM_DATE_NE_B:'+sid+':'+oy);
+        if(norm_(o.BATALHAO)&&norm_(o.BATALHAO)!==draftBatt)details.push('ORIGEM_BATT_NE_DRAFT:'+sid);
+        if(norm_(o.COMPANHIA)&&norm_(o.COMPANHIA)!==draftComp)details.push('ORIGEM_COMP_NE_DRAFT:'+sid);
+      });
+      Object.keys(rsdById).forEach(function(sid){
+        if(String(rsdById[sid].RCO_REPORT_ID||'')===reportId)originIds[sid]=true;
+      });
+      var payloadOrigens=payload.rcoOrigens||payload.origens||[];
+      if(Array.isArray(payloadOrigens)){
+        payloadOrigens.forEach(function(o){
+          var sid=String((o&&(o.rsdReportId||o.RSD_REPORT_ID||o.reportId))||'');
+          if(sid)originIds[sid]=true;
+        });
+      }
+      Object.keys(originIds).forEach(function(sid){
+        var r=rsdById[sid];
+        if(!r)return;
+        var ry=ymdAny_(r.DATA_SERVICO);
+        if(ry&&isYmd_(B)&&ry!==B)details.push('RSD_DATE_NE_B:'+sid+':'+ry);
+        if(norm_(r.BATALHAO)&&norm_(r.BATALHAO)!==draftBatt)details.push('RSD_BATT_NE_DRAFT:'+sid);
+        if(norm_(r.COMPANHIA)&&norm_(r.COMPANHIA)!==draftComp)details.push('RSD_COMP_NE_DRAFT:'+sid);
+      });
+      (audById[reportId]||[]).forEach(function(a){
+        var acao=String(a.ACAO||'');
+        if(acao.indexOf('RCO_DATE_RECOVERY')>=0||acao.indexOf('RCO_DATE_CAUSAL')>=0)return;
+        var rawSnap=a.SNAPSHOT_JSON,snap=null;
+        if(rawSnap==null||String(rawSnap)==='')return;
+        try{snap=typeof rawSnap==='object'?rawSnap:JSON.parse(String(rawSnap));}catch(_){return;}
+        function walk(o,path,depth){
+          if(depth>5||o==null)return;
+          if(typeof o==='string'&&isQuoted_(o))return;
+          if(Object.prototype.toString.call(o)==='[object Date]'){
+            var yd=ymdAny_(o);
+            if(yd&&isYmd_(B)&&yd!==B)details.push('AUDIT_DATE_NE_B:'+acao+':'+path+':'+yd);
+            return;
+          }
+          if(typeof o!=='object'){
+            if(isYmd_(o)&&isYmd_(B)&&String(o).trim()!==B&&/(dataServico|DATA_SERVICO|periodo\.inicio|expectedDate|^data$)/i.test(path))
+              details.push('AUDIT_DATE_NE_B:'+acao+':'+path+':'+String(o).trim());
+            return;
+          }
+          if(Array.isArray(o)){for(var i=0;i<Math.min(o.length,20);i++)walk(o[i],path+'['+i+']',depth+1);return;}
+          Object.keys(o).forEach(function(k){
+            var p=path?path+'.'+k:k;
+            var v=o[k];
+            if(k==='DATA_SERVICO'||k==='dataServico'||k==='expectedDate'||k==='data'){
+              var y=ymdAny_(v);
+              if(y&&isYmd_(B)&&y!==B&&!(typeof v==='string'&&isQuoted_(v)))details.push('AUDIT_DATE_NE_B:'+acao+':'+p+':'+y);
+            }
+            if(k==='periodo'&&v&&typeof v==='object'){
+              var yi=ymdAny_(v.inicio);
+              if(yi&&isYmd_(B)&&yi!==B)details.push('AUDIT_DATE_NE_B:'+acao+':'+p+'.inicio:'+yi);
+            }
+            walk(v,p,depth+1);
+          });
+        }
+        walk(snap,'',0);
+      });
+      var alt=String(payload.dataServico||payload.data_servico||'').trim();
+      if(isYmd_(alt)&&isYmd_(B)&&alt!==B)details.push('PAYLOAD_ALT_DATE_NE_B:'+alt);
+      if(rcoCount>1)details.push('DUPLICATE_RCO_ROWS:'+rcoCount);
+      var seen={},uniq=[];
+      details.forEach(function(d){if(!seen[d]){seen[d]=true;uniq.push(d);}});
+      return uniq;
+    }
+
+    var scriptTz=scriptTz_();
+    var draftSheet=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS');
+    var draft=findOne_(draftSheet,'RCO_REPORT_ID',reportId);
+    var baseReturn={
+      writeFields:[],publicActionExposed:false,backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_(),
+      reportId:reportId,mutatedDraftRow:false,mutatedProductionRows:false,
+      evidenceMode:'CAUSAL_ROOT_SIGNATURE',SCRIPT_TIMEZONE:scriptTz,
+      RCO_TABLE_ROW_EXPECTED_BEFORE_CONSOLIDATION:false
+    };
+    if(!draft)return Object.assign({},baseReturn,{ok:false,aborted:true,reasons:['DRAFT_NOT_FOUND'],code:'DRAFT_NOT_FOUND',safety:'UNSAFE'});
+
+    var rcoSheet=sheet_(P3_SHEET_ID,'RCO');
+    var rcoRows=objectsFields_(rcoSheet,['REPORT_ID','DATA_SERVICO','STATUS','VERSAO','BATALHAO','COMPANHIA']).filter(function(r){
+      return String(r.REPORT_ID||'')===reportId;
+    });
+    var rco=rcoRows[0]||null;
+    var rcoCount=rcoRows.length;
+    var payload={};
+    try{payload=loadJsonPayload_(draft)||{};}catch(e){
+      return Object.assign({},baseReturn,{ok:false,aborted:true,reasons:['PAYLOAD_LOAD_FAILED'],detail:String(e&&e.message||e),code:'PAYLOAD_LOAD_FAILED',safety:'UNSAFE'});
+    }
+
+    var origByRco={};
+    objectsFields_(sheet_(P3_SHEET_ID,'RCO_ORIGENS'),['RCO_REPORT_ID','RSD_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA']).forEach(function(o){
+      var rid=String(o.RCO_REPORT_ID||'');
+      if(!rid)return;
+      if(!origByRco[rid])origByRco[rid]=[];
+      origByRco[rid].push(o);
+    });
+    var rsdById={};
+    objectsFields_(sheet_(P3_SHEET_ID,'RSD'),['REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS','RCO_REPORT_ID']).forEach(function(r){
+      rsdById[String(r.REPORT_ID||'')]=r;
+    });
+    var audById={};
+    objectsFields_(sheet_(P3_SHEET_ID,'AUDITORIA_VERSOES'),['AUDITORIA_ID','TIPO_ENTIDADE','ENTIDADE_ID','ACAO','DATA_HORA','SNAPSHOT_JSON']).forEach(function(a){
+      if(String(a.TIPO_ENTIDADE||'')!=='RCO')return;
+      var id=String(a.ENTIDADE_ID||'');
+      if(!audById[id])audById[id]=[];
+      audById[id].push(a);
+    });
+
+    var raw=draft.DATA_SERVICO;
+    var isDateObj=Object.prototype.toString.call(raw)==='[object Date]';
+    var rawStr=isDateObj?rawToken_(raw):String(raw==null?'':raw).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
+    var semanticYmd=isDateObj?(isNaN(raw.getTime())?'':Utilities.formatDate(raw,scriptTz,'yyyy-MM-dd')):(isYmd_(rawStr)?rawStr:'');
+    var periodo=payload.periodo||{},state=payload.state||{},unidade=payload.unidade||{};
+    var B=String(periodo.inicio||payload.data||'').trim();
+    var A=ymdQuoted_(rawStr);
+    var C=rco?ymdAny_(rco.DATA_SERVICO):'';
+    var stateReportId=String(state.reportId||payload.reportId||'').trim();
+    var draftBatt=norm_(draft.BATALHAO),draftComp=norm_(draft.COMPANHIA);
+    var battPayload=norm_(unidade.batalhao),compPayload=norm_(unidade.companhia);
+    var identityParity=!!reportId&&reportId===stateReportId&&String(draft.RCO_REPORT_ID||'')===reportId;
+    var unitParity=!!draftBatt&&!!draftComp&&(!battPayload||battPayload===draftBatt)&&(!compPayload||compPayload===draftComp);
+    var activeLease=leaseActive_(draft);
+    var statusLive=String(draft.STATUS||'');
+    var activeOpen=['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(statusLive)>=0;
+    var contradictions=collectContradictions_(reportId,B,draftBatt,draftComp,payload,origByRco,rsdById,audById,rcoCount);
+    var sig=serializeBugQuotedIsoFromYmd_(B);
+    var rootMatch=!!sig.ok&&rawStr===sig.serialized;
+
+    var preApply={
+      DATA_SERVICO:rawStr,STATUS:statusLive,REVISAO:Number(draft.REVISAO||0),
+      PAYLOAD_HASH:String(draft.PAYLOAD_HASH||''),PAYLOAD_FILE_ID:String(draft.PAYLOAD_FILE_ID||''),
+      BATALHAO:draftBatt,COMPANHIA:draftComp,
+      EDIT_DEVICE_ID:String(draft.EDIT_DEVICE_ID||''),EDIT_LEASE_UNTIL:String(draft.EDIT_LEASE_UNTIL||''),
+      ULTIMO_SYNC_EM:String(draft.ULTIMO_SYNC_EM||''),ATUALIZADO_EM:String(draft.ATUALIZADO_EM||''),
+      activeLease:!!activeLease
+    };
+
+    // Idempotente: já canônico + C ausente + coerência
+    if(semanticYmd&&isYmd_(semanticYmd)){
+      var stale=[];
+      if(!activeOpen)stale.push('STATUS_NOT_ACTIVE');
+      if(!(isYmd_(B)&&B===semanticYmd))stale.push('B_NE_RECOVERED');
+      if(rco||C)stale.push('C_PRESENT_UNEXPECTED');
+      if(!identityParity)stale.push('IDENTITY_MISMATCH');
+      if(!unitParity)stale.push('UNIT_MISMATCH');
+      if(activeLease)stale.push('ACTIVE_LEASE');
+      if(contradictions.length)stale.push('CONTRADICTORY_EVIDENCE');
+      if(!stale.length){
+        return Object.assign({},baseReturn,{
+          ok:true,alreadyRecovered:true,idempotent:true,staleManifest:false,
+          code:'ALREADY_RECOVERED',safety:'SAFE',
+          CAUSAL_GATE_ALL_PASS:true,
+          A_QUOTED:A||semanticYmd,B_PAYLOAD:B,C_RCO:'',
+          ROOT_CAUSE_SIGNATURE_MATCH:true,
+          IDENTITY_PARITY:true,UNIT_PARITY:true,CONTRADICTORY_EVIDENCE:false,
+          snapshotCreated:false,auditEvent:'',
+          postApply:{DATA_SERVICO:semanticYmd,STATUS:statusLive,REVISAO:Number(draft.REVISAO||0),PAYLOAD_HASH:String(draft.PAYLOAD_HASH||'')},
+          preApply:preApply
+        });
+      }
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,alreadyRecovered:true,idempotent:false,staleManifest:true,
+        code:'ALREADY_RECOVERED_BUT_STATE_CHANGED',safety:'UNSAFE',reasons:stale,preApply:preApply
+      });
+    }
+
+    var reasons=[];
+    if(!activeOpen)reasons.push('STATUS_NOT_ACTIVE');
+    if(!isQuoted_(rawStr))reasons.push('NOT_QUOTED_ISO');
+    if(!(isYmd_(A)&&isYmd_(B)&&A===B)){
+      if(isYmd_(A)&&isYmd_(B)&&A!==B)reasons.push('A_NE_B');
+      else reasons.push('A_NE_B_OR_NOT_CANONICAL');
+    }
+    if(!isYmd_(B))reasons.push('B_NOT_CANONICAL_YMD');
+    if(rco||C)reasons.push('C_MUST_BE_MISSING');
+    if(rcoCount>1)reasons.push('DUPLICATE_RCO_ROWS');
+    if(!rootMatch)reasons.push('ROOT_CAUSE_SIGNATURE_MISMATCH');
+    if(!identityParity)reasons.push('IDENTITY_MISMATCH');
+    if(!unitParity)reasons.push('UNIT_MISMATCH');
+    if(activeLease)reasons.push('ACTIVE_LEASE');
+    if(contradictions.length)reasons.push('CONTRADICTORY_EVIDENCE');
+
+    if(reasons.length){
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,reasons:reasons,code:'CAUSAL_GATE_FAILED',safety:'UNSAFE',
+        CAUSAL_GATE_ALL_PASS:false,
+        A_QUOTED:A,B_PAYLOAD:B,C_RCO:C||'',
+        SERIALIZED_FROM_B:sig.serialized||'',RAW_DATA_SERVICO:rawStr,
+        ROOT_CAUSE_SIGNATURE_MATCH:rootMatch,
+        IDENTITY_PARITY:identityParity,UNIT_PARITY:unitParity,
+        CONTRADICTORY_EVIDENCE:contradictions.length>0,CONTRADICTION_DETAILS:contradictions,
+        preApply:preApply
+      });
+    }
+
+    var proposedDate=B;
+    var beforeProj=projectDraftRow_(draft);
+
+    var snapshotObj={
+      kind:'PRE_RCO_DATE_RECOVERY',
+      evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+      classification:'CAUSAL_RECOVERY_CANDIDATE',
+      motivo:String(opts.reason||'REPAIR_QUOTED_ISO_CAUSAL_ROOT_SIGNATURE'),
+      timestamp:nowIso_(),
+      reportId:reportId,
+      branchSha:String(opts.branchSha||''),
+      backendVersion:CENTRAL_V10_VERSION,
+      SCRIPT_TIMEZONE:scriptTz,
+      RECONSTRUCTED_DATE_OBJECT:sig.dateIso||'',
+      SERIALIZED_FROM_B:sig.serialized,
+      RAW_DATA_SERVICO:rawStr,
+      A_QUOTED:A,B_PAYLOAD:B,C_RCO:'MISSING_PRE_CONSOLIDATION',
+      IDENTITY_PARITY:true,UNIT_PARITY:true,
+      CONTRADICTORY_EVIDENCE:false,CONTRADICTION_DETAILS:[],
+      ROOT_CAUSE_SIGNATURE_MATCH:true,
+      RCO_TABLE_ROW_EXPECTED_BEFORE_CONSOLIDATION:false,
+      draftRow:serializeDraftRow_(draft),
+      payloadJson:payload,
+      revisao:Number(draft.REVISAO||0),
+      payloadHash:String(draft.PAYLOAD_HASH||''),
+      preconditions:preApply
+    };
+    var snapJson=JSON.stringify(snapshotObj);
+    var folder=folderFor_('RCO_RECOVERY_SNAPSHOT_FOLDER_ID','Central RCO - Recovery Snapshots');
+    var snapName='PRE_RCO_DATE_RECOVERY_'+reportId+'_'+Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyyMMdd_HHmmss')+'.json';
+    var snapFile=folder.createFile(Utilities.newBlob(snapJson,'application/json',snapName));
+
+    var h=headers_(draftSheet);
+    var col=h.indexOf('DATA_SERVICO');
+    if(col<0)throw new Error('Coluna DATA_SERVICO ausente.');
+    var rowNum=Number(draft._row||0);
+    if(rowNum<2)throw new Error('Linha inválida.');
+    draftSheet.getRange(rowNum,col+1).setValue(String(proposedDate));
+
+    var draft2=findOne_(draftSheet,'RCO_REPORT_ID',reportId);
+    if(!draft2){
+      audit_('RCO',reportId,Number(draft.REVISAO||0),'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED','','SISTEMA',draftBatt,draftComp,{
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',snapshotFileId:snapFile.getId(),snapshotFileName:snapName,observed:{missing:true}
+      });
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,mutatedDraftRow:true,code:'READBACK_FAILED',safety:'UNSAFE',
+        writeFields:['DATA_SERVICO'],readBackOk:false,auditEvent:'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED',
+        snapshotCreated:true,snapshotFileId:snapFile.getId(),snapshotFileName:snapName,preApply:preApply
+      });
+    }
+    var afterProj=projectDraftRow_(draft2);
+    var unexpectedChangedFields=diffExcludingDate_(beforeProj,afterProj);
+    var otherFieldsChanged=unexpectedChangedFields.length>0;
+    var afterRaw=draft2.DATA_SERVICO;
+    var afterStr=Object.prototype.toString.call(afterRaw)==='[object Date]'
+      ?(isNaN(afterRaw.getTime())?'':Utilities.formatDate(afterRaw,scriptTz_(),'yyyy-MM-dd'))
+      :String(afterRaw==null?'':afterRaw);
+    var afterYmd=isYmd_(afterStr)?afterStr:dateText_(afterRaw);
+    var postStatus=String(draft2.STATUS||'');
+    var postRev=Number(draft2.REVISAO||0);
+    var postHash=String(draft2.PAYLOAD_HASH||'');
+    var postBatt=norm_(draft2.BATALHAO),postComp=norm_(draft2.COMPANHIA);
+    var postFile=String(draft2.PAYLOAD_FILE_ID||'');
+    var postP3=String(draft2.P3_CONSOLIDADO||'');
+    var postPdf=String(draft2.PDF_GERADO||draft2.PDF||'');
+    var postEnc=String(draft2.ENCERRADO||'');
+    var postEditDev=String(draft2.EDIT_DEVICE_ID||'');
+    var postLease=String(draft2.EDIT_LEASE_UNTIL||'');
+
+    var readBackOk=
+      afterYmd===proposedDate&&
+      postStatus===statusLive&&
+      postRev===Number(draft.REVISAO||0)&&
+      postHash===String(draft.PAYLOAD_HASH||'')&&
+      postBatt===draftBatt&&
+      postComp===draftComp&&
+      postFile===String(draft.PAYLOAD_FILE_ID||'')&&
+      postP3===String(draft.P3_CONSOLIDADO||'')&&
+      postEditDev===String(draft.EDIT_DEVICE_ID||'')&&
+      postLease===String(draft.EDIT_LEASE_UNTIL||'')&&
+      !otherFieldsChanged;
+
+    if(!readBackOk){
+      audit_('RCO',reportId,postRev,'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED','','SISTEMA',postBatt,postComp,{
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+        before:rawStr,afterObserved:afterYmd,expectedAfter:proposedDate,
+        snapshotFileId:snapFile.getId(),unexpectedChangedFields:unexpectedChangedFields
+      });
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,mutatedDraftRow:true,code:'READBACK_FAILED',safety:'UNSAFE',
+        writeFields:['DATA_SERVICO'],readBackOk:false,
+        unexpectedChangedFields:unexpectedChangedFields,otherFieldsChanged:otherFieldsChanged,
+        auditEvent:'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED',
+        snapshotCreated:true,snapshotFileId:snapFile.getId(),snapshotFileName:snapName,
+        preApply:preApply,
+        postApply:{DATA_SERVICO:afterYmd,STATUS:postStatus,REVISAO:postRev,PAYLOAD_HASH:postHash}
+      });
+    }
+
+    // C continua ausente
+    var rcoAfter=findOne_(rcoSheet,'REPORT_ID',reportId);
+    if(rcoAfter){
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,mutatedDraftRow:true,code:'C_APPEARED_DURING_APPLY',safety:'UNSAFE',
+        writeFields:['DATA_SERVICO'],readBackOk:true,
+        snapshotCreated:true,snapshotFileId:snapFile.getId(),preApply:preApply
+      });
+    }
+
+    audit_('RCO',reportId,postRev,'RCO_DATE_CAUSAL_RECOVERY_APPLIED','','SISTEMA',postBatt,postComp,{
+      evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+      before:rawStr,
+      after:proposedDate,
+      A:A,B:B,C:'MISSING_PRE_CONSOLIDATION',
+      scriptTimezone:scriptTz,
+      serializedFromB:sig.serialized,
+      rootCauseSignatureMatch:true,
+      contradictoryEvidence:false,
+      snapshotFileId:snapFile.getId(),
+      snapshotFileName:snapName,
+      writeFields:['DATA_SERVICO'],
+      revisaoUnchanged:true
+    });
+
+    function shiftYmd_(ymd,delta){
+      var p=String(ymd||'').split('-');
+      if(p.length!==3)return '';
+      var dt=new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+      dt.setDate(dt.getDate()+Number(delta||0));
+      return Utilities.formatDate(dt,scriptTz_(),'yyyy-MM-dd');
+    }
+    var wantDate=proposedDate;
+    var visibleCorrect=objectsFields_(draftSheet,['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS']).some(function(x){
+      return String(x.RCO_REPORT_ID||'')===reportId&&
+        norm_(x.BATALHAO)===draftBatt&&
+        norm_(x.COMPANHIA)===draftComp&&
+        dateText_(x.DATA_SERVICO)===wantDate&&
+        ['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(x.STATUS||''))>=0;
+    });
+    var wrongDates=[shiftYmd_(wantDate,-1),shiftYmd_(wantDate,1)].filter(Boolean);
+    var visibleWrong=wrongDates.some(function(wd){
+      return objectsFields_(draftSheet,['RCO_REPORT_ID','DATA_SERVICO']).some(function(x){
+        return String(x.RCO_REPORT_ID||'')===reportId&&dateText_(x.DATA_SERVICO)===wd;
+      });
+    });
+
+    return Object.assign({},baseReturn,{
+      ok:true,
+      alreadyRecovered:false,
+      idempotent:false,
+      code:'CAUSAL_APPLIED',
+      safety:'SAFE',
+      CAUSAL_GATE_ALL_PASS:true,
+      mutatedDraftRow:true,
+      writeFields:['DATA_SERVICO'],
+      A_QUOTED:A,B_PAYLOAD:B,C_RCO:'',
+      SERIALIZED_FROM_B:sig.serialized,
+      RAW_DATA_SERVICO:rawStr,
+      RECONSTRUCTED_DATE_OBJECT:sig.dateIso||'',
+      ROOT_CAUSE_SIGNATURE_MATCH:true,
+      IDENTITY_PARITY:true,UNIT_PARITY:true,
+      CONTRADICTORY_EVIDENCE:false,CONTRADICTION_DETAILS:[],
+      PROPOSED_DATE:proposedDate,
+      preApply:preApply,
+      postApply:{
+        DATA_SERVICO:afterYmd,DATA_SERVICO_RAW:afterStr,STATUS:postStatus,REVISAO:postRev,
+        PAYLOAD_HASH:postHash,BATALHAO:postBatt,COMPANHIA:postComp,
+        PAYLOAD_FILE_ID:postFile,P3_CONSOLIDADO:postP3,PDF:postPdf,ENCERRADO:postEnc,
+        EDIT_DEVICE_ID:postEditDev,EDIT_LEASE_UNTIL:postLease
+      },
+      snapshotCreated:true,
+      snapshotFileId:snapFile.getId(),
+      snapshotFileUrl:snapFile.getUrl(),
+      snapshotFileName:snapName,
+      snapshotFolder:'Central RCO - Recovery Snapshots',
+      auditEvent:'RCO_DATE_CAUSAL_RECOVERY_APPLIED',
+      readBackOk:true,
+      unexpectedChangedFields:[],
+      otherFieldsChanged:false,
+      rcoVisibleInCorrectScope:!!visibleCorrect,
+      rcoVisibleInWrongScope:!!visibleWrong
+    });
+  }finally{
+    lock.releaseLock();
+  }
+}
+
+/** FASE 7A — piloto causal ÚNICO autorizado. */
+function rcoSelectiveDateRecoveryCausalApplyPilotFase7a_(){
+  return rcoSelectiveDateRecoveryCausalApply_({
+    reportId:'cpu-5e000c43-ef9c-4c90-82ea-7bfeaea08f63',
+    evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+    branchSha:'eacf4541be558116dd0a02b69ad31fdc91562209',
+    reason:'REPAIR_QUOTED_ISO_CAUSAL_ROOT_SIGNATURE'
+  });
+}
+
 /** FASE 5 — serial STRICT: somente 5 FINALIZADOS autorizados com A=B=C. Para no primeiro erro. */
 function rcoSelectiveDateRecoveryApplyFinalizedAbcSerialFase5_(){
   var ids=[

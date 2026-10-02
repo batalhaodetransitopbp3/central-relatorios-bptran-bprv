@@ -34,6 +34,18 @@ try {
   dateWrite = null;
 }
 
+var rootSig = null;
+try {
+  rootSig = require('./rco_root_cause_signature.js');
+} catch (_) {
+  rootSig = null;
+}
+
+/** FASE 7A — piloto causal autorizado (único). */
+var CAUSAL_PILOT_REPORT_ID = 'cpu-5e000c43-ef9c-4c90-82ea-7bfeaea08f63';
+var EVIDENCE_MODE_CAUSAL = 'CAUSAL_ROOT_SIGNATURE';
+var PRODUCTION_SCRIPT_TZ = (rootSig && rootSig.PRODUCTION_SCRIPT_TZ) || 'America/Sao_Paulo';
+
 function isQuotedIsoDateToken(v) {
   if (dateWrite && typeof dateWrite.isQuotedIsoDateToken === 'function') {
     return dateWrite.isQuotedIsoDateToken(v);
@@ -777,8 +789,325 @@ function applySerialActiveAbc(db, reportIds, opts) {
   };
 }
 
+/**
+ * Gate causal (Node mirror). Exige evidenceMode=CAUSAL_ROOT_SIGNATURE e timezone explícito.
+ * NÃO usa requireAbc=false — caminho separado.
+ */
+function validateCausalApplyPreconditions(live, opts) {
+  opts = opts || {};
+  var reasons = [];
+  if (String(opts.evidenceMode || '') !== EVIDENCE_MODE_CAUSAL) {
+    return {
+      ok: false,
+      code: 'EVIDENCE_MODE_REQUIRED',
+      safety: 'UNSAFE',
+      reasons: ['EVIDENCE_MODE_NOT_CAUSAL_ROOT_SIGNATURE'],
+      evidenceMode: String(opts.evidenceMode || '')
+    };
+  }
+  var tz = String(opts.scriptTimezone || '').trim();
+  if (!tz) {
+    return {
+      ok: false,
+      code: 'SCRIPT_TIMEZONE_REQUIRED',
+      safety: 'UNSAFE',
+      reasons: ['SCRIPT_TIMEZONE_MISSING'],
+      evidenceMode: EVIDENCE_MODE_CAUSAL
+    };
+  }
+  if (!rootSig) {
+    return { ok: false, code: 'SIGNATURE_MODULE_MISSING', safety: 'UNSAFE', reasons: ['ROOT_SIG_UNAVAILABLE'] };
+  }
+
+  var nowMs = opts.nowMs != null ? opts.nowMs : Date.now();
+  var draft = live.draft || {};
+  var payload = live.payload || {};
+  var rco = live.rco || null;
+  var periodo = payload.periodo || {};
+  var state = payload.state || {};
+  var unidade = payload.unidade || {};
+  var reportId = String(draft.RCO_REPORT_ID || live.reportId || '').trim();
+  var raw = draft.DATA_SERVICO;
+  var rawStr = String(raw == null ? '' : raw).replace(/\u00a0/g, ' ').trim();
+  var status = String(draft.STATUS || '');
+  var activeOpen = status === 'EM_ANDAMENTO' || status === 'EM_RETIFICACAO';
+  var A = extractYmdFromQuotedIso(rawStr);
+  var B = String(periodo.inicio || payload.data || '').trim();
+  var C = '';
+  if (rco && (rco.REPORT_ID || rco.DATA_SERVICO)) {
+    C = Object.prototype.toString.call(rco.DATA_SERVICO) === '[object Date]'
+      ? dateTextSim(rco.DATA_SERVICO)
+      : (isYmd(rco.DATA_SERVICO) ? String(rco.DATA_SERVICO).trim() : dateTextSim(rco.DATA_SERVICO));
+  }
+  var rcoPresent = !!(rco && String(rco.REPORT_ID || '').trim());
+  var stateReportId = String(state.reportId || payload.reportId || '').trim();
+  var draftBatt = normUnit(draft.BATALHAO);
+  var draftComp = normUnit(draft.COMPANHIA);
+  var battPayload = normUnit(unidade.batalhao);
+  var compPayload = normUnit(unidade.companhia);
+  var identityParity = !!reportId && reportId === stateReportId;
+  var unitParity = !!draftBatt && !!draftComp &&
+    (!battPayload || battPayload === draftBatt) &&
+    (!compPayload || compPayload === draftComp);
+  var activeLease = leaseActive(draft.EDIT_LEASE_UNTIL, nowMs);
+  var contradictions = Array.isArray(opts.contradictionDetails) ? opts.contradictionDetails.slice() : [];
+  if (opts.contradictoryEvidence === true && !contradictions.length) contradictions.push('FLAGGED');
+  var rcoRowCount = opts.rcoRowCount != null ? Number(opts.rcoRowCount) : (rcoPresent ? 1 : 0);
+  if (rcoRowCount > 1) contradictions.push('DUPLICATE_RCO_ROWS:' + rcoRowCount);
+
+  var semanticYmd = Object.prototype.toString.call(raw) === '[object Date]'
+    ? dateTextSim(raw)
+    : (isYmd(rawStr) ? rawStr : '');
+
+  // Idempotente: já canônico, C ausente, identidade/unidade ok
+  if (semanticYmd && isYmd(semanticYmd)) {
+    var stale = [];
+    if (!activeOpen) stale.push('STATUS_NOT_ACTIVE');
+    if (!(isYmd(B) && B === semanticYmd)) stale.push('B_NE_RECOVERED');
+    if (rcoPresent || C) stale.push('C_PRESENT_UNEXPECTED');
+    if (!identityParity) stale.push('IDENTITY_MISMATCH');
+    if (!unitParity) stale.push('UNIT_MISMATCH');
+    if (activeLease) stale.push('ACTIVE_LEASE');
+    if (contradictions.length) stale.push('CONTRADICTORY_EVIDENCE');
+    if (!stale.length) {
+      return {
+        ok: true,
+        alreadyRecovered: true,
+        idempotent: true,
+        code: 'ALREADY_RECOVERED',
+        safety: 'SAFE',
+        reasons: [],
+        evidenceMode: EVIDENCE_MODE_CAUSAL,
+        scriptTimezone: tz,
+        proposedDate: semanticYmd,
+        A: A || semanticYmd,
+        B: B,
+        C: '',
+        ROOT_CAUSE_SIGNATURE_MATCH: true,
+        identityParity: true,
+        unitParity: true,
+        activeLease: false,
+        contradictoryEvidence: false
+      };
+    }
+    return {
+      ok: false,
+      alreadyRecovered: true,
+      idempotent: false,
+      code: 'ALREADY_RECOVERED_BUT_STATE_CHANGED',
+      safety: 'UNSAFE',
+      reasons: stale,
+      evidenceMode: EVIDENCE_MODE_CAUSAL,
+      scriptTimezone: tz
+    };
+  }
+
+  if (!activeOpen) reasons.push('STATUS_NOT_ACTIVE');
+  if (!isQuotedIsoDateToken(rawStr)) reasons.push('NOT_QUOTED_ISO');
+  if (!(isYmd(A) && isYmd(B) && A === B)) {
+    if (isYmd(A) && isYmd(B) && A !== B) reasons.push('A_NE_B');
+    else reasons.push('A_NE_B_OR_NOT_CANONICAL');
+  }
+  if (!isYmd(B)) reasons.push('B_NOT_CANONICAL_YMD');
+  if (rcoPresent || C) reasons.push('C_MUST_BE_MISSING');
+  if (rcoRowCount > 1) reasons.push('DUPLICATE_RCO_ROWS');
+
+  var sig = rootSig.rootCauseSignatureMatch(rawStr, B, tz);
+  if (!sig.ROOT_CAUSE_SIGNATURE_MATCH) reasons.push('ROOT_CAUSE_SIGNATURE_MISMATCH');
+  if (!identityParity) reasons.push('IDENTITY_MISMATCH');
+  if (!unitParity) reasons.push('UNIT_MISMATCH');
+  if (activeLease) reasons.push('ACTIVE_LEASE');
+  if (contradictions.length) reasons.push('CONTRADICTORY_EVIDENCE');
+
+  return {
+    ok: reasons.length === 0,
+    alreadyRecovered: false,
+    idempotent: false,
+    code: reasons.length === 0 ? 'READY_TO_APPLY_CAUSAL' : 'CAUSAL_GATE_FAILED',
+    safety: reasons.length === 0 ? 'SAFE' : 'UNSAFE',
+    reasons: reasons,
+    evidenceMode: EVIDENCE_MODE_CAUSAL,
+    scriptTimezone: tz,
+    proposedDate: reasons.length === 0 ? B : '',
+    A: A,
+    B: B,
+    C: C || '',
+    SERIALIZED_FROM_B: sig.SERIALIZED_FROM_B,
+    RAW_DATA_SERVICO: rawStr,
+    ROOT_CAUSE_SIGNATURE_MATCH: !!sig.ROOT_CAUSE_SIGNATURE_MATCH,
+    RECONSTRUCTED_DATE_OBJECT_ISO: sig.RECONSTRUCTED_DATE_OBJECT_ISO,
+    identityParity: identityParity,
+    unitParity: unitParity,
+    activeLease: activeLease,
+    contradictoryEvidence: contradictions.length > 0,
+    contradictionDetails: contradictions,
+    rcoRowExpectedAtThisStage: false
+  };
+}
+
+/**
+ * Simula apply causal (teste): snapshot → write um campo → read-back.
+ */
+function applyCausalSimulated(db, opts) {
+  opts = opts || {};
+  var reportId = String(opts.reportId || CAUSAL_PILOT_REPORT_ID).trim();
+  var row = db.drafts[reportId];
+  if (!row) {
+    return {
+      ok: false,
+      aborted: true,
+      reasons: ['DRAFT_NOT_FOUND'],
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
+      evidenceMode: EVIDENCE_MODE_CAUSAL
+    };
+  }
+  var live = {
+    reportId: reportId,
+    draft: row,
+    payload: db.payloads[reportId] || {},
+    rco: db.rcos && db.rcos[reportId] ? db.rcos[reportId] : null
+  };
+  var v = validateCausalApplyPreconditions(live, {
+    evidenceMode: opts.evidenceMode,
+    scriptTimezone: opts.scriptTimezone || PRODUCTION_SCRIPT_TZ,
+    nowMs: opts.nowMs,
+    contradictionDetails: opts.contradictionDetails,
+    contradictoryEvidence: opts.contradictoryEvidence,
+    rcoRowCount: opts.rcoRowCount
+  });
+  if (v.alreadyRecovered && v.ok && v.idempotent) {
+    return {
+      ok: true,
+      alreadyRecovered: true,
+      idempotent: true,
+      code: 'ALREADY_RECOVERED',
+      safety: 'SAFE',
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
+      writeFields: [],
+      snapshotCreated: false,
+      auditEvent: '',
+      evidenceMode: EVIDENCE_MODE_CAUSAL,
+      readBackOk: true,
+      unexpectedChangedFields: [],
+      otherFieldsChanged: false
+    };
+  }
+  if (!v.ok) {
+    return {
+      ok: false,
+      aborted: true,
+      reasons: v.reasons.slice(),
+      code: v.code,
+      safety: 'UNSAFE',
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
+      writeFields: [],
+      snapshotCreated: false,
+      evidenceMode: EVIDENCE_MODE_CAUSAL,
+      causalGateAllPass: false
+    };
+  }
+
+  var beforeProj = projectDraftRow(row);
+  var snapshot = {
+    kind: 'PRE_RCO_DATE_RECOVERY',
+    evidenceMode: EVIDENCE_MODE_CAUSAL,
+    reportId: reportId,
+    scriptTimezone: v.scriptTimezone,
+    serializedFromB: v.SERIALIZED_FROM_B,
+    rawDataServico: v.RAW_DATA_SERVICO,
+    A: v.A,
+    B: v.B,
+    C: 'MISSING_PRE_CONSOLIDATION',
+    draftRow: JSON.parse(JSON.stringify(row)),
+    payload: JSON.parse(JSON.stringify(live.payload))
+  };
+  db.snapshots = db.snapshots || [];
+  db.snapshots.push(snapshot);
+
+  var beforeRaw = String(row.DATA_SERVICO);
+  row.DATA_SERVICO = v.proposedDate;
+  if (typeof opts.injectSideEffect === 'function') opts.injectSideEffect(row);
+  db.writes = db.writes || [];
+  db.writes.push({ field: 'DATA_SERVICO', from: beforeRaw, to: v.proposedDate });
+
+  if (opts.simulateReadbackFail) {
+    row.DATA_SERVICO = opts.simulateReadbackFail === true ? beforeRaw : opts.simulateReadbackFail;
+  }
+
+  var afterProj = projectDraftRow(row);
+  var unexpectedChangedFields = diffDraftRowsExcludingDate(beforeProj, afterProj);
+  var otherFieldsChanged = unexpectedChangedFields.length > 0;
+  var afterYmd = isYmd(row.DATA_SERVICO) ? String(row.DATA_SERVICO) : dateTextSim(row.DATA_SERVICO);
+  var readBackOk = afterYmd === v.proposedDate && !otherFieldsChanged;
+
+  db.audits = db.audits || [];
+  if (!readBackOk) {
+    db.audits.push({ action: 'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED', reportId: reportId });
+    return {
+      ok: false,
+      aborted: true,
+      code: 'READBACK_FAILED',
+      safety: 'UNSAFE',
+      mutatedDraftRow: true,
+      mutatedProductionRows: false,
+      writeFields: ['DATA_SERVICO'],
+      snapshotCreated: true,
+      readBackOk: false,
+      unexpectedChangedFields: unexpectedChangedFields,
+      otherFieldsChanged: otherFieldsChanged,
+      evidenceMode: EVIDENCE_MODE_CAUSAL,
+      auditEvent: 'RCO_DATE_CAUSAL_RECOVERY_READBACK_FAILED'
+    };
+  }
+
+  db.audits.push({
+    action: 'RCO_DATE_CAUSAL_RECOVERY_APPLIED',
+    reportId: reportId,
+    evidenceMode: EVIDENCE_MODE_CAUSAL,
+    before: beforeRaw,
+    after: v.proposedDate,
+    A: v.A,
+    B: v.B,
+    C: 'MISSING_PRE_CONSOLIDATION',
+    scriptTimezone: v.scriptTimezone,
+    serializedFromB: v.SERIALIZED_FROM_B,
+    rootCauseSignatureMatch: true
+  });
+
+  return {
+    ok: true,
+    alreadyRecovered: false,
+    idempotent: false,
+    code: 'CAUSAL_APPLIED',
+    safety: 'SAFE',
+    mutatedDraftRow: true,
+    mutatedProductionRows: false,
+    writeFields: ['DATA_SERVICO'],
+    snapshotCreated: true,
+    readBackOk: true,
+    unexpectedChangedFields: [],
+    otherFieldsChanged: false,
+    evidenceMode: EVIDENCE_MODE_CAUSAL,
+    auditEvent: 'RCO_DATE_CAUSAL_RECOVERY_APPLIED',
+    postApply: { DATA_SERVICO: afterYmd, STATUS: String(row.STATUS || ''), REVISAO: Number(row.REVISAO || 0), PAYLOAD_HASH: String(row.PAYLOAD_HASH || '') },
+    proposedDate: v.proposedDate,
+    causalGateAllPass: true,
+    ROOT_CAUSE_SIGNATURE_MATCH: true,
+    scriptTimezone: v.scriptTimezone,
+    A: v.A,
+    B: v.B,
+    C: ''
+  };
+}
+
 module.exports = {
   PILOT_APPLY_EXPECTED: PILOT_APPLY_EXPECTED,
+  CAUSAL_PILOT_REPORT_ID: CAUSAL_PILOT_REPORT_ID,
+  EVIDENCE_MODE_CAUSAL: EVIDENCE_MODE_CAUSAL,
+  PRODUCTION_SCRIPT_TZ: PRODUCTION_SCRIPT_TZ,
   RCO_SNAPSHOT_FOLDER_PROP: RCO_SNAPSHOT_FOLDER_PROP,
   RCO_SNAPSHOT_FOLDER_NAME: RCO_SNAPSHOT_FOLDER_NAME,
   FASE3_ACTIVE_ABC_IDS: [
@@ -807,5 +1136,7 @@ module.exports = {
   validateApplyPreconditions: validateApplyPreconditions,
   applySimulated: applySimulated,
   buildExpectedFromLive: buildExpectedFromLive,
-  applySerialActiveAbc: applySerialActiveAbc
+  applySerialActiveAbc: applySerialActiveAbc,
+  validateCausalApplyPreconditions: validateCausalApplyPreconditions,
+  applyCausalSimulated: applyCausalSimulated
 };

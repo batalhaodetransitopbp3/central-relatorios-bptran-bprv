@@ -10,10 +10,25 @@
  */
 'use strict';
 
-var DEFAULT_SCRIPT_TZ = 'America/Fortaleza';
+/**
+ * Documentação do timezone LIVE observado (Session.getScriptTimeZone).
+ * NÃO usar como fallback silencioso em apply causal — timezone deve ser explícito.
+ */
+var PRODUCTION_SCRIPT_TZ = 'America/Sao_Paulo';
+
+/** @deprecated Preferir timezone explícito; mantido só para fixtures legados não-causais. */
+var DEFAULT_SCRIPT_TZ = PRODUCTION_SCRIPT_TZ;
 
 /** Espelho documentado: linha RCO na aba RCO só nasce em rcoConsolidateFinal_/rcoSupplementalUpsertBody_. */
 var RCO_TABLE_ROW_EXPECTED_BEFORE_CONSOLIDATION = false;
+
+function requireTimeZone(timeZone, fnName) {
+  var tz = String(timeZone || '').trim();
+  if (!tz) {
+    throw new Error((fnName || 'signature') + ': timezone IANA explícito obrigatório (ex.: America/Sao_Paulo)');
+  }
+  return tz;
+}
 
 function isYmd(v) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim());
@@ -67,7 +82,7 @@ function getTimezoneOffsetMs(date, timeZone) {
  */
 function zonedCivilMidnightDate(ymd, timeZone) {
   if (!isYmd(ymd)) return null;
-  timeZone = timeZone || DEFAULT_SCRIPT_TZ;
+  timeZone = requireTimeZone(timeZone, 'zonedCivilMidnightDate');
   var p = String(ymd).trim().split('-').map(Number);
   var y = p[0];
   var m = p[1];
@@ -88,21 +103,22 @@ function zonedCivilMidnightDate(ymd, timeZone) {
  * Retorno inclui as aspas literais, ex.: `"2026-09-30T03:00:00.000Z"`.
  */
 function serializeBugQuotedIsoFromYmd(ymd, timeZone) {
-  var dt = zonedCivilMidnightDate(ymd, timeZone);
+  var tz = requireTimeZone(timeZone, 'serializeBugQuotedIsoFromYmd');
+  var dt = zonedCivilMidnightDate(ymd, tz);
   if (!dt) return '';
   return JSON.stringify(dt);
 }
 
 function rootCauseSignatureMatch(rawCorrupted, payloadYmd, timeZone) {
+  var tz = requireTimeZone(timeZone, 'rootCauseSignatureMatch');
   var raw = String(rawCorrupted == null ? '' : rawCorrupted).replace(/\u00a0/g, ' ').trim();
   var b = String(payloadYmd || '').trim();
-  var serialized = serializeBugQuotedIsoFromYmd(b, timeZone);
+  var serialized = serializeBugQuotedIsoFromYmd(b, tz);
+  var recon = zonedCivilMidnightDate(b, tz);
   return {
     B_PAYLOAD_YMD: b,
-    SCRIPT_TIMEZONE: timeZone || DEFAULT_SCRIPT_TZ,
-    RECONSTRUCTED_DATE_OBJECT_ISO: zonedCivilMidnightDate(b, timeZone)
-      ? zonedCivilMidnightDate(b, timeZone).toISOString()
-      : '',
+    SCRIPT_TIMEZONE: tz,
+    RECONSTRUCTED_DATE_OBJECT_ISO: recon ? recon.toISOString() : '',
     SERIALIZED_FROM_B: serialized,
     RAW_CORRUPTED: raw,
     ROOT_CAUSE_SIGNATURE_MATCH: !!serialized && raw === serialized
@@ -121,7 +137,7 @@ function classifyCausalRecovery(item) {
   var A = String(item.A_QUOTED_YMD || extractYmdFromQuotedIso(raw) || '').trim();
   var B = String(item.B_PAYLOAD_YMD || '').trim();
   var C = String(item.C_RCO || '').trim();
-  var tz = item.SCRIPT_TIMEZONE || DEFAULT_SCRIPT_TZ;
+  var tz = requireTimeZone(item.SCRIPT_TIMEZONE, 'classifyCausalRecovery');
   var sig = rootCauseSignatureMatch(raw, B, tz);
   var identityParity = item.IDENTITY_PARITY === true;
   var unitParity = item.UNIT_PARITY === true;
@@ -177,8 +193,10 @@ function classifyCausalRecovery(item) {
 }
 
 module.exports = {
+  PRODUCTION_SCRIPT_TZ: PRODUCTION_SCRIPT_TZ,
   DEFAULT_SCRIPT_TZ: DEFAULT_SCRIPT_TZ,
   RCO_TABLE_ROW_EXPECTED_BEFORE_CONSOLIDATION: RCO_TABLE_ROW_EXPECTED_BEFORE_CONSOLIDATION,
+  requireTimeZone: requireTimeZone,
   isYmd: isYmd,
   isQuotedIsoDateToken: isQuotedIsoDateToken,
   extractYmdFromQuotedIso: extractYmdFromQuotedIso,
