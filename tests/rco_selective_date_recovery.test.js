@@ -431,6 +431,7 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyPilot_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyActiveAbcSerialFase3_') >= 0);
   assert.ok(src.indexOf('function auditRcoActiveAbMissingForensicRo_') >= 0);
+  assert.ok(src.indexOf('function auditRcoActiveAbCausalSignatureRo_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyFinalizedAbcSerialFase5_') >= 0);
   assert.ok(src.indexOf('requireFinalized') >= 0);
   assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0);
@@ -448,6 +449,9 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   }
   if (!process.env.ALLOW_TEMP_FASE5_ACTION) {
     assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-apply-finalized-abc-serial'") < 0);
+  }
+  if (!process.env.ALLOW_TEMP_FASE6_ACTION) {
+    assert.ok(src.indexOf("action === 'audit-rco-active-ab-causal-signature-ro'") < 0);
   }
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf('PRE_RCO_DATE_RECOVERY') >= 0);
