@@ -632,10 +632,160 @@ function applySimulated(db, expected, opts) {
   };
 }
 
+/**
+ * Rebuild expected from live snapshot (FASE 3). requireActive + requireAbc.
+ */
+function buildExpectedFromLive(live, opts) {
+  opts = opts || {};
+  var draft = live.draft || {};
+  var payload = live.payload || {};
+  var rco = live.rco || {};
+  var periodo = payload.periodo || {};
+  var state = payload.state || {};
+  var reportId = String(draft.RCO_REPORT_ID || live.reportId || '').trim();
+  var raw = draft.DATA_SERVICO;
+  var rawStr = Object.prototype.toString.call(raw) === '[object Date]'
+    ? dateTextSim(raw)
+    : String(raw == null ? '' : raw);
+  var semanticYmd = Object.prototype.toString.call(raw) === '[object Date]'
+    ? dateTextSim(raw)
+    : (isYmd(rawStr) ? rawStr : '');
+  var payloadInicio = String(periodo.inicio || payload.data || '').trim();
+  var stateReportId = String(state.reportId || payload.reportId || '').trim();
+  var rcoReportId = String(rco.REPORT_ID || '').trim();
+  var rcoDate = Object.prototype.toString.call(rco.DATA_SERVICO) === '[object Date]'
+    ? dateTextSim(rco.DATA_SERVICO)
+    : (isYmd(rco.DATA_SERVICO) ? String(rco.DATA_SERVICO).trim() : dateTextSim(rco.DATA_SERVICO));
+  var quotedYmd = extractYmdFromQuotedIso(rawStr);
+  var abcParity =
+    isQuotedIsoDateToken(rawStr) &&
+    isYmd(quotedYmd) &&
+    isYmd(payloadInicio) &&
+    isYmd(rcoDate) &&
+    quotedYmd === payloadInicio &&
+    payloadInicio === rcoDate;
+  var statusLive = String(draft.STATUS || '');
+  var activeOpen = ['EM_ANDAMENTO', 'EM_RETIFICACAO'].indexOf(statusLive) >= 0;
+  var activeLease = leaseActive(draft.EDIT_LEASE_UNTIL, opts.nowMs);
+  var reasons = [];
+  if (String(draft.RCO_REPORT_ID || '') !== reportId) reasons.push('REPORT_ID_MISMATCH');
+  if (!(reportId && reportId === rcoReportId && reportId === stateReportId)) reasons.push('IDENTITY_MISMATCH');
+  if (activeLease) reasons.push('ACTIVE_EDIT_RISK');
+  if (opts.requireActive !== false && !activeOpen) reasons.push('STATUS_NOT_ACTIVE');
+  if (semanticYmd) {
+    if (!(isYmd(payloadInicio) && isYmd(rcoDate) && payloadInicio === rcoDate && payloadInicio === semanticYmd)) {
+      reasons.push('DATE_EVIDENCE_MISMATCH');
+    }
+  } else if (!abcParity) {
+    reasons.push('DATE_EVIDENCE_MISMATCH');
+    if (!isQuotedIsoDateToken(rawStr)) reasons.push('NOT_QUOTED_ISO');
+  }
+  if (reasons.length) {
+    return { ok: false, reasons: reasons, abcParity: !!abcParity, alreadyYmd: !!semanticYmd };
+  }
+  var expectedDate = semanticYmd || quotedYmd;
+  return {
+    ok: true,
+    abcParity: !!abcParity || (!!semanticYmd && payloadInicio === semanticYmd && rcoDate === semanticYmd),
+    alreadyYmd: !!semanticYmd,
+    expected: {
+      reportId: reportId,
+      status: statusLive,
+      batalhao: normUnit(draft.BATALHAO),
+      companhia: normUnit(draft.COMPANHIA),
+      dataServicoRaw: String(raw == null ? '' : raw),
+      revisao: Number(draft.REVISAO || 0),
+      payloadHash: String(draft.PAYLOAD_HASH || ''),
+      payloadPeriodoInicio: payloadInicio,
+      expectedDate: expectedDate,
+      rcoDataServico: rcoDate
+    }
+  };
+}
+
+/**
+ * Serial apply of authorized active ABC ids — stop on first failure.
+ */
+function applySerialActiveAbc(db, reportIds, opts) {
+  opts = opts || {};
+  var results = [];
+  var recovered = [];
+  for (var i = 0; i < reportIds.length; i++) {
+    var id = reportIds[i];
+    var live = {
+      reportId: id,
+      draft: db.drafts[id],
+      payload: db.payloads[id] || {},
+      rco: db.rcos[id] || {}
+    };
+    if (!live.draft) {
+      var miss = { ok: false, aborted: true, reasons: ['DRAFT_NOT_FOUND'], reportId: id };
+      results.push(miss);
+      return {
+        ok: false,
+        serialSequenceCompleted: false,
+        abortedReportId: id,
+        abortReason: 'DRAFT_NOT_FOUND',
+        recoveredReportIds: recovered.slice(),
+        results: results
+      };
+    }
+    var built = buildExpectedFromLive(live, opts);
+    if (!built.ok) {
+      var abort = {
+        ok: false,
+        aborted: true,
+        reasons: built.reasons.slice(),
+        code: 'PRECONDITION_FAILED',
+        reportId: id,
+        abcParity: built.abcParity
+      };
+      results.push(abort);
+      return {
+        ok: false,
+        serialSequenceCompleted: false,
+        abortedReportId: id,
+        abortReason: built.reasons.join(','),
+        recoveredReportIds: recovered.slice(),
+        results: results
+      };
+    }
+    var out = applySimulated(db, built.expected, opts);
+    out.reportId = id;
+    out.abcParity = built.abcParity;
+    results.push(out);
+    if (out.ok && (out.mutatedDraftRow || out.alreadyRecovered)) recovered.push(id);
+    if (!out.ok) {
+      return {
+        ok: false,
+        serialSequenceCompleted: false,
+        abortedReportId: id,
+        abortReason: String(out.code || (out.reasons || []).join(',') || 'UNKNOWN'),
+        recoveredReportIds: recovered.slice(),
+        results: results
+      };
+    }
+  }
+  return {
+    ok: true,
+    serialSequenceCompleted: true,
+    abortedReportId: '',
+    abortReason: '',
+    recoveredReportIds: recovered.slice(),
+    results: results
+  };
+}
+
 module.exports = {
   PILOT_APPLY_EXPECTED: PILOT_APPLY_EXPECTED,
   RCO_SNAPSHOT_FOLDER_PROP: RCO_SNAPSHOT_FOLDER_PROP,
   RCO_SNAPSHOT_FOLDER_NAME: RCO_SNAPSHOT_FOLDER_NAME,
+  FASE3_ACTIVE_ABC_IDS: [
+    'cpu-aa7032a3-6927-4c86-8668-4a9cfc96ed73',
+    'cpu-5adae17b-0962-43a5-8663-713e29ae12ae',
+    'cpu-51cac595-eb20-4937-8fea-ca0e0bf53ddf',
+    'cpu-b5a23368-278a-4d7c-8464-8f7cb198a6dd'
+  ],
   isQuotedIsoDateToken: isQuotedIsoDateToken,
   extractYmdFromQuotedIso: extractYmdFromQuotedIso,
   isYmd: isYmd,
@@ -647,5 +797,7 @@ module.exports = {
   buildManifest: buildManifest,
   dryRun: dryRun,
   validateApplyPreconditions: validateApplyPreconditions,
-  applySimulated: applySimulated
+  applySimulated: applySimulated,
+  buildExpectedFromLive: buildExpectedFromLive,
+  applySerialActiveAbc: applySerialActiveAbc
 };

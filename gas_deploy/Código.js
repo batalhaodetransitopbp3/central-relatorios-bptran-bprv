@@ -5602,17 +5602,19 @@ function rcoSelectiveDateRecoveryApplyPilot_(){
 }
 
 /**
- * FASE 2 — APPLY controlado: SOMENTE RCO_RASCUNHOS.DATA_SERVICO.
- * ScriptLock + re-leitura + preconditions exatas + snapshot RCO + célula única +
+ * FASE 2/3 — APPLY controlado: SOMENTE RCO_RASCUNHOS.DATA_SERVICO.
+ * ScriptLock + re-leitura + preconditions + snapshot RCO + célula única +
  * read-back crítico + row-diff + audit. ACTIVE_EDIT_RISK BLOQUEANTE.
- * Idempotência exige preconditions live (STATUS/REVISAO/HASH). NÃO expor em doGet/doPost.
+ * opts.rebuildFromLive: reconstrói expected a partir do estado LIVE (A=B=C).
+ * NÃO expor em doGet/doPost (exceto harness TEMP temporário).
  */
 function rcoSelectiveDateRecoveryApply_(opts){
   opts=opts||{};
   var expected=opts.expected||{};
   var reportId=String(opts.reportId||expected.reportId||'').trim();
   if(!reportId)throw new Error('Informe reportId.');
-  if(!expected.expectedDate||!expected.dataServicoRaw)throw new Error('Informe expected.dataServicoRaw e expected.expectedDate.');
+  if(!opts.rebuildFromLive && (!expected.expectedDate||!expected.dataServicoRaw))
+    throw new Error('Informe expected.dataServicoRaw e expected.expectedDate (ou rebuildFromLive).');
   var lock=LockService.getScriptLock();
   lock.waitLock(20000);
   try{
@@ -5695,8 +5697,53 @@ function rcoSelectiveDateRecoveryApply_(opts){
     var rcoDate=rcoYmd_(rco.DATA_SERVICO);
     var activeLease=leaseActive_(draft);
     var reasons=[];
+    var quotedYmd=ymdQuoted_(rawStr);
+    var abcParity=isQuoted_(rawStr)&&isYmd_(quotedYmd)&&isYmd_(payloadInicio)&&isYmd_(rcoDate)&&
+      quotedYmd===payloadInicio&&payloadInicio===rcoDate;
+    var statusLive=String(draft.STATUS||'');
+    var activeOpen=['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(statusLive)>=0;
     var baseReturn={writeFields:[],publicActionExposed:false,backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_(),reportId:reportId,
-      mutatedDraftRow:false,mutatedProductionRows:false};
+      mutatedDraftRow:false,mutatedProductionRows:false,abcParity:!!abcParity};
+
+    // FASE 3: reconstruir expected a partir do LIVE (nunca confiar em manifest antigo).
+    if(opts.rebuildFromLive){
+      var liveAbort=[];
+      if(String(draft.RCO_REPORT_ID||'')!==reportId)liveAbort.push('REPORT_ID_MISMATCH');
+      if(!(reportId&&reportId===rcoReportId&&reportId===stateReportId))liveAbort.push('IDENTITY_MISMATCH');
+      if(activeLease)liveAbort.push('ACTIVE_EDIT_RISK');
+      if(opts.requireActive!==false&&!activeOpen)liveAbort.push('STATUS_NOT_ACTIVE');
+      if(semanticYmd){
+        // Já canônico: só aceita se ainda A/B/C coerentes com a data recuperada.
+        if(!(isYmd_(payloadInicio)&&isYmd_(rcoDate)&&payloadInicio===rcoDate&&payloadInicio===semanticYmd))
+          liveAbort.push('DATE_EVIDENCE_MISMATCH');
+        if(liveAbort.length){
+          return Object.assign({},baseReturn,{
+            ok:false,aborted:true,alreadyRecovered:true,idempotent:false,staleManifest:true,
+            code:'ALREADY_RECOVERED_BUT_STATE_CHANGED',safety:'UNSAFE',reasons:liveAbort,
+            preApply:{DATA_SERVICO:rawStr,STATUS:statusLive,REVISAO:Number(draft.REVISAO||0),PAYLOAD_HASH:String(draft.PAYLOAD_HASH||''),EDIT_LEASE_UNTIL:String(draft.EDIT_LEASE_UNTIL||''),activeLease:activeLease}
+          });
+        }
+        expected={
+          reportId:reportId,status:statusLive,batalhao:norm_(draft.BATALHAO),companhia:norm_(draft.COMPANHIA),
+          dataServicoRaw:rawStr,revisao:Number(draft.REVISAO||0),payloadHash:String(draft.PAYLOAD_HASH||''),
+          payloadPeriodoInicio:payloadInicio,expectedDate:semanticYmd,rcoDataServico:rcoDate
+        };
+      }else{
+        if(!abcParity)liveAbort.push('DATE_EVIDENCE_MISMATCH');
+        if(!isQuoted_(rawStr))liveAbort.push('NOT_QUOTED_ISO');
+        if(liveAbort.length){
+          return Object.assign({},baseReturn,{
+            ok:false,aborted:true,reasons:liveAbort,code:'PRECONDITION_FAILED',safety:'UNSAFE',
+            preApply:{DATA_SERVICO:rawStr,STATUS:statusLive,REVISAO:Number(draft.REVISAO||0),PAYLOAD_HASH:String(draft.PAYLOAD_HASH||''),EDIT_LEASE_UNTIL:String(draft.EDIT_LEASE_UNTIL||''),activeLease:activeLease}
+          });
+        }
+        expected={
+          reportId:reportId,status:statusLive,batalhao:norm_(draft.BATALHAO),companhia:norm_(draft.COMPANHIA),
+          dataServicoRaw:rawStr,revisao:Number(draft.REVISAO||0),payloadHash:String(draft.PAYLOAD_HASH||''),
+          payloadPeriodoInicio:payloadInicio,expectedDate:quotedYmd,rcoDataServico:rcoDate
+        };
+      }
+    }
 
     // Já YYYY-MM-DD: só idempotente se preconditions live (STATUS/REVISAO/HASH/identidade) baterem.
     if(semanticYmd===String(expected.expectedDate)){
@@ -5737,7 +5784,6 @@ function rcoSelectiveDateRecoveryApply_(opts){
     if(rcoReportId!==reportId)reasons.push('RCO_REPORT_ID_MISMATCH');
     if(rcoDate!==String(expected.rcoDataServico))reasons.push('RCO_DATE_MISMATCH');
     if(!(reportId&&reportId===rcoReportId&&reportId===stateReportId))reasons.push('IDENTITY_MISMATCH');
-    var quotedYmd=ymdQuoted_(rawStr);
     if(!(isQuoted_(rawStr)&&quotedYmd===String(expected.expectedDate)&&payloadInicio===String(expected.expectedDate)&&rcoDate===String(expected.expectedDate)))
       reasons.push('DATE_EVIDENCE_MISMATCH');
     if(activeLease)reasons.push('ACTIVE_EDIT_RISK');
@@ -5882,8 +5928,15 @@ function rcoSelectiveDateRecoveryApply_(opts){
       revisaoUnchanged:true
     });
 
-    // Visibilidade de escopo (READ-ONLY)
+    // Visibilidade de escopo (READ-ONLY) — datas erradas = vizinhos do expectedDate
     var wantDate=String(expected.expectedDate);
+    function shiftYmd_(ymd,delta){
+      var p=String(ymd||'').split('-');
+      if(p.length!==3)return '';
+      var dt=new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+      dt.setDate(dt.getDate()+Number(delta||0));
+      return Utilities.formatDate(dt,scriptTz_(),'yyyy-MM-dd');
+    }
     var visibleCorrect=objectsFields_(draftSheet,['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA','STATUS']).some(function(x){
       return String(x.RCO_REPORT_ID||'')===reportId &&
         norm_(x.BATALHAO)===String(expected.batalhao)&&
@@ -5891,12 +5944,51 @@ function rcoSelectiveDateRecoveryApply_(opts){
         dateText_(x.DATA_SERVICO)===wantDate&&
         ['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(x.STATUS||''))>=0;
     });
-    var wrongDates=['2026-09-30','2026-10-02'];
+    var wrongDates=[shiftYmd_(wantDate,-1),shiftYmd_(wantDate,1)].filter(Boolean);
     var visibleWrong=wrongDates.some(function(wd){
       return objectsFields_(draftSheet,['RCO_REPORT_ID','DATA_SERVICO','BATALHAO','COMPANHIA']).some(function(x){
         return String(x.RCO_REPORT_ID||'')===reportId && dateText_(x.DATA_SERVICO)===wd;
       });
     });
+
+    if((['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(postStatus)>=0) && (!visibleCorrect || visibleWrong)){
+      return {
+        ok:false,
+        aborted:true,
+        alreadyRecovered:false,
+        idempotent:false,
+        mutatedDraftRow:true,
+        mutatedProductionRows:false,
+        writeFields:['DATA_SERVICO'],
+        publicActionExposed:false,
+        backendVersion:CENTRAL_V10_VERSION,
+        generatedAt:nowIso_(),
+        reportId:reportId,
+        code:'SCOPE_VALIDATION_FAILED',
+        safety:'UNSAFE',
+        abcParity:true,
+        preApply:{
+          DATA_SERVICO:rawStr,STATUS:String(draft.STATUS||''),REVISAO:Number(draft.REVISAO||0),
+          PAYLOAD_HASH:String(draft.PAYLOAD_HASH||''),EDIT_LEASE_UNTIL:String(draft.EDIT_LEASE_UNTIL||''),activeLease:false
+        },
+        postApply:{
+          DATA_SERVICO:afterYmd,DATA_SERVICO_RAW:afterStr,STATUS:postStatus,REVISAO:postRev,
+          PAYLOAD_HASH:postHash,BATALHAO:postBatt,COMPANHIA:postComp,
+          P3_CONSOLIDADO:postP3,P3_CONSOLIDATE_INTEGRAL:postIntegral
+        },
+        snapshotCreated:true,
+        snapshotFileId:snapFile.getId(),
+        snapshotFileUrl:snapFile.getUrl(),
+        snapshotFileName:snapName,
+        snapshotFolder:'Central RCO - Recovery Snapshots',
+        auditEvent:'RCO_DATE_RECOVERY_APPLIED',
+        readBackOk:true,
+        rcoVisibleInCorrectScope:!!visibleCorrect,
+        rcoVisibleInWrongScope:!!visibleWrong,
+        otherFieldsChanged:false,
+        unexpectedChangedFields:[]
+      };
+    }
 
     return {
       ok:true,
@@ -5912,6 +6004,7 @@ function rcoSelectiveDateRecoveryApply_(opts){
       reportId:reportId,
       code:'APPLIED',
       safety:'SAFE',
+      abcParity:true,
       preApply:{
         DATA_SERVICO:rawStr,STATUS:String(draft.STATUS||''),REVISAO:Number(draft.REVISAO||0),
         PAYLOAD_HASH:String(draft.PAYLOAD_HASH||''),EDIT_LEASE_UNTIL:String(draft.EDIT_LEASE_UNTIL||''),activeLease:false
@@ -5942,5 +6035,57 @@ function rcoSelectiveDateRecoveryApply_(opts){
   }finally{
     lock.releaseLock();
   }
+}
+
+/** FASE 3 — serial STRICT: somente 4 ativos autorizados com A=B=C. Para no primeiro erro. */
+function rcoSelectiveDateRecoveryApplyActiveAbcSerialFase3_(){
+  var ids=[
+    'cpu-aa7032a3-6927-4c86-8668-4a9cfc96ed73',
+    'cpu-5adae17b-0962-43a5-8663-713e29ae12ae',
+    'cpu-51cac595-eb20-4937-8fea-ca0e0bf53ddf',
+    'cpu-b5a23368-278a-4d7c-8464-8f7cb198a6dd'
+  ];
+  var results=[];
+  var recovered=[];
+  for(var i=0;i<ids.length;i++){
+    var out=rcoSelectiveDateRecoveryApply_({
+      reportId:ids[i],
+      rebuildFromLive:true,
+      requireActive:true,
+      requireAbc:true,
+      branchSha:'e30e45995a140409e32260eced05f8ce64381b7f',
+      reason:'REPAIR_QUOTED_ISO_DATA_SERVICO'
+    });
+    results.push(out);
+    if(out&&out.ok&&out.mutatedDraftRow)recovered.push(ids[i]);
+    if(out&&out.ok&&out.alreadyRecovered&&out.idempotent)recovered.push(ids[i]);
+    if(!(out&&out.ok)){
+      return {
+        ok:false,
+        serialSequenceCompleted:false,
+        abortedReportId:ids[i],
+        abortReason:String(out&&(out.code||((out.reasons||[]).join(',')))||'UNKNOWN'),
+        abortReasons:out&&out.reasons||[],
+        recoveredReportIds:recovered.slice(),
+        results:results,
+        publicActionExposed:false,
+        mutatedProductionRows:false,
+        backendVersion:CENTRAL_V10_VERSION,
+        generatedAt:nowIso_()
+      };
+    }
+  }
+  return {
+    ok:true,
+    serialSequenceCompleted:true,
+    abortedReportId:'',
+    abortReason:'',
+    recoveredReportIds:recovered.slice(),
+    results:results,
+    publicActionExposed:false,
+    mutatedProductionRows:false,
+    backendVersion:CENTRAL_V10_VERSION,
+    generatedAt:nowIso_()
+  };
 }
 

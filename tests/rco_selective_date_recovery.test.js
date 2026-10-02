@@ -330,17 +330,102 @@ test('TEST_RCO_SNAPSHOT_FOLDER', function () {
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_READBACK_FAILED') >= 0);
 });
 
+test('TEST_BUILD_EXPECTED_FROM_LIVE_ABC', function () {
+  const live = JSON.parse(JSON.stringify(PILOT_LIVE));
+  live.draft.STATUS = 'EM_ANDAMENTO';
+  const built = R.buildExpectedFromLive(live);
+  assert.strictEqual(built.ok, true);
+  assert.strictEqual(built.abcParity, true);
+  assert.strictEqual(built.expected.expectedDate, '2026-10-01');
+  assert.strictEqual(built.expected.revisao, 1);
+  assert.strictEqual(built.expected.payloadHash, 'a50dded450683ed9cf597ae8b9bacd71');
+});
+
+test('TEST_SERIAL_STOPS_ON_FIRST_FAILURE', function () {
+  const a = JSON.parse(JSON.stringify(PILOT_LIVE));
+  a.reportId = 'cpu-serial-a';
+  a.draft.RCO_REPORT_ID = 'cpu-serial-a';
+  a.payload.state.reportId = 'cpu-serial-a';
+  a.rco.REPORT_ID = 'cpu-serial-a';
+  const b = JSON.parse(JSON.stringify(PILOT_LIVE));
+  b.reportId = 'cpu-serial-b';
+  b.draft.RCO_REPORT_ID = 'cpu-serial-b';
+  b.payload.state.reportId = 'cpu-serial-b';
+  b.rco.REPORT_ID = 'cpu-serial-b';
+  b.draft.DATA_SERVICO = '"2026-09-30T03:00:00.000Z"';
+  b.payload.periodo.inicio = '2026-09-29'; // A≠B → abort
+  b.rco.DATA_SERVICO = '2026-09-29';
+  const db = {
+    drafts: { 'cpu-serial-a': a.draft, 'cpu-serial-b': b.draft },
+    payloads: { 'cpu-serial-a': a.payload, 'cpu-serial-b': b.payload },
+    rcos: { 'cpu-serial-a': a.rco, 'cpu-serial-b': b.rco },
+    snapshots: [],
+    writes: [],
+    audits: []
+  };
+  // break first so serial stops before second
+  db.drafts['cpu-serial-a'].EDIT_LEASE_UNTIL = '2099-01-01T00:00:00.000Z';
+  const out = R.applySerialActiveAbc(db, ['cpu-serial-a', 'cpu-serial-b'], {
+    nowMs: Date.parse('2026-10-01T18:00:00.000Z')
+  });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.serialSequenceCompleted, false);
+  assert.strictEqual(out.abortedReportId, 'cpu-serial-a');
+  assert.ok(String(out.abortReason).indexOf('ACTIVE_EDIT_RISK') >= 0);
+  assert.strictEqual(db.writes.length, 0);
+  assert.strictEqual(db.drafts['cpu-serial-b'].DATA_SERVICO, '"2026-09-30T03:00:00.000Z"');
+});
+
+test('TEST_SERIAL_SUCCESS_ACTIVE_ABC', function () {
+  const mk = function (id, ymd) {
+    const live = JSON.parse(JSON.stringify(PILOT_LIVE));
+    live.reportId = id;
+    live.draft.RCO_REPORT_ID = id;
+    live.draft.DATA_SERVICO = '"' + ymd + 'T03:00:00.000Z"';
+    live.draft.STATUS = 'EM_ANDAMENTO';
+    live.payload.state.reportId = id;
+    live.payload.periodo.inicio = ymd;
+    live.rco.REPORT_ID = id;
+    live.rco.DATA_SERVICO = ymd;
+    return live;
+  };
+  const a = mk('cpu-serial-ok-1', '2026-09-30');
+  const b = mk('cpu-serial-ok-2', '2026-09-29');
+  const db = {
+    drafts: { 'cpu-serial-ok-1': a.draft, 'cpu-serial-ok-2': b.draft },
+    payloads: { 'cpu-serial-ok-1': a.payload, 'cpu-serial-ok-2': b.payload },
+    rcos: { 'cpu-serial-ok-1': a.rco, 'cpu-serial-ok-2': b.rco },
+    snapshots: [],
+    writes: [],
+    audits: []
+  };
+  const out = R.applySerialActiveAbc(db, ['cpu-serial-ok-1', 'cpu-serial-ok-2']);
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.serialSequenceCompleted, true);
+  assert.deepStrictEqual(out.recoveredReportIds, ['cpu-serial-ok-1', 'cpu-serial-ok-2']);
+  assert.strictEqual(db.drafts['cpu-serial-ok-1'].DATA_SERVICO, '2026-09-30');
+  assert.strictEqual(db.drafts['cpu-serial-ok-2'].DATA_SERVICO, '2026-09-29');
+  assert.strictEqual(db.snapshots.length, 2);
+});
+
 test('GAS: apply interno existe e NÃO está em actions públicas', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApply_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyPilot_') >= 0);
+  assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyActiveAbcSerialFase3_') >= 0);
   assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0);
   assert.ok(src.indexOf('function rcoDraftPrepareRowForWrite_') >= 0);
   assert.ok(src.indexOf("action === 'rco-selective-date-recovery") < 0);
   assert.ok(src.indexOf("action === 'rco-date-recovery") < 0);
   assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-apply-pilot'") < 0);
+  // Harness TEMP pode existir durante execução (ALLOW_TEMP_SERIAL_ACTION=1).
+  // Commit final deve remover a action pública.
+  if (!process.env.ALLOW_TEMP_SERIAL_ACTION) {
+    assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-apply-active-abc-serial'") < 0);
+  }
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf('PRE_RCO_DATE_RECOVERY') >= 0);
+  assert.ok(src.indexOf('rebuildFromLive') >= 0);
   assert.ok(src.indexOf("getRange(rowNum,col+1).setValue") >= 0);
   assert.ok(src.indexOf('mutatedDraftRow:true') >= 0 || src.indexOf('mutatedDraftRow: true') >= 0 || src.indexOf('mutatedDraftRow:true') >= 0);
   assert.ok(src.indexOf("mutatedProductionRows:false") >= 0 || src.indexOf('mutatedProductionRows: false') >= 0);
