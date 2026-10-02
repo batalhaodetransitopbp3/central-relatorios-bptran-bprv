@@ -376,6 +376,23 @@ test('TEST_SERIAL_STOPS_ON_FIRST_FAILURE', function () {
   assert.strictEqual(db.drafts['cpu-serial-b'].DATA_SERVICO, '"2026-09-30T03:00:00.000Z"');
 });
 
+test('TEST_REQUIRE_FINALIZED_ABORTS_ACTIVE', function () {
+  const live = JSON.parse(JSON.stringify(PILOT_LIVE));
+  live.draft.STATUS = 'EM_ANDAMENTO';
+  const built = R.buildExpectedFromLive(live, { requireActive: false, requireFinalized: true });
+  assert.strictEqual(built.ok, false);
+  assert.ok(built.reasons.indexOf('STATUS_MISMATCH') >= 0);
+});
+
+test('TEST_REQUIRE_FINALIZED_ACCEPTS_FINALIZADO_ABC', function () {
+  const live = JSON.parse(JSON.stringify(PILOT_LIVE));
+  live.draft.STATUS = 'FINALIZADO';
+  const built = R.buildExpectedFromLive(live, { requireActive: false, requireFinalized: true });
+  assert.strictEqual(built.ok, true);
+  assert.strictEqual(built.expected.status, 'FINALIZADO');
+  assert.strictEqual(built.abcParity, true);
+});
+
 test('TEST_SERIAL_SUCCESS_ACTIVE_ABC', function () {
   const mk = function (id, ymd) {
     const live = JSON.parse(JSON.stringify(PILOT_LIVE));
@@ -414,6 +431,8 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyPilot_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyActiveAbcSerialFase3_') >= 0);
   assert.ok(src.indexOf('function auditRcoActiveAbMissingForensicRo_') >= 0);
+  assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApplyFinalizedAbcSerialFase5_') >= 0);
+  assert.ok(src.indexOf('requireFinalized') >= 0);
   assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0);
   assert.ok(src.indexOf('function rcoDraftPrepareRowForWrite_') >= 0);
   assert.ok(src.indexOf("action === 'rco-selective-date-recovery") < 0);
@@ -426,6 +445,9 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   }
   if (!process.env.ALLOW_TEMP_FORENSIC_ACTION) {
     assert.ok(src.indexOf("action === 'audit-rco-active-ab-missing-forensic-ro'") < 0);
+  }
+  if (!process.env.ALLOW_TEMP_FASE5_ACTION) {
+    assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-apply-finalized-abc-serial'") < 0);
   }
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf('PRE_RCO_DATE_RECOVERY') >= 0);

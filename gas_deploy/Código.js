@@ -5712,6 +5712,7 @@ function rcoSelectiveDateRecoveryApply_(opts){
       if(!(reportId&&reportId===rcoReportId&&reportId===stateReportId))liveAbort.push('IDENTITY_MISMATCH');
       if(activeLease)liveAbort.push('ACTIVE_EDIT_RISK');
       if(opts.requireActive!==false&&!activeOpen)liveAbort.push('STATUS_NOT_ACTIVE');
+      if(opts.requireFinalized&&statusLive!=='FINALIZADO')liveAbort.push('STATUS_MISMATCH');
       if(semanticYmd){
         // Já canônico: só aceita se ainda A/B/C coerentes com a data recuperada.
         if(!(isYmd_(payloadInicio)&&isYmd_(rcoDate)&&payloadInicio===rcoDate&&payloadInicio===semanticYmd))
@@ -5990,6 +5991,24 @@ function rcoSelectiveDateRecoveryApply_(opts){
       };
     }
 
+    // Confirmar aba RCO intacta (não escrita nesta operação)
+    var rcoAfter=findOne_(rcoSheet,'REPORT_ID',reportId)||{};
+    var postRcoDate=rcoYmd_(rcoAfter.DATA_SERVICO);
+    var postRcoVer=Number(rcoAfter.VERSAO||0);
+    var preRcoVer=Number(rco.VERSAO||0);
+    if(postRcoDate!==rcoDate||postRcoVer!==preRcoVer||String(rcoAfter.REPORT_ID||'')!==reportId){
+      return {
+        ok:false,aborted:true,mutatedDraftRow:true,mutatedProductionRows:false,
+        writeFields:['DATA_SERVICO'],code:'RCO_SHEET_CHANGED',safety:'UNSAFE',
+        reportId:reportId,readBackOk:true,auditEvent:'RCO_DATE_RECOVERY_APPLIED',
+        preApply:{DATA_SERVICO:rawStr,STATUS:String(draft.STATUS||''),REVISAO:Number(draft.REVISAO||0),PAYLOAD_HASH:String(draft.PAYLOAD_HASH||'')},
+        postApply:{DATA_SERVICO:afterYmd,STATUS:postStatus,REVISAO:postRev,PAYLOAD_HASH:postHash},
+        preRco:{REPORT_ID:rcoReportId,DATA_SERVICO:rcoDate,VERSAO:preRcoVer},
+        postRco:{REPORT_ID:String(rcoAfter.REPORT_ID||''),DATA_SERVICO:postRcoDate,VERSAO:postRcoVer},
+        snapshotCreated:true,snapshotFileId:snapFile.getId(),snapshotFileName:snapName
+      };
+    }
+
     return {
       ok:true,
       aborted:false,
@@ -6020,6 +6039,8 @@ function rcoSelectiveDateRecoveryApply_(opts){
         P3_CONSOLIDADO:postP3,
         P3_CONSOLIDATE_INTEGRAL:postIntegral
       },
+      preRco:{REPORT_ID:rcoReportId,DATA_SERVICO:rcoDate,VERSAO:preRcoVer},
+      postRco:{REPORT_ID:reportId,DATA_SERVICO:postRcoDate,VERSAO:postRcoVer},
       snapshotCreated:true,
       snapshotFileId:snapFile.getId(),
       snapshotFileUrl:snapFile.getUrl(),
@@ -6035,6 +6056,60 @@ function rcoSelectiveDateRecoveryApply_(opts){
   }finally{
     lock.releaseLock();
   }
+}
+
+/** FASE 5 — serial STRICT: somente 5 FINALIZADOS autorizados com A=B=C. Para no primeiro erro. */
+function rcoSelectiveDateRecoveryApplyFinalizedAbcSerialFase5_(){
+  var ids=[
+    'cpu-22d239b0-587f-4600-b904-95711903e6de',
+    'cpu-470f389e-7e9a-4cbc-a3aa-6d8581ca4de9',
+    'cpu-eef891bf-09bc-42e2-8c8f-dc97f2a5f13a',
+    'cpu-8d421d4c-7d53-43c0-8fc8-722ffae58d66',
+    'cpu-2a0dbb2d-18b1-4016-9483-83c9c9b53e76'
+  ];
+  var results=[];
+  var recovered=[];
+  for(var i=0;i<ids.length;i++){
+    var out=rcoSelectiveDateRecoveryApply_({
+      reportId:ids[i],
+      rebuildFromLive:true,
+      requireActive:false,
+      requireFinalized:true,
+      requireAbc:true,
+      branchSha:'6ce6c77cdd463bfd10c608148bd948607ad71d40',
+      reason:'REPAIR_QUOTED_ISO_DATA_SERVICO'
+    });
+    results.push(out);
+    if(out&&out.ok&&out.mutatedDraftRow)recovered.push(ids[i]);
+    if(out&&out.ok&&out.alreadyRecovered&&out.idempotent)recovered.push(ids[i]);
+    if(!(out&&out.ok)){
+      return {
+        ok:false,
+        serialSequenceCompleted:false,
+        abortedReportId:ids[i],
+        abortReason:String(out&&(out.code||((out.reasons||[]).join(',')))||'UNKNOWN'),
+        abortReasons:out&&out.reasons||[],
+        recoveredReportIds:recovered.slice(),
+        results:results,
+        publicActionExposed:false,
+        mutatedProductionRows:false,
+        backendVersion:CENTRAL_V10_VERSION,
+        generatedAt:nowIso_()
+      };
+    }
+  }
+  return {
+    ok:true,
+    serialSequenceCompleted:true,
+    abortedReportId:'',
+    abortReason:'',
+    recoveredReportIds:recovered.slice(),
+    results:results,
+    publicActionExposed:false,
+    mutatedProductionRows:false,
+    backendVersion:CENTRAL_V10_VERSION,
+    generatedAt:nowIso_()
+  };
 }
 
 /** FASE 3 — serial STRICT: somente 4 ativos autorizados com A=B=C. Para no primeiro erro. */

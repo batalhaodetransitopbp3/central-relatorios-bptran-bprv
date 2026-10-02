@@ -672,6 +672,7 @@ function buildExpectedFromLive(live, opts) {
   if (!(reportId && reportId === rcoReportId && reportId === stateReportId)) reasons.push('IDENTITY_MISMATCH');
   if (activeLease) reasons.push('ACTIVE_EDIT_RISK');
   if (opts.requireActive !== false && !activeOpen) reasons.push('STATUS_NOT_ACTIVE');
+  if (opts.requireFinalized && statusLive !== 'FINALIZADO') reasons.push('STATUS_MISMATCH');
   if (semanticYmd) {
     if (!(isYmd(payloadInicio) && isYmd(rcoDate) && payloadInicio === rcoDate && payloadInicio === semanticYmd)) {
       reasons.push('DATE_EVIDENCE_MISMATCH');
@@ -785,6 +786,13 @@ module.exports = {
     'cpu-5adae17b-0962-43a5-8663-713e29ae12ae',
     'cpu-51cac595-eb20-4937-8fea-ca0e0bf53ddf',
     'cpu-b5a23368-278a-4d7c-8464-8f7cb198a6dd'
+  ],
+  FASE5_FINALIZED_ABC_IDS: [
+    'cpu-22d239b0-587f-4600-b904-95711903e6de',
+    'cpu-470f389e-7e9a-4cbc-a3aa-6d8581ca4de9',
+    'cpu-eef891bf-09bc-42e2-8c8f-dc97f2a5f13a',
+    'cpu-8d421d4c-7d53-43c0-8fc8-722ffae58d66',
+    'cpu-2a0dbb2d-18b1-4016-9483-83c9c9b53e76'
   ],
   isQuotedIsoDateToken: isQuotedIsoDateToken,
   extractYmdFromQuotedIso: extractYmdFromQuotedIso,
