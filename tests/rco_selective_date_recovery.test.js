@@ -51,8 +51,16 @@ function seedDb(live) {
     payloads: { [id]: JSON.parse(JSON.stringify(live.payload)) },
     rcos: { [id]: JSON.parse(JSON.stringify(live.rco)) },
     snapshots: [],
-    writes: []
+    writes: [],
+    audits: []
   };
+}
+
+function recoveredLive(mutator) {
+  const live = JSON.parse(JSON.stringify(PILOT_LIVE));
+  live.draft.DATA_SERVICO = '2026-10-01';
+  if (mutator) mutator(live);
+  return live;
 }
 
 test('dry-run piloto SAFE_TO_APPLY', function () {
@@ -167,6 +175,8 @@ test('APPLY one-field-only + snapshot-before-write + read-back', function () {
   });
   assert.strictEqual(out.ok, true);
   assert.strictEqual(out.mutated, true);
+  assert.strictEqual(out.mutatedDraftRow, true);
+  assert.strictEqual(out.mutatedProductionRows, false);
   assert.deepStrictEqual(out.writeFields, ['DATA_SERVICO']);
   assert.strictEqual(out.snapshotCreated, true);
   assert.ok(db.snapshots.length === 1);
@@ -176,7 +186,9 @@ test('APPLY one-field-only + snapshot-before-write + read-back', function () {
   assert.strictEqual(out.postApply.REVISAO, 1);
   assert.strictEqual(out.postApply.PAYLOAD_HASH, 'a50dded450683ed9cf597ae8b9bacd71');
   assert.strictEqual(out.postApply.STATUS, 'EM_ANDAMENTO');
-  assert.deepStrictEqual(out.otherFieldsChanged, []);
+  assert.strictEqual(out.otherFieldsChanged, false);
+  assert.deepStrictEqual(out.unexpectedChangedFields, []);
+  assert.strictEqual(out.auditEvent, 'RCO_DATE_RECOVERY_APPLIED');
   assert.strictEqual(db.drafts[R.PILOT_APPLY_EXPECTED.reportId].DATA_SERVICO, '2026-10-01');
 });
 
@@ -193,6 +205,8 @@ test('APPLY idempotent second execution', function () {
   assert.strictEqual(second.alreadyRecovered, true);
   assert.strictEqual(second.idempotent, true);
   assert.strictEqual(second.mutated, false);
+  assert.strictEqual(second.mutatedDraftRow, false);
+  assert.strictEqual(second.mutatedProductionRows, false);
   assert.strictEqual(db.writes.length, 1);
   assert.strictEqual(db.snapshots.length, 1);
 });
@@ -205,6 +219,8 @@ test('APPLY idempotent quando DATA_SERVICO já é Date canônica', function () {
   });
   assert.strictEqual(v.ok, true);
   assert.strictEqual(v.alreadyRecovered, true);
+  assert.strictEqual(v.idempotent, true);
+  assert.strictEqual(v.safety, 'SAFE');
 });
 
 test('APPLY aborts with zero writes on precondition fail', function () {
@@ -219,6 +235,101 @@ test('APPLY aborts with zero writes on precondition fail', function () {
   assert.strictEqual(db.drafts[R.PILOT_APPLY_EXPECTED.reportId].DATA_SERVICO, '"2026-10-01T03:00:00.000Z"');
 });
 
+test('TEST_IDEMPOTENT_REQUIRES_CURRENT_REVISION', function () {
+  const live = recoveredLive(function (l) { l.draft.REVISAO = 3; });
+  const v = R.validateApplyPreconditions(live, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(v.alreadyRecovered, true);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.idempotent, false);
+  assert.strictEqual(v.staleManifest, true);
+  assert.strictEqual(v.code, 'ALREADY_RECOVERED_BUT_STATE_CHANGED');
+  assert.strictEqual(v.safety, 'UNSAFE');
+  assert.ok(v.reasons.indexOf('REVISION_MISMATCH') >= 0);
+  const db = seedDb(live);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.staleManifest, true);
+  assert.strictEqual(db.writes.length, 0);
+});
+
+test('TEST_IDEMPOTENT_REQUIRES_CURRENT_HASH', function () {
+  const live = recoveredLive(function (l) { l.draft.PAYLOAD_HASH = 'changedhash000'; });
+  const v = R.validateApplyPreconditions(live, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(v.alreadyRecovered, true);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.code, 'ALREADY_RECOVERED_BUT_STATE_CHANGED');
+  assert.strictEqual(v.safety, 'UNSAFE');
+  assert.ok(v.reasons.indexOf('HASH_MISMATCH') >= 0);
+});
+
+test('TEST_IDEMPOTENT_REQUIRES_CURRENT_STATUS', function () {
+  const live = recoveredLive(function (l) { l.draft.STATUS = 'ENCERRADO'; });
+  const v = R.validateApplyPreconditions(live, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(v.alreadyRecovered, true);
+  assert.strictEqual(v.ok, false);
+  assert.strictEqual(v.code, 'ALREADY_RECOVERED_BUT_STATE_CHANGED');
+  assert.strictEqual(v.safety, 'UNSAFE');
+  assert.ok(v.reasons.indexOf('STATUS_MISMATCH') >= 0);
+});
+
+test('TEST_ONLY_DATA_SERVICO_CHANGED', function () {
+  const db = seedDb(PILOT_LIVE);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.otherFieldsChanged, false);
+  assert.deepStrictEqual(out.unexpectedChangedFields, []);
+  assert.deepStrictEqual(out.writeFields, ['DATA_SERVICO']);
+});
+
+test('TEST_UNEXPECTED_FIELD_DIFF_DETECTED', function () {
+  const db = seedDb(PILOT_LIVE);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED, {
+    injectSideEffect: function (row) { row.STATUS = 'HACKED'; }
+  });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.readBackOk, false);
+  assert.strictEqual(out.otherFieldsChanged, true);
+  assert.ok(out.unexpectedChangedFields.indexOf('STATUS') >= 0);
+  assert.strictEqual(out.auditEvent, 'RCO_DATE_RECOVERY_READBACK_FAILED');
+  assert.ok(db.audits.some(function (a) { return a.event === 'RCO_DATE_RECOVERY_READBACK_FAILED'; }));
+  assert.ok(!db.audits.some(function (a) { return a.event === 'RCO_DATE_RECOVERY_APPLIED'; }));
+});
+
+test('TEST_READBACK_FAILURE_NOT_APPLIED', function () {
+  const db = seedDb(PILOT_LIVE);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED, {
+    simulateReadbackFail: '"2026-10-01T03:00:00.000Z"'
+  });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.readBackOk, false);
+  assert.strictEqual(out.auditEvent, 'RCO_DATE_RECOVERY_READBACK_FAILED');
+  assert.ok(db.audits.some(function (a) { return a.event === 'RCO_DATE_RECOVERY_READBACK_FAILED'; }));
+  assert.ok(!db.audits.some(function (a) { return a.event === 'RCO_DATE_RECOVERY_APPLIED'; }));
+  assert.strictEqual(out.mutatedDraftRow, true);
+  assert.strictEqual(out.mutatedProductionRows, false);
+});
+
+test('TEST_MUTATED_PRODUCTION_ROWS_FALSE', function () {
+  const db = seedDb(PILOT_LIVE);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.mutatedDraftRow, true);
+  assert.strictEqual(out.mutatedProductionRows, false);
+});
+
+test('TEST_RCO_SNAPSHOT_FOLDER', function () {
+  const db = seedDb(PILOT_LIVE);
+  const out = R.applySimulated(db, R.PILOT_APPLY_EXPECTED);
+  assert.strictEqual(out.snapshotFolder, 'Central RCO - Recovery Snapshots');
+  assert.strictEqual(db.snapshots[0].folderProp, 'RCO_RECOVERY_SNAPSHOT_FOLDER_ID');
+  assert.strictEqual(db.snapshots[0].folderName, 'Central RCO - Recovery Snapshots');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
+  const applySrc = src.slice(src.indexOf('function rcoSelectiveDateRecoveryApply_'));
+  assert.ok(applySrc.indexOf("folderFor_('RCO_RECOVERY_SNAPSHOT_FOLDER_ID','Central RCO - Recovery Snapshots')") >= 0);
+  assert.ok(applySrc.indexOf("folderFor_('RSD_RECOVERY_SNAPSHOT_FOLDER_ID'") < 0);
+  assert.ok(src.indexOf('RCO_DATE_RECOVERY_READBACK_FAILED') >= 0);
+});
+
 test('GAS: apply interno existe e NÃO está em actions públicas', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApply_') >= 0);
@@ -231,6 +342,8 @@ test('GAS: apply interno existe e NÃO está em actions públicas', function () 
   assert.ok(src.indexOf('RCO_DATE_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf('PRE_RCO_DATE_RECOVERY') >= 0);
   assert.ok(src.indexOf("getRange(rowNum,col+1).setValue") >= 0);
+  assert.ok(src.indexOf('mutatedDraftRow:true') >= 0 || src.indexOf('mutatedDraftRow: true') >= 0 || src.indexOf('mutatedDraftRow:true') >= 0);
+  assert.ok(src.indexOf("mutatedProductionRows:false") >= 0 || src.indexOf('mutatedProductionRows: false') >= 0);
   // dry-run ainda sem write
   const dry = src.slice(src.indexOf('function rcoSelectiveDateRecoveryDryRun_'), src.indexOf('function rcoSelectiveDateRecoveryApplyPilot_'));
   assert.ok(dry.indexOf('setValue') < 0);

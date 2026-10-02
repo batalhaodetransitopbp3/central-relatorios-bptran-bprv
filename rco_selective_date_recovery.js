@@ -2,7 +2,9 @@
  * Recuperação seletiva DATA_SERVICO (quoted-ISO) em RCO_RASCUNHOS.
  *
  * FASE 1: DRY-RUN / manifest — ZERO writes.
- * FASE 2: apply controlado (piloto) — um campo, com preconditions/snapshot.
+ * FASE 2: apply controlado — um campo, com preconditions/snapshot.
+ * Hardening: idempotência exige preconditions live; row-diff; read-back crítico;
+ * pasta de snapshot RCO própria; semântica mutatedDraftRow.
  * NÃO altera prevenção 10.8.38 (rcoDraftPrepareRowForWrite_).
  * NÃO altera dateText_.
  */
@@ -21,6 +23,9 @@ var PILOT_APPLY_EXPECTED = {
   expectedDate: '2026-10-01',
   rcoDataServico: '2026-10-01'
 };
+
+var RCO_SNAPSHOT_FOLDER_PROP = 'RCO_RECOVERY_SNAPSHOT_FOLDER_ID';
+var RCO_SNAPSHOT_FOLDER_NAME = 'Central RCO - Recovery Snapshots';
 
 var dateWrite = null;
 try {
@@ -60,6 +65,40 @@ function leaseActive(editLeaseUntil, nowMs) {
   var t = Date.parse(s);
   if (isNaN(t)) return false;
   return t > (nowMs == null ? Date.now() : nowMs);
+}
+
+function canonicalizeRowValue(v) {
+  if (v == null) return null;
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    if (isNaN(v.getTime())) return null;
+    return dateTextSim(v);
+  }
+  if (typeof v === 'number' && isFinite(v)) return v;
+  if (typeof v === 'boolean') return v;
+  return String(v);
+}
+
+function projectDraftRow(row) {
+  var out = {};
+  var keys = Object.keys(row || {}).sort();
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k === '_row') continue;
+    out[k] = canonicalizeRowValue(row[k]);
+  }
+  return out;
+}
+
+function diffDraftRowsExcludingDate(beforeProj, afterProj) {
+  var changed = [];
+  var keys = {};
+  Object.keys(beforeProj || {}).forEach(function (k) { keys[k] = true; });
+  Object.keys(afterProj || {}).forEach(function (k) { keys[k] = true; });
+  Object.keys(keys).forEach(function (k) {
+    if (k === 'DATA_SERVICO') return;
+    if (JSON.stringify(beforeProj[k]) !== JSON.stringify(afterProj[k])) changed.push(k);
+  });
+  return changed.sort();
 }
 
 /**
@@ -184,6 +223,7 @@ function buildManifest(live, opts) {
   return {
     mode: 'DRY_RUN',
     mutatedProductionRows: false,
+    mutatedDraftRow: false,
     reportId: reportId,
     currentStatus: String(draft.STATUS || ''),
     currentBattalion: battDraft,
@@ -234,10 +274,10 @@ function buildManifest(live, opts) {
         'LockService.getScriptLock().waitLock(20000)',
         'reler findOne_ RCO_RASCUNHOS',
         'validar preconditions exatas (raw date, hash, revision, ids, units)',
-        'criar snapshot imutável PRE_RCO_DATE_RECOVERY',
+        'criar snapshot imutável PRE_RCO_DATE_RECOVERY em Central RCO - Recovery Snapshots',
         'alterar SOMENTE DATA_SERVICO → YYYY-MM-DD',
-        'read-back + audit before/after',
-        'idempotente se já YYYY-MM-DD esperado'
+        'read-back crítico + audit before/after',
+        'idempotente só se YYYY-MM-DD + preconditions live compatíveis'
       ]
     }
   };
@@ -252,6 +292,7 @@ function dryRun(live, opts) {
     ok: true,
     mode: 'DRY_RUN',
     mutatedProductionRows: false,
+    mutatedDraftRow: false,
     publicActionExposed: false,
     manifest: manifest,
     safeToApply: !!manifest.safeToApply,
@@ -263,7 +304,8 @@ function dryRun(live, opts) {
 /**
  * Valida preconditions exatas do APPLY (FASE 2).
  * ACTIVE_EDIT_RISK é BLOQUEANTE no apply.
- * @returns {{ok:boolean, alreadyRecovered?:boolean, reasons:string[], checks:object}}
+ * Idempotência (já YYYY-MM-DD) também exige STATUS/REVISAO/HASH/identidade live.
+ * @returns {{ok:boolean, alreadyRecovered?:boolean, idempotent?:boolean, staleManifest?:boolean, code?:string, safety?:string, reasons:string[], checks:object}}
  */
 function validateApplyPreconditions(live, expected, opts) {
   opts = opts || {};
@@ -300,27 +342,55 @@ function validateApplyPreconditions(live, expected, opts) {
   checks.companhia = normUnit(draft.COMPANHIA) === expected.companhia;
   if (!checks.companhia) reasons.push('COMPANHIA_MISMATCH');
 
-  // Idempotente: já recuperado (YMD string ou Date serializado como YMD)
+  // Já recuperado (YMD string ou Date) — só idempotente se preconditions live baterem.
   var semanticYmd = Object.prototype.toString.call(raw) === '[object Date]'
     ? dateTextSim(raw)
     : (isYmd(rawStr) ? rawStr : '');
   if (semanticYmd === expected.expectedDate) {
-    var idOk = reportId === expected.reportId && reportId === rcoReportId && reportId === stateReportId;
-    var dateOk = payloadInicio === expected.expectedDate && rcoDate === expected.expectedDate;
-    var unitOk = normUnit(draft.BATALHAO) === expected.batalhao && normUnit(draft.COMPANHIA) === expected.companhia;
-    if (idOk && dateOk && unitOk && !activeLease) {
+    var stale = [];
+    if (reportId !== expected.reportId) stale.push('REPORT_ID_MISMATCH');
+    if (String(draft.STATUS || '') !== expected.status) stale.push('STATUS_MISMATCH');
+    if (normUnit(draft.BATALHAO) !== expected.batalhao) stale.push('BATALHAO_MISMATCH');
+    if (normUnit(draft.COMPANHIA) !== expected.companhia) stale.push('COMPANHIA_MISMATCH');
+    if (Number(draft.REVISAO || 0) !== Number(expected.revisao)) stale.push('REVISION_MISMATCH');
+    if (String(draft.PAYLOAD_HASH || '') !== String(expected.payloadHash)) stale.push('HASH_MISMATCH');
+    if (!(reportId === rcoReportId && reportId === stateReportId && !!reportId)) stale.push('IDENTITY_MISMATCH');
+    if (!(payloadInicio === expected.expectedDate && rcoDate === expected.expectedDate)) {
+      stale.push('DATE_EVIDENCE_MISMATCH');
+    }
+    if (activeLease) stale.push('ACTIVE_EDIT_RISK');
+
+    checks.alreadyYmd = true;
+    checks.revisao = Number(draft.REVISAO || 0) === Number(expected.revisao);
+    checks.payloadHash = String(draft.PAYLOAD_HASH || '') === String(expected.payloadHash);
+    checks.identityParity = !!reportId && reportId === rcoReportId && reportId === stateReportId;
+    checks.dateEvidenceParity = payloadInicio === expected.expectedDate && rcoDate === expected.expectedDate;
+    checks.activeEditRisk = activeLease;
+
+    if (stale.length === 0) {
       return {
         ok: true,
         alreadyRecovered: true,
+        idempotent: true,
+        staleManifest: false,
+        code: 'ALREADY_RECOVERED',
+        safety: 'SAFE',
         reasons: [],
-        checks: Object.assign(checks, {
-          alreadyYmd: true,
-          identityParity: true,
-          dateEvidenceParity: true,
-          activeEditRisk: false
-        })
+        checks: checks
       };
     }
+    return {
+      ok: false,
+      alreadyRecovered: true,
+      idempotent: false,
+      staleManifest: true,
+      code: 'ALREADY_RECOVERED_BUT_STATE_CHANGED',
+      safety: 'UNSAFE',
+      reasons: stale,
+      checks: checks,
+      expectedDate: expected.expectedDate,
+      currentDateRaw: rawStr
+    };
   }
 
   checks.dataServicoRaw = rawStr === expected.dataServicoRaw;
@@ -361,6 +431,10 @@ function validateApplyPreconditions(live, expected, opts) {
   return {
     ok: reasons.length === 0,
     alreadyRecovered: false,
+    idempotent: false,
+    staleManifest: false,
+    code: reasons.length === 0 ? 'READY_TO_APPLY' : 'PRECONDITION_FAILED',
+    safety: reasons.length === 0 ? 'SAFE' : 'UNSAFE',
     reasons: reasons,
     checks: checks,
     expectedDate: expected.expectedDate,
@@ -369,15 +443,23 @@ function validateApplyPreconditions(live, expected, opts) {
 }
 
 /**
- * Simula apply (teste): snapshot → write um campo → read-back.
- * db.drafts[reportId] = row object; db.writes = log.
+ * Simula apply (teste): snapshot → write um campo → read-back + row-diff.
+ * db.drafts[reportId] = row object; db.writes / db.snapshots / db.audits = logs.
  */
 function applySimulated(db, expected, opts) {
   opts = opts || {};
   expected = expected || PILOT_APPLY_EXPECTED;
   var reportId = expected.reportId;
   var row = db.drafts[reportId];
-  if (!row) return { ok: false, aborted: true, reasons: ['DRAFT_NOT_FOUND'] };
+  if (!row) {
+    return {
+      ok: false,
+      aborted: true,
+      reasons: ['DRAFT_NOT_FOUND'],
+      mutatedDraftRow: false,
+      mutatedProductionRows: false
+    };
+  }
   var live = {
     reportId: reportId,
     draft: row,
@@ -385,19 +467,53 @@ function applySimulated(db, expected, opts) {
     rco: db.rcos[reportId] || {}
   };
   var v = validateApplyPreconditions(live, expected, opts);
-  if (v.alreadyRecovered) {
+  if (v.alreadyRecovered && v.ok && v.idempotent) {
     return {
       ok: true,
       alreadyRecovered: true,
       idempotent: true,
+      staleManifest: false,
+      code: 'ALREADY_RECOVERED',
+      safety: 'SAFE',
       mutated: false,
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
+      writeFields: [],
+      snapshotCreated: false,
+      otherFieldsChanged: false,
+      unexpectedChangedFields: []
+    };
+  }
+  if (v.alreadyRecovered && !v.ok) {
+    return {
+      ok: false,
+      aborted: true,
+      alreadyRecovered: true,
+      idempotent: false,
+      staleManifest: true,
+      code: v.code || 'ALREADY_RECOVERED_BUT_STATE_CHANGED',
+      safety: 'UNSAFE',
+      reasons: v.reasons.slice(),
+      mutated: false,
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
       writeFields: [],
       snapshotCreated: false
     };
   }
   if (!v.ok) {
-    return { ok: false, aborted: true, reasons: v.reasons.slice(), mutated: false, writeFields: [] };
+    return {
+      ok: false,
+      aborted: true,
+      reasons: v.reasons.slice(),
+      mutated: false,
+      mutatedDraftRow: false,
+      mutatedProductionRows: false,
+      writeFields: []
+    };
   }
+
+  var beforeProj = projectDraftRow(row);
   var snapshot = {
     kind: 'PRE_RCO_DATE_RECOVERY',
     reportId: reportId,
@@ -407,47 +523,126 @@ function applySimulated(db, expected, opts) {
     payloadHash: String(row.PAYLOAD_HASH || ''),
     draftRow: JSON.parse(JSON.stringify(row)),
     payload: JSON.parse(JSON.stringify(live.payload)),
-    rcoRow: JSON.parse(JSON.stringify(live.rco))
+    rcoRow: JSON.parse(JSON.stringify(live.rco)),
+    folderProp: RCO_SNAPSHOT_FOLDER_PROP,
+    folderName: RCO_SNAPSHOT_FOLDER_NAME
   };
   db.snapshots = db.snapshots || [];
   db.snapshots.push(snapshot);
-  // write ONLY DATA_SERVICO
-  var beforeKeys = Object.keys(row).slice().sort();
+  db.audits = db.audits || [];
+
   var beforeClone = JSON.parse(JSON.stringify(row));
   row.DATA_SERVICO = expected.expectedDate;
+  if (typeof opts.injectSideEffect === 'function') {
+    opts.injectSideEffect(row);
+  }
   db.writes = db.writes || [];
-  db.writes.push({ field: 'DATA_SERVICO', from: beforeClone.DATA_SERVICO, to: row.DATA_SERVICO });
-  var afterKeys = Object.keys(row).slice().sort();
-  var otherChanged = beforeKeys.filter(function (k) {
-    if (k === 'DATA_SERVICO') return false;
-    return JSON.stringify(beforeClone[k]) !== JSON.stringify(row[k]);
+  db.writes.push({ field: 'DATA_SERVICO', from: beforeClone.DATA_SERVICO, to: expected.expectedDate });
+
+  if (opts.simulateReadbackFail) {
+    row.DATA_SERVICO = opts.simulateReadbackFail === true
+      ? beforeClone.DATA_SERVICO
+      : opts.simulateReadbackFail;
+  }
+
+  var afterProj = projectDraftRow(row);
+  var unexpectedChangedFields = diffDraftRowsExcludingDate(beforeProj, afterProj);
+  var otherFieldsChanged = unexpectedChangedFields.length > 0;
+
+  var afterYmd = Object.prototype.toString.call(row.DATA_SERVICO) === '[object Date]'
+    ? dateTextSim(row.DATA_SERVICO)
+    : (isYmd(row.DATA_SERVICO) ? String(row.DATA_SERVICO).trim() : dateTextSim(row.DATA_SERVICO));
+
+  var readBackOk =
+    afterYmd === expected.expectedDate &&
+    String(row.STATUS || '') === expected.status &&
+    Number(row.REVISAO || 0) === Number(expected.revisao) &&
+    String(row.PAYLOAD_HASH || '') === String(expected.payloadHash) &&
+    normUnit(row.BATALHAO) === expected.batalhao &&
+    normUnit(row.COMPANHIA) === expected.companhia &&
+    !otherFieldsChanged;
+
+  if (!readBackOk) {
+    db.audits.push({
+      event: 'RCO_DATE_RECOVERY_READBACK_FAILED',
+      reportId: reportId,
+      snapshotRef: snapshot,
+      observed: {
+        DATA_SERVICO: afterYmd,
+        STATUS: row.STATUS,
+        REVISAO: row.REVISAO,
+        PAYLOAD_HASH: row.PAYLOAD_HASH,
+        unexpectedChangedFields: unexpectedChangedFields
+      }
+    });
+    return {
+      ok: false,
+      aborted: true,
+      alreadyRecovered: false,
+      idempotent: false,
+      mutated: true,
+      mutatedDraftRow: true,
+      mutatedProductionRows: false,
+      writeFields: ['DATA_SERVICO'],
+      snapshotCreated: true,
+      snapshot: snapshot,
+      snapshotFolder: RCO_SNAPSHOT_FOLDER_NAME,
+      readBackOk: false,
+      auditEvent: 'RCO_DATE_RECOVERY_READBACK_FAILED',
+      otherFieldsChanged: otherFieldsChanged,
+      unexpectedChangedFields: unexpectedChangedFields,
+      postApply: {
+        DATA_SERVICO: afterYmd,
+        STATUS: row.STATUS,
+        REVISAO: row.REVISAO,
+        PAYLOAD_HASH: row.PAYLOAD_HASH
+      }
+    };
+  }
+
+  db.audits.push({
+    event: 'RCO_DATE_RECOVERY_APPLIED',
+    reportId: reportId,
+    before: String(expected.dataServicoRaw),
+    after: String(expected.expectedDate)
   });
+
   return {
     ok: true,
     alreadyRecovered: false,
     idempotent: false,
     mutated: true,
+    mutatedDraftRow: true,
+    mutatedProductionRows: false,
     writeFields: ['DATA_SERVICO'],
     snapshotCreated: true,
     snapshot: snapshot,
+    snapshotFolder: RCO_SNAPSHOT_FOLDER_NAME,
+    readBackOk: true,
+    auditEvent: 'RCO_DATE_RECOVERY_APPLIED',
     postApply: {
       DATA_SERVICO: row.DATA_SERVICO,
       STATUS: row.STATUS,
       REVISAO: row.REVISAO,
       PAYLOAD_HASH: row.PAYLOAD_HASH
     },
-    otherFieldsChanged: otherChanged,
-    keysUnchanged: afterKeys.join('|') === beforeKeys.join('|')
+    otherFieldsChanged: false,
+    unexpectedChangedFields: [],
+    keysUnchanged: true
   };
 }
 
 module.exports = {
   PILOT_APPLY_EXPECTED: PILOT_APPLY_EXPECTED,
+  RCO_SNAPSHOT_FOLDER_PROP: RCO_SNAPSHOT_FOLDER_PROP,
+  RCO_SNAPSHOT_FOLDER_NAME: RCO_SNAPSHOT_FOLDER_NAME,
   isQuotedIsoDateToken: isQuotedIsoDateToken,
   extractYmdFromQuotedIso: extractYmdFromQuotedIso,
   isYmd: isYmd,
   leaseActive: leaseActive,
   dateTextSim: dateTextSim,
+  projectDraftRow: projectDraftRow,
+  diffDraftRowsExcludingDate: diffDraftRowsExcludingDate,
   simulatePostPatchDateText: simulatePostPatchDateText,
   buildManifest: buildManifest,
   dryRun: dryRun,
