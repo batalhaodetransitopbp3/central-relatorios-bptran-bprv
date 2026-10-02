@@ -188,18 +188,61 @@ test('CAUSAL_AMBIGUOUS_BLOCKED', function () {
   assert.strictEqual(out.snapshotCreated, false);
 });
 
+test('CAUSAL_SERIAL_STOPS_ON_FIRST_FAILURE', function () {
+  var ids = R.FASE7B_CAUSAL_IDS.slice(0, 3);
+  var db = { drafts: {}, payloads: {}, rcos: {}, snapshots: [], writes: [], audits: [] };
+  ids.forEach(function (id, idx) {
+    var ymd = '2026-09-2' + (8 + idx);
+    db.drafts[id] = {
+      RCO_REPORT_ID: id,
+      STATUS: 'EM_ANDAMENTO',
+      BATALHAO: 'BPTran',
+      COMPANHIA: '2ª CPTran',
+      DATA_SERVICO: '"' + ymd + 'T03:00:00.000Z"',
+      REVISAO: 1,
+      PAYLOAD_HASH: 'h' + idx,
+      EDIT_LEASE_UNTIL: ''
+    };
+    db.payloads[id] = {
+      state: { reportId: id },
+      periodo: { inicio: ymd },
+      unidade: { batalhao: 'BPTran', companhia: '2ª CPTran' }
+    };
+  });
+  // Corrompe o 2º: A≠B
+  db.drafts[ids[1]].DATA_SERVICO = '"2026-10-01T03:00:00.000Z"';
+  db.payloads[ids[1]].periodo.inicio = '2026-09-30';
+  var out = R.applySerialCausal(db, ids, { evidenceMode: R.EVIDENCE_MODE_CAUSAL, scriptTimezone: TZ });
+  assert.strictEqual(out.ok, false);
+  assert.strictEqual(out.serialSequenceCompleted, false);
+  assert.strictEqual(out.abortedReportId, ids[1]);
+  assert.deepStrictEqual(out.recoveredReportIds, [ids[0]]);
+  assert.strictEqual(db.drafts[ids[0]].DATA_SERVICO, '2026-09-28');
+  assert.ok(/^"/.test(String(db.drafts[ids[2]].DATA_SERVICO))); // 3º não tocado
+});
+
+test('CAUSAL_SERIAL_SUCCESS_FASE7B_ALLOWLIST_SIZE', function () {
+  assert.strictEqual(R.FASE7B_CAUSAL_IDS.length, 13);
+  assert.ok(R.FASE7B_CAUSAL_IDS.indexOf(R.CAUSAL_PILOT_REPORT_ID) < 0);
+});
+
 test('GAS: caminho causal dedicado; requireAbc padrão intacto; action pública só TEMP', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryCausalApply_') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryCausalApplyPilotFase7a_') >= 0);
+  assert.ok(src.indexOf('function rcoSelectiveDateRecoveryCausalApplySerialFase7b_') >= 0);
   assert.ok(src.indexOf('CAUSAL_ROOT_SIGNATURE') >= 0);
   assert.ok(src.indexOf('RCO_DATE_CAUSAL_RECOVERY_APPLIED') >= 0);
   assert.ok(src.indexOf("cpu-5e000c43-ef9c-4c90-82ea-7bfeaea08f63") >= 0);
+  assert.ok(src.indexOf('cpu-171f2630-f393-4d6b-856e-d054b031f1d4') >= 0);
   // requireAbc path still present for ABC recovery
   assert.ok(src.indexOf('requireAbc') >= 0);
   assert.ok(src.indexOf('function rcoSelectiveDateRecoveryApply_') >= 0);
   if (!process.env.ALLOW_TEMP_FASE7A_ACTION) {
     assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-causal-apply-pilot'") < 0);
+  }
+  if (!process.env.ALLOW_TEMP_FASE7B_ACTION) {
+    assert.ok(src.indexOf("action === 'audit-rco-selective-date-recovery-causal-apply-serial'") < 0);
   }
 });
 

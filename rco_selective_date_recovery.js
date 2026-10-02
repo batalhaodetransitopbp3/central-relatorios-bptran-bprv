@@ -43,6 +43,22 @@ try {
 
 /** FASE 7A — piloto causal autorizado (único). */
 var CAUSAL_PILOT_REPORT_ID = 'cpu-5e000c43-ef9c-4c90-82ea-7bfeaea08f63';
+/** FASE 7B — 13 restantes (sem piloto, sem AMBIGUOUS, sem FINALIZADO conflitante). */
+var FASE7B_CAUSAL_IDS = [
+  'cpu-171f2630-f393-4d6b-856e-d054b031f1d4',
+  'cpu-2d0ae2c7-9162-4d38-af00-aab90e776223',
+  'cpu-2cd5ab14-4b76-4a91-baa9-adf916560dc5',
+  'cpu-2e3759d2-46b5-44c6-914d-89fac6d26afe',
+  'cpu-2c8cb41d-e027-4379-9fcb-abaa9a4c955e',
+  'cpu-f7528aab-77d2-44dc-aa34-48fe68c5c9c7',
+  'cpu-2e646703-2cbf-482f-bc38-6cca3ddbb491',
+  'cpu-5870e14d-e628-49ac-ac74-64c73cb5ff91',
+  'cpu-fa312e36-1625-4a0d-9397-5407b9aee9c2',
+  'cpu-6de321c9-d226-4aef-bcea-db67ea966c22',
+  'cpu-07da6de8-a0aa-4091-8bd4-8d6707678772',
+  'cpu-899d8a89-7fdc-4749-b5fc-149281e61114',
+  'cpu-ac5be573-2eaf-4e11-88fb-38b1eaba359b'
+];
 var EVIDENCE_MODE_CAUSAL = 'CAUSAL_ROOT_SIGNATURE';
 var PRODUCTION_SCRIPT_TZ = (rootSig && rootSig.PRODUCTION_SCRIPT_TZ) || 'America/Sao_Paulo';
 
@@ -1103,9 +1119,55 @@ function applyCausalSimulated(db, opts) {
   };
 }
 
+/**
+ * Serial causal (Node): um por vez, stop-on-first-error.
+ */
+function applySerialCausal(db, ids, opts) {
+  opts = opts || {};
+  ids = ids || FASE7B_CAUSAL_IDS;
+  var results = [];
+  var recovered = [];
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    var out = applyCausalSimulated(db, {
+      reportId: id,
+      evidenceMode: opts.evidenceMode || EVIDENCE_MODE_CAUSAL,
+      scriptTimezone: opts.scriptTimezone || PRODUCTION_SCRIPT_TZ,
+      nowMs: opts.nowMs,
+      contradictionDetails: opts.contradictionDetailsById && opts.contradictionDetailsById[id],
+      contradictoryEvidence: opts.contradictoryById && opts.contradictoryById[id],
+      rcoRowCount: opts.rcoRowCountById && opts.rcoRowCountById[id]
+    });
+    out.reportId = id;
+    results.push(out);
+    if (out.ok && (out.mutatedDraftRow || (out.alreadyRecovered && out.idempotent))) {
+      recovered.push(id);
+    }
+    if (!out.ok) {
+      return {
+        ok: false,
+        serialSequenceCompleted: false,
+        abortedReportId: id,
+        abortReason: String(out.code || (out.reasons || []).join(',') || 'UNKNOWN'),
+        recoveredReportIds: recovered.slice(),
+        results: results
+      };
+    }
+  }
+  return {
+    ok: true,
+    serialSequenceCompleted: true,
+    abortedReportId: '',
+    abortReason: '',
+    recoveredReportIds: recovered.slice(),
+    results: results
+  };
+}
+
 module.exports = {
   PILOT_APPLY_EXPECTED: PILOT_APPLY_EXPECTED,
   CAUSAL_PILOT_REPORT_ID: CAUSAL_PILOT_REPORT_ID,
+  FASE7B_CAUSAL_IDS: FASE7B_CAUSAL_IDS,
   EVIDENCE_MODE_CAUSAL: EVIDENCE_MODE_CAUSAL,
   PRODUCTION_SCRIPT_TZ: PRODUCTION_SCRIPT_TZ,
   RCO_SNAPSHOT_FOLDER_PROP: RCO_SNAPSHOT_FOLDER_PROP,
@@ -1138,5 +1200,6 @@ module.exports = {
   buildExpectedFromLive: buildExpectedFromLive,
   applySerialActiveAbc: applySerialActiveAbc,
   validateCausalApplyPreconditions: validateCausalApplyPreconditions,
-  applyCausalSimulated: applyCausalSimulated
+  applyCausalSimulated: applyCausalSimulated,
+  applySerialCausal: applySerialCausal
 };

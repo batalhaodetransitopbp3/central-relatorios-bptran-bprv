@@ -6510,6 +6510,19 @@ function rcoSelectiveDateRecoveryCausalApply_(opts){
       });
     });
 
+    if(activeOpen&&(!visibleCorrect||visibleWrong)){
+      return Object.assign({},baseReturn,{
+        ok:false,aborted:true,mutatedDraftRow:true,code:'SCOPE_VALIDATION_FAILED',safety:'UNSAFE',
+        writeFields:['DATA_SERVICO'],readBackOk:true,
+        auditEvent:'RCO_DATE_CAUSAL_RECOVERY_APPLIED',
+        snapshotCreated:true,snapshotFileId:snapFile.getId(),snapshotFileName:snapName,
+        rcoVisibleInCorrectScope:!!visibleCorrect,rcoVisibleInWrongScope:!!visibleWrong,
+        unexpectedChangedFields:[],otherFieldsChanged:false,
+        preApply:preApply,
+        postApply:{DATA_SERVICO:afterYmd,STATUS:postStatus,REVISAO:postRev,PAYLOAD_HASH:postHash,BATALHAO:postBatt,COMPANHIA:postComp}
+      });
+    }
+
     return Object.assign({},baseReturn,{
       ok:true,
       alreadyRecovered:false,
@@ -6559,6 +6572,139 @@ function rcoSelectiveDateRecoveryCausalApplyPilotFase7a_(){
     branchSha:'eacf4541be558116dd0a02b69ad31fdc91562209',
     reason:'REPAIR_QUOTED_ISO_CAUSAL_ROOT_SIGNATURE'
   });
+}
+
+/**
+ * FASE 7B — serial STRICT dos 13 RCOs causais restantes.
+ * Um por vez; stop-on-first-error. NÃO inclui o piloto 7A nem AMBIGUOUS.
+ */
+function rcoSelectiveDateRecoveryCausalApplySerialFase7b_(){
+  var ids=[
+    'cpu-171f2630-f393-4d6b-856e-d054b031f1d4',
+    'cpu-2d0ae2c7-9162-4d38-af00-aab90e776223',
+    'cpu-2cd5ab14-4b76-4a91-baa9-adf916560dc5',
+    'cpu-2e3759d2-46b5-44c6-914d-89fac6d26afe',
+    'cpu-2c8cb41d-e027-4379-9fcb-abaa9a4c955e',
+    'cpu-f7528aab-77d2-44dc-aa34-48fe68c5c9c7',
+    'cpu-2e646703-2cbf-482f-bc38-6cca3ddbb491',
+    'cpu-5870e14d-e628-49ac-ac74-64c73cb5ff91',
+    'cpu-fa312e36-1625-4a0d-9397-5407b9aee9c2',
+    'cpu-6de321c9-d226-4aef-bcea-db67ea966c22',
+    'cpu-07da6de8-a0aa-4091-8bd4-8d6707678772',
+    'cpu-899d8a89-7fdc-4749-b5fc-149281e61114',
+    'cpu-ac5be573-2eaf-4e11-88fb-38b1eaba359b'
+  ];
+  var forbidden={
+    'cpu-5e000c43-ef9c-4c90-82ea-7bfeaea08f63':true,
+    'cpu-fbd37c76-854b-41ae-9753-183e58590004':true,
+    'cpu-3bb1c33f-c70a-4598-89cc-e38a841c59ce':true,
+    'cpu-246ab3eb-c13c-4e29-a5d1-4a9d11a7fc0d':true
+  };
+  var results=[];
+  var recovered=[];
+  for(var i=0;i<ids.length;i++){
+    var id=ids[i];
+    if(forbidden[id]){
+      return {
+        ok:false,serialSequenceCompleted:false,abortedReportId:id,
+        abortReason:'FORBIDDEN_ID_IN_ALLOWLIST',recoveredReportIds:recovered.slice(),results:results,
+        publicActionExposed:false,mutatedProductionRows:false,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_()
+      };
+    }
+    var out;
+    try{
+      out=rcoSelectiveDateRecoveryCausalApply_({
+        reportId:id,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+        branchSha:'9e221079aad1990d41884783820dc4e9b2448d04',
+        reason:'REPAIR_QUOTED_ISO_CAUSAL_ROOT_SIGNATURE'
+      });
+    }catch(e){
+      return {
+        ok:false,serialSequenceCompleted:false,abortedReportId:id,
+        abortReason:'EXCEPTION:'+String(e&&e.message||e),
+        recoveredReportIds:recovered.slice(),results:results,
+        publicActionExposed:false,mutatedProductionRows:false,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_()
+      };
+    }
+    results.push(out);
+    var unexpected=(out&&out.unexpectedChangedFields)||[];
+    var scopeFail=!!(out&&out.mutatedDraftRow&&(!out.rcoVisibleInCorrectScope||out.rcoVisibleInWrongScope));
+    var readbackFail=!!(out&&out.mutatedDraftRow&&(out.readBackOk===false||out.otherFieldsChanged===true||unexpected.length>0));
+    var ok=!!(out&&out.ok)&&!scopeFail&&!readbackFail;
+    if(ok&&out.mutatedDraftRow)recovered.push(id);
+    if(ok&&out.alreadyRecovered&&out.idempotent)recovered.push(id);
+    if(!ok){
+      var reason=String((out&&out.code)||((out&&out.reasons)||[]).join(',')||'UNKNOWN');
+      if(scopeFail)reason='SCOPE_VALIDATION_FAILED';
+      if(readbackFail&&reason==='UNKNOWN')reason='READBACK_FAILED';
+      return {
+        ok:false,
+        serialSequenceCompleted:false,
+        abortedReportId:id,
+        abortReason:reason,
+        abortReasons:out&&out.reasons||[],
+        recoveredReportIds:recovered.slice(),
+        results:results,
+        publicActionExposed:false,
+        mutatedProductionRows:false,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+        backendVersion:CENTRAL_V10_VERSION,
+        generatedAt:nowIso_()
+      };
+    }
+  }
+  // Idempotência controlada em UM dos recuperados (zero write / zero novo snapshot / zero APPLIED).
+  var sampleId=recovered[0]||'';
+  var idempotentSample=null;
+  if(sampleId){
+    try{
+      idempotentSample=rcoSelectiveDateRecoveryCausalApply_({
+        reportId:sampleId,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+        branchSha:'9e221079aad1990d41884783820dc4e9b2448d04',
+        reason:'IDEMPOTENT_CHECK_CAUSAL'
+      });
+    }catch(e){
+      return {
+        ok:false,serialSequenceCompleted:false,abortedReportId:sampleId,
+        abortReason:'IDEMPOTENT_EXCEPTION:'+String(e&&e.message||e),
+        recoveredReportIds:recovered.slice(),results:results,
+        publicActionExposed:false,mutatedProductionRows:false,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_()
+      };
+    }
+    if(!(idempotentSample&&idempotentSample.ok&&idempotentSample.alreadyRecovered&&idempotentSample.idempotent&&
+        !idempotentSample.mutatedDraftRow&&!idempotentSample.snapshotCreated)){
+      return {
+        ok:false,serialSequenceCompleted:false,abortedReportId:sampleId,
+        abortReason:'IDEMPOTENT_CHECK_FAILED',
+        recoveredReportIds:recovered.slice(),results:results,
+        idempotentSample:idempotentSample,
+        publicActionExposed:false,mutatedProductionRows:false,
+        evidenceMode:'CAUSAL_ROOT_SIGNATURE',backendVersion:CENTRAL_V10_VERSION,generatedAt:nowIso_()
+      };
+    }
+  }
+
+  return {
+    ok:true,
+    serialSequenceCompleted:true,
+    abortedReportId:'',
+    abortReason:'',
+    recoveredReportIds:recovered.slice(),
+    results:results,
+    idempotentSample:idempotentSample,
+    idempotentSampleReportId:sampleId,
+    publicActionExposed:false,
+    mutatedProductionRows:false,
+    evidenceMode:'CAUSAL_ROOT_SIGNATURE',
+    authorizedCount:ids.length,
+    backendVersion:CENTRAL_V10_VERSION,
+    generatedAt:nowIso_()
+  };
 }
 
 /** FASE 5 — serial STRICT: somente 5 FINALIZADOS autorizados com A=B=C. Para no primeiro erro. */
