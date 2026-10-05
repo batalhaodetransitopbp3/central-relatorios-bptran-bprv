@@ -662,6 +662,136 @@
     return { ok: true, path: path };
   }
 
+  function cloneData(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  /** Mesma regra de num() do formulário: inteiro; vazio ou inválido não é produção. */
+  function positiveLeaf(value) {
+    if (value == null || typeof value === 'object') return 0;
+    var n = parseInt(String(value).replace(/[^0-9-]/g, ''), 10);
+    if (!isFinite(n) || n <= 0) return 0;
+    return n;
+  }
+
+  function walkProduction(node, path, visit) {
+    if (!node || typeof node !== 'object') return;
+    var keys = Object.keys(node);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var value = node[key];
+      var next = path.concat(key);
+      if (value && typeof value === 'object') walkProduction(value, next, visit);
+      else visit(next, value);
+    }
+  }
+
+  function productionHasPositive(prod) {
+    var found = false;
+    walkProduction(prod, [], function (_path, value) {
+      if (positiveLeaf(value) > 0) found = true;
+    });
+    return found;
+  }
+
+  function getLeaf(root, path) {
+    var node = root;
+    for (var i = 0; i < path.length; i++) {
+      if (!node || typeof node !== 'object') return undefined;
+      node = node[path[i]];
+    }
+    return node;
+  }
+
+  function setLeaf(root, path, value) {
+    var node = root;
+    for (var i = 0; i < path.length - 1; i++) {
+      var key = path[i];
+      if (!node[key] || typeof node[key] !== 'object') node[key] = {};
+      node = node[key];
+    }
+    node[path[path.length - 1]] = value;
+  }
+
+  /**
+   * Preenche só folhas zeradas/ausentes. Folha já positiva na Central permanece.
+   * Um zero local não apaga produção já gravada.
+   */
+  function mergeProductionKeepServerPositive(serverProd, localProd) {
+    var out = cloneData(serverProd && typeof serverProd === 'object' ? serverProd : {}) || {};
+    walkProduction(localProd, [], function (path, value) {
+      var localN = positiveLeaf(value);
+      if (!(localN > 0)) return;
+      if (positiveLeaf(getLeaf(out, path)) > 0) return;
+      setLeaf(out, path, localN);
+    });
+    return out;
+  }
+
+  function unionById(serverArr, localArr) {
+    var out = Array.isArray(serverArr) ? cloneData(serverArr) : [];
+    var seen = {};
+    var i;
+    for (i = 0; i < out.length; i++) {
+      if (out[i] && out[i].id) seen[String(out[i].id)] = true;
+    }
+    var local = Array.isArray(localArr) ? localArr : [];
+    for (i = 0; i < local.length; i++) {
+      var item = local[i];
+      if (!item || typeof item !== 'object') continue;
+      if (item.id && seen[String(item.id)]) continue;
+      var copy = cloneData(item);
+      if (!item.id) {
+        var key = stableStringify(copy);
+        var dup = false;
+        for (var k = 0; k < out.length; k++) {
+          if (stableStringify(out[k]) === key) { dup = true; break; }
+        }
+        if (dup) continue;
+      }
+      out.push(copy);
+      if (copy && copy.id) seen[String(copy.id)] = true;
+    }
+    return out;
+  }
+
+  /**
+   * Reidratação: cabeçalho/identidade vêm da Central.
+   * Produção positiva, ocorrência e observação que só existem no aparelho
+   * entram no payload exibido — sem substituir valor positivo já gravado.
+   */
+  function preserveUnsyncedOperationalContent(serverPayload, localDraft) {
+    var server = serverPayload && typeof serverPayload === 'object' ? serverPayload : {};
+    if (!localDraft || typeof localDraft !== 'object') return cloneData(server);
+    var serverId = draftIdentity(server);
+    var localId = draftIdentity(localDraft);
+    if (!identityMatches(localId, serverId.reportId, serverId.serviceId)) return cloneData(server);
+    var out = cloneData(server);
+    out.producao = mergeProductionKeepServerPositive(out.producao, localDraft.producao);
+    out.ocorrencias = unionById(out.ocorrencias, localDraft.ocorrencias);
+    if (!filled(out.observacoes) && filled(localDraft.observacoes)) out.observacoes = String(localDraft.observacoes);
+    return out;
+  }
+
+  function hasPositiveOperational(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    return productionHasPositive(payload.producao) || countArr(payload, ['ocorrencias']) > 0 || filled(payload.observacoes);
+  }
+
+  /**
+   * Gravação local explícita enquanto a nuvem está bloqueada.
+   * Não grava formulário operacionalmente vazio por cima de outro RSD.
+   */
+  function commitExplicitLocalDraft(prev, next) {
+    if (!next || typeof next !== 'object') return { write: false, reason: 'EMPTY_NEXT' };
+    if (prev && typeof prev === 'object' && prev.reportId && next.reportId && String(prev.reportId) !== String(next.reportId)) {
+      return { write: false, reason: 'FOREIGN' };
+    }
+    if (!hasPositiveOperational(next)) return { write: false, reason: 'NO_OPERATIONAL_CONTENT' };
+    return { write: true, reason: 'EXPLICIT_OPERATIONAL', draft: preserveUnsyncedOperationalContent(next, prev) };
+  }
+
   return {
     DRAFT_KEY: DRAFT_KEY,
     PRE_HYDRATION_KEY: PRE_HYDRATION_KEY_LEGACY,
@@ -682,6 +812,9 @@
     hasSubstantiveContent: hasSubstantiveContent,
     simpleFingerprint: simpleFingerprint,
     identityMatches: identityMatches,
-    draftIdentity: draftIdentity
+    draftIdentity: draftIdentity,
+    preserveUnsyncedOperationalContent: preserveUnsyncedOperationalContent,
+    commitExplicitLocalDraft: commitExplicitLocalDraft,
+    productionHasPositive: productionHasPositive
   };
 });
