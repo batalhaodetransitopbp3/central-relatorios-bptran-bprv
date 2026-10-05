@@ -392,7 +392,12 @@ test('TEST_WRITE_ORDER_PRODUCAO / VEICULOS / ORIGENS', function () {
 
 test('GAS helpers + ScriptLock draft + write projection + deleteRows + merge legado', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
-  assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0 || src.indexOf("CENTRAL_V10_VERSION = '10.8.37'") >= 0);
+  const finalAt = src.indexOf('function rcoConsolidateFinal_');
+  assert.ok(finalAt >= 0, 'entrada da consolidação');
+  const finalFn = src.slice(finalAt, finalAt + 6000);
+  assert.ok(finalFn.indexOf('rcoConsolidateIsIntegralComplete_') >= 0, 'retry de pacote já integral não regrava');
+  assert.ok(finalFn.indexOf("draftStatus!=='EM_RETIFICACAO'") >= 0, 'retificação não usa o atalho de pacote já integral');
+  assert.ok(finalFn.indexOf('rcoSupplementalUpsertBody_') >= 0, 'escrita da consolidação passa pelo corpo otimizado');
   assert.ok(src.indexOf('function rcoConsolidateProjectWrites_') >= 0);
   assert.ok(src.indexOf('function rcoConsolidateMergePodRow_') >= 0);
   assert.ok(src.indexOf('function rcoConsolidateMergeOpRow_') >= 0);
