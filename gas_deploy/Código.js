@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.41-rsd-continue-window';
+var CENTRAL_V10_VERSION = '10.8.42-rco-service-window';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -439,6 +439,22 @@ function objectsFields_(s, fields) {
   groups.forEach(function(gr){var vals=s.getRange(2,gr.start+1,lastRow-1,gr.end-gr.start+1).getValues();for(var ri=0;ri<vals.length;ri++){for(var ci=gr.start;ci<=gr.end;ci++){var k=h[ci];if(wanted.indexOf(k)>=0)out[ri][k]=vals[ri][ci-gr.start];}}});
   return out;
 }
+function isCanonicalYmd_(v){return /^\d{4}-\d{2}-\d{2}$/.test(String(v==null?'':v));}
+/** Texto YYYY-MM-DD na célula DATA_SERVICO, aplicado antes do setValues. Não reformatar a coluna inteira. */
+function primeDataServicoTextColumn_(sheet, headers, startRow, rowCount, matrix){
+  var col=-1;
+  for(var i=0;i<(headers||[]).length;i++)if(headers[i]==='DATA_SERVICO'){col=i;break;}
+  if(col<0||!(rowCount>0)||!matrix||!matrix.length)return;
+  var any=false;
+  for(var r=0;r<matrix.length;r++){
+    var cell=matrix[r][col];
+    if(cell===''||cell==null)continue;
+    if(!isCanonicalYmd_(cell))return;
+    any=true;
+  }
+  if(!any)return;
+  sheet.getRange(startRow,col+1,rowCount,1).setNumberFormat('@');
+}
 function rowFor_(headers, obj) {
   return headers.map(function(k){
     var v = obj.hasOwnProperty(k) ? obj[k] : '';
@@ -457,12 +473,15 @@ function upsert_(s, keyField, keyValue, obj) {
     for (var i=0;i<vals.length;i++) if (String(vals[i][0]) === String(keyValue)) { row=i+2; break; }
   }
   if (!row) row = last + 1;
-  s.getRange(row,1,1,h.length).setValues([rowFor_(h,obj)]);
+  var matrix=[rowFor_(h,obj)];
+  primeDataServicoTextColumn_(s,h,row,1,matrix);
+  s.getRange(row,1,1,h.length).setValues(matrix);
   return row;
 }
 function append_(s, obj) {
-  var h = headers_(s);
-  s.getRange(s.getLastRow()+1,1,1,h.length).setValues([rowFor_(h,obj)]);
+  var h = headers_(s), row=s.getLastRow()+1, matrix=[rowFor_(h,obj)];
+  primeDataServicoTextColumn_(s,h,row,1,matrix);
+  s.getRange(row,1,1,h.length).setValues(matrix);
 }
 function deleteWhere_(s, field, value) {
   var h = headers_(s), idx = h.indexOf(field);
@@ -607,12 +626,22 @@ function parseJson_(v, fallback) { try { return JSON.parse(String(v||'')); } cat
  * Parse de data para leitura/filtro.
  * NÃO usa s.slice(0,10) como fallback — esse padrão gera tokens como `"2026-09-3`.
  */
+/**
+ * Dia civil de uma data vinda do Sheets.
+ * Serial de data (somente dia) chega como meia-noite UTC do dia exibido.
+ * formatDate no fuso do script ou da planilha recua esse dia quando o fuso está atrás de UTC.
+ * Instante com hora diferente de 00:00:00.000Z continua no fuso do script.
+ */
+function sheetDateSerialYmd_(v){
+  if(Object.prototype.toString.call(v)!=='[object Date]'||isNaN(v.getTime()))return '';
+  if(v.getUTCHours()===0&&v.getUTCMinutes()===0&&v.getUTCSeconds()===0&&v.getUTCMilliseconds()===0){
+    return Utilities.formatDate(v,'UTC','yyyy-MM-dd');
+  }
+  return Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd');
+}
 function dateText_(v) {
   if (!v && v!==0) return '';
-  if (Object.prototype.toString.call(v)==='[object Date]') {
-    if(isNaN(v.getTime()))return '';
-    return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
-  }
+  if (Object.prototype.toString.call(v)==='[object Date]') return sheetDateSerialYmd_(v);
   var s=String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
   if(!s)return '';
   var m=s.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
@@ -626,10 +655,7 @@ function dateText_(v) {
 /** Aceita somente YYYY-MM-DD canônico (ou Date de Sheets). Para novos writes de DATA_SERVICO. */
 function strictYmdDate_(v){
   if(!v&&v!==0)return '';
-  if(Object.prototype.toString.call(v)==='[object Date]'){
-    if(isNaN(v.getTime()))return '';
-    return Utilities.formatDate(v, scriptTz_(),'yyyy-MM-dd');
-  }
+  if(Object.prototype.toString.call(v)==='[object Date]')return sheetDateSerialYmd_(v);
   var s=String(v).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
   if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
   var m=s.match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
@@ -1152,7 +1178,9 @@ function rcoDraftPhysicalDuplicatePlan_(p){
 }
 function writeSheetRowObject_(s,rowNum,obj){
   var h=headers_(s),n=Number(rowNum||0);if(n<2)throw new Error('Linha inválida.');
-  s.getRange(n,1,1,h.length).setValues([rowFor_(h,obj)]);
+  var matrix=[rowFor_(h,obj)];
+  primeDataServicoTextColumn_(s,h,n,1,matrix);
+  s.getRange(n,1,1,h.length).setValues(matrix);
 }
 /**
  * 10.8.38 — PREVENÇÃO RCO_RASCUNHOS:
@@ -1170,7 +1198,7 @@ function rcoDraftPrepareRowForWrite_(row){
     var v=row[k];
     if(Object.prototype.toString.call(v)!=='[object Date]')continue;
     if(isNaN(v.getTime())){row[k]='';continue;}
-    if(k==='DATA_SERVICO')row[k]=Utilities.formatDate(v,scriptTz_(),'yyyy-MM-dd');
+    if(k==='DATA_SERVICO')row[k]=sheetDateSerialYmd_(v);
     else row[k]=Utilities.formatDate(v,scriptTz_(),"yyyy-MM-dd'T'HH:mm:ssXXX");
   }
   return row;
@@ -3608,6 +3636,130 @@ function rcoDraftStartOrContinue_(payload){
     return out;
   }finally{if(locked)try{lock.releaseLock();}catch(_){}}
 }
+function rcoFormatBrYmd_(ymd){
+  var m=String(ymd||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?(m[3]+'/'+m[2]+'/'+m[1]):'';
+}
+function rcoYmdFromStoredServiceDate_(v){
+  var direct=strictYmdDate_(v);
+  if(direct)return direct;
+  var text=dateText_(v);
+  direct=strictYmdDate_(text);
+  if(direct)return direct;
+  var legacy=preserveLegacyIdentityDate_(v);
+  var m=String(legacy||'').match(/(\d{4}-\d{2}-\d{2})/);
+  return (m&&strictYmdDate_(m[1]))?m[1]:'';
+}
+/**
+ * Janela do RCO = exatamente um dia civil, 07:00→07:00.
+ * Novo: DATA_SERVICO = início; término forçado para início+1, mesmo se o cliente enviar 48h.
+ * Existente: início válido diferente do DATA_SERVICO é rejeitado. Não move a identidade.
+ * passagem.data não identifica o RCO e não é reescrita aqui.
+ */
+function rcoBindDraftServiceWindow_(r, old){
+  r=r||{};
+  if(!r.periodo||typeof r.periodo!=='object'||Array.isArray(r.periodo))r.periodo={};
+  var incoming=strictYmdDate_(r.periodo.inicio||r.data||'');
+  var horario='07:00 às 07:00';
+  if(old){
+    var canonical=rcoYmdFromStoredServiceDate_(old.DATA_SERVICO);
+    var legacy=preserveLegacyIdentityDate_(old.DATA_SERVICO);
+    var rowDate=strictYmdDate_(legacy)||legacy||canonical;
+    if(canonical&&incoming&&incoming!==canonical){
+      var fim=addCalendarDaysYmd_(canonical,1);
+      return {ok:false,reject:true,data:rowDate,message:'A data de início deste RCO já está vinculada ao período '+rcoFormatBrYmd_(canonical)+'–'+rcoFormatBrYmd_(fim)+'. Para alterar a identidade do serviço, utilize correção administrativa.'};
+    }
+    if(!canonical&&legacy&&incoming){
+      return {ok:false,reject:true,data:rowDate,message:'A data de início deste RCO já está vinculada e não pode ser alterada por este salvamento. Para alterar a identidade do serviço, utilize correção administrativa.'};
+    }
+    if(canonical){
+      var termino=addCalendarDaysYmd_(canonical,1);
+      if(!termino)return {ok:false,reject:true,data:rowDate,message:'Não foi possível calcular o término do serviço (início + 1 dia).'};
+      r.periodo.inicio=canonical;
+      r.periodo.termino=termino;
+      r.periodo.horario=horario;
+      return {ok:true,reject:false,data:rowDate,message:''};
+    }
+    return {ok:true,reject:false,data:rowDate,message:''};
+  }
+  if(!incoming)return {ok:false,reject:false,data:'',message:''};
+  var next=addCalendarDaysYmd_(incoming,1);
+  if(!next)return {ok:false,reject:true,data:'',message:'Não foi possível calcular o término do serviço (início + 1 dia).'};
+  r.periodo.inicio=incoming;
+  r.periodo.termino=next;
+  r.periodo.horario=horario;
+  return {ok:true,reject:false,data:incoming,message:''};
+}
+function rcoDraftPayloadWindowNormalized_(payload, oldRow){
+  var copy=JSON.parse(JSON.stringify(payload||{}));
+  rcoBindDraftServiceWindow_(copy, oldRow||null);
+  return copy;
+}
+/** A normalização início+1 / 07:00–07:00 não é alteração substantiva do consolidado. */
+function rcoDraftWindowOnlyNormalization_(old, incomingPayload, reportId){
+  if(!old)return false;
+  var priorPayload=loadJsonPayload_(old)||{};
+  if(!priorPayload||typeof priorPayload!=='object'||!Object.keys(priorPayload).length)return false;
+  var priorNorm=rcoDraftPayloadWindowNormalized_(priorPayload, old);
+  return rcoConsolidateDraftFingerprint_(priorNorm, reportId)===rcoConsolidateDraftFingerprint_(incomingPayload, reportId);
+}
+function rcoDraftResolveConsolidateMarkers_(old, r, reportId){
+  var priorPkgFp=old?String(old.P3_CONSOLIDATE_FP||''):'';
+  var priorDraftFp=old?String(old.P3_CONSOLIDATE_DRAFT_FP||''):'';
+  var priorIntegral=!!(old&&String(old.P3_CONSOLIDATE_INTEGRAL||'').toUpperCase()==='SIM');
+  var incomingDraftFp=rcoConsolidateDraftFingerprint_(r, reportId);
+  var windowOnly=false;
+  if(priorDraftFp&&incomingDraftFp!==priorDraftFp&&(priorIntegral||priorPkgFp)){
+    try{windowOnly=rcoDraftWindowOnlyNormalization_(old, r, reportId);}catch(_){windowOnly=false;}
+  }
+  var fpForDecision=windowOnly?priorDraftFp:incomingDraftFp;
+  var keep=false,outPkgFp='',outDraftFp='',outIntegral='NAO',clearConsolidated=false;
+  if(priorIntegral&&priorPkgFp&&priorDraftFp&&fpForDecision===priorDraftFp){
+    keep=true;outPkgFp=priorPkgFp;outDraftFp=windowOnly?incomingDraftFp:priorDraftFp;outIntegral='SIM';
+  }else if(priorIntegral&&priorDraftFp&&fpForDecision!==priorDraftFp){
+    clearConsolidated=true;
+  }else if(priorPkgFp&&!priorIntegral&&(!priorDraftFp||fpForDecision===priorDraftFp)){
+    outPkgFp=priorPkgFp;outDraftFp=windowOnly?incomingDraftFp:(priorDraftFp||incomingDraftFp);outIntegral='NAO';
+  }
+  return {keep:keep,windowOnly:windowOnly,outPkgFp:outPkgFp,outDraftFp:outDraftFp,outIntegral:outIntegral,incomingDraftFp:incomingDraftFp,clearConsolidated:clearConsolidated};
+}
+function rcoConsolidateWindowFpCompatible_(storedFp, pkg, reportId, rcoRow){
+  storedFp=String(storedFp||'');
+  if(!storedFp||!rcoRow)return false;
+  var rco=(pkg&&(pkg.rco||pkg))||{};
+  var periodo=rco.periodo||{};
+  var inicio=strictYmdDate_(periodo.inicio||'');
+  var termino=strictYmdDate_(periodo.termino||'');
+  var horario=String(periodo.horario||rco.horarioServico||'');
+  if(!inicio||termino!==addCalendarDaysYmd_(inicio,1)||horario!=='07:00 às 07:00')return false;
+  if(dateText_(rcoRow.DATA_SERVICO)&&dateText_(rcoRow.DATA_SERVICO)!==inicio)return false;
+  var clone=JSON.parse(JSON.stringify(pkg||{}));
+  var cr=clone.rco||clone;
+  if(!cr.periodo||typeof cr.periodo!=='object'||Array.isArray(cr.periodo))cr.periodo={};
+  cr.periodo.inicio=inicio;
+  cr.periodo.termino=strictYmdDate_(rcoRow.TERMINO)||String(rcoRow.TERMINO||'');
+  cr.periodo.horario=String(rcoRow.HORARIO_SERVICO||'');
+  return String(rcoConsolidateFingerprint_(clone, reportId))===storedFp;
+}
+function rcoAlignConsolidatedWindowHeader_(reportId, rco, existingRow){
+  if(!existingRow)return false;
+  var periodo=(rco&&rco.periodo)||{};
+  var inicio=strictYmdDate_(periodo.inicio||'');
+  var termino=addCalendarDaysYmd_(inicio,1);
+  if(!inicio||!termino)return false;
+  if(dateText_(existingRow.DATA_SERVICO)&&dateText_(existingRow.DATA_SERVICO)!==inicio)return false;
+  var horario='07:00 às 07:00';
+  var storedTermino=strictYmdDate_(existingRow.TERMINO)||String(existingRow.TERMINO||'');
+  if(storedTermino===termino&&String(existingRow.HORARIO_SERVICO||'')===horario)return false;
+  ['DATA_SERVICO','INICIO','TERMINO'].forEach(function(k){
+    if(Object.prototype.toString.call(existingRow[k])==='[object Date]')existingRow[k]=strictYmdDate_(existingRow[k])||'';
+  });
+  existingRow.INICIO=existingRow.INICIO||inicio;
+  existingRow.TERMINO=termino;
+  existingRow.HORARIO_SERVICO=horario;
+  upsert_(sheet_(P3_SHEET_ID,'RCO'),'REPORT_ID',reportId,existingRow);
+  return true;
+}
 function rcoDraftUpsert_(payload){
   var r=payload.rco||payload||{},reportId=String((r.state||{}).reportId||r.reportId||''),deviceId=String(payload.deviceId||'');if(!reportId)throw new Error('RCO sem REPORT_ID.');
   // ScriptLock GLOBAL (mesmo de rcoConsolidateFinal_). Serializa draft×consolidate.
@@ -3624,7 +3776,9 @@ function rcoDraftUpsert_(payload){
   }
   var s=sheet_(P3_SHEET_ID,'RCO_RASCUNHOS'),old=findOne_(s,'RCO_REPORT_ID',reportId);
   var u=r.unidade||{},batt=normBattalion_(u.batalhao),comp=u.companhia||normCompany_(batt,u.companhiaNumero);
-  var data=old?preserveLegacyIdentityDate_(old.DATA_SERVICO)||strictYmdDate_((r.periodo||{}).inicio||r.data||''):strictYmdDate_((r.periodo||{}).inicio||r.data||'');
+  var bound=rcoBindDraftServiceWindow_(r,old);
+  if(bound.reject)throw new Error(bound.message);
+  var data=bound.data;
   if(!old&&!data)throw new Error('Informe a data do serviço para iniciar o RCO (AAAA-MM-DD).');
 
   // Unicidade atômica por Cia+janela 07–07. Save de RCO já existente (old) não é bloqueado por cluster histórico.
@@ -3657,30 +3811,17 @@ function rcoDraftUpsert_(payload){
   ensureHeaders_(s,['RESPONSAVEL_POSTO_GRAD','PASSAGEM_PENDENTE','PASSAGEM_ID','PASSAGEM_DE','PASSAGEM_EM','PASSAGEM_OBSERVACAO'].concat(RCO_CLOSURE_HEADERS_));
   var closure=rcoMergeClosureFromClient_(old,r);
   r=rcoApplyClosureFlagsToPayload_(r,closure);
-  // Markers de consolidação: preservar só se o conteúdo substantivo do rascunho não mudou.
-  var priorPkgFp=old?String(old.P3_CONSOLIDATE_FP||''):'';
-  var priorDraftFp=old?String(old.P3_CONSOLIDATE_DRAFT_FP||''):'';
-  var priorIntegral=old&&String(old.P3_CONSOLIDATE_INTEGRAL||'').toUpperCase()==='SIM';
-  var incomingDraftFp=rcoConsolidateDraftFingerprint_(r,reportId);
-  var keepConsolidateMarkers=false;
-  var outPkgFp='',outDraftFp='',outIntegral='NAO';
-  if(priorIntegral&&priorPkgFp&&priorDraftFp&&incomingDraftFp===priorDraftFp){
-    // Mesmo conteúdo substantivo → mantém validade da consolidação (retry pós-timeout seguro).
-    keepConsolidateMarkers=true;
-    outPkgFp=priorPkgFp;outDraftFp=priorDraftFp;outIntegral='SIM';
+  // Markers: a normalização da janela não invalida consolidação nem apaga o que já foi gravado.
+  var marker=rcoDraftResolveConsolidateMarkers_(old, r, reportId);
+  var keepConsolidateMarkers=!!marker.keep;
+  var outPkgFp=marker.outPkgFp,outDraftFp=marker.outDraftFp,outIntegral=marker.outIntegral;
+  if(marker.keep){
     closure.p3Consolidado=true;
     if(!closure.p3ConsolidadoEm)closure.p3ConsolidadoEm=String(old.P3_CONSOLIDADO_EM||nowIso_());
     r=rcoApplyClosureFlagsToPayload_(r,closure);
-  }else if(priorIntegral&&priorDraftFp&&incomingDraftFp!==priorDraftFp){
-    // Alteração substantiva → invalida conclusão; exige reconsolidação.
-    outPkgFp='';outDraftFp='';outIntegral='NAO';
+  }else if(marker.clearConsolidated){
     closure.p3Consolidado=false;closure.p3ConsolidadoEm='';
     r=rcoApplyClosureFlagsToPayload_(r,closure);
-  }else if(priorPkgFp&&!priorIntegral&&(!priorDraftFp||incomingDraftFp===priorDraftFp)){
-    // Consolidação parcial em voo (INTEGRAL=NAO, FP set): preserva FP para repairSameFp.
-    outPkgFp=priorPkgFp;outDraftFp=priorDraftFp||incomingDraftFp;outIntegral='NAO';
-  }else{
-    outPkgFp='';outDraftFp='';outIntegral='NAO';
   }
   var rev=old?Number(old.REVISAO||0)+1:1,json=JSON.stringify(r),saved=saveJsonPayload_(reportId,'draft-'+rev,json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',old&&old.PAYLOAD_FILE_ID||'');
   var obj={RCO_REPORT_ID:reportId,DATA_SERVICO:data,BATALHAO:batt,COMPANHIA:comp,STATUS:draftStatus,
@@ -4393,6 +4534,7 @@ function rcoAppendRows_(sheet,objs,perf){
   objs=objs||[];if(!objs.length)return;
   var h=headers_(sheet),start=sheet.getLastRow()+1;
   var block=objs.map(function(o){return rowFor_(h,o);});
+  primeDataServicoTextColumn_(sheet,h,start,block.length,block);
   sheet.getRange(start,1,block.length,h.length).setValues(block);
   if(perf)perf.trackedSheetWrites++;
 }
@@ -4904,11 +5046,22 @@ function rcoConsolidateFinal_(payload) {
     if(draftStatus!=='EM_RETIFICACAO'){
       rcoPerfStart_(perf,'idempotencyCheck');
       var done=rcoConsolidateIsIntegralComplete_(draft,pkg,reportId,fp,perf);
+      if(!done.complete&&done.state==='FP_MISMATCH_OR_RETIFICACAO'&&rcoConsolidateWindowFpCompatible_(String(draft.P3_CONSOLIDATE_FP||''),pkg,reportId,existing)){
+        rcoAlignConsolidatedWindowHeader_(reportId,rco,existing);
+        draft.P3_CONSOLIDATE_FP=fp;
+        draft.P3_CONSOLIDATE_DRAFT_FP=rcoConsolidateDraftFingerprint_(rco,reportId);
+        draft.P3_CONSOLIDATE_INTEGRAL='SIM';
+        if(String(draft.P3_CONSOLIDADO||'').toUpperCase()!=='SIM')draft.P3_CONSOLIDADO='SIM';
+        rcoDraftUpsertRow_(draftSheet,reportId,draft);
+        done={complete:true,state:'COMPLETE_WINDOW_ALIGNED'};
+      }
       rcoPerfEnd_(perf,'idempotencyCheck');
       if(done.complete){
         return {
           ok:true,idempotent:true,
-          message:'Consolidação P3 já estava integralmente concluída para este pacote. Nenhuma alteração adicional.',
+          message:done.state==='COMPLETE_WINDOW_ALIGNED'
+            ?'Janela do RCO alinhada para 07:00–07:00. Indicadores e ocorrências já consolidados foram preservados, sem nova gravação.'
+            :'Consolidação P3 já estava integralmente concluída para este pacote. Nenhuma alteração adicional.',
           reportId:reportId,version:Number((existing&&existing.VERSAO)||1),resolutions:[],
           pdfGerado:!!flags.pdfGerado,p3Consolidado:true,p3ConsolidadoEm:flags.p3ConsolidadoEm||'',
           encerrado:false,readyToClose:!!(flags.pdfGerado&&flags.p3Consolidado),status:draftStatus,
