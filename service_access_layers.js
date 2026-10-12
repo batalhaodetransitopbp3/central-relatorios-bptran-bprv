@@ -419,7 +419,6 @@ function renderOpenServiceCards(box,items,type,mode,p){
    const dl='<dl class="central-access-dl">'+rows.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+(timing?'<dt>Info</dt><dd>'+esc(timing)+'</dd>':'')+'</dl>';
    const badges=[];
    if(x.passagemPendente||mode==='receive')badges.push('<span class="central-access-badge passagem">Passagem pendente — aguardando recebimento</span>');
-   if(type==='rsd'&&x.historicalOpen)badges.push('<span class="central-access-badge legacy">Serviço anterior ainda aberto — confira a data</span>');
    const hasLegacy=!!(x.duplicadoLegadoHint||(x.legacyDuplicates&&x.legacyDuplicates.length));
    if(hasLegacy)badges.push('<span class="central-access-badge legacy">Registro(s) legado(s)</span>');
    const note=hasLegacy?'<div class="central-access-note">Há registro(s) legado(s) associados — Gestão pode arquivar</div>':'';
@@ -463,7 +462,6 @@ async function enterSelectedService(type,mode,item,el){
      const ok=await global.centralRsdReceiveSelectedPassage(item,key);if(ok){lockRsdHeader();clearLayer();exitSetup()}return !!ok
    }
    if(typeof global.centralRsdClaimCloudItem!=='function'){alert('Atualize a página e tente novamente.');return false}
-   if(item.historicalOpen&&!confirm('ATENÇÃO: este RSD pertence a um período operacional anterior ('+String(item.data||'')+'). Continuar não muda a data do serviço. Deseja abrir o registro antigo?'))return false;
    const ok=await global.centralRsdClaimCloudItem(item,false,'',key);if(ok){lockRsdHeader();clearLayer();exitSetup()}return !!ok
  }
  if(typeof global.centralRcoClaimCloudItem!=='function'){alert('Atualize a página para carregar o fluxo do RCO.');return false}

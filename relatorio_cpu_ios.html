@@ -844,20 +844,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 (function(){
   const baseCollect=window.collectState,baseApply=window.applyCpu,baseRenderMatrix=window.renderMatrix,baseRenderPrint=window.renderPrintMatrix;
   let cloudItems=[],cloudPayloads={},origins=[],showCancelledRsd=false;
-  const rcoDeviceId=CentralCloud.getDeviceId();let rcoSyncTimer=null,rcoConflictNotified=false,rcoRevisionNotified=false,rcoKnownRevisionByReport={};
-  function rcoRevisionStorageKey(reportId){return 'pmpb-rco-known-revision::'+String(reportId||'')}
-  function rcoRememberRevision(reportId,rev){
-    const id=String(reportId||'');if(!id||rev==null||rev==='')return;
-    const n=Number(rev);if(!Number.isFinite(n))return;
-    rcoKnownRevisionByReport[id]=n;
-    try{sessionStorage.setItem(rcoRevisionStorageKey(id),String(n))}catch(_){}
-  }
-  function rcoKnownRevisionFor(reportId){
-    const id=String(reportId||'');if(!id)return null;
-    if(Object.prototype.hasOwnProperty.call(rcoKnownRevisionByReport,id))return rcoKnownRevisionByReport[id];
-    try{const raw=sessionStorage.getItem(rcoRevisionStorageKey(id));if(raw!=null&&raw!==''&&Number.isFinite(Number(raw)))return Number(raw)}catch(_){}
-    return null;
-  }
+  const rcoDeviceId=CentralCloud.getDeviceId();let rcoSyncTimer=null,rcoConflictNotified=false;
   function rcoStoredRoleToken(){try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}}
   window.RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG||'Sua sessão expirou. Volte às opções de acesso e entre novamente.';
   const RCO_SESSION_EXPIRED_MSG=window.RCO_SESSION_EXPIRED_MSG;
@@ -884,28 +871,17 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     if(window.__rcoContextAbandoned||!navigator.onLine)return false;
     let token=rcoWorkflowToken(silent);if(!token)return false;
     let rco;try{rco=window.collectState()}catch(_){return false}
-    const reportId=String(rco?.state?.reportId||rco?.reportId||'');
-    const known=rcoKnownRevisionFor(reportId);
-    const body={rco,deviceId:rcoDeviceId};
-    if(known!=null){body.knownDraftRevision=known;body.draftRevision=known}
     try{
-      const r=await CentralCloud.submitForm('rco-draft-upsert',body,token,{popup:false,progress:!silent});
-      rcoConflictNotified=false;rcoRevisionNotified=false;
-      if(r&&r.revision!=null)rcoRememberRevision(r.reportId||reportId,r.revision);
+      const r=await CentralCloud.submitForm('rco-draft-upsert',{rco,deviceId:rcoDeviceId},token,{popup:false,progress:!silent});
+      rcoConflictNotified=false;
       if(r&&r.existing&&r.reportId){
         if(!silent)alert(r.message||'Já existe RCO em andamento para esta unidade e data. Abrindo o relatório canônico.');
         const opened=await claimRcoDraft({reportId:r.reportId},false,false,token);return !!opened
       }
       window.centralMarkSaved?.();return true
     }catch(e){
-      const msg=String(e?.message||e||'');
-      if(/LEGACY_CLIENT_RELOAD_REQUIRED|STALE_REVISION/i.test(msg)){
-        clearTimeout(rcoSyncTimer);
-        if(!rcoRevisionNotified){rcoRevisionNotified=true;alert(msg+'\n\nAs alterações deste aparelho continuam nesta tela. Recarregue o RCO da Central antes de salvar novamente. Nada foi apagado daqui nem da Central.')}
-        return false
-      }
-      if(/outro aparelho/i.test(msg)){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}
-      else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+msg+'\n\nAs alterações deste aparelho não foram apagadas.');
+      if(/outro aparelho/i.test(String(e.message||e))){if(!rcoConflictNotified){rcoConflictNotified=true;alert('Este RCO foi assumido em outro aparelho. As alterações deste dispositivo não serão sincronizadas até nova assunção.')}}
+      else if(!silent)alert('Não foi possível salvar o RCO na nuvem: '+e.message);
       return false
     }
   }
@@ -992,7 +968,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       alert('Não foi possível solicitar a retificação: '+(err.message||err));
     }
   };
-  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken=''){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const u=currentUnit();const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,data:claimData,...CentralCloud.unitParams({batalhao:item.batalhao||u.batalhao,companhia:item.companhia||u.companhia,companhiaNumero:item.companhiaNumero||u.companhiaNumero})},token,{popup:false});window.__rcoContextAbandoned=false;rcoRevisionNotified=false;rcoRememberRevision(item.reportId||r.rco?.state?.reportId||r.rco?.reportId,r.revision);const hintResp=r.rco?.responsavelRco||r.responsavel||null;if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else window.__rcoPendingContinueResponsible=true;window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
+  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken=''){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const u=currentUnit();const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,data:claimData,...CentralCloud.unitParams({batalhao:item.batalhao||u.batalhao,companhia:item.companhia||u.companhia,companhiaNumero:item.companhiaNumero||u.companhiaNumero})},token,{popup:false});window.__rcoContextAbandoned=false;const hintResp=r.rco?.responsavelRco||r.responsavel||null;if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else window.__rcoPendingContinueResponsible=true;window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
   async function continueRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false}
 
   window.centralRcoContinueCloud=continueRcoCloud;
@@ -1019,33 +995,10 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function payloadIds(p){return new Set([...(p?.ocorrencias||[]),...(p?.operacoes||[]),...(p?.veiculosRecuperados||[]),...(p?.tcos||[]),...(p?.arvc||p?.cirvc||[])].map(x=>x?.id).filter(Boolean))}
   function clearCloudGuarnicao(name){const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());if(name&&guId(name)!=='cpu')delete state.guarnicoes[guId(name)];removeDynamicForGu(name);const ids=new Set();related.forEach(o=>(o.recordIds||[]).forEach(id=>ids.add(id)));state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!ids.has(id));const reports=new Set(related.map(o=>o.rsdReportId));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!reports.has(id))}
   function rebuildCloudGuarnicao(name){clearCloudGuarnicao(name);const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).sort((a,b)=>Number(a.segmento||0)-Number(b.segmento||0));related.forEach(o=>{const p=cloudPayloads[o.rsdReportId];if(!p)return;importDailyV2(p,'RSD em nuvem');o.recordIds=Array.from(payloadIds(p))})}
-  function rcoSnapshotIsNewer(origin,item){if(!origin||!item)return false;const latestVersion=Number(item.version||item.versao||0),storedVersion=Number(origin.versao||0);if(latestVersion&&storedVersion&&latestVersion!==storedVersion)return latestVersion>storedVersion;return Number(item.draftRevision||0)>Number(origin.draftRevision||0)}
+  function rcoSnapshotIsNewer(origin,item){if(!origin||!item)return false;return Number(item.version||item.versao||0)>Number(origin.versao||0)||Number(item.draftRevision||0)>Number(origin.draftRevision||0)}
   function rcoColumnDivergesFromSnapshot(name,payload){const g=state.guarnicoes?.[guId(name)];if(!g||!payload)return false;const expected=productionMapV2(payload.producao||{});const keys=new Set([...Object.keys(expected||{}),...Object.keys(g.metrics||{})]);for(const k of keys){if(num(g.metrics?.[k])!==num(expected[k]))return true}return false}
-  function rcoForceDraftIsEmpty(p){const map=productionMapV2((p||{}).producao||{});const hasProd=Object.values(map).some(v=>num(v)>0);const hasOcc=Array.isArray(p?.ocorrencias)&&p.ocorrencias.length>0;const hasObs=String(p?.observacoes||'').trim().length>0;const hasOther=['operacoes','veiculosRecuperados','tcos','arvc','cirvc'].some(k=>Array.isArray(p?.[k])&&p[k].length>0);return !hasProd&&!hasOcc&&!hasObs&&!hasOther}
-  function rcoImportWouldEraseWork(name,item,p){
-    const g=state.guarnicoes?.[guId(name)]||{};
-    const old=cloudPayloads[item.reportId]||null;
-    const incoming=rcoForceDraftIsEmpty(p);
-    const hadSnapshot=!!(old&&!rcoForceDraftIsEmpty(old));
-    const hadManual=Object.values(g.metrics||{}).some(v=>num(v)>0)||(g.ocorrencias||[]).length>0||String(g.observacoes||'').trim().length>0;
-    return incoming&&(hadSnapshot||hadManual);
-  }
-  function rcoSnapshotWouldDiscardFields(old,p){
-    if(!old||!p)return false;
-    const before=productionMapV2(old.producao||{}),after=productionMapV2(p.producao||{});
-    if(Object.keys(before).some(key=>num(before[key])>num(after[key])))return true;
-    const arrays=['ocorrencias','operacoes','veiculosRecuperados','tcos','arvc','cirvc'];
-    for(const key of arrays){
-      const prev=Array.isArray(old[key])?old[key]:[];
-      const next=Array.isArray(p[key])?p[key]:[];
-      const ids=new Set(next.map(x=>String(x?.id||'')).filter(Boolean));
-      if(prev.some(x=>x?.id&&!ids.has(String(x.id))))return true;
-      if(prev.length&&next.length<prev.length)return true;
-    }
-    if(String(old.observacoes||'').trim()&&!String(p.observacoes||'').trim())return true;
-    return false;
-  }
-  function rcoApplyCloudSnapshot(item,p,opDate){const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&!rcoSnapshotIsNewer(oldOrigin,item))return 'atual';const name=item.guarnicao||p?.guarnicao?.nome||'';if(rcoImportWouldEraseWork(name,item,p)){alert('ATUALIZAÇÃO BLOQUEADA: o RSD retornou vazio, mas esta guarnição já possui dados no RCO. Os indicadores, ocorrências e ajustes foram preservados. Confira o salvamento do RSD na Central antes de substituir informações.');return 'cancelado'}if(oldOrigin&&rcoSnapshotWouldDiscardFields(cloudPayloads[item.reportId],p)){if(!confirm('O RSD atualizado contém redução ou retirada de indicadores, ocorrências ou outros registros já importados. Confira se a retificação é intencional.\n\nOK — Substituir pelo pacote mais recente\nCancelar — Preservar os dados do RCO'))return 'cancelado'}if(oldOrigin&&rcoColumnDivergesFromSnapshot(name,cloudPayloads[item.reportId])){if(!confirm('Esta guarnição possui ajustes feitos manualmente no RCO. Atualizar pelos dados do RSD substituirá esses valores.\n\nOK — Atualizar e substituir pelos dados do RSD\nCancelar — manter os ajustes manuais'))return 'cancelado'}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:name,versao:Number(item.version||p.versao||p.version||0),draftRevision:Number(item.draftRevision||p.draftRevision||0),ultimoRascunhoEm:item.ultimoRascunhoEm||p.ultimoRascunhoEm||'',snapshotAt:p.generatedAt||'',status:item.status||'INCLUIDO',data:item.operationalDate||item.data||opDate||'',batalhao:item.batalhao||p.unidade?.batalhao||'',companhia:item.companhia||p.unidade?.companhia||'',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(name);return oldOrigin?'atualizado':'incluido'}
+  function rcoForceDraftIsEmpty(p){const map=productionMapV2((p||{}).producao||{});const hasProd=Object.values(map).some(v=>num(v)>0);const hasOcc=Array.isArray(p?.ocorrencias)&&p.ocorrencias.length>0;const hasObs=String(p?.observacoes||'').trim().length>0;return !hasProd&&!hasOcc&&!hasObs}
+  function rcoApplyCloudSnapshot(item,p,opDate){const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&!rcoSnapshotIsNewer(oldOrigin,item))return 'atual';const name=item.guarnicao||p?.guarnicao?.nome||'';if(oldOrigin&&rcoColumnDivergesFromSnapshot(name,cloudPayloads[item.reportId])){if(!confirm('Esta guarnição possui ajustes feitos manualmente no RCO. Atualizar pelos dados do RSD substituirá esses valores.\n\nOK — Atualizar e substituir pelos dados do RSD\nCancelar — manter os ajustes manuais'))return 'cancelado'}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:name,versao:Number(item.version||p.versao||p.version||0),draftRevision:Number(item.draftRevision||p.draftRevision||0),ultimoRascunhoEm:item.ultimoRascunhoEm||p.ultimoRascunhoEm||'',snapshotAt:p.generatedAt||'',status:item.status||'INCLUIDO',data:item.operationalDate||item.data||opDate||'',batalhao:item.batalhao||p.unidade?.batalhao||'',companhia:item.companhia||p.unidade?.companhia||'',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(name);return oldOrigin?'atualizado':'incluido'}
   window.rcoStaleIncludedGuarnicoes=function(){return origins.filter(o=>{const item=(cloudItems||[]).find(x=>x.reportId===o.rsdReportId);return !!(item&&rcoSnapshotIsNewer(o,item))}).map(o=>o.guarnicao||o.rsdReportId)}
 
   function rcoRoleActor(){const a=window.rcoResponsibleData?.()||{};return {perfil:String(a.perfil||'CPU').toUpperCase(),matricula:a.matricula||'',nome:a.nome||''}}
@@ -1268,7 +1221,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     }
     return sameOperationalUnit({batalhao:item?.batalhao,companhia:item?.companhia},u);
   }
-  async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();const opDate=rcoOperationalDate(val('dataInicio'));if(!rsdBelongsToRcoUnit(item,u)){alert('Este RSD pertence a outra companhia/batalhão e não pode ser incluído neste RCO.');return}try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,data:opDate,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');if(p.unidade&&!validateImportedUnit(p,'RSD nuvem'))return;if(p.sheetStructuralFallback&&!rsdBelongsToRcoUnit({batalhao:p.sheetStructuralFallback.batalhao,companhia:p.sheetStructuralFallback.companhia},u)){alert('RSD fora do escopo do RCO (batalhão/companhia).');return}const applied=rcoApplyCloudSnapshot(item,p,opDate);if(applied==='atual'){alert('Esta versão do RSD já está incluída.');return}if(applied==='cancelado')return;renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);clearTimeout(rcoSyncTimer);renderCloud();const persisted=await syncRcoDraft(false);if(!persisted){alert('O RSD foi importado apenas nesta tela. A gravação no RCO da nuvem NÃO foi confirmada. Preserve esta página e use Salvar RCO na nuvem antes de sair.');return}alert(applied==='atualizado'?'Dados do RSD atualizados e salvos na nuvem.':'RSD incluído e salvo no RCO da nuvem.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
+  async function addCloud(item){const token=rcoWorkflowToken(false);if(!token)return;const u=currentUnit();const opDate=rcoOperationalDate(val('dataInicio'));if(!rsdBelongsToRcoUnit(item,u)){alert('Este RSD pertence a outra companhia/batalhão e não pode ser incluído neste RCO.');return}try{const r=await CentralCloud.jsonp('rsd-get',{...CentralCloud.unitParams(u),reportId:item.reportId,data:opDate,token});const p=r.rsd;if(!p)throw new Error('Pacote do RSD não retornado.');if(p.unidade&&!validateImportedUnit(p,'RSD nuvem'))return;if(p.sheetStructuralFallback&&!rsdBelongsToRcoUnit({batalhao:p.sheetStructuralFallback.batalhao,companhia:p.sheetStructuralFallback.companhia},u)){alert('RSD fora do escopo do RCO (batalhão/companhia).');return}const applied=rcoApplyCloudSnapshot(item,p,opDate);if(applied==='atual'){alert('Esta versão do RSD já está incluída.');return}if(applied==='cancelado')return;renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();alert(applied==='atualizado'?'Dados do RSD atualizados nesta guarnição.':'RSD incluído na consolidação.')}catch(e){alert('Não foi possível adicionar o RSD: '+e.message)}}
   /** Data operacional do RCO = período.inicio (janela 07h→07h). Não expandir ±1 dia — isso misturava serviços. */
   function rcoOperationalDate(inicio){
     const d=String(inicio||'').slice(0,10);
@@ -1525,6 +1478,6 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.43"></script>
+<script src="service_access_layers.js?v=10.8.34"></script>
 <script src="service_flow.js?v=10.8.34"></script>
 </body></html>

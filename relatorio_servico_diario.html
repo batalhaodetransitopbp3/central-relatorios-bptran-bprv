@@ -1731,9 +1731,9 @@ async function publishPass(){
         if(['AGUARDANDO_ANALISE','DEFERIDO','DEFERIDO_COM_RESSALVAS','INCLUIDO_RCO','FINALIZADO'].includes(st)){
           serviceRegistered=false;saveIdentity();saveActiveContext();renderReviewBanner(atual.rsd);updateFinalizeUi(st);return true;
         }
-        if(atual?.rsd){renderReviewBanner(atual.rsd);alert('RSD NÃO FINALIZADO NA CENTRAL. Status: '+(st||'desconhecido')+'.\n\nFalha no envio: '+String(e.message||e)+'\n\nOs dados preenchidos neste aparelho precisam ser preservados. Um PDF gerado não comprova envio. Não encerre ou limpe o histórico antes de confirmar a sincronização.');return false}
+        if(atual?.rsd){renderReviewBanner(atual.rsd);if(!opts.fromExit)alert(reviewMessage(atual.rsd));return false}
       }catch(_){}
-      alert('RSD NÃO FINALIZADO. Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.');
+      if(!opts.fromExit)alert('Não foi possível sincronizar o RSD: '+e.message+'\n\nO relatório permaneceu salvo neste aparelho.');
       return false;
     }
     }finally{setRsdOpBusy(false)}
@@ -1761,6 +1761,6 @@ async function publishPass(){
   window.addEventListener('central-v10-ready',()=>setTimeout(install,20));if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,40));else setTimeout(install,40);
 })();
 </script>
-<script src="service_access_layers.js?v=10.8.43"></script>
+<script src="service_access_layers.js?v=10.8.35"></script>
 <script src="service_flow.js?v=10.8.35"></script>
 </body></html>
