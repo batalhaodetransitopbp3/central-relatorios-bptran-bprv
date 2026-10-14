@@ -16,7 +16,7 @@
  * O banco P3 e o banco do Checklist ficam separados por decisão de arquitetura.
  */
 
-var CENTRAL_V10_VERSION = '10.8.44-rco-linked-modules';
+var CENTRAL_V10_VERSION = '10.8.44.1-rco-session-hotfix';
 var MASTER_ADMIN_PASSWORD_SHA256 = 'd291d40f83f21c0cbaba275b44c8d70fad57bdb5f72894d012f19c4bc952ffaf';
 var P3_SHEET_ID = '1fNE2hEz4vYjX6r-KmLowswlejkVpj6CeD_2FdNK_keM';
 var CHECKLIST_SHEET_ID = '15KvRMVC8ofELZLXGlllMq7h5SkPV5qDcC1qtOVB6jBs';
@@ -60,10 +60,10 @@ function handleApiReadViaGet_(action, p) {
       assertToken_(p.token, 'central');
       out = {ok:true, items:passagensPendentes_(p)};
     } else if (action === 'operation-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId ? 'rco' : 'central');
       out = {ok:true, items:operationList_(p)};
     } else if (action === 'service-event-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId ? 'rco' : 'central');
       out = {ok:true, items:serviceEventList_(p)};
     } else if (action === 'rco-draft-list') {
       assertToken_(p.token, 'rco');
@@ -78,7 +78,7 @@ function handleApiReadViaGet_(action, p) {
       assertToken_(p.token, 'rco');
       out = {ok:true, reboque:reboqueGet_(p.reportId)};
     } else if (action === 'cirvc-list') {
-      assertToken_(p.token, 'central');
+      assertToken_(p.token, p.rcoReportId ? 'rco' : 'central');
       out = {ok:true, items:cirvcList_(p)};
     } else if (action === 'cirvc-pending') {
       assertToken_(p.token, 'central');

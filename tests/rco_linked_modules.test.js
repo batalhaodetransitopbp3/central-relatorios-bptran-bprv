@@ -230,7 +230,7 @@ function op(extra) {
     assert.ok(a.includes('rcoReportId') || a.includes('RCO_REPORT_ID') || a.includes('rcoCanonicalDraft_') || a.includes('rcoLinkedScopeDecision_'), name);
     assert.strictEqual(a, b, name + ' divergente entre apps_script e clasp');
   });
-  assert.ok(gas.includes("var CENTRAL_V10_VERSION = '10.8.44-rco-linked-modules'"));
+  assert.ok(gas.includes("var CENTRAL_V10_VERSION = '10.8.44.1-rco-session-hotfix'"));
   assert.ok(!gas.includes("CENTRAL_V10_VERSION = '10.8.38'"));
   assert.ok(gas.includes('RCO_REPORT_ID:incomingRco||old&&old.RCO_REPORT_ID||\'\''));
   assert.ok(gas.includes('if(!sid&&!rid&&!rco)throw new Error'));
