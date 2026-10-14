@@ -23,6 +23,18 @@ function formatYmdLocal(d) {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
 
+/**
+ * Espelho de sheetDateSerialYmd_.
+ * Meia-noite UTC = dia civil exibido pelo Sheets. Qualquer outro instante usa o fuso local do teste.
+ */
+function formatDataServicoYmd(d) {
+  if (!isDateObject(d) || isNaN(d.getTime())) return '';
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0) {
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+  }
+  return formatYmdLocal(d);
+}
+
 function formatIsoLocal(d) {
   if (!isDateObject(d) || isNaN(d.getTime())) return '';
   return formatYmdLocal(d) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
@@ -57,7 +69,7 @@ function prepareRcoDraftRowForWrite(row, opts) {
       row[k] = '';
       return;
     }
-    if (k === 'DATA_SERVICO') row[k] = ymd(v);
+    if (k === 'DATA_SERVICO') row[k] = (opts.formatYmd ? ymd(v) : formatDataServicoYmd(v));
     else row[k] = iso(v);
   });
   return row;
@@ -128,6 +140,7 @@ function classifyQuotedIsoRecovery(item) {
 module.exports = {
   isDateObject: isDateObject,
   formatYmdLocal: formatYmdLocal,
+  formatDataServicoYmd: formatDataServicoYmd,
   formatIsoLocal: formatIsoLocal,
   rowForLegacy: rowForLegacy,
   prepareRcoDraftRowForWrite: prepareRcoDraftRowForWrite,

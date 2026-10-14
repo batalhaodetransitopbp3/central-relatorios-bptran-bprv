@@ -239,7 +239,7 @@ function entriesFrom(container){return Array.from(document.querySelectorAll(`#${
 function entries(container){return entriesFrom(container)}
 function populateEntry(entry,data={}){if(data.id)entry.dataset.id=data.id;entry.querySelectorAll('[data-k]').forEach(el=>{if(data[el.dataset.k]!==undefined){if(el.type==='checkbox')el.checked=!!data[el.dataset.k];else el.value=data[el.dataset.k]}});entry.querySelectorAll('[data-k="situacao"]').forEach(toggleClone);entry.querySelectorAll('[data-k="placaOriginalIdentificada"]').forEach(toggleOriginal);entry.querySelectorAll('[data-k="houveConduzidos"]').forEach(toggleConduzidos)}
 
-const SOMATORIO=[["apreensoes-veiculos-recolhimentos", "APREENSÕES DE VEÍCULOS (RECOLHIMENTOS)", [["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"]]], ["remocoes-sinistros", "REMOÇÕES DECORRENTES DE SINISTROS DE TRÂNSITO", [["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"]]], ["sinistros-sem-embriaguez", "SINISTROS (SEM EMBRIAGUEZ)", [["c-vitimas", "C/ VÍTIMAS (TODOS)"], ["s-vitimas-s-cnh", "S/ VÍTIMAS (S/ CNH)"], ["s-vitimas-menores", "S/ VÍTIMAS (MENORES)"], ["s-vitimas-vtr-pmpb", "S/ VÍTIMAS (VTR PMPB)"], ["atropelamentos", "ATROPELAMENTOS"], ["outros", "OUTROS"]]], ["sinistros-embriaguez", "SINISTROS POR EMBRIAGUEZ", [["c-vitimas", "C/ VÍTIMAS"], ["s-vitimas", "S/ VÍTIMAS"], ["atropelamentos", "ATROPELAMENTOS"], ["outros", "OUTROS"]]], ["acionamentos", "ACIONAMENTOS", [["bsts", "BST’s"], ["reboque-outras-unidades", "REBOQUE para outras unidade"], ["vtr-bst-apoio", "VTRs de BST em apoio a outras unidades (ou órgãos)"]]], ["notificacoes", "NOTIFICAÇÕES", [["art-165", "ART. 165"], ["art-165-a", "ART. 165-A"], ["art-230-xi", "ART. 230 XI"], ["demais-aits-com-abordagem", "DEMAIS AITs COM ABORDAGEM"], ["aits-sem-abordagem", "AITs SEM ABORDAGEM"], ["total-aits", "TOTAL DE AITs LAVRADOS"]]], ["sem-grupo", "", [["cnhs-recolhidas", "CNH’s RECOLHIDAS"], ["testes-etilometro", "QUANTIDADE DE TESTE DE ETILÔMETRO REALIZADOS"]]], ["apreensoes", "APREENSÕES", [["armas", "ARMAS"], ["drogas", "DROGAS"], ["menores", "MENORES"], ["siva-r", "SIVA-R"], ["sinais", "SINAIS"]]], ["prisoes", "PRISÕES", [["embriaguez", "EMBRIAGUEZ NO TRÂNSITO"], ["sinistro", "SINISTRO DE TRÂNSITO"], ["armas", "PORTE/POSSE ARMAS"], ["drogas", "PORTE/POSSE DROGAS"], ["mandado", "MANDADO DE PRISÃO"], ["siva-r", "SIVA-R"], ["sinais", "SINAIS"], ["tco-sasp", "TCO - SASP"], ["outros", "OUTROS"]]], ["abordagens", "ABORDAGENS", [["pessoas", "PESSOAS"], ["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"], ["checkpoints", "CHECK POINTS / BLITZ"]]]];let state={reportId:uid('cpu'),guarnicoes:{},importedReportIds:[],importedRecordIds:[],fisco:[]};const DRAFT='pmpb-transito-cpu-v2-draft';
+const SOMATORIO=[["apreensoes-veiculos-recolhimentos", "APREENSÕES DE VEÍCULOS (RECOLHIMENTOS)", [["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"]]], ["remocoes-sinistros", "REMOÇÕES DECORRENTES DE SINISTROS DE TRÂNSITO", [["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"]]], ["sinistros-sem-embriaguez", "SINISTROS (SEM EMBRIAGUEZ)", [["c-vitimas", "C/ VÍTIMAS (TODOS)"], ["s-vitimas-s-cnh", "S/ VÍTIMAS (S/ CNH)"], ["s-vitimas-menores", "S/ VÍTIMAS (MENORES)"], ["s-vitimas-vtr-pmpb", "S/ VÍTIMAS (VTR PMPB)"], ["atropelamentos", "ATROPELAMENTOS"], ["outros", "OUTROS"]]], ["sinistros-embriaguez", "SINISTROS POR EMBRIAGUEZ", [["c-vitimas", "C/ VÍTIMAS"], ["s-vitimas", "S/ VÍTIMAS"], ["atropelamentos", "ATROPELAMENTOS"], ["outros", "OUTROS"]]], ["acionamentos", "ACIONAMENTOS", [["bsts", "BST’s"], ["reboque-outras-unidades", "REBOQUE para outras unidade"], ["vtr-bst-apoio", "VTRs de BST em apoio a outras unidades (ou órgãos)"]]], ["notificacoes", "NOTIFICAÇÕES", [["art-165", "ART. 165"], ["art-165-a", "ART. 165-A"], ["art-230-xi", "ART. 230 XI"], ["demais-aits-com-abordagem", "DEMAIS AITs COM ABORDAGEM"], ["aits-sem-abordagem", "AITs SEM ABORDAGEM"], ["total-aits", "TOTAL DE AITs LAVRADOS"]]], ["sem-grupo", "", [["cnhs-recolhidas", "CNH’s RECOLHIDAS"], ["testes-etilometro", "QUANTIDADE DE TESTE DE ETILÔMETRO REALIZADOS"]]], ["apreensoes", "APREENSÕES", [["armas", "ARMAS"], ["drogas", "DROGAS"], ["menores", "MENORES"], ["siva-r", "SIVA-R"], ["sinais", "SINAIS"]]], ["prisoes", "PRISÕES", [["embriaguez", "EMBRIAGUEZ NO TRÂNSITO"], ["sinistro", "SINISTRO DE TRÂNSITO"], ["armas", "PORTE/POSSE ARMAS"], ["drogas", "PORTE/POSSE DROGAS"], ["mandado", "MANDADO DE PRISÃO"], ["siva-r", "SIVA-R"], ["sinais", "SINAIS"], ["tco-sasp", "TCO - SASP"], ["outros", "OUTROS"]]], ["abordagens", "ABORDAGENS", [["pessoas", "PESSOAS"], ["motocicletas", "MOTOCICLETAS"], ["ciclomotores", "CICLOMOTORES"], ["automoveis", "AUTOMÓVEIS"], ["outros", "OUTROS"], ["checkpoints", "CHECK POINTS / BLITZ"]]]];let state={reportId:uid('cpu'),guarnicoes:{},importedReportIds:[],importedRecordIds:[],rcoLinkedRecords:[],fisco:[]};const DRAFT='pmpb-transito-cpu-v2-draft';
 const RCO_HISTORY_KEY='central-history-rco-v1';
 function loadRcoHistoryObj(){try{return JSON.parse(localStorage.getItem(RCO_HISTORY_KEY)||'{}')||{}}catch(_){return {}}}
 function saveRcoHistory(){try{const old=loadRcoHistoryObj();const people=cpuPeopleData().filter(x=>String(x.nome||'').trim());const profiles=[...(old.profiles||[])];for(const p of people){const k=String(p.nome||'').trim().toUpperCase();const i=profiles.findIndex(x=>String(x.nome||'').trim().toUpperCase()===k);if(i>=0)profiles.splice(i,1);profiles.unshift({graduacao:p.graduacao||'',nome:p.nome||'',matricula:p.matricula||'',turno:p.turno||''})}const h={batalhao:val('batalhao')||old.batalhao||'BPTran',companhiaNumero:Number(val('companhiaNumero'))||old.companhiaNumero||1,horarioServico:val('horarioServico')||old.horarioServico||'',nomeAssinante:val('nomeAssinante')||old.nomeAssinante||'',patenteAssinante:val('patenteAssinante')||old.patenteAssinante||'',profiles:profiles.slice(0,20)};localStorage.setItem(RCO_HISTORY_KEY,JSON.stringify(h));refreshRcoHistoryDatalist()}catch(_){}}
@@ -262,6 +262,105 @@ function occurrencePrintHtml(g){return (g?.ocorrencias||[]).length?`<table class
 function refreshGuOccurrencePrint(gu){const g=state.guarnicoes[gu],wrap=document.querySelector(`.gu-card[data-gu-card="${gu}"] .print-occ-wrap`);if(g&&wrap)wrap.innerHTML=occurrencePrintHtml(g)}
 function updateGuOccurrence(gu,id,k,v){const g=state.guarnicoes[gu],o=g?.ocorrencias?.find(x=>x.id===id);if(o){o[k]=v;refreshGuOccurrencePrint(gu)}}
 function removeGuOccurrence(gu,id){const g=state.guarnicoes[gu];if(!g)return;g.ocorrencias=(g.ocorrencias||[]).filter(x=>x.id!==id);renderGuarnicoes();window.centralAutosave?.()}
+function rcoClassifyModuleOrigins(list){
+ const map=new Map();
+ (list||[]).forEach(o=>{if(!o||(!o.rsdReportId&&!o.serviceId))return;map.set(String(o.rsdReportId||o.serviceId),o)});
+ const rows=[...map.values()];
+ if(!rows.length)return {mode:'direct',chosen:null,ambiguous:false,options:[]};
+ if(rows.length===1)return {mode:'single',chosen:rows[0],ambiguous:false,options:rows};
+ const rank=o=>{const st=String(o.status||'').toUpperCase();const active=(st==='EM_SERVICO'||st==='EM_ANDAMENTO'||st==='EM_RETIFICACAO')?1:0;return [Number(o.segmento||0),active,String(o.adicionadoEm||o.ultimoRascunhoEm||o.snapshotAt||'')]};
+ const sorted=rows.slice().sort((a,b)=>{const ra=rank(a),rb=rank(b);for(let i=0;i<3;i++){if(ra[i]>rb[i])return -1;if(ra[i]<rb[i])return 1}return 0});
+ const top=rank(sorted[0]);
+ const same=sorted.filter(o=>{const r=rank(o);return r[0]===top[0]&&r[1]===top[1]&&r[2]===top[2]});
+ if(same.length>1)return {mode:'ambiguous',chosen:null,ambiguous:true,options:same};
+ return {mode:'latest',chosen:sorted[0],ambiguous:false,options:sorted};
+}
+function rcoUnitKey(rec){
+ rec=rec||{};
+ const batt=String(rec.batalhao||rec.unidade?.batalhao||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+ const b=batt.indexOf('BPRV')>=0?'BPRV':(batt.indexOf('BPTRAN')>=0?'BPTRAN':'');
+ const comp=Number(rec.companhiaNumero||rec.unidade?.companhiaNumero)||Number(String(rec.companhia||rec.unidade?.companhia||'').match(/\d+/)?.[0])||0;
+ return b&&comp?(b+'|'+comp):'';
+}
+function rcoRecordInScope(rec, scope){
+ rec=rec||{};scope=scope||{};
+ const uk=rcoUnitKey(rec),sk=rcoUnitKey(scope);
+ if(!uk||!sk||uk!==sk)return false;
+ const data=String(rec.data||rec.operationalDate||rec.operacao?.data||'').slice(0,10);
+ const want=String(scope.operationalDate||scope.data||'').slice(0,10);
+ if(!data||!want||data!==want)return false;
+ const gu=String(rec.guarnicao||rec.operacao?.guarnicoes||'').trim().toLowerCase();
+ const wg=String(scope.guarnicao||'').trim().toLowerCase();
+ if(!gu||!wg||gu!==wg)return false;
+ if(scope.rcoReportId&&String(rec.rcoReportId||'')!==String(scope.rcoReportId))return false;
+ if(scope.rsdReportId&&String(rec.rsdReportId||'')!==String(scope.rsdReportId))return false;
+ if(scope.serviceId&&String(rec.serviceId||'')!==String(scope.serviceId))return false;
+ if(scope.segmento&&Number(rec.segmento||0)!==Number(scope.segmento))return false;
+ if(Array.isArray(scope.rsdReportIds)&&(!rec.rsdReportId||scope.rsdReportIds.indexOf(String(rec.rsdReportId))<0))return false;
+ return true;
+}
+function rcoStableLinkedId(kind, rec){
+ rec=rec||{};
+ if(kind==='operacao')return String(rec.reportId||rec.id||'');
+ if(kind==='cirvc')return String(rec.id||rec.CIRVC_ID||rec.cirvcId||'');
+ if(kind==='bopm')return String(rec.referenciaId||rec.numeroDocumento||rec.numero||rec.id||'');
+ return '';
+}
+function rcoPayloadIds(p){
+ const ids=[];
+ (p?.ocorrencias||[]).forEach(x=>{const id=x?.referenciaId||x?.id;if(id)ids.push(String(id));if(x?.id&&String(x.id)!==String(id||''))ids.push(String(x.id))});
+ (p?.operacoes||[]).forEach(x=>{const id=x?.reportId||x?.id;if(id)ids.push(String(id))});
+ (p?.veiculosRecuperados||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});
+ (p?.tcos||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});
+ (p?.arvc||p?.cirvc||[]).forEach(x=>{const id=x?.id||x?.CIRVC_ID;if(id)ids.push(String(id))});
+ return new Set(ids.filter(Boolean));
+}
+function rcoModuleContext(base, origin){
+ base=base||{};origin=origin||null;
+ const has=!!(origin&&(origin.rsdReportId||origin.serviceId));
+ const unidade=base.unidade||{};
+ return {returnModule:'rco',returnUrl:String(base.returnUrl||''),rcoReportId:String(base.rcoReportId||''),rsdReportId:has?String(origin.rsdReportId||''):'',serviceId:has?String(origin.serviceId||''):'',segmento:has?(Number(origin.segmento||1)||1):1,guarnicao:String(base.guarnicao||''),operationalDate:String(base.operationalDate||''),data:String(base.operationalDate||''),unidade:{batalhao:unidade.batalhao||'',companhia:unidade.companhia||'',companhiaNumero:Number(unidade.companhiaNumero||0)||0},vtrs:Array.isArray(base.vtrs)?base.vtrs.slice():[],comandante:String(base.comandante||''),comandanteMatricula:String(base.comandanteMatricula||'')};
+}
+function rcoPlanLinkedMerge(existingIds, incoming, scope){
+ const ids=new Set(existingIds||[]);
+ const accept=[],reject=[];
+ const consider=(kind,rec)=>{
+  const id=rcoStableLinkedId(kind,rec);
+  if(!id){reject.push({kind,reason:'sem-id'});return}
+  if(!rcoRecordInScope(rec,scope)){reject.push({kind,id,reason:'fora-do-escopo'});return}
+  if(ids.has(id)){reject.push({kind,id,reason:'duplicado'});return}
+  ids.add(id);accept.push({kind,id,rec});
+ };
+ (incoming?.operacoes||[]).forEach(r=>consider('operacao',r));
+ (incoming?.cirvc||[]).forEach(r=>consider('cirvc',r));
+ (incoming?.boletins||[]).forEach(r=>consider('bopm',r));
+ return {accept,reject,ids:[...ids]};
+}
+function rcoLinkedBlockHtml(g){
+ const name=String(g?.nome||'').trim().toLowerCase();
+ const bits=[];
+ const safeId=v=>String(v||'').replace(/[^A-Za-z0-9_.:-]/g,'');
+ document.querySelectorAll('#cpuOperations .entry').forEach(el=>{
+  const gu=String(el.querySelector('[data-k="guarnicao"]')?.value||'').trim().toLowerCase();
+  if(gu!==name)return;
+  const nome=el.querySelector('[data-k="nome"]')?.value||'Operação';
+  const local=el.querySelector('[data-k="local"]')?.value||el.querySelector('[data-k="localPrevisto"]')?.value||'';
+  bits.push('<div class="rco-linked-item"><b>'+esc(nome)+'</b><div>'+esc(local)+'</div><button type="button" class="small" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'operation\',\''+safeId(el.dataset.id)+'\')">Ver / editar</button></div>');
+ });
+ document.querySelectorAll('#cpuArvcs .entry').forEach(el=>{
+  const gu=String(el.querySelector('[data-k="guarnicao"]')?.value||'').trim().toLowerCase();
+  if(gu!==name)return;
+  const placa=el.querySelector('[data-k="placa"]')?.value||'';
+  const local=el.querySelector('[data-k="local"]')?.value||'';
+  bits.push('<div class="rco-linked-item"><b>CIRVC</b><div>'+esc([placa,local].filter(Boolean).join(' • '))+'</div><button type="button" class="small" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'cirvc\',\''+safeId(el.dataset.id)+'\')">Abrir módulo</button></div>');
+ });
+ (g.ocorrencias||[]).forEach(o=>{
+  if(String(o.tipo||'').toUpperCase()!=='BO'&&!/^PM20/i.test(String(o.numero||'')))return;
+  const id=safeId(o.referenciaId||o.numero||o.id);
+  bits.push('<div class="rco-linked-item"><b>'+esc(o.numero||'BOPM')+'</b><div>'+esc(o.descricao||'')+'</div><button type="button" class="small" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'bo\',\''+id+'\')">Abrir BOPM</button></div>');
+ });
+ return '<div class="field span12 no-print rco-linked-box"><div class="occ-label-row"><label>Registros vinculados</label></div><div class="actions"><button type="button" class="small secondary" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'bo\')">Registrar BOPM</button><button type="button" class="small secondary" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'operation\')">Registrar operação</button><button type="button" class="small secondary" onclick="rcoOpenLinkedModule(\''+g.id+'\',\'cirvc\')">Registrar CIRVC</button></div>'+bits.join('')+'</div>';
+}
 function occurrenceEditor(g,o){const tco=o.tipo==='TCO';return `<div class="gu-occ-row"><input type="date" value="${esc(o.data||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','data',this.value)"><input type="time" value="${esc(o.hora||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','hora',this.value)"><input placeholder="PM2026XXXXXX" value="${esc(o.numero||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','numero',this.value)"><select onchange="updateGuOccurrence('${g.id}','${o.id}','tipo',this.value);renderGuarnicoes()"><option ${o.tipo==='BST'?'selected':''}>BST</option><option ${o.tipo==='TCO'?'selected':''}>TCO</option><option ${o.tipo==='BO'?'selected':''}>BO</option><option ${o.tipo==='Outro'?'selected':''}>Outro</option></select><textarea class="occ-desc-input" rows="2" placeholder="Descrição breve da ocorrência" oninput="updateGuOccurrence('${g.id}','${o.id}','descricao',this.value)">${esc(o.descricao||'')}</textarea>${tco?`<input placeholder="Tipificação" value="${esc(o.tipificacao||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','tipificacao',this.value)"><select onchange="updateGuOccurrence('${g.id}','${o.id}','tcoSasp',this.value);renderGuarnicoes()"><option ${o.tcoSasp!=='Sim'?'selected':''}>Não</option><option ${o.tcoSasp==='Sim'?'selected':''}>Sim</option></select>${o.tcoSasp==='Sim'?`<input placeholder="TCO-..." value="${esc(o.numeroTco||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','numeroTco',this.value)">`:''}`:''}<button class="small danger no-print" onclick="removeGuOccurrence('${g.id}','${o.id}')">×</button></div>`}
 function renderGuarnicoes(){
  const badges=document.getElementById('guarnicoesBadges'),panels=document.getElementById('guPanels');badges.innerHTML='';panels.innerHTML='';const u=currentUnit();
@@ -271,7 +370,7 @@ function renderGuarnicoes(){
   const occEdit=isCpu?`<div class="gu-occ-editor no-print">${g.ocorrencias.map(o=>occurrenceEditor(g,o)).join('')}<button class="small secondary" onclick="addOccurrenceToGuarnicao('${g.id}')">+ ocorrência</button></div>`:'';
   const identidade=isCpu?'':`<div class="field span4"><label>Responsável</label><input data-gu="${g.id}" data-k="responsavel" value="${esc(g.responsavel||'')}" placeholder="Posto/grad. e QRA"><span class="print-value"></span></div><div class="field span2"><label>Matrícula</label><input class="matricula" maxlength="9" placeholder="500.000-0" data-gu="${g.id}" data-k="matricula" value="${esc(g.matricula||'')}"><span class="print-value"></span></div>`;
   const materialLabel=u.batalhao==='BPRv'?'Material da base':'Material cautelado';const materialDefault='Não houve alteração no material cautelado.';
-  p.innerHTML=`<div class="gu-title"><span>${esc(g.nome)}</span><span class="status-badge">Guarnição</span></div><div class="grid gu-compact-grid">${identidade}<div class="field span2"><label>Efetivo</label><input data-gu="${g.id}" data-k="efetivo" value="${esc(g.efetivo||'')}" placeholder="Ex.: 03 PMs"><span class="print-value"></span></div><div class="field span1"><label>Viatura</label><input class="vtr-prefix" maxlength="5" data-gu="${g.id}" data-k="viatura" value="${esc(g.viatura||'')}" placeholder="Ex.: 9157"><span class="print-value"></span></div><div class="field span3"><label>${materialLabel}</label><textarea data-default="${materialDefault}" data-gu="${g.id}" data-k="materialCarga" placeholder="Registre somente falta, avaria, substituição ou alteração do material cautelado.">${esc(g.materialCarga||'')}</textarea><span class="print-value"></span></div><div class="field span3"><label>Alterações da viatura</label><textarea data-default="Não houve alteração na VTR." data-gu="${g.id}" data-k="alteracoesViatura" placeholder="Registre somente avaria, indisponibilidade, substituição ou outra alteração na VTR.">${esc(g.alteracoesViatura||'')}</textarea><span class="print-value"></span></div><div class="field span4"><label>Observações</label><textarea data-default="Sem observações" data-gu="${g.id}" data-k="observacoes" placeholder="Registre somente informação relevante não contemplada nos campos anteriores.">${esc(g.observacoes||'')}</textarea><span class="print-value"></span></div><div class="field span12"><div class="occ-label-row"><label>Ocorrências (BST/TCO/BO)</label>${isCpu?'<span class="no-print">Preenchimento manual do CPU</span>':''}</div>${occEdit}<div class="print-occ-wrap">${occPrint}</div></div></div>`;panels.appendChild(p)
+  p.innerHTML=`<div class="gu-title"><span>${esc(g.nome)}</span><span class="status-badge">Guarnição</span></div><div class="grid gu-compact-grid">${identidade}<div class="field span2"><label>Efetivo</label><input data-gu="${g.id}" data-k="efetivo" value="${esc(g.efetivo||'')}" placeholder="Ex.: 03 PMs"><span class="print-value"></span></div><div class="field span1"><label>Viatura</label><input class="vtr-prefix" maxlength="5" data-gu="${g.id}" data-k="viatura" value="${esc(g.viatura||'')}" placeholder="Ex.: 9157"><span class="print-value"></span></div><div class="field span3"><label>${materialLabel}</label><textarea data-default="${materialDefault}" data-gu="${g.id}" data-k="materialCarga" placeholder="Registre somente falta, avaria, substituição ou alteração do material cautelado.">${esc(g.materialCarga||'')}</textarea><span class="print-value"></span></div><div class="field span3"><label>Alterações da viatura</label><textarea data-default="Não houve alteração na VTR." data-gu="${g.id}" data-k="alteracoesViatura" placeholder="Registre somente avaria, indisponibilidade, substituição ou outra alteração na VTR.">${esc(g.alteracoesViatura||'')}</textarea><span class="print-value"></span></div><div class="field span4"><label>Observações</label><textarea data-default="Sem observações" data-gu="${g.id}" data-k="observacoes" placeholder="Registre somente informação relevante não contemplada nos campos anteriores.">${esc(g.observacoes||'')}</textarea><span class="print-value"></span></div><div class="field span12"><div class="occ-label-row"><label>Ocorrências (BST/TCO/BO)</label>${isCpu?'<span class="no-print">Preenchimento manual do CPU</span>':''}</div>${occEdit}<div class="print-occ-wrap">${occPrint}</div></div>${rcoLinkedBlockHtml(g)}</div>`;panels.appendChild(p)
  });
  panels.querySelectorAll('[data-gu][data-k]').forEach(e=>e.addEventListener('input',()=>{const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}));panels.querySelectorAll('.matricula').forEach(e=>{e.oninput=()=>{e.value=formatMatricula(e.value);const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}});panels.querySelectorAll('.vtr-prefix').forEach(e=>{e.oninput=()=>{e.value=String(e.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,5);const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}});panels.querySelectorAll('input,textarea,select').forEach(syncPrintValue)
 }
@@ -335,8 +434,8 @@ function importarOperacoesDoDiaCpu(){const data=val('dataInicio'),u=currentUnit(
 function salvarRascunho(s=false){saveRcoHistory();localStorage.setItem(DRAFT,JSON.stringify(collectState()));if(!s)alert('Rascunho salvo neste aparelho.')}
 function carregarRascunho(){const raw=localStorage.getItem(DRAFT);if(!raw){alert('Nenhum rascunho salvo.');return}try{applyCpu(JSON.parse(raw));alert('Rascunho carregado.')}catch(e){console.error(e);alert('Rascunho inválido.')}}
 function clearContainer(ids){ids.forEach(id=>document.getElementById(id).innerHTML='')}
-function applyCpu(p){if(p.unidade){document.getElementById('batalhao').value=p.unidade.batalhao||'BPTran';document.getElementById('companhiaNumero').value=String(p.unidade.companhiaNumero||1)}for(const [id,v] of Object.entries({dataInicio:p.periodo?.inicio,horarioServico:'07:00 às 07:00',observacoesGerais:p.observacoes,substitutoLegal:p.passagem?.substituto,dataFinal:p.passagem?.data,nomeAssinante:p.assinante?.nome,patenteAssinante:p.assinante?.posto})){const e=document.getElementById(id);if(e)e.value=v||''}state=p.state||state;if(!state.guarnicoes)state.guarnicoes={};Object.values(state.guarnicoes).forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura=''});ensureGuarnicao('CPU');clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);(p.cpu||[]).forEach(addCpuPerson);(p.alteracoesEfetivo||[]).forEach(addEfetivoChange);(p.operacoes||[]).forEach(addCpuOperation);(p.veiculosRecuperados||[]).forEach(addCpuVehicle);(p.tcos||[]).forEach(addCpuTco);(p.cirvc||p.arvc||[]).forEach(addCpuArvc);(p.anexos||[]).forEach(addAnexo);syncUnitHeader();rcoSyncServiceWindow();atualizarDiaCpu();renderGuarnicoes();renderMatrix();renderFisco();syncDefaultFiscoAnexo();syncAll()}
-function limparFormulario(){if(!confirm('Limpar todo o relatório CPU?'))return;try{localStorage.removeItem(DRAFT);localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase())}catch(_){}state={reportId:uid('cpu'),guarnicoes:{},importedReportIds:[],importedRecordIds:[],fisco:[]};clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);setDates();ensureGuarnicao('CPU');addCpuPerson();defaultAnexos();document.querySelectorAll('textarea').forEach(e=>e.value='');syncAll()}
+function applyCpu(p){if(p.unidade){document.getElementById('batalhao').value=p.unidade.batalhao||'BPTran';document.getElementById('companhiaNumero').value=String(p.unidade.companhiaNumero||1)}for(const [id,v] of Object.entries({dataInicio:p.periodo?.inicio,horarioServico:'07:00 às 07:00',observacoesGerais:p.observacoes,substitutoLegal:p.passagem?.substituto,dataFinal:p.passagem?.data,nomeAssinante:p.assinante?.nome,patenteAssinante:p.assinante?.posto})){const e=document.getElementById(id);if(e)e.value=v||''}state=p.state||state;if(!state.guarnicoes)state.guarnicoes={};if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];Object.values(state.guarnicoes).forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura=''});ensureGuarnicao('CPU');clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);(p.cpu||[]).forEach(addCpuPerson);(p.alteracoesEfetivo||[]).forEach(addEfetivoChange);(p.operacoes||[]).forEach(addCpuOperation);(p.veiculosRecuperados||[]).forEach(addCpuVehicle);(p.tcos||[]).forEach(addCpuTco);(p.cirvc||p.arvc||[]).forEach(addCpuArvc);(p.anexos||[]).forEach(addAnexo);syncUnitHeader();rcoSyncServiceWindow();atualizarDiaCpu();renderGuarnicoes();renderMatrix();renderFisco();syncDefaultFiscoAnexo();syncAll()}
+function limparFormulario(){if(!confirm('Limpar todo o relatório CPU?'))return;try{localStorage.removeItem(DRAFT);localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase())}catch(_){}state={reportId:uid('cpu'),guarnicoes:{},importedReportIds:[],importedRecordIds:[],rcoLinkedRecords:[],fisco:[]};clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);setDates();ensureGuarnicao('CPU');addCpuPerson();defaultAnexos();document.querySelectorAll('textarea').forEach(e=>e.value='');syncAll()}
 function syncDefaultFiscoAnexo(){const tbody=document.getElementById('anexos');if(!tbody)return;[...tbody.querySelectorAll('tr.entry')].filter(r=>r.dataset.autoDefault==='fisco'||r.querySelector('[data-k="descricao"]')?.value==='Relatório de Ocorrências do Fisco Estadual').forEach(r=>r.remove())}
 function defaultAnexos(){
   const base=[
@@ -1010,15 +1109,138 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function semCpu(){return !!document.getElementById('rcoSemCpu')?.checked}
   function consolidator(){return {semCpu:semCpu(),postoGrad:val('rcoConsolidadorPosto'),nome:val('rcoConsolidadorNome'),matricula:window.CentralCloud?CentralCloud.formatMatricula(val('rcoConsolidadorMatricula')):val('rcoConsolidadorMatricula'),turno:val('rcoConsolidadorTurno')}}
   function hideCpuColumns(){const active=semCpu();document.body.classList.toggle('rco-sem-cpu',active);document.querySelectorAll('table.matrix').forEach(t=>{const th=[...t.querySelectorAll('thead th')],idx=th.findIndex(x=>(x.textContent||'').trim().toUpperCase()==='CPU');if(idx>=0)[...t.rows].forEach(r=>{if(r.cells[idx])r.cells[idx].style.display=active?'none':''})});document.querySelectorAll('#matrixPrint table').forEach(t=>{const th=[...t.querySelectorAll('thead th')],idx=th.findIndex(x=>(x.textContent||'').trim().toUpperCase()==='CPU');if(idx>=0)[...t.rows].forEach(r=>{if(r.cells[idx])r.cells[idx].style.display=active?'none':''})})}
+  function rcoOriginChoices(rows){
+    return (rows||[]).map(o=>{const p=cloudPayloads[o.rsdReportId]||{},g=p.guarnicao||{};return Object.assign({},o,{comandante:g.responsavel||o.comandante||'',matricula:g.matricula||o.matricula||'',viatura:g.viatura||o.viatura||'',data:o.data||p.servico?.data||''})});
+  }
+  function rcoAskSegment(options){
+    const lines=(options||[]).map((o,i)=>(i+1)+'. '+(o.comandante||'Comandante não informado')+' • '+(o.matricula||'sem matrícula')+' • segmento '+(o.segmento??'?')+' • VTR '+(o.viatura||'—')+' • '+(o.data||o.adicionadoEm||'sem horário'));
+    const answer=prompt('Esta guarnição possui mais de um segmento de serviço.\nSelecione o segmento ao qual este registro pertence.\n\n'+lines.join('\n')+'\n\nDigite o número:');
+    if(answer==null)return null;
+    const n=Number(String(answer).trim());
+    if(!Number.isInteger(n)||n<1||n>options.length){alert('Seleção inválida. Nenhum registro foi vinculado.');return null}
+    return options[n-1];
+  }
+  function rcoOriginsForGuarnicao(nome){
+    const key=String(nome||'').trim().toLowerCase();
+    return origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===key&&String(o.status||'').toUpperCase()!=='REMOVIDO');
+  }
+  async function rcoOpenLinkedModule(guKey, kind, editId){
+    const g=state.guarnicoes[guKey];
+    if(!g){alert('Guarnição não encontrada.');return}
+    if(!state.reportId){alert('O RCO ainda não tem identificador. Salve a progressão antes de abrir o módulo.');return}
+    const classified=g.id==='cpu'?rcoClassifyModuleOrigins([]):rcoClassifyModuleOrigins(rcoOriginsForGuarnicao(g.nome));
+    let origin=classified.chosen;
+    if(classified.ambiguous){origin=rcoAskSegment(rcoOriginChoices(classified.options));if(!origin)return}
+    const page=(location.pathname.split('/').pop()||'relatorio_cpu.html');
+    const resp=(g.id==='cpu'&&window.rcoResponsibleData)?(window.rcoResponsibleData()||{}):{};
+    const ctx=rcoModuleContext({returnUrl:page,rcoReportId:state.reportId,guarnicao:g.nome,operationalDate:val('dataInicio'),unidade:currentUnit(),vtrs:String(g.viatura||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean),comandante:g.responsavel||resp.nome||'',comandanteMatricula:g.matricula||resp.matricula||''},origin);
+    if(editId)ctx.editId=String(editId);
+    try{localStorage.setItem('pmpb-active-service-v1',JSON.stringify(ctx))}catch(_){}
+    let saved=false;try{saved=await window.centralRcoSaveProgression?.()===true}catch(_){saved=false}
+    if(!saved){const go=confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja abrir o módulo mesmo assim?');if(!go)return}
+    const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+    const map={operation:ios?'relatorio_operacao_ios.html':'relatorio_operacao.html',cirvc:ios?'auto_remocao_veiculos_ios.html':'auto_remocao_veiculos.html',bo:ios?'boletim_ocorrencia_bptrans_1cprv_ios.html':'boletim_ocorrencia_bptrans_1cprv.html'};
+    const target=map[kind];if(!target)return;
+    const q=new URLSearchParams({from:'rco',returnTo:page,module:kind});
+    if(editId)q.set('editId',String(editId));
+    location.href=target+'?'+q.toString();
+  }
+  window.rcoOpenLinkedModule=rcoOpenLinkedModule;
+  window.rcoResolveModuleOrigin=function(guarnicaoId){const g=state.guarnicoes[guarnicaoId];if(!g||g.id==='cpu')return rcoClassifyModuleOrigins([]);return rcoClassifyModuleOrigins(rcoOriginsForGuarnicao(g.nome))};
+  function rcoFlatOperation(item){return {reportId:item.reportId||'',id:item.reportId||item.id||'',rcoReportId:item.rcoReportId||'',rsdReportId:item.rsdReportId||'',serviceId:item.serviceId||'',segmento:item.segmento||'',batalhao:item.unidade?.batalhao||item.batalhao||'',companhia:item.unidade?.companhia||item.companhia||'',companhiaNumero:item.unidade?.companhiaNumero||'',data:item.operacao?.data||item.data||'',guarnicao:item.operacao?.guarnicoes||item.guarnicao||'',raw:item}}
+  function rcoFlatCirvc(item){return {id:item.id||item.CIRVC_ID||'',CIRVC_ID:item.CIRVC_ID||'',rcoReportId:item.rcoReportId||'',rsdReportId:item.rsdReportId||'',serviceId:item.serviceId||'',segmento:item.segmento||'',batalhao:item.unidade?.batalhao||item.batalhao||'',companhia:item.unidade?.companhia||item.companhia||'',companhiaNumero:item.unidade?.companhiaNumero||'',data:item.data||'',guarnicao:item.guarnicao||'',raw:item}}
+  function rcoFlatBo(item){return {referenciaId:item.referenciaId||item.numeroDocumento||'',numero:item.numeroDocumento||item.referenciaId||'',id:item.referenciaId||item.eventId||'',rcoReportId:item.rcoReportId||'',rsdReportId:item.rsdReportId||'',serviceId:item.serviceId||'',segmento:item.segmento||'',batalhao:item.batalhao||'',companhia:item.companhia||'',data:item.data||'',guarnicao:item.guarnicao||'',raw:item}}
+  function rcoKnownIds(){
+    const ids=new Set(state.importedRecordIds||[]);
+    (state.importedReportIds||[]).forEach(id=>ids.add(String(id)));
+    document.querySelectorAll('#cpuOperations .entry, #cpuArvcs .entry').forEach(el=>{if(el.dataset.id)ids.add(String(el.dataset.id))});
+    Object.values(state.guarnicoes||{}).forEach(g=>(g.ocorrencias||[]).forEach(o=>{if(o.id)ids.add(String(o.id));if(o.referenciaId)ids.add(String(o.referenciaId));if(o.numero)ids.add(String(o.numero))}));
+    return ids;
+  }
+  let linkedRefreshBusy=false,linkedRefreshQueued=false;
+  async function centralRcoRefreshLinkedRecords(onlyName){
+    if(linkedRefreshBusy){linkedRefreshQueued=true;return {ok:false,reason:'busy'}}
+    const token=(()=>{try{return sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){return ''}})();
+    if(!token||!window.CentralCloud||!state.reportId)return {ok:false,reason:'sem-sessao'};
+    linkedRefreshBusy=true;
+    try{
+      const unit=currentUnit(),opDate=val('dataInicio');
+      const names=onlyName?[onlyName]:Object.values(state.guarnicoes||{}).map(g=>g.nome);
+      let added=0;
+      for(const name of names){
+        const g=Object.values(state.guarnicoes||{}).find(x=>String(x.nome||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
+        if(!g)continue;
+        const classified=g.id==='cpu'?rcoClassifyModuleOrigins([]):rcoClassifyModuleOrigins(rcoOriginsForGuarnicao(g.nome));
+        const scope={batalhao:unit.batalhao,companhia:unit.companhia,companhiaNumero:unit.companhiaNumero,operationalDate:opDate,guarnicao:g.nome,rcoReportId:state.reportId};
+        if(classified.mode!=='direct')scope.rsdReportIds=rcoOriginsForGuarnicao(g.nome).map(o=>String(o.rsdReportId||'')).filter(Boolean);
+        const q={rcoReportId:state.reportId,batalhao:unit.batalhao,companhia:unit.companhia,data:opDate,guarnicao:g.nome,token};
+        let ops=[],cir=[],evs=[];
+        try{ops=(await CentralCloud.jsonp('operation-list',q,{timeout:20000})).items||[]}catch(_){ops=[]}
+        try{cir=(await CentralCloud.jsonp('cirvc-list',q,{timeout:20000})).items||[]}catch(_){cir=[]}
+        try{evs=((await CentralCloud.jsonp('service-event-list',q,{timeout:20000})).items||[]).filter(e=>String(e.tipo||'').toUpperCase()==='BO')}catch(_){evs=[]}
+        const planned=rcoPlanLinkedMerge([...rcoKnownIds()],{operacoes:ops.map(rcoFlatOperation),cirvc:cir.map(rcoFlatCirvc),boletins:evs.map(rcoFlatBo)},scope);
+        planned.accept.forEach(item=>{
+          const data=rcoLinkedDataFromAccept(item,opDate);
+          if(item.kind==='operacao')addCpuOperation(Object.assign({id:item.id,guarnicao:g.nome},data));
+          else if(item.kind==='cirvc')addCpuArvc(Object.assign({id:item.id,guarnicao:g.nome},data));
+          else if(item.kind==='bopm'){g.ocorrencias=g.ocorrencias||[];g.ocorrencias.push(Object.assign({id:item.id,referenciaId:item.id,tipo:'BO'},data))}
+          rcoRememberLinkedRecord({id:item.id,kind:item.kind,guarnicao:g.nome,data});
+          if(!state.importedRecordIds.includes(item.id))state.importedRecordIds.push(item.id);
+          if(item.kind==='operacao'&&!state.importedReportIds.includes(item.id))state.importedReportIds.push(item.id);
+          added++;
+        });
+      }
+      if(added){renderGuarnicoes();try{await window.centralRcoSaveProgression?.()}catch(_){}}
+      return {ok:true,added};
+    }finally{
+      linkedRefreshBusy=false;
+      if(linkedRefreshQueued){linkedRefreshQueued=false;return centralRcoRefreshLinkedRecords(onlyName)}
+    }
+  }
+  window.centralRcoRefreshLinkedRecords=centralRcoRefreshLinkedRecords;
   window.centralRcoToggleSemCpu=function(){const on=semCpu();document.getElementById('rcoConsolidadorFields')?.classList.toggle('hidden',!on);if(on&&document.getElementById('rcoConsolidadorMatricula'))document.getElementById('rcoConsolidadorMatricula').value=CentralCloud?.formatMatricula(document.getElementById('rcoConsolidadorMatricula').value)||'';hideCpuColumns();window.centralAutosave?.()}
   if(baseRenderMatrix)window.renderMatrix=function(){const r=baseRenderMatrix.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
   if(baseRenderPrint)window.renderPrintMatrix=function(){const r=baseRenderPrint.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
   window.collectState=function(){const p=baseCollect();p.rcoOrigens=origins.slice();p.rcoCloudPayloads=JSON.parse(JSON.stringify(cloudPayloads||{}));p.consolidacaoResponsavel=consolidator();p.semGuarnicaoCpu=semCpu();const cf=window.__rcoClosureFlags||{};p.pdfGerado=!!(p.pdfGerado||cf.pdfGerado);p.pdfGeradoEm=p.pdfGeradoEm||cf.pdfGeradoEm||'';p.p3Consolidado=!!(p.p3Consolidado||cf.p3Consolidado);p.p3ConsolidadoEm=p.p3ConsolidadoEm||cf.p3ConsolidadoEm||'';p.encerrado=!!(p.encerrado||cf.encerrado);p.encerradoEm=p.encerradoEm||cf.encerradoEm||'';if(semCpu()){p.cpu=[];p.state=JSON.parse(JSON.stringify(p.state||{}));if(p.state.guarnicoes)delete p.state.guarnicoes.cpu;const keep=x=>String(x?.guarnicao||'').trim().toUpperCase()!=='CPU';p.operacoes=(p.operacoes||[]).filter(keep);p.veiculosRecuperados=(p.veiculosRecuperados||[]).filter(keep);p.tcos=(p.tcos||[]).filter(keep);p.arvc=(p.arvc||[]).filter(keep)}return p}
-  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu();window.__rcoClosureFlags={pdfGerado:!!p?.pdfGerado,pdfGeradoEm:String(p?.pdfGeradoEm||''),p3Consolidado:!!p?.p3Consolidado,p3ConsolidadoEm:String(p?.p3ConsolidadoEm||''),encerrado:!!p?.encerrado,encerradoEm:String(p?.encerradoEm||'')};try{window.p3RefreshClosureStatus?.();const el=document.getElementById('p3Status');if(el&&!el.textContent){const f=window.__rcoClosureFlags;if(f.pdfGerado&&!f.p3Consolidado)el.textContent='PDF gerado. Ainda falta Consolidar P3.';else if(!f.pdfGerado&&f.p3Consolidado)el.textContent='Dados consolidados. Ainda falta Gerar PDF do RCO.';else if(f.pdfGerado&&f.p3Consolidado&&!f.encerrado)el.textContent='PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.'}}catch(_){}}
+  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu();window.__rcoClosureFlags={pdfGerado:!!p?.pdfGerado,pdfGeradoEm:String(p?.pdfGeradoEm||''),p3Consolidado:!!p?.p3Consolidado,p3ConsolidadoEm:String(p?.p3ConsolidadoEm||''),encerrado:!!p?.encerrado,encerradoEm:String(p?.encerradoEm||'')};try{window.p3RefreshClosureStatus?.();const el=document.getElementById('p3Status');if(el&&!el.textContent){const f=window.__rcoClosureFlags;if(f.pdfGerado&&!f.p3Consolidado)el.textContent='PDF gerado. Ainda falta Consolidar P3.';else if(!f.pdfGerado&&f.p3Consolidado)el.textContent='Dados consolidados. Ainda falta Gerar PDF do RCO.';else if(f.pdfGerado&&f.p3Consolidado&&!f.encerrado)el.textContent='PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.'}}catch(_){}try{window.centralRcoRefreshLinkedRecords?.()}catch(_){}}
+  function rcoLinkedDataFromAccept(item, opDate){
+    const raw=item.rec?.raw||item.rec||{};
+    if(item.kind==='operacao')return {nome:raw.operacao?.nome||raw.resumoCpu?.nome||'',local:raw.local?.descricao||raw.resumoCpu?.local||'',localPrevisto:raw.pod?.localPrevisto||raw.resumoCpu?.localPrevisto||'',coordenadas:raw.local?.coordenadas||'',statusCumprimento:raw.pod?.statusCumprimento||raw.resumoCpu?.statusCumprimento||'Não informado',motivoAlteracao:raw.pod?.motivoAlteracao||raw.resumoCpu?.motivoAlteracao||'',turno:raw.operacao?.turno||raw.resumoCpu?.turno||''};
+    if(item.kind==='cirvc')return {data:raw.data||opDate,hora:raw.hora||'',numeroTermo:raw.numeroTermo||'',placa:raw.placa||'',local:raw.local||'',militarResponsavelAit:raw.militarResponsavelAit||''};
+    if(item.kind==='bopm')return {data:raw.data||opDate,hora:raw.hora||'',numero:raw.numeroDocumento||raw.referenciaId||item.id,descricao:raw.resumo||raw.titulo||'',tipificacao:'',tcoSasp:'Não',numeroTco:''};
+    return {};
+  }
+  function rcoRememberLinkedRecord(row){
+    if(!row||!row.id)return;
+    if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];
+    const id=String(row.id);
+    const item={id,kind:String(row.kind||''),guarnicao:String(row.guarnicao||''),data:row.data&&typeof row.data==='object'?JSON.parse(JSON.stringify(row.data)):{}};
+    const at=state.rcoLinkedRecords.findIndex(x=>String(x.id)===id);
+    if(at>=0)state.rcoLinkedRecords[at]=item;else state.rcoLinkedRecords.push(item);
+  }
+  function rcoLinkedRecordVisible_(row){
+    const id=String(row&&row.id||'');
+    if(!id)return false;
+    try{const sel='[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]';if(typeof document!=='undefined'&&document.querySelector&&document.querySelector(sel))return true}catch(e){}
+    return Object.values(state.guarnicoes||{}).some(g=>(g.ocorrencias||[]).some(o=>[o.id,o.referenciaId,o.numero].some(v=>String(v||'')===id)));
+  }
+  function rcoReapplyLinkedRecords(name){
+    const key=String(name||'').trim().toLowerCase();
+    const rows=(Array.isArray(state.rcoLinkedRecords)?state.rcoLinkedRecords:[]).filter(r=>String(r.guarnicao||'').trim().toLowerCase()===key);
+    rows.forEach(row=>{
+      if(rcoLinkedRecordVisible_(row)){if(!state.importedRecordIds.includes(row.id))state.importedRecordIds.push(row.id);return}
+      const d=row.data||{};
+      if(row.kind==='operacao')addCpuOperation(Object.assign({id:row.id,guarnicao:row.guarnicao},d));
+      else if(row.kind==='cirvc')addCpuArvc(Object.assign({id:row.id,guarnicao:row.guarnicao},d));
+      else if(row.kind==='bopm'){const g=ensureGuarnicao(row.guarnicao);if(g){g.ocorrencias=g.ocorrencias||[];g.ocorrencias.push(Object.assign({id:row.id,referenciaId:row.id,tipo:'BO'},d))}}
+      if(row.kind==='operacao'&&Array.isArray(state.importedReportIds)&&!state.importedReportIds.includes(row.id))state.importedReportIds.push(row.id);
+      if(!state.importedRecordIds.includes(row.id))state.importedRecordIds.push(row.id);
+    });
+  }
   function removeDynamicForGu(name){['cpuOperations','cpuVehicles','cpuTcos','cpuArvcs'].forEach(id=>document.querySelectorAll('#'+id+' .entry').forEach(e=>{const g=e.querySelector('[data-k="guarnicao"]');if(g&&String(g.value||'').trim().toLowerCase()===String(name||'').trim().toLowerCase())e.remove()}))}
-  function payloadIds(p){return new Set([...(p?.ocorrencias||[]),...(p?.operacoes||[]),...(p?.veiculosRecuperados||[]),...(p?.tcos||[]),...(p?.arvc||p?.cirvc||[])].map(x=>x?.id).filter(Boolean))}
+  function payloadIds(p){const ids=[];(p?.ocorrencias||[]).forEach(x=>{const id=x?.referenciaId||x?.id;if(id)ids.push(String(id));if(x?.id&&String(x.id)!==String(id||''))ids.push(String(x.id))});(p?.operacoes||[]).forEach(x=>{const id=x?.reportId||x?.id;if(id)ids.push(String(id))});(p?.veiculosRecuperados||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.tcos||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.arvc||p?.cirvc||[]).forEach(x=>{const id=x?.id||x?.CIRVC_ID;if(id)ids.push(String(id))});return new Set(ids.filter(Boolean))}
   function clearCloudGuarnicao(name){const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());if(name&&guId(name)!=='cpu')delete state.guarnicoes[guId(name)];removeDynamicForGu(name);const ids=new Set();related.forEach(o=>(o.recordIds||[]).forEach(id=>ids.add(id)));state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!ids.has(id));const reports=new Set(related.map(o=>o.rsdReportId));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!reports.has(id))}
-  function rebuildCloudGuarnicao(name){clearCloudGuarnicao(name);const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).sort((a,b)=>Number(a.segmento||0)-Number(b.segmento||0));related.forEach(o=>{const p=cloudPayloads[o.rsdReportId];if(!p)return;importDailyV2(p,'RSD em nuvem');o.recordIds=Array.from(payloadIds(p))})}
+  function rebuildCloudGuarnicao(name){const keep=new Set((state.rcoLinkedRecords||[]).filter(r=>String(r.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).map(r=>String(r.id)));clearCloudGuarnicao(name);if(keep.size){state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!keep.has(String(id)));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!keep.has(String(id)))}const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).sort((a,b)=>Number(a.segmento||0)-Number(b.segmento||0));related.forEach(o=>{const p=cloudPayloads[o.rsdReportId];if(!p)return;importDailyV2(p,'RSD em nuvem');o.recordIds=Array.from(payloadIds(p))});if(typeof rcoReapplyLinkedRecords==='function')rcoReapplyLinkedRecords(name)}
   function rcoSnapshotIsNewer(origin,item){if(!origin||!item)return false;const latestVersion=Number(item.version||item.versao||0),storedVersion=Number(origin.versao||0);if(latestVersion&&storedVersion&&latestVersion!==storedVersion)return latestVersion>storedVersion;return Number(item.draftRevision||0)>Number(origin.draftRevision||0)}
   function rcoColumnDivergesFromSnapshot(name,payload){const g=state.guarnicoes?.[guId(name)];if(!g||!payload)return false;const expected=productionMapV2(payload.producao||{});const keys=new Set([...Object.keys(expected||{}),...Object.keys(g.metrics||{})]);for(const k of keys){if(num(g.metrics?.[k])!==num(expected[k]))return true}return false}
   function rcoForceDraftIsEmpty(p){const map=productionMapV2((p||{}).producao||{});const hasProd=Object.values(map).some(v=>num(v)>0);const hasOcc=Array.isArray(p?.ocorrencias)&&p.ocorrencias.length>0;const hasObs=String(p?.observacoes||'').trim().length>0;const hasOther=['operacoes','veiculosRecuperados','tcos','arvc','cirvc'].some(k=>Array.isArray(p?.[k])&&p[k].length>0);return !hasProd&&!hasOcc&&!hasObs&&!hasOther}
@@ -1526,5 +1748,5 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 })();
 </script>
 <script src="service_access_layers.js?v=10.8.43"></script>
-<script src="service_flow.js?v=10.8.34"></script>
+<script src="service_flow.js?v=10.8.44-rco-linked-modules"></script>
 </body></html>

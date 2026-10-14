@@ -169,7 +169,11 @@ function makeSheet(name, headers) {
             while (rows.length <= ri) rows.push([]);
             line.forEach(function (cell, j) { rows[ri][c - 1 + j] = cell; });
           });
-        }
+          return this;
+        },
+        // O backend 10.8.42 protege DATA_SERVICO com formato TEXT antes de gravar.
+        // Mock de planilha: nao converte tipo, mas reproduz a API getRange().
+        setNumberFormat() { return this; }
       };
     },
     deleteRow(row) { rows.splice(row - 1, 1); }

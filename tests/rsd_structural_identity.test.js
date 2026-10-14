@@ -661,3 +661,64 @@ test('GAS: existing-row call sites usam resolveExistingOperationalDate_', functi
 });
 
 console.log('\nPASSED', passed);
+
+test('REGRESSAO 10/10: quoted 03Z comprovado por payload original permite finalizacao, sem perder producao', function () {
+  const day = '2026-10-10';
+  const saved = {
+    reportId: 'sd-test-bprv-001',
+    unidade: { batalhao: 'BPRv', companhia: '1ª CPRv' },
+    servico: { data: day },
+    guarnicao: { nome: 'BASE 02', viatura: '8569' },
+    producao: { notificacoes: { 'art-165': 1, 'total-aits': 10 }, abordagens: { pessoas: 12 } },
+    ocorrencias: []
+  };
+  const old = oldRow({
+    DATA_SERVICO: '"2026-10-10T03:00:00.000Z"',
+    PAYLOAD_JSON: JSON.stringify(saved)
+  });
+  const incoming = {
+    ...saved,
+    producao: { notificacoes: { 'art-165': 1, 'total-aits': 10 }, abordagens: { pessoas: 12 } },
+    ocorrencias: [{ id: 'oc-prova', descricao: 'Teste isolado' }],
+    observacoes: 'Teste de preservacao'
+  };
+  const out = I.draftPersistPipeline(old, incoming, { doUpsert: true });
+  assert.strictEqual(out.ok, true);
+  assert.strictEqual(out.identity.normalizedLegacyDate, true);
+  assert.strictEqual(out.line.DATA_SERVICO, day);
+  assert.strictEqual(out.persistedPayload.servico.data, day);
+  assert.strictEqual(out.persistedPayload.producao.notificacoes['total-aits'], 10);
+  assert.strictEqual(out.persistedPayload.ocorrencias[0].id, 'oc-prova');
+  assert.strictEqual(out.persistedPayload.observacoes, 'Teste de preservacao');
+  assert.strictEqual(out.counters.upsert_called, 1);
+});
+test('REGRESSAO quoted: outro dia, sem JSON de origem, unidade alheia e tokens truncados sao recusados', function () {
+  const saved = { unidade: { batalhao: 'BPRv', companhia: '1ª CPRv' }, servico: { data: '2026-10-10' } };
+  for (const old of [
+    oldRow({ DATA_SERVICO: '"2026-10-10T03:00:00.000Z"', PAYLOAD_JSON: '' }),
+    oldRow({ DATA_SERVICO: '"2026-10-10T03:00:00.000Z"', PAYLOAD_JSON: JSON.stringify({ ...saved, servico: { data: '2026-10-09' } }) }),
+    oldRow({ DATA_SERVICO: '"2026-10-10T03:00:00.000Z"', PAYLOAD_JSON: JSON.stringify({ ...saved, unidade: { batalhao: 'BPTran', companhia: '1ª CPTran' } }) }),
+    oldRow({ DATA_SERVICO: '"2026-10-10T02:00:00.000Z"', PAYLOAD_JSON: JSON.stringify(saved) }),
+    oldRow({ DATA_SERVICO: '"2026-10-1', PAYLOAD_JSON: JSON.stringify(saved) })
+  ]) {
+    const out = I.draftPersistPipeline(old, { unidade: saved.unidade, servico: { data: '2026-10-10' } }, { doUpsert: true });
+    assert.strictEqual(out.ok, false);
+    assert.strictEqual(out.counters.upsert_called, 0);
+    assert.strictEqual(out.counters.saveJsonPayload_called, 0);
+  }
+  const another = I.resolveStructuralIdentity(oldRow({ DATA_SERVICO: '"2026-10-10T03:00:00.000Z"', PAYLOAD_JSON: JSON.stringify(saved) }),
+    { unidade: saved.unidade, servico: { data: '2026-10-11' } });
+  assert.strictEqual(another.ok, false);
+});
+
+test('10843 preserva leitura quotada oficial 10842 e conflito fail-closed', function () {
+  const token = '"2026-10-10T03:00:00.000Z"';
+  const ok = I.classifyExistingOperationalDate(token, '2026-10-11T06:30:00.000Z', '2026-10-10');
+  assert.strictEqual(ok.value, '2026-10-10');
+  assert.strictEqual(ok.conflict, false);
+  assert.strictEqual(I.resolveExistingOperationalDate(token, '', '2026-10-10'), '2026-10-10');
+  const conflict = I.classifyExistingOperationalDate(token, '', '2026-10-11');
+  assert.strictEqual(conflict.value, '');
+  assert.strictEqual(conflict.conflict, true);
+  assert.strictEqual(I.resolveExistingOperationalDate('"2026-10-1', '', '2026-10-10'), '');
+});

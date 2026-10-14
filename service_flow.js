@@ -6,11 +6,26 @@ const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const ctx=()=>{try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}};
 const qs=new URLSearchParams(location.search);
-const fromRsd=qs.get('from')==='rsd';
+const RETURN_PAGES=/^(?:relatorio_servico_diario(?:_ios)?|relatorio_cpu(?:_ios)?)\.html$/i;
+const fromKind=qs.get('from')==='rco'?'rco':(qs.get('from')==='rsd'?'rsd':'');
+const fromRsd=fromKind==='rsd';
+const fromRco=fromKind==='rco';
+const fromLinked=fromRsd||fromRco;
 const RETURN_KEY='central-rsd-return-v1';
-const returnTo=()=>{const raw=qs.get('returnTo')||'relatorio_servico_diario.html';const name=String(raw).split('/').pop();return /^relatorio_servico_diario(?:_ios)?\.html$/i.test(name)?name:'relatorio_servico_diario.html'};
+function safeReturnPage(raw, fallback){
+ const name=String(raw||'').split('?')[0].split('#')[0].split('/').pop();
+ return RETURN_PAGES.test(name)?name:fallback;
+}
+const returnTo=()=>safeReturnPage(qs.get('returnTo'), fromRco?'relatorio_cpu.html':'relatorio_servico_diario.html');
+function homeName(){return fromRco?'RCO':'RSD'}
 function returnUrl(){
- const c=ctx(),p=new URLSearchParams({resumeRsd:'1'});
+ const c=ctx();
+ if(fromRco){
+  const p=new URLSearchParams({resumeRco:'1'});
+  if(c.rcoReportId)p.set('rcoReportId',c.rcoReportId);
+  return returnTo()+'?'+p.toString();
+ }
+ const p=new URLSearchParams({resumeRsd:'1'});
  if(c.serviceId)p.set('serviceId',c.serviceId);if(c.rsdReportId)p.set('rsdReportId',c.rsdReportId);if(c.segmento)p.set('segmento',String(c.segmento));
  return returnTo()+'?'+p.toString();
 }
@@ -186,56 +201,60 @@ function installRsd(){
  setTimeout(refreshRsd,350);addEventListener('pageshow',()=>setTimeout(refreshRsd,120));addEventListener('focus',()=>setTimeout(refreshRsd,120));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshRsd,120)});
 }
 function contextBanner(label){
- if(!fromRsd)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
+ if(!fromLinked)return;style();const c=ctx(),tb=$('.toolbar');if(!tb)return;
+ const home=homeName();
  let box=$('#centralModuleContext');if(!box){box=document.createElement('div');box.id='centralModuleContext';box.className='central-module-context no-print';tb.insertAdjacentElement('afterend',box)}
- box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado ao serviço '+esc(c.guarnicao||'')+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao RSD.';
- if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao RSD sem vincular';a.onclick=()=>{markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}};tb.prepend(a)}
+ box.innerHTML='<strong>'+esc(label)+'</strong><br>Vinculado a '+esc(c.guarnicao||home)+(Array.isArray(c.vtrs)&&c.vtrs.length?' • VTR '+esc(c.vtrs.join(', ')):'')+'. Ao salvar, os dados resumidos retornarão automaticamente ao '+home+'.';
+ if(!$('.central-module-return',tb)){const a=document.createElement('a');a.href=returnUrl();a.className='secondary central-module-return no-print';a.textContent='Voltar ao '+home+' sem vincular';a.onclick=()=>{markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}};tb.prepend(a)}
 }
-function goBack(){markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}try{global.CentralCloud?.beginProgress?.('Retornando ao RSD…')}catch(_){}const target=new URL(returnUrl(),location.href).href;location.assign(target)}
+function goBack(){markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}try{global.CentralCloud?.beginProgress?.('Retornando ao '+homeName()+'…')}catch(_){}const target=new URL(returnUrl(),location.href).href;location.assign(target)}
 function installOperation(){
- if(!fromRsd)return;contextBanner('Relatório de Operação vinculado ao RSD');
+ if(!fromLinked)return;contextBanner('Relatório de Operação vinculado ao '+homeName());
  const c=ctx(),u=c.unidade||{};
  const applyLockedContext=()=>{
-   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
+   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data||c.operationalDate,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
    Object.entries(map).forEach(([id,v])=>{const el=$('#'+id);if(!el||v==null||v==='')return;el.value=String(v);el.dispatchEvent(new Event('change',{bubbles:true}));if(/batalhao|companhiaNumero/.test(id))el.disabled=true;else el.readOnly=true});
    global.syncUnitHeader?.();
  };
  applyLockedContext();setTimeout(applyLockedContext,80);
  const tryWrap=()=>{const fn=global.registrarOperacaoDoDiaCloud;if(typeof fn!=='function'||fn.__centralReturnWrapped)return false;
    const w=async function(){const r=await fn.apply(this,arguments);if(r===true)goBack();return r};w.__centralReturnWrapped=true;global.registrarOperacaoDoDiaCloud=w;
-   $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao RSD'});return true};
+   $$('button').forEach(b=>{if((b.getAttribute('onclick')||'').includes('registrarOperacaoDoDiaCloud'))b.textContent='Salvar operação e voltar ao '+homeName()});return true};
  if(!tryWrap())setTimeout(tryWrap,300);
 }
 function installCirvc(){
- if(!fromRsd)return;contextBanner('CIRVC vinculado ao RSD');
+ if(!fromLinked)return;contextBanner('CIRVC vinculado ao '+homeName());
  const c=ctx(),u=c.unidade||{},serviceVtr=Array.isArray(c.vtrs)?c.vtrs.join(', '):'',guVtr=[c.guarnicao,serviceVtr&&('VTR '+serviceVtr)].filter(Boolean).join(' / ');
  const lockContext=()=>{
    const b=$('#globalBatalhao'),co=$('#globalCompanhia');if(b&&u.batalhao){b.value=u.batalhao;b.disabled=true}if(co&&u.companhiaNumero){co.value=String(u.companhiaNumero);co.disabled=true}
    $$('.auto-card').forEach(card=>{
      const data=card.querySelector('[data-name="dataEntrega"]'),gv=card.querySelector('[data-name="guarnicaoVtr"]'),mr=card.querySelector('[data-name="militarResponsavel"]');
-     if(data&&!data.value&&c.data)data.value=c.data;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}if(mr&&c.comandante){mr.value=c.comandante;mr.readOnly=true}
-     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=c.guarnicao||card.dataset.guarnicao||'';
+     if(data&&!data.value&&(c.data||c.operationalDate))data.value=c.data||c.operationalDate;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}if(mr&&c.comandante){mr.value=c.comandante;mr.readOnly=true}
+     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.rcoReportId=c.rcoReportId||card.dataset.rcoReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=c.guarnicao||card.dataset.guarnicao||'';
    });
  };
  lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
  let done=false,tries=0;
- const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao RSD';const old=b.onclick;b.onclick=async()=>{lockContext();b.disabled=true;try{const r=await Promise.resolve(old?.call(b));if(r===true){goBack();return true}return r}finally{if(document.body.contains(b))b.disabled=false}};return true};
+ const tryWrap=()=>{if(done)return true;const b=$('[data-cirvc-cloud-save]');if(!b)return false;done=true;b.textContent='Salvar CIRVC e voltar ao '+homeName();const old=b.onclick;b.onclick=async()=>{lockContext();b.disabled=true;try{const r=await Promise.resolve(old?.call(b));if(r===true){goBack();return true}return r}finally{if(document.body.contains(b))b.disabled=false}};return true};
  const retry=()=>{if(tryWrap()||++tries>=20)return;setTimeout(retry,250)};retry();
  window.addEventListener('central-v10-ready',()=>setTimeout(()=>{lockContext();tryWrap()},30),{once:true});
 }
 async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
+ const anchor=String(c.serviceId||'').trim()||String(c.rcoReportId||'').trim();
+ if(!anchor){alert('Registre o serviço ou o RCO antes de vincular o BO.');return}
  const token=centralToken(true);if(!token)return;
- const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),date=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):c.data||today();
- const ev={eventId:c.serviceId+'::BO::'+num,serviceId:c.serviceId,rsdReportId:c.rsdReportId||'',segmento:c.segmento||1,tipo:'BO',subtipo:'BO',data:date,hora:$('#horaOcorrencia')?.value||nowTime(),
+ const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),opDate=c.data||c.operationalDate||today(),date=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):opDate;
+ const home=homeName();
+ const ev={eventId:anchor+'::BO::'+num,serviceId:c.serviceId||'',rsdReportId:c.rsdReportId||'',rcoReportId:c.rcoReportId||'',segmento:c.segmento||1,tipo:'BO',subtipo:'BO',data:date,hora:$('#horaOcorrencia')?.value||nowTime(),
    titulo:'BO — '+num,resumo:$('#naturezaOcorrencia')?.value||'',numeroDocumento:num,referenciaId:num,unidade:c.unidade||{},guarnicao:c.guarnicao||'',vtr:Array.isArray(c.vtrs)?c.vtrs.join(', '):'',comandanteMatricula:c.comandanteMatricula||'',
    payload:{id:num,tipo:'BO',numero:num,data:date,hora:$('#horaOcorrencia')?.value||'',descricao:$('#naturezaOcorrencia')?.value||'',naturezaPrincipal:$('#naturezaOcorrencia')?.value||''}};
- try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);alert('BO vinculado ao serviço. O número e o resumo ficarão disponíveis automaticamente no RSD.');goBack()}catch(e){alert('Não foi possível vincular o BO ao RSD: '+e.message)}
+ try{await CentralCloud.submitForm('service-event-upsert',{event:ev},token,{popup:false});global.saveDraft?.(true);alert('BO vinculado. O número e o resumo ficarão disponíveis automaticamente no '+home+'.');goBack()}catch(e){alert('Não foi possível vincular o BO ao '+home+': '+e.message)}
 }
 function installBo(){
- if(!fromRsd)return;contextBanner('Boletim de Ocorrência vinculado ao RSD');const c=ctx();
- setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}if(c.data&&$('#dataOcorrencia')){const p=c.data.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):c.data}global.syncInstitutionSpecific?.()}catch(_){}},100);
- const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao RSD';b.onclick=saveBoLink;tb.prepend(b)}
+ if(!fromLinked)return;contextBanner('Boletim de Ocorrência vinculado ao '+homeName());const c=ctx();
+ setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}const opDate=c.data||c.operationalDate||'';if(opDate&&$('#dataOcorrencia')){const p=opDate.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):opDate}const editId=qs.get('editId')||c.editId||'';const numEl=$('#ciopCopom');if(fromRco&&editId&&numEl&&!String(numEl.value||'').trim())numEl.value=editId;global.syncInstitutionSpecific?.()}catch(_){}},100);
+ const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao '+homeName();b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
  const hideLegacy=()=>{$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
@@ -243,7 +262,7 @@ function installRcoAuto(){
   if(document.getElementById('centralAccessLayer')||document.getElementById('centralAccessKeyOverlay')||document.body.classList.contains('central-service-setup'))return false;
   try{return !!sessionStorage.getItem('pmpb-rco-role-token-v1')}catch(_){return false}
  };
- const run=()=>{hideLegacy();if(!canRefresh())return;try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}};
+ const run=()=>{hideLegacy();if(!canRefresh())return;try{if(typeof global.centralRcoRefreshCloud==='function')global.centralRcoRefreshCloud()}catch(_){}try{if(typeof global.centralRcoRefreshLinkedRecords==='function')global.centralRcoRefreshLinkedRecords()}catch(_){}};
  hideLegacy();setTimeout(run,350);addEventListener('focus',()=>setTimeout(run,150));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(run,150)});
 }
 function init(){

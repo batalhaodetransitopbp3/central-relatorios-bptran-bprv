@@ -924,6 +924,7 @@
       section.dataset.autoId = id;
       const svcCtx=activeServiceContextCirvc();
       section.dataset.rsdReportId=data.rsdReportId||svcCtx.rsdReportId||'';
+      section.dataset.rcoReportId=data.rcoReportId||svcCtx.rcoReportId||'';
       section.dataset.serviceId=data.serviceId||svcCtx.serviceId||'';
       section.dataset.segmento=String(data.segmento||svcCtx.segmento||1);
       section.dataset.guarnicao=data.guarnicao||svcCtx.guarnicao||'';
@@ -1286,13 +1287,13 @@ function arvcPayloadCpu(){
     const core=[cirvcReportId,a.dataEntrega||'',a.horaEntrega||'',String(a.placa||'').toUpperCase(),a.guarnicaoVtr||'',a.numeroTermo||'',i+1].join('|');
     return {id:'cirvc-'+stableArvcToken(core),sourceReportId:cirvcReportId,numeroTermo:a.numeroTermo||'',data:a.dataEntrega||'',hora:a.horaEntrega||'',
       placa:a.placa||'',guarnicao:a.guarnicao||ctx.guarnicao||a.guarnicaoVtr||'',militarResponsavelAit:a.militarResponsavel||ctx.comandante||'',local:a.localDestino||'',
-      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
+      rsdReportId:a.rsdReportId||ctx.rsdReportId||'',rcoReportId:a.rcoReportId||ctx.rcoReportId||'',serviceId:a.serviceId||ctx.serviceId||'',segmento:Number(a.segmento||ctx.segmento||1)||1,
       matriculaResponsavel:a.matriculaResponsavel||ctx.comandanteMatricula||'',vtr:a.guarnicaoVtr||(Array.isArray(ctx.vtrs)?ctx.vtrs[0]||'':''),
       localApreensao:a.localApreensao||'',motivo:a.motivo||'',tipo:a.tipo||'',marcaModelo:[a.marca,a.modelo].filter(Boolean).join('/'),
       unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null}};
   }).filter(r=>r.placa||r.militarResponsavelAit||r.local);
   return {schema:'pmpb-transito-cirvc-v1',schemaVersion:2,reportId:cirvcReportId,generatedAt:new Date().toISOString(),
-    serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',segmento:Number(ctx.segmento||1)||1,
+    serviceId:ctx.serviceId||'',rsdReportId:ctx.rsdReportId||'',rcoReportId:ctx.rcoReportId||'',segmento:Number(ctx.segmento||1)||1,
     unidade:{batalhao:ctxUnit.batalhao||inst.batalhao||'',companhia:ctxUnit.companhia||inst.companhia||'',companhiaNumero:Number(ctxUnit.companhiaNumero||inst.numero||0)||null},registros};
 }
 function downloadArvcJson(name,obj){const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
@@ -1321,6 +1322,7 @@ function prepareAndPrint() {
       dados.assinaturaRecebedor = assinaturaRecebedor ? (assinaturaRecebedor.dataset.signatureData || '') : '';
       dados.fotos = getFotos(section);
       dados.rsdReportId=section.dataset.rsdReportId||'';
+      dados.rcoReportId=section.dataset.rcoReportId||'';
       dados.serviceId=section.dataset.serviceId||'';
       dados.segmento=Number(section.dataset.segmento||1)||1;
       dados.guarnicao=section.dataset.guarnicao||'';
@@ -1585,6 +1587,6 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
 })();
 </script>
 
-<script src="service_flow.js"></script>
+<script src="service_flow.js?v=10.8.44-rco-linked-modules"></script>
 </body>
 </html>

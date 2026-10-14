@@ -74,6 +74,7 @@ function boot() {
     oneLine('function rcoSnapshotIsNewer('),
     oneLine('function rcoColumnDivergesFromSnapshot('),
     oneLine('function rcoForceDraftIsEmpty('),
+    html.slice(html.indexOf('  function rcoImportWouldEraseWork('), html.indexOf('  function rcoApplyCloudSnapshot(')),
     oneLine('function rcoApplyCloudSnapshot('),
     oneLine('window.rcoStaleIncludedGuarnicoes='),
     'function baseCollect(){return {state:state,reportId:state.reportId,operacoes:[],veiculosRecuperados:[],tcos:[],arvc:[]};}',

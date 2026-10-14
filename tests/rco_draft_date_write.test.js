@@ -122,11 +122,19 @@ test('mark PDF / consolidate closure / encerrar / claim / retificação usam pre
   path('retificacao', function (r) { r.STATUS = 'EM_RETIFICACAO'; r.PDF_GERADO = 'NAO'; r.P3_CONSOLIDADO = 'NAO'; });
 });
 
-test('GAS: helpers + chokepoint + versão 10.8.38', function () {
+test('GAS: helpers + chokepoint + versão backend publicada', function () {
   const src = fs.readFileSync(path.join(__dirname, '..', 'apps_script_v10.gs'), 'utf8');
   const gas = fs.readFileSync(path.join(__dirname, '..', 'gas_deploy', 'Código.js'), 'utf8');
-  assert.ok(src.indexOf("CENTRAL_V10_VERSION = '10.8.38'") >= 0);
+  const version = src.match(/var CENTRAL_V10_VERSION = '(\d+)\.(\d+)\.(\d+)([^']*)'/);
+  assert.ok(version, 'CENTRAL_V10_VERSION ausente');
+  const patch = Number(version[3]);
+  assert.ok(Number(version[1]) === 10 && Number(version[2]) === 8 && patch >= 41, 'versão backend anterior à fonte publicada 10.8.41: ' + version[0]);
   assert.strictEqual(src, gas, 'apps_script_v10.gs === gas_deploy/Código.js');
+  assert.ok(src.indexOf('function sheetDateSerialYmd_') >= 0);
+  assert.ok(src.indexOf("Utilities.formatDate(v,'UTC','yyyy-MM-dd')") >= 0);
+  assert.ok(src.indexOf('function primeDataServicoTextColumn_') >= 0);
+  assert.ok(src.indexOf("setNumberFormat('@')") >= 0);
+  assert.ok(src.indexOf('primeDataServicoTextColumn_(s,h,row,1,matrix)') >= 0);
   assert.ok(src.indexOf('function rcoDraftPrepareRowForWrite_') >= 0);
   assert.ok(src.indexOf('function rcoDraftUpsertRow_') >= 0);
   assert.ok(src.indexOf('function rcoDraftWriteRowObject_') >= 0);
@@ -153,6 +161,30 @@ test('classificação SAFE_RECOVERY do smoke RCO', function () {
     rcoDataServico: '2026-10-01'
   });
   assert.strictEqual(c2.class, 'SAFE_RECOVERY');
+});
+
+test('serial UTC midnight keeps the civil day shown by Sheets', function () {
+  const serial = new Date('2099-01-15T00:00:00.000Z');
+  const row = { DATA_SERVICO: serial };
+  D.prepareRcoDraftRowForWrite(row);
+  assert.strictEqual(row.DATA_SERVICO, '2099-01-15');
+  assert.strictEqual(D.formatDataServicoYmd(serial), '2099-01-15');
+  const timed = new Date('2099-01-15T03:00:00.000Z');
+  assert.notStrictEqual(
+    timed.getUTCHours(),
+    0,
+    'instante com hora não usa a regra de serial'
+  );
+  assert.strictEqual(D.formatDataServicoYmd(timed), D.formatYmdLocal(timed));
+});
+
+test('quoted ISO and canonical text stay untouched', function () {
+  const quoted = { DATA_SERVICO: '"2099-01-15T00:00:00.000Z"' };
+  D.prepareRcoDraftRowForWrite(quoted);
+  assert.strictEqual(quoted.DATA_SERVICO, '"2099-01-15T00:00:00.000Z"');
+  const text = { DATA_SERVICO: '2099-01-15' };
+  D.prepareRcoDraftRowForWrite(text);
+  assert.strictEqual(text.DATA_SERVICO, '2099-01-15');
 });
 
 console.log('\nPASSED', passed);

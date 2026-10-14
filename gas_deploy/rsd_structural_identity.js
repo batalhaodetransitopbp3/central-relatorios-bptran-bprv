@@ -139,6 +139,30 @@
     };
   }
 
+  /*
+   * Reparacao estritamente comprovada: versoes antigas gravaram a DATA_SERVICO
+   * como token JSON entre aspas de 03:00Z (meia-noite da Paraiba).
+   * Somente normalizar num SALVAMENTO autorizado quando a data canonica
+   * enviada coincidir com a do token E com servico.data do payload original.
+   * Token truncado, outro horario, outra data ou JSON indisponivel falham fechados.
+   */
+  function legacyQuotedDateProven_(old, incoming) {
+    if (!old || !incoming || !incoming.dataServicoValid) return '';
+    var raw = trimPreservingContent(old.DATA_SERVICO != null ? old.DATA_SERVICO : old.dataServico);
+    var match = /^"(\d{4}-\d{2}-\d{2})T03:00:00\.000Z"$/.exec(raw);
+    if (!match || match[1] !== incoming.dataServico) return '';
+    var date = new Date(match[1] + 'T00:00:00.000Z');
+    if (isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== match[1]) return '';
+    var saved;
+    try { saved = JSON.parse(String(old.PAYLOAD_JSON || '')); } catch (_) { return ''; }
+    var known = saved && saved.servico && saved.servico.data;
+    if (String(known || '') !== match[1]) return '';
+    var savedUnit = extractPayloadUnit(saved);
+    if (savedUnit.batalhao !== normBattalion(old.BATALHAO || old.batalhao) ||
+        savedUnit.companhia !== normCompany(savedUnit.batalhao, old.COMPANHIA || old.companhia)) return '';
+    return match[1];
+  }
+
   function resolveStructuralIdentity(old, payload, opts) {
     opts = opts || {};
     var incoming = extractPayloadUnit(payload);
@@ -162,6 +186,12 @@
     }
 
     var row = extractRowIdentity(old);
+    var provenDate = row.legacyDateCorruption ? legacyQuotedDateProven_(old, incoming) : '';
+    if (provenDate) {
+      row.dataServico = provenDate;
+      row.dataServicoValid = true;
+      row.legacyDateCorruption = false;
+    }
     if (!row.batalhao || !row.companhia || !row.dataServico) {
       return {
         ok: false,
@@ -212,6 +242,8 @@
       dataServicoValid: !!row.dataServicoValid,
       legacyDateCorruption: !!row.legacyDateCorruption,
       dataServicoRaw: row.dataServicoRaw,
+      normalizedLegacyDate: !!provenDate,
+      originalLegacyDateToken: provenDate ? row.dataServicoRaw : '',
       reportId: row.reportId,
       serviceId: row.serviceId || String((payload && (payload.serviceId || (payload.servico && payload.servico.serviceId))) || ''),
       mismatch: null,
@@ -578,14 +610,72 @@
     return operationalDateFromInstant(parsed, false);
   }
 
-  /** EXISTING_ROW_DATE_RESOLUTION — nunca new Date(). */
-  function resolveExistingOperationalDate(dataServico, iniciadoEm) {
+  /**
+   * Quoted date-only at midnight America/Sao_Paulo (UTC-3, no DST):
+   * "YYYY-MM-DDT03:00:00.000Z"
+   * The YMD is the stored operational date. Any other quoted shape stays unresolved.
+   */
+  function quotedMidnightSpOperationalYmd(v) {
+    var s = String(v == null ? '' : v)
+      .replace(/\u00a0/g, ' ')
+      .replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+    var m = s.match(/^"(\d{4}-\d{2}-\d{2})T03:00:00\.000Z"$/);
+    return m ? m[1] : '';
+  }
+
+  function explicitYmd(v) {
+    var s = String(v == null ? '' : v).replace(/\u00a0/g, ' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+  }
+
+  /**
+   * Leitura de linha já persistida.
+   * Data explícita (YMD canônico ou quoted midnight SP) vence o relógio.
+   * iniciadoEm só define a janela quando não há data explícita.
+   * DATA vazia + servico.data válido usa servico.data.
+   * Se servico.data divergir do quoted, conflict e value vazio.
+   */
+  function classifyExistingOperationalDate(dataServico, iniciadoEm, explicitDate) {
+    var quoted = quotedMidnightSpOperationalYmd(dataServico);
+    var canonical = dateTokenFilled(dataServico) ? (strictYmdDate(dataServico) || '') : '';
+    var explicit = explicitYmd(explicitDate);
+    var started = operationalDateFromInstant(iniciadoEm, false);
+    var sources = { canonical: canonical, quoted: quoted, explicit: explicit, started: started };
     if (dateTokenFilled(dataServico)) {
-      return strictYmdDate(dataServico) || '';
+      if (canonical) {
+        var clockCanonical = !!(started && started !== canonical);
+        return { value: canonical, conflict: false, unresolved: false, clockConflict: clockCanonical, sources: sources };
+      }
+      if (!quoted) {
+        return { value: '', conflict: false, unresolved: true, clockConflict: false, sources: sources };
+      }
+      if (explicit && explicit !== quoted) {
+        return { value: '', conflict: true, unresolved: true, clockConflict: false, sources: sources };
+      }
+      return {
+        value: quoted,
+        conflict: false,
+        unresolved: false,
+        clockConflict: !!(started && started !== quoted),
+        sources: sources
+      };
     }
-    var instant = parseExistingServiceInstant(iniciadoEm);
-    if (!instant) return '';
-    return operationalDateFromInstant(instant, false);
+    if (explicit) {
+      return {
+        value: explicit,
+        conflict: false,
+        unresolved: false,
+        clockConflict: !!(started && started !== explicit),
+        sources: sources
+      };
+    }
+    if (!started) return { value: '', conflict: false, unresolved: true, clockConflict: false, sources: sources };
+    return { value: started, conflict: false, unresolved: false, clockConflict: false, sources: sources };
+  }
+
+  /** EXISTING_ROW_DATE_RESOLUTION — nunca new Date(). */
+  function resolveExistingOperationalDate(dataServico, iniciadoEm, explicitDate) {
+    return classifyExistingOperationalDate(dataServico, iniciadoEm, explicitDate).value;
   }
 
   /** serviceKey fail-closed (sem inventar data). */
@@ -622,6 +712,7 @@
     preserveLegacyIdentityDate: preserveLegacyIdentityDate,
     resolveNewOperationalDate: resolveNewOperationalDate,
     resolveExistingOperationalDate: resolveExistingOperationalDate,
+    classifyExistingOperationalDate: classifyExistingOperationalDate,
     parseExistingServiceInstant: parseExistingServiceInstant,
     operationalDateFromInstant: operationalDateFromInstant,
     serviceKeyRsd: serviceKeyRsd,
