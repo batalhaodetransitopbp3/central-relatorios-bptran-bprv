@@ -1658,6 +1658,38 @@ function rsdDraftObject_(r,old,deviceId) {
   }
   return rowObj;
 }
+function rsdStoredOperationalYmd_(dataServico, iniciadoEm){
+  var resolved=resolveExistingOperationalDate_(dataServico, iniciadoEm, '');
+  if(!resolved)return '';
+  var s=String(dataServico==null?'':dataServico).replace(/\u00a0/g,' ').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g,'');
+  if(/^\d{4}-\d{2}-\d{2}T/.test(s)){
+    var inst=new Date(s);
+    if(!isNaN(inst.getTime()))return operationalServiceDate_(inst);
+  }
+  return resolved;
+}
+function rsdOpenVtrConflictRows_(rows, opts){
+  opts=opts||{};
+  var open=rsdOpenEditableStatuses_();
+  var data0=strictYmdDate_(opts.data||'');
+  var vtr0=normVtrPrefix_(opts.vtr||'');
+  var batt0=normBattalion_(opts.batalhao||'');
+  var comp0=String(opts.companhia||'');
+  var gu0=normalizeGuarnicaoNome_(opts.guarnicao||'', opts.tipo||guarnicaoTipoFromNome_(opts.guarnicao||''));
+  var reportId=String(opts.reportId||'');
+  if(!data0||!vtr0)return [];
+  return (rows||[]).filter(function(x){
+    if(open.indexOf(String(x.STATUS||''))<0)return false;
+    if(normVtrPrefix_(x.VTR_PRINCIPAL||'')!==vtr0)return false;
+    if(rsdStoredOperationalYmd_(x.DATA_SERVICO, x.INICIADO_EM)!==data0)return false;
+    if(normBattalion_(x.BATALHAO)!==batt0)return false;
+    if(String(x.COMPANHIA||'')!==comp0)return false;
+    if(reportId&&String(x.REPORT_ID||'')===reportId)return false;
+    var xGu=normalizeGuarnicaoNome_(x.GUARNICAO, x.GUARNICAO_TIPO||guarnicaoTipoFromNome_(x.GUARNICAO));
+    if(gu0&&xGu&&xGu===gu0)return false;
+    return true;
+  });
+}
 function rsdStart_(payload) {
   var lock=LockService.getScriptLock();lock.waitLock(15000);
   try{
@@ -1711,21 +1743,20 @@ function rsdStart_(payload) {
     }
   }
 
-  // Aviso suave: mesma VTR em outro serviço (outra guarnição) na unidade/data.
-  if(!old&&data0&&!passagem0){
-    var candidates=objects_(s).filter(function(x){
-      var xv=normVtrPrefix_(x.VTR_PRINCIPAL||mainVtrMap[String(x.REPORT_ID||'')]||'');
-      return ['CANCELADO','INDEFERIDO'].indexOf(String(x.STATUS))<0 &&
-        xv===vtr0 &&
-        dateText_(x.DATA_SERVICO)===data0 &&
-        String(x.BATALHAO||'')===String(batt0) &&
-        String(x.COMPANHIA||'')===String(comp0) &&
-        String(x.REPORT_ID||'')!==reportId;
-    }).sort(function(a,b){
+  // A VTR é auxiliar. Só um serviço ABERTO de outra guarnição, no mesmo período, pede confirmação.
+  var ackVtr=!!(payload.acknowledgeVtrConflict||r.acknowledgeVtrConflict);
+  if(!old&&data0&&!passagem0&&!ackVtr){
+    var vtrRows=objects_(s).map(function(x){
+      if(x.VTR_PRINCIPAL||!mainVtrMap[String(x.REPORT_ID||'')])return x;
+      var copy={};for(var k in x)if(Object.prototype.hasOwnProperty.call(x,k))copy[k]=x[k];
+      copy.VTR_PRINCIPAL=mainVtrMap[String(x.REPORT_ID||'')];
+      return copy;
+    });
+    var candidates=rsdOpenVtrConflictRows_(vtrRows,{data:data0,vtr:vtr0,batalhao:batt0,companhia:comp0,guarnicao:guEscolhida0,tipo:tipo0,reportId:reportId}).sort(function(a,b){
       return String(b.ULTIMO_RASCUNHO_EM||b.INICIADO_EM||b.FINALIZADO_EM||'').localeCompare(String(a.ULTIMO_RASCUNHO_EM||a.INICIADO_EM||a.FINALIZADO_EM||''));
     });
     if(candidates.length){
-      return {ok:true,existing:true,possible_duplicate:true,message:'A VTR '+vtr0+' já aparece em outro serviço nesta unidade e data. Confirme se deseja continuar o existente ou se a VTR foi informada por engano.',
+      return {ok:true,existing:true,possible_duplicate:true,ownStartAllowed:true,message:'A VTR '+vtr0+' está em um serviço aberto de outra guarnição nesta unidade e período. Continue aquele serviço ou inicie o serviço desta guarnição.',
         candidates:candidates.slice(0,8).map(function(x){return rsdCandidateCard_(x,mainVtrMap);}),
         reportId:String(candidates[0].REPORT_ID||''),serviceId:String(candidates[0].SERVICE_ID||''),segmento:Number(candidates[0].SEGMENTO||1),status:String(candidates[0].STATUS||'')};
     }
@@ -3757,6 +3788,10 @@ function rcoDraftStartOrContinue_(payload){
         existing:true,created:false,revision:decision.revision,status:decision.status,message:decision.message,
         batalhao:batt,companhia:comp,data:opDate};
     }
+    if(!normMat_(payload.matricula||(payload.responsavelRco||{}).matricula||'')){
+      return {ok:true,outcome:'AWAITING_RESPONSIBLE',existing:false,created:false,
+        message:'Identifique o responsável antes de criar o RCO. Nenhum relatório foi gravado.'};
+    }
     var reportId='cpu-'+Utilities.getUuid();
     var termino=addCalendarDaysYmd_(opDate,1);
     var rco={
@@ -3977,6 +4012,14 @@ function rcoDraftUpsert_(payload){
       return {ok:true,outcome:'EXISTING',existing:true,created:false,message:uniq.message,
         reportId:String(uniq.reportId||''),revision:Number(uniq.revision||0),status:String(uniq.status||''),
         operationalKey:uniq.operationalKey,data:data,batalhao:batt,companhia:comp};
+    }
+  }
+
+  if(!old){
+    var respGate=r.responsavelRco||{},consGate=r.consolidacaoResponsavel||{};
+    if(!normMat_(respGate.matricula||consGate.matricula||'')){
+      return {ok:true,outcome:'AWAITING_RESPONSIBLE',existing:false,created:false,reportId:reportId,
+        message:'O RCO desta companhia será gravado na Central depois da identificação do responsável. Nenhum relatório foi criado agora.'};
     }
   }
 
