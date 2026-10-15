@@ -79,7 +79,7 @@ test('backends permanecem idênticos', function () {
 });
 
 test('versão publicada e a credencial do RCO permanecem', function () {
-  assert.ok(gas.includes("var CENTRAL_V10_VERSION = '10.8.44.1-rco-session-hotfix';"));
+  assert.ok(gas.includes("var CENTRAL_V10_VERSION = '10.8.44.2-service-start-window';"));
   assert.strictEqual(gas.split("p.rcoReportId ? 'rco' : 'central'").length - 1, 3);
 });
 
