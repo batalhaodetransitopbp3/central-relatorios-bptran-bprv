@@ -1,0 +1,37 @@
+name: BO Photo Annex - Static Contracts Only
+
+on:
+  pull_request:
+    paths:
+      - 'boletim_ocorrencia_bptrans_1cprv*.html'
+      - 'tests/bo_photo_annex_ci.test.cjs'
+      - '.github/workflows/bo_photo_annex_ci.yml'
+  push:
+    branches:
+      - 'feature/bo-anexo-fotografico-r240-review'
+    paths:
+      - 'boletim_ocorrencia_bptrans_1cprv*.html'
+      - 'tests/bo_photo_annex_ci.test.cjs'
+      - '.github/workflows/bo_photo_annex_ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bo-photo-static-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bo-photo-static-contracts:
+    name: Static contracts (not production approval)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test both BO HTML variants (11 static checks, no secrets)
+        run: node --test tests/bo_photo_annex_ci.test.cjs
