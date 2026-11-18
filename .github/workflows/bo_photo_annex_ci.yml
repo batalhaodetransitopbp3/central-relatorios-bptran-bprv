@@ -1,10 +1,11 @@
-name: BO Photo Annex - Static Contracts Only
+name: BO Photo Annex - Static and Chromium QA
 
 on:
   pull_request:
     paths:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
+      - 'tests/bo_photo_annex_browser_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
   push:
     branches:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
+      - 'tests/bo_photo_annex_browser_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
 
 permissions:
