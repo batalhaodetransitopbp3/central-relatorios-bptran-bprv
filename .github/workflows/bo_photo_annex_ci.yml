@@ -58,8 +58,9 @@ jobs:
         run: node tests/bo_photo_annex_browser_smoke.cjs
   bo-photo-webkit-smoke:
     name: WebKit mobile photo vault (not physical Safari)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    timeout-minutes: 15
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -69,7 +70,5 @@ jobs:
           node-version: '22'
       - name: Install Playwright WebKit test dependency
         run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
-      - name: Install WebKit browser and OS dependencies
-        run: npx playwright install --with-deps webkit
       - name: Validate synthetic encrypted photographs in WebKit
         run: node tests/bo_photo_annex_webkit_smoke.cjs
