@@ -1380,7 +1380,7 @@ if(window.BoPhotoAnnex)return;
 const DB='central-bo-photo-annex-v1',STORE='reports',MAX_PHOTOS=96,PER_PAGE=4;
 const $=id=>document.getElementById(id);
 const state={photos:[],visible:false,ready:false,busy:false,key:'',revision:0};
-let readyPromise=null,mutateChain=Promise.resolve();
+let readyPromise=null,mutateChain=Promise.resolve(),pendingMutations=0;
 const esc=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const validPhoto=s=>typeof s==='string'&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(s);
 function documentScope(){
@@ -1389,10 +1389,11 @@ function documentScope(){
  const formNumber=String(document.getElementById('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
  const editNumber=String(unique||'').trim().toUpperCase().replace(/\s+/g,'');
  const number=/^PM20\d{8}$/.test(formNumber)?formNumber:/^PM20\d{8}$/.test(editNumber)?editNumber:'';
- const service=q.get('serviceId')||q.get('rsdReportId')||q.get('rcoReportId')||'avulso';
- // Canonical BO number wins over editId so RSD and RCO share the same scoped annex.
- if(number)return 'bo-annex::'+service+'::number:'+number;
- if(unique&&/^[a-z0-9_:.-]{5,150}$/i.test(unique))return 'bo-annex::'+service+'::edit:'+unique;
+ // The canonical PM number is globally unique within the BO family: same annex
+ // from index, RSD and RCO regardless of the URL's serviceId parameter.
+ // A serviceId alone is never used as a photo key: shifts contain multiple BOs.
+ if(number)return 'bo-annex::number:'+number;
+ if(unique&&/^[a-z0-9_:.-]{5,150}$/i.test(unique))return 'bo-annex::edit:'+unique;
  return '';
 }
 function openDb(){
@@ -1460,7 +1461,9 @@ async function persist(){
    visible:state.visible,updatedAt:new Date().toISOString()});
 }
 function mutate(fn){
- const next=mutateChain.catch(()=>{}).then(fn);mutateChain=next;return next;
+ pendingMutations++;
+ const next=mutateChain.catch(()=>{}).then(fn).finally(()=>{pendingMutations--;});
+ mutateChain=next;return next;
 }
 function validateStoredPhotos(value){
  if(!Array.isArray(value))return [];
@@ -1749,6 +1752,29 @@ function install(){
    const c=e.target.closest('[data-bo-caption]');
    if(c)caption(c.dataset.boCaption,c.value);
   });
+ }
+  if(typeof window.prepareAndPrint==='function'&&!window.__boPhotoPrintGuardInstalled){
+  const printOriginal=window.prepareAndPrint;
+  window.prepareAndPrint=function(){
+   if(state.busy||pendingMutations>0){
+    const note='Aguarde a conclusão do salvamento das fotografias antes de gerar o PDF.';
+    message(note,true);alert(note);return false;
+   }
+   if(state.photos.length){
+    if(!state.ready||!state.key||state.key!==documentScope()){
+     const note='Confira o número do BO e recarregue o anexo antes de imprimir.';
+     message(note,true);alert(note);return false;
+    }
+    const previews=[...document.querySelectorAll('#boPhotoAnnex img.bo-photo-image')];
+    if(previews.length!==state.photos.length||
+      previews.some(img=>!img.complete||img.naturalWidth===0)){
+      const note='Aguarde o carregamento completo das fotos antes de gerar o PDF.';
+      message(note,true);alert(note);return false;
+    }
+   }
+   return printOriginal.apply(this,arguments);
+  };
+  window.__boPhotoPrintGuardInstalled=true;
  }
  if(typeof window.clearForm==='function')window.clearForm=resetAll;
  document.addEventListener('input',e=>{
