@@ -83,6 +83,14 @@ async function main(){
     BoPhotoAnnex.storageScope==='bo-annex::number:'+num,
     {timeout:12000},info.bo);
    await page.$eval('#boAnnexOpenButton',el=>el.click());
+   await page.waitForSelector('#boVaultPassword',{timeout:10000});
+   assert.equal(await page.$eval('#boVaultPassword',el=>el.type),'password');
+   await page.$eval('#boVaultPassword',el=>{el.value='FAKE-R246-Strong-Secret-1234!'});
+   await page.$eval('#boVaultConfirm',el=>{el.value='FAKE-R246-Strong-Secret-1234!'});
+   await page.$eval('#boVaultUnlock',el=>el.click());
+   await page.waitForFunction(()=>BoPhotoAnnex.isUnlocked&&
+      document.getElementById('boPhotoAnnex').classList.contains('is-open'),
+      {timeout:15000});
    const data=await page.evaluate(()=>{
     const c=document.createElement('canvas');c.width=800;c.height=600;
     const g=c.getContext('2d');g.fillStyle='#153a5d';g.fillRect(0,0,800,600);
@@ -100,6 +108,41 @@ async function main(){
    assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll(
     '[data-bo-annex-page]')].map(el=>
      el.querySelectorAll('.bo-photo-image').length)),[4,1]);
+   const envelope=await page.evaluate(async()=>{
+     const db=await new Promise((resolve,reject)=>{
+       const r=indexedDB.open('central-bo-photo-annex-v1');
+       r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+     });
+     const saved=await new Promise((resolve,reject)=>{
+       const r=db.transaction('reports','readonly').objectStore('reports')
+         .get(BoPhotoAnnex.storageScope);
+       r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+     });
+     db.close();return saved;
+   });
+   assert.equal(envelope.cryptoVersion,1);
+   assert.equal(envelope.cipher,'AES-256-GCM');
+   assert.equal(envelope.kdf,'PBKDF2-SHA256');
+   assert.equal(envelope.revision,5);
+   assert(!Object.hasOwn(envelope,'photos'));
+   assert(!JSON.stringify(envelope).includes('data:image/jpeg'));
+   await page.evaluate(()=>window.centralPrepareNavigation?.());
+   await page.reload({waitUntil:'domcontentloaded'});
+   await page.waitForFunction(()=>BoPhotoAnnex?.isReady,{timeout:12000});
+   await page.$eval('#ciopCopom',(el,num)=>{
+     el.value=num;el.dispatchEvent(new Event('input',{bubbles:true}));
+   },info.bo);
+   await page.waitForFunction(()=>BoPhotoAnnex.isReady&&BoPhotoAnnex.isLocked,
+     {timeout:12000});
+   assert.equal(await page.evaluate(()=>BoPhotoAnnex.photoCount),0);
+   const denied=await page.evaluate(async()=>{
+     try{await BoPhotoAnnex.unlockWithPassphrase('WRONG-FAKE-12345!!');return false}
+     catch(e){return /Senha incorreta|corrompido/.test(String(e.message))}
+   });
+   assert(denied,'Wrong vault password must be rejected');
+   await page.evaluate(async p=>BoPhotoAnnex.unlockWithPassphrase(p),
+     'FAKE-R246-Strong-Secret-1234!');
+   assert.equal(await page.evaluate(()=>BoPhotoAnnex.photoCount),5);
    await page.$eval('[data-bo-crop]',el=>el.click());
    await page.waitForSelector('#photoFramerModal.open',{timeout:10000});
    await page.$eval('#pfZoomIn',el=>el.click());

@@ -24,6 +24,7 @@ const files=docs.map(name=>({
 const all=files.map(f=>({
  ...f,
  js:parse(f.text,'boPhotoAnnexScript','script'),
+ vault:parse(f.text,'boPhotoVaultScript','script'),
  css:parse(f.text,'boPhotoAnnexStyle','style'),
  framer:parse(f.text,'photoFramerScript','script'),
  framerCss:parse(f.text,'photoFramerStyles','style')
@@ -32,12 +33,14 @@ const canonicalCIRVC=fs.readFileSync(path.join(root,'auto_remocao_veiculos.html'
 test('Exactly two BO variants exist and share byte-identical annex source',()=>{
  assert.equal(all.length,2);
  assert.equal(all[0].js,all[1].js);
+ assert.equal(all[0].vault,all[1].vault);
  assert.equal(all[0].css,all[1].css);
  assert.equal(all[0].framer,all[1].framer);
 });
 test('Embedded annex JS and CIRVC PhotoFramer compile as JavaScript',()=>{
  for(const f of all){
   assert.doesNotThrow(()=>new vm.Script(f.js,{filename:f.name+':annex'}));
+  assert.doesNotThrow(()=>new vm.Script(f.vault,{filename:f.name+':vault'}));
   assert.doesNotThrow(()=>new vm.Script(f.framer,{filename:f.name+':PhotoFramer'}));
  }
 });
@@ -78,7 +81,7 @@ test('Photos are not stored in the legacy BO text draft or sent to public endpoi
   assert.match(f.js,/indexedDB\.open\(DB,1\)/);
   assert.match(f.js,/central-bo-photo-annex-v1/);
   assert.doesNotMatch(f.js,/\bfetch\s*\(|XMLHttpRequest|google\.script\.run|UrlFetchApp|DriveApp/);
-  assert.match(f.js,/não são anexadas à nuvem automaticamente/);
+  assert.match(f.js,/Não são anexadas à nuvem/);
  }
 });
 test('One canonical BO number works for index, RSD and RCO; no service-only key',()=>{
@@ -96,7 +99,9 @@ test('Duplicate tabs use IndexedDB compare-and-swap version plus deletion tombst
   assert.match(f.js,/const read=store\.get\(key\)/);
   assert.match(f.js,/current!==expected/);
   assert.match(f.js,/tx\.abort\(\)/);
-  assert.match(f.js,/revision:committedRevision/);
+  assert.match(f.js,/const encrypted=await vault.encrypt/);
+  assert.match(f.vault,/AES-GCM/);
+  assert.match(f.vault,/PBKDF2/);
   assert.match(f.js,/deletedAt:new Date\(\)\.toISOString\(\)/);
  }
 });
@@ -117,6 +122,6 @@ test('All variants have visible user warning and preservation instructions',()=>
 });
 test('PR-reviewed static image code contains no hardcoded credentials',()=>{
  for(const f of all){
-  assert.doesNotMatch(f.js,/AKfycb|AIza|ghp_[A-Za-z0-9]{30,}|-----BEGIN PRIVATE KEY/);
+  assert.doesNotMatch(f.js+f.vault,/AKfycb|AIza|ghp_[A-Za-z0-9]{30,}|-----BEGIN PRIVATE KEY/);
  }
 });
