@@ -1377,7 +1377,7 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
 if(window.BoPhotoAnnex)return;
 const DB='central-bo-photo-annex-v1',STORE='reports',MAX_PHOTOS=96,PER_PAGE=4;
 const $=id=>document.getElementById(id);
-const state={photos:[],visible:false,ready:false,busy:false,key:''};
+const state={photos:[],visible:false,ready:false,busy:false,key:'',revision:0};
 let readyPromise=null,mutateChain=Promise.resolve();
 const esc=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const validPhoto=s=>typeof s==='string'&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(s);
@@ -1411,23 +1411,43 @@ async function recordRead(key=state.key){
    req.onerror=()=>reject(req.error||Error('Não foi possível carregar o anexo.'));
  });}finally{db.close();}
 }
+function staleError(){
+ const e=new Error('Este anexo foi atualizado em outra aba. Recarregue o BO antes de adicionar ou alterar fotografias.');
+ e.code='BO_PHOTO_STALE_REVISION';return e;
+}
 async function recordWrite(record){
+ const key=state.key,expected=state.revision;
+ if(!key||!state.ready)throw Error('Informe e confirme o número do BO antes de salvar fotografias.');
  const db=await openDb();
- try{await new Promise((resolve,reject)=>{
-   const tx=db.transaction(STORE,'readwrite');
-   tx.objectStore(STORE).put(record);
+ let committedRevision=0;
+ try{
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+   let failure=null;
    tx.oncomplete=resolve;
-   tx.onabort=()=>reject(tx.error||Error('Espaço insuficiente para salvar as fotografias.'));
+   tx.onabort=()=>reject(failure||tx.error||Error('Espaço insuficiente para salvar as fotografias.'));
    tx.onerror=()=>{};
- });}finally{db.close();}
+   const read=store.get(key);
+   read.onsuccess=()=>{
+    const current=read.result&&Number.isInteger(read.result.revision)?read.result.revision:0;
+    if(current!==expected){
+     failure=staleError();tx.abort();return;
+    }
+    if(state.key!==key){
+     failure=Error('O número do BO foi alterado durante a gravação. Tente novamente.');tx.abort();return;
+    }
+    committedRevision=current+1;
+    store.put({...record,key,revision:committedRevision});
+   };
+  });
+ }finally{db.close();}
+ state.revision=committedRevision;
+ return committedRevision;
 }
 async function recordDelete(){
- const db=await openDb();
- try{await new Promise((resolve,reject)=>{
-  const tx=db.transaction(STORE,'readwrite');
-  tx.objectStore(STORE).delete(state.key);
-  tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Erro ao apagar anexo.'));
- });}finally{db.close();}
+ // Tombstone keeps the version monotonic: a stale tab cannot resurrect erased photos.
+ return recordWrite({key:state.key,photos:[],visible:false,
+   deletedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
 }
 function message(msg,error=false){
  const el=$('boPhotoStatus');
@@ -1492,7 +1512,7 @@ async function load(){
  if(state.ready&&wanted===state.key)return !!wanted;
  if(state.busy)return false;
  const openBefore=state.visible;
- state.key=wanted;state.ready=false;state.photos=[];state.visible=openBefore;
+ state.key=wanted;state.ready=false;state.photos=[];state.revision=0;state.visible=openBefore;
  if(!wanted){
   state.ready=true;render();
   message('Informe o número do BO (PM20XXXXXXXX) antes de adicionar fotografias.',true);
@@ -1503,6 +1523,7 @@ async function load(){
   if(state.key!==wanted)return false;
   if(saved){
    state.photos=validateStoredPhotos(saved.photos);
+   state.revision=Number.isInteger(saved.revision)&&saved.revision>=0?saved.revision:0;
    state.visible=!!saved.visible||state.photos.length>0||openBefore;
   }
   state.ready=true;render();
@@ -1571,8 +1592,8 @@ async function open(){
  state.visible=true;
  render();
  if(!scoped){message('Informe o número do BO (PM20XXXXXXXX) para abrir um anexo exclusivo desta ocorrência.',true);return;}
- try{await persist();message('Anexo pronto. Use "Adicionar fotografias" para selecionar as imagens.');}
- catch(e){message('Anexo aberto, mas a preferência não foi salva: '+String(e.message||e),true);}
+ // Opening the panel is read-only: it must not invalidate another tab's edit version.
+ message('Anexo pronto. Use "Adicionar fotografias" para selecionar as imagens.');
  $('boPhotoAnnex')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
 async function addFiles(input){
@@ -1673,8 +1694,9 @@ async function clearAnnex(){
 }
 async function resetAll(){
  if(!confirm('Deseja limpar todo o boletim, incluindo o anexo fotográfico deste aparelho?'))return;
- await ensureLoaded();
- try{await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});}
+ const scoped=await ensureLoaded();
+ try{if(scoped)await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});
+  else {state.photos=[];state.visible=false;}}
  catch(e){alert('Os anexos não puderam ser apagados. O BO foi preservado: '+String(e.message||e));return;}
  try{
   localStorage.removeItem('bo_bptrans_1cprv_v2');
