@@ -1,4 +1,4 @@
-name: BO Photo Annex - Static and Chromium QA
+name: BO Photo Annex - Static Chromium WebKit QA
 
 on:
   pull_request:
@@ -6,6 +6,7 @@ on:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
       - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_annex_webkit_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
   push:
     branches:
@@ -14,6 +15,7 @@ on:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
       - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_annex_webkit_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
 
 permissions:
@@ -54,3 +56,20 @@ jobs:
         run: npm install --no-save --no-package-lock --ignore-scripts puppeteer-core@24 pdf-lib@1
       - name: Check synthetic photographs and PDFs in Chrome
         run: node tests/bo_photo_annex_browser_smoke.cjs
+  bo-photo-webkit-smoke:
+    name: WebKit mobile photo vault (not physical Safari)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright WebKit test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Install WebKit browser and OS dependencies
+        run: npx playwright install --with-deps webkit
+      - name: Validate synthetic encrypted photographs in WebKit
+        run: node tests/bo_photo_annex_webkit_smoke.cjs
