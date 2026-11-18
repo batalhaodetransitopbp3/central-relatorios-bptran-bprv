@@ -1323,11 +1323,13 @@ const validPhoto=s=>typeof s==='string'&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$
 function documentScope(){
  const q=new URLSearchParams(location.search);
  const unique=q.get('editId')||q.get('boReportId')||q.get('boId');
- const number=String(document.getElementById('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
+ const formNumber=String(document.getElementById('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
+ const editNumber=String(unique||'').trim().toUpperCase().replace(/\s+/g,'');
+ const number=/^PM20\d{8}$/.test(formNumber)?formNumber:/^PM20\d{8}$/.test(editNumber)?editNumber:'';
  const service=q.get('serviceId')||q.get('rsdReportId')||q.get('rcoReportId')||'avulso';
- // Never use serviceId alone: one shift can contain multiple distinct BOs.
+ // Canonical BO number wins over editId so RSD and RCO share the same scoped annex.
+ if(number)return 'bo-annex::'+service+'::number:'+number;
  if(unique&&/^[a-z0-9_:.-]{5,150}$/i.test(unique))return 'bo-annex::'+service+'::edit:'+unique;
- if(/^PM20\d{8}$/.test(number))return 'bo-annex::'+service+'::number:'+number;
  return '';
 }
 function openDb(){
