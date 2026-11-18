@@ -1909,6 +1909,10 @@ function install(){
   if(typeof window.prepareAndPrint==='function'&&!window.__boPhotoPrintGuardInstalled){
   const printOriginal=window.prepareAndPrint;
   window.prepareAndPrint=function(){
+   if(!state.ready&&documentScope()){
+    const note='Aguarde a verificação do anexo fotográfico antes de imprimir.';
+    message(note,true);alert(note);return false;
+   }
    if(state.locked){
     const note='Há fotografias protegidas neste BO. Desbloqueie o anexo antes de gerar o PDF.';
     message(note,true);alert(note);return false;
