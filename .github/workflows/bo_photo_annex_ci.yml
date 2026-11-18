@@ -35,3 +35,20 @@ jobs:
           node-version: '22'
       - name: Test both BO HTML variants (11 static checks, no secrets)
         run: node --test tests/bo_photo_annex_ci.test.cjs
+  bo-photo-chromium-smoke:
+    name: Chromium crop and two-page PDF (not physical mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm Chrome is installed
+        run: command -v google-chrome || command -v google-chrome-stable || command -v chromium
+      - name: Install CI browser driver and PDF inspection library
+        run: npm install --no-save --no-package-lock --ignore-scripts puppeteer-core@24 pdf-lib@1
+      - name: Check synthetic photographs and PDFs in Chrome
+        run: node tests/bo_photo_annex_browser_smoke.cjs
