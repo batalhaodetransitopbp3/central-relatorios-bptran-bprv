@@ -1,0 +1,22 @@
+name: R254 BO session + CSRF + local HTTP (NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-secure-session-r254-review]
+  pull_request:
+    paths:
+      - 'R254_BO_SESSION_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r254_server_session_http_integration.test.js'
+      - '.github/workflows/r254_bo_session_ci.yml'
+jobs:
+  request-session-simulation:
+    name: Synthetic OIDC / local HTTP loopback / R252 ACL (NOT prod)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert prototype contracts
+        run: node --test tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
