@@ -1,0 +1,22 @@
+name: R253 Google OIDC signed JWT - synthetic gate (NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-google-oidc-r253-review]
+  pull_request:
+    paths:
+      - 'R253_GOOGLE_OIDC_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r253_google_oidc_signed_jwt_bridge.test.js'
+      - '.github/workflows/r253_google_oidc_ci.yml'
+jobs:
+  rsa-jwt-and-bridge-simulation:
+    name: RSA signed synthetic tokens and R252 regression (NOT production approval)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate prototype (no user tokens or Google data)
+        run: node --test tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
