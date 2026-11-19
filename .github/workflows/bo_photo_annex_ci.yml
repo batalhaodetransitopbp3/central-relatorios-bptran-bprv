@@ -6,6 +6,7 @@ on:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
       - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_actual_entrypoints_smoke.cjs'
       - 'tests/bo_photo_annex_webkit_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
   push:
@@ -15,6 +16,7 @@ on:
       - 'boletim_ocorrencia_bptrans_1cprv*.html'
       - 'tests/bo_photo_annex_ci.test.cjs'
       - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_actual_entrypoints_smoke.cjs'
       - 'tests/bo_photo_annex_webkit_smoke.cjs'
       - '.github/workflows/bo_photo_annex_ci.yml'
 
@@ -56,6 +58,8 @@ jobs:
         run: npm install --no-save --no-package-lock --ignore-scripts puppeteer-core@24 pdf-lib@1
       - name: Check synthetic photographs and PDFs in Chrome
         run: node tests/bo_photo_annex_browser_smoke.cjs
+      - name: Validate real index/RSD/RCO source routing with synthetic BOs
+        run: node tests/bo_photo_actual_entrypoints_smoke.cjs
   bo-photo-webkit-smoke:
     name: WebKit mobile photo vault (not physical Safari)
     runs-on: ubuntu-latest
