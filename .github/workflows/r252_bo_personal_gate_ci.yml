@@ -1,0 +1,22 @@
+name: R252 BO personal authority candidate - isolated tests
+on:
+  push:
+    branches: [feature/bo-photo-personal-auth-r252-review]
+  pull_request:
+    paths:
+      - 'R252_BO_PERSONAL_IDENTITY_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r252_bo_personal_gate_r239_integration.test.js'
+      - '.github/workflows/r252_bo_personal_gate_ci.yml'
+jobs:
+  isolated-r252-contracts:
+    name: Synthetic identity / idempotency (NOT production approval)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run fail-closed candidate tests
+        run: node --test tests/r252_bo_personal_gate_r239_integration.test.js
