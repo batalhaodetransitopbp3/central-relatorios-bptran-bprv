@@ -102,6 +102,11 @@
            assert(image&&image.requestId===body.requestId&&image.digest===digest&&
              image.createdBy===actor.matricula&&image.position===body.position,
              'COMMIT_LEDGER_INCONSISTENT');
+           // Idempotent replay MUST confirm the encrypted original is intact;
+           // committed metadata alone is not proof of evidence availability.
+           const stored=await a.findFileByStableName(stableName);
+           assert(stored&&stored.digest===digest&&stored.eventId===body.eventId,
+             'COMMIT_PRIVATE_FILE_MISSING_OR_CORRUPT');
            return {ok:true,duplicate:true,requestId:body.requestId,
              photoId:body.photoId,position:body.position,
              page:Math.ceil(body.position/4),digest};
