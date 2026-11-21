@@ -1,0 +1,22 @@
+name: R259 isolated Google account and workspace preflight (NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-gas-account-gate-r259-review]
+  pull_request:
+    paths:
+      - 'R259_BO_GAS_IDENTITY_PREFLIGHT_NO_DEPLOY/**'
+      - 'tests/r259_gas_account_workspace_preflight.test.js'
+      - '.github/workflows/r259_gas_workspace_gate_ci.yml'
+jobs:
+  synthetic-isolation-boundary:
+    name: Node24 wrong-account fails closed + 151 predecessor regressions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run synthetic workspace isolation and prior regressions (NO GOOGLE WRITE)
+        run: node --test tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
