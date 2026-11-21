@@ -1,0 +1,31 @@
+name: R261 browser client to canonical BO HTTP staging (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/bo-browser-api-r261-review
+  pull_request:
+    paths:
+      - 'R261_BO_BROWSER_CANONICAL_CANDIDATE_NO_DEPLOY/**'
+      - 'R255_BO_DURABLE_SESSION_CANDIDATE_NO_DEPLOY/r255_server_session_gate.cjs'
+      - 'tests/r261_browser_http_canonical_end_to_end.test.cjs'
+      - '.github/workflows/r261_bo_browser_http_review_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-to-staging-backend:
+    name: Node24 loopback HTTP canonical session + all 215 predecessor regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check module parsing and run 232 synthetic tests (NO GOOGLE WRITE)
+        run: |
+          node --check R261_BO_BROWSER_CANONICAL_CANDIDATE_NO_DEPLOY/r261_bo_browser_session_client.js
+          node --check R255_BO_DURABLE_SESSION_CANDIDATE_NO_DEPLOY/r255_server_session_gate.cjs
+          node --test tests/r261_browser_http_canonical_end_to_end.test.cjs tests/r260_unified_bo_context_security.test.cjs tests/bo_photo_annex_ci.test.cjs tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
