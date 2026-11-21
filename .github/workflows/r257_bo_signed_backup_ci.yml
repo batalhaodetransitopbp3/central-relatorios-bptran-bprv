@@ -1,0 +1,22 @@
+name: R257 signed evidence backup-restore (ISOLATED - NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-photo-recovery-r257-review]
+  pull_request:
+    paths:
+      - 'R257_BO_RECOVERY_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r257_signed_backup_restore.test.js'
+      - '.github/workflows/r257_bo_signed_backup_ci.yml'
+jobs:
+  backup-restore-ed25519:
+    name: Node 24 signed snapshot / restore and photo regressions (NO DEPLOY)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test synthetic backups plus all predecessor security regressions
+        run: node --test tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
