@@ -1,0 +1,23 @@
+name: R256 encrypted BO photo ledger - isolated review (NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-photo-ledger-r256-review]
+  pull_request:
+    paths:
+      - 'R256_BO_PHOTO_LEDGER_CANDIDATE_NO_DEPLOY/**'
+      - 'R252_BO_PERSONAL_IDENTITY_CANDIDATE_NO_DEPLOY/r252_bo_photo_archive_core.js'
+      - 'tests/r256_photo_ledger_persistent_integration.test.js'
+      - '.github/workflows/r256_bo_photo_ledger_ci.yml'
+jobs:
+  signed-session-durable-photo-ledger:
+    name: Node 24 synthetic OIDC / SQLite / AES-GCM (NOT production)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test local synthetic custody ledger and predecessor regressions
+        run: node --test tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
