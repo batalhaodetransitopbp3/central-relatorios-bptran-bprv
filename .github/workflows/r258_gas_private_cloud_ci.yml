@@ -1,0 +1,22 @@
+name: R258 GAS private Drive Sheets adapter (ISOLATED NO DEPLOY)
+on:
+  push:
+    branches: [feature/bo-gas-private-drive-r258-review]
+  pull_request:
+    paths:
+      - 'R258_BO_GAS_DRIVE_SHEETS_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r258_gas_private_drive_sheets_bridge.test.js'
+      - '.github/workflows/r258_gas_private_cloud_ci.yml'
+jobs:
+  synthetic-gas-adapter:
+    name: Node 24 GAS mock/HTTP personal ACL + 121 regressions (not production)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run isolated GAS service mocks and full predecessor regressions
+        run: node --test tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
