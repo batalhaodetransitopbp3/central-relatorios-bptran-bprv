@@ -8,6 +8,7 @@
 const crypto=require('node:crypto');
 const authorityGate=require('../R252_BO_PERSONAL_IDENTITY_CANDIDATE_NO_DEPLOY/r252_personal_bo_gate');
 const archiveCore=require('../R252_BO_PERSONAL_IDENTITY_CANDIDATE_NO_DEPLOY/r252_bo_photo_archive_core');
+const canonicalBridge=require('../R260_BO_UNIFIED_REVIEW_NO_DEPLOY/r260_canonical_entry_bridge');
 const LOGIN_COOKIE='__Host-bo_login',SESSION_COOKIE='__Host-bo_session';
 const SESSION_SECONDS=900,CHALLENGE_SECONDS=300;
 function deny(code){const e=new Error('R255_'+code);e.code=code;throw e}
@@ -22,7 +23,7 @@ function cookieSet(name,value,seconds){
 }
 function cookieClear(name){return cookieSet(name,'',0)}
 function create({allowedOrigin,clientId,oidcVerifier,authority,storage,now,
-  challengeStore,sessionStore}={}){
+  challengeStore,sessionStore,canonicalEventLookup,canonicalMode}={}){
  if(typeof allowedOrigin!=='string'||!/^https:\/\/[^/]+$/.test(allowedOrigin)||
     !clientId||!oidcVerifier||typeof oidcVerifier.verify!=='function'||
     !authority||!storage||typeof now!=='function')
@@ -35,6 +36,14 @@ function create({allowedOrigin,clientId,oidcVerifier,authority,storage,now,
     typeof challengeStore.prune!=='function'||
     typeof sessionStore.isActive!=='function'||
     typeof sessionStore.prune!=='function')deny('DURABLE_STORES_REQUIRED');
+ // R261: opt-in canonical BO resolution for the new browser client.
+ // No production routing is enabled here and the default R255 contract is
+ // preserved solely for predecessor regression tests.
+ if(canonicalEventLookup!==undefined||canonicalMode!==undefined){
+   if(canonicalMode!=='ISOLATED_HOMOLOGATION'||
+     typeof canonicalEventLookup!=='function')
+     deny('CANONICAL_REVIEW_MODE_REQUIRED');
+ }
  const challenges=challengeStore,sessions=sessionStore;
  function nowMs(){
    const ms=Date.parse(now());
@@ -139,6 +148,22 @@ function create({allowedOrigin,clientId,oidcVerifier,authority,storage,now,
    const service=archiveCore.create({
      ...storage,authenticate:personal.authenticate,getEvent:personal.getEvent
    });
+   if(canonicalMode==='ISOLATED_HOMOLOGATION'){
+     // Never accept eventId/actor/identity from a browser upload payload;
+     // the server locates the unique BO event and checks RSD/RCO linkage.
+     const canonical=canonicalBridge.create({
+       authority:personal,findCanonicalEventsByBoNumber:canonicalEventLookup,
+       archive:service
+     });
+     const input=ctx.body;
+     if(Object.keys(input).some(key=>![
+       'numeroBO','launch','photo'
+     ].includes(key)))deny('CANONICAL_CLIENT_FIELDS_FORBIDDEN');
+     return ctx.operation==='upload'
+       ?canonical.upload({numeroBO:input.numeroBO,launch:input.launch,
+           photo:input.photo})
+       :canonical.list({numeroBO:input.numeroBO,launch:input.launch});
+   }
    return ctx.operation==='upload'
      ?service.upload(ctx.body,undefined):service.list(ctx.body,undefined);
  }

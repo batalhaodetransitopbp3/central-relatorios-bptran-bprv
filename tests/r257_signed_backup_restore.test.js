@@ -55,7 +55,7 @@ function makeFixture(){
   encryptionKey,auditKey,now:()=>CLOCK
  });
  function cleanup(){
-  ledger.close();fs.rmSync(root,{recursive:true,force:true});
+  ledger.close();fs.rmSync(root,{recursive:true,force:true,maxRetries:60,retryDelay:50});
  }
  return {root,dbPath,photoDirectory,backupRoot,restoreRoot,
   encryptionKey,auditKey,pair,ledger,addPhoto,snapshot,verify,restore,cleanup};

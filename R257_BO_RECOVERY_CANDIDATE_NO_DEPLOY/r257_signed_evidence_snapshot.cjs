@@ -73,6 +73,22 @@ function checkLedger({dbPath,photoDirectory,encryptionKey,auditKey,now}){
   return audit;
  }finally{ledger.close()}
 }
+async function removeOfflineWorkDirectory(dir){
+ // SQLite VFS Windows may release a closed SHM.tmp asynchronously. Keep
+ // the backup stage unpublished until disposal is complete. Bounded retries
+ // fail closed rather than silently shipping a dirty signed snapshot.
+ for(let attempt=0;attempt<60;attempt++){
+  try{
+   await fs.promises.rm(dir,{recursive:true,force:true,
+    maxRetries:2,retryDelay:30});
+   return;
+  }catch(error){
+   if(!['EPERM','EBUSY','ENOTEMPTY','EACCES'].includes(error.code)||attempt===59)
+    throw error;
+   await new Promise(resolve=>setTimeout(resolve,40+10*attempt));
+  }
+ }
+}
 function finalizeOfflineSnapshotDb(databasePath){
  // All connections to the snapshot must have closed before this function.
  // Merge WAL contents and switch only this OFFLINE COPY to DELETE journal.
@@ -142,7 +158,7 @@ function reconcileDisposableDatabase(sourceDb,photoDirectory,options,stageRoot){
    auditKey:options.auditKey,now:options.now
   });
  }finally{
-  fs.rmSync(workDir,{recursive:true,force:true,maxRetries:24,retryDelay:30});
+  fs.rmSync(workDir,{recursive:true,force:true,maxRetries:60,retryDelay:50});
  }
 }
 function safeNewTarget(base,name){
@@ -207,7 +223,7 @@ async function createSnapshot(input){
    copyProtected(workDb,backupDb);
    dbFingerprint=hashFile(backupDb);
   }finally{
-   fs.rmSync(workDir,{recursive:true,force:true,maxRetries:24,retryDelay:30});
+   await removeOfflineWorkDirectory(workDir);
   }
   const copied=[];
   for(const entry of originalFiles){
@@ -254,7 +270,7 @@ async function createSnapshot(input){
   return {ok:true,snapshotDir:out,snapshotId:id,
     files:copied.length,auditTip:initialAudit.tip,releaseAllowed:false};
  }finally{
-  if(!published)fs.rmSync(tmp,{recursive:true,force:true});
+  if(!published)await removeOfflineWorkDirectory(tmp);
  }
 }
 function verifySnapshot({snapshotDir,verificationPublicKey}={}){
@@ -343,7 +359,7 @@ function restoreSnapshot({snapshotDir,restoreRoot,verificationPublicKey,
   return {ok:true,restoredDir:out,snapshotId:checked.snapshotId,
    files:checked.files,auditTip:checked.ledger.tip,releaseAllowed:false};
  }finally{
-  if(!completed)fs.rmSync(tmp,{recursive:true,force:true});
+  if(!completed)fs.rmSync(tmp,{recursive:true,force:true,maxRetries:60,retryDelay:50});
  }
 }
 function oopsFileMismatch(snapshotDir,stagingDir){

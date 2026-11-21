@@ -1,5 +1,9 @@
 'use strict';
 const test=require('node:test');
+// Windows SQLite can defer closing native WAL/SHM handles until a later
+// event-loop turn. Keep test teardown asynchronous so it can release them.
+const pendingCleanup=[];
+test.after(async()=>{await Promise.all(pendingCleanup)});
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const cp=require('node:child_process'),crypto=require('node:crypto');
@@ -114,8 +118,13 @@ function fixture(){
    operation:'upload',body:request});
  }
  function cleanup(){
-  for(const ext of ['','-wal','-shm'])try{fs.unlinkSync(dbPath+ext)}catch(_){}
-  fs.rmSync(dir,{recursive:true,force:true});
+  // Test-only directory; no production file or installed SQLite instance.
+  // Deferring native Windows handle release is necessary: synchronous
+  // retries block the event loop and can never allow the VFS to finish.
+  const task=fs.promises.rm(dir,{recursive:true,force:true,
+   maxRetries:80,retryDelay:75});
+  pendingCleanup.push(task);
+  return task;
  }
  return {dir,dbPath,key,state,stores,open,photo,loginStart,loginFinish,upload,cleanup,
   setClock:v=>{clock=v},getClock:()=>clock};
