@@ -1,0 +1,22 @@
+name: R255 durable session SQLite proof - NO DEPLOY
+on:
+  push:
+    branches: [feature/bo-durable-session-r255-review]
+  pull_request:
+    paths:
+      - 'R255_BO_DURABLE_SESSION_CANDIDATE_NO_DEPLOY/**'
+      - 'tests/r255_sqlite_durable_session_integration.test.js'
+      - '.github/workflows/r255_bo_durable_session_ci.yml'
+jobs:
+  encrypted-sqlite-durable-sessions:
+    name: Node 24 SQLite restart and signed OIDC tests (not prod)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run isolated synthetic persistence, ACL, and local HTTP tests
+        run: node --test tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
