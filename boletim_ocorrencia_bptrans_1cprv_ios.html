@@ -548,6 +548,106 @@
 }
 </style>
 <meta name="central-version" content="10.0-resistencia-texto-final">
+<style id="photoFramerStyles">
+  #photoFramerModal{position:fixed;inset:0;z-index:5000;background:rgba(2,12,23,.94);display:none;align-items:center;justify-content:center;padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+  #photoFramerModal.open{display:flex}
+  .pf-card{width:min(980px,100%);height:min(820px,97dvh);background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border:1px solid rgba(148,163,184,.7);border-radius:20px;padding:14px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;box-shadow:0 26px 80px rgba(0,0,0,.42)}
+  .pf-head{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:2px 2px 10px;border-bottom:1px solid #dbe5ef}.pf-head-copy{min-width:0}.pf-head strong{font-size:17px;color:#082d4e}.pf-head span{display:block;margin-top:3px;font-size:12px;line-height:1.35;color:#526579}.pf-head span b{color:#0f4c81}
+  .pf-stage{min-height:0;background:#020617;justify-self:center;align-self:center;border:4px solid #38bdf8;outline:2px solid #fff;outline-offset:-6px;border-radius:15px;overflow:hidden;touch-action:none;position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #0f4c81,0 14px 36px rgba(2,12,23,.35),0 0 28px rgba(56,189,248,.22)}
+  #pfCanvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab}.pf-stage.dragging #pfCanvas{cursor:grabbing}
+  .pf-crop-overlay{position:absolute;inset:0;z-index:3;pointer-events:none;background-image:linear-gradient(to right,transparent 33.15%,rgba(255,255,255,.46) 33.15%,rgba(255,255,255,.46) 33.48%,transparent 33.48%,transparent 66.48%,rgba(255,255,255,.46) 66.48%,rgba(255,255,255,.46) 66.81%,transparent 66.81%),linear-gradient(to bottom,transparent 33.15%,rgba(255,255,255,.46) 33.15%,rgba(255,255,255,.46) 33.48%,transparent 33.48%,transparent 66.48%,rgba(255,255,255,.46) 66.48%,rgba(255,255,255,.46) 66.81%,transparent 66.81%)}
+  .pf-crop-badge{position:absolute;left:10px;top:10px;max-width:calc(100% - 20px);padding:6px 9px;border:1px solid rgba(255,255,255,.9);border-radius:999px;background:rgba(8,45,78,.92);color:#fff;font-size:10px;font-weight:900;letter-spacing:.45px;text-transform:uppercase;box-shadow:0 3px 12px rgba(0,0,0,.28)}
+  .pf-crop-help{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 20px);padding:6px 10px;border-radius:8px;background:rgba(2,12,23,.76);color:#fff;font-size:11px;font-weight:750;text-align:center;box-shadow:0 3px 12px rgba(0,0,0,.24)}
+  .pf-corner{position:absolute;width:28px;height:28px;border-color:#fff;border-style:solid;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}.pf-corner.tl{left:7px;top:7px;border-width:3px 0 0 3px;border-radius:7px 0 0 0}.pf-corner.tr{right:7px;top:7px;border-width:3px 3px 0 0;border-radius:0 7px 0 0}.pf-corner.bl{left:7px;bottom:7px;border-width:0 0 3px 3px;border-radius:0 0 0 7px}.pf-corner.br{right:7px;bottom:7px;border-width:0 3px 3px 0;border-radius:0 0 7px 0}
+  .pf-footer{display:grid;gap:9px}.pf-controls-panel{border:1px solid #d6e1eb;border-radius:12px;background:#fff;padding:9px 11px;box-shadow:0 3px 10px rgba(15,23,42,.05)}.pf-controls-label{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:7px;color:#334155}.pf-controls-label strong{font-size:12px}.pf-controls-label span{font-size:11px;color:#64748b}
+  .pf-controls{display:grid;grid-template-columns:42px minmax(100px,1fr) 42px 62px;gap:8px;align-items:center;font-size:12px;color:#475569}.pf-controls input[type="range"]{width:100%;accent-color:#176aa5}.pf-zoom-btn{height:38px;border:1px solid #b8c8d7;border-radius:9px;background:#f8fafc;color:#082d4e;font-size:20px;font-weight:900;cursor:pointer;line-height:1}.pf-zoom-value{text-align:center;font-weight:900;color:#0f4c81;background:#eaf2fb;border-radius:8px;padding:8px 4px}
+  .pf-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}.pf-btn{border:1px solid #c7d4e0;border-radius:10px;padding:10px 13px;font-weight:800;cursor:pointer;background:#fff;color:#082d4e;min-height:42px}.pf-btn.primary{border-color:#0f4c81;background:linear-gradient(145deg,#176aa5,#082d4e);color:#fff}.pf-btn.danger{color:#9f1239}.pf-note{font-size:11px;color:#64748b;text-align:center;line-height:1.35}.pf-note strong{color:#0f4c81}
+  .photo-adjust-btn{position:absolute;left:6px;top:6px;z-index:3;border:1px solid rgba(255,255,255,.82)!important;border-radius:999px!important;padding:5px 8px!important;background:rgba(8,45,78,.90)!important;color:#fff!important;font-size:10px!important;font-weight:850!important;box-shadow:0 2px 8px rgba(0,0,0,.18)!important;cursor:pointer!important}
+  .photo-card{position:relative}.photo-card .photo-adjust-inline{margin-left:auto}
+  @media(max-width:700px){#photoFramerModal{padding:0}.pf-card{width:100%;height:100dvh;max-height:none;border-radius:0;border:0;padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));gap:8px}.pf-head{padding-bottom:7px}.pf-head strong{font-size:15px}.pf-head span{font-size:11px}.pf-stage{border-width:3px;border-radius:11px}.pf-crop-badge{top:7px;left:7px;font-size:9px;padding:5px 7px}.pf-crop-help{bottom:7px;font-size:10px;padding:5px 7px}.pf-controls-panel{padding:7px 8px}.pf-controls-label span{display:none}.pf-controls{grid-template-columns:40px minmax(80px,1fr) 40px 56px;gap:6px}.pf-actions{display:grid;grid-template-columns:1fr 1fr}.pf-actions .pf-btn{width:100%;padding:9px 8px}.pf-actions .pf-btn.primary{grid-column:1/-1}.pf-note{font-size:10px}}
+  @media(max-width:390px){.pf-head span{display:none}.pf-crop-help{max-width:78%;white-space:normal}.pf-controls-label{margin-bottom:5px}.pf-actions .pf-btn{font-size:12px}}
+  @media print{#photoFramerModal,.photo-adjust-btn,.photo-adjust-inline{display:none!important}}
+</style>
+<style id="boPhotoAnnexStyle">
+
+/* R238 — BO photo annex candidate, shared by desktop and iOS variants. */
+#boPhotoAnnex{margin:16px 0 0;display:none;color:#12304d;font-family:Arial,Helvetica,sans-serif}
+#boPhotoAnnex.is-open{display:block}
+#boPhotoAnnex .bo-photo-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;background:#e9f2fa;border:1px solid #9bb9d0;border-radius:9px;margin-bottom:12px}
+#boPhotoAnnex .bo-photo-top strong{font-size:15px}
+#boPhotoAnnex .bo-photo-top small{display:block;font-size:11px;color:#475569;margin-top:3px}
+#boPhotoAnnex .bo-photo-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#boPhotoAnnex .bo-photo-actions button{background:#0d4f7e;color:#fff}
+#boPhotoAnnex .bo-photo-actions button.secondary{background:#eef3f8;color:#16466e;border:1px solid #9db4ca}
+#boPhotoAnnex .bo-photo-page{width:100%;background:#fff;border:1px solid #9ab0c2;padding:12px;margin:12px 0 18px;box-shadow:0 4px 16px #18385411;border-radius:9px;break-inside:avoid}
+#boPhotoAnnex .bo-photo-page-header{border-bottom:2px solid #163a59;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:10px;padding-bottom:7px}
+#boPhotoAnnex .bo-photo-page-header strong{font-size:16px;line-height:1.2}
+#boPhotoAnnex .bo-photo-page-header span{font-size:11px;color:#475569}
+#boPhotoAnnex .bo-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px;min-height:460px}
+#boPhotoAnnex .bo-photo-cell{position:relative;border:1px solid #b5c5d2;border-radius:7px;min-width:0;padding:6px;background:#fafcfe;display:flex;flex-direction:column;gap:5px}
+#boPhotoAnnex .bo-photo-image{width:100%;height:177px;object-fit:contain;background:#f1f5f9;border:1px solid #d2dde7;border-radius:4px;display:block}
+#boPhotoAnnex .bo-photo-empty{height:177px;display:flex;align-items:center;justify-content:center;color:#94a3b8;text-align:center;border:1px dashed #cbd5e1;border-radius:4px;font-size:12px}
+#boPhotoAnnex .bo-photo-caption-row{display:flex;align-items:center;gap:6px;min-width:0}
+#boPhotoAnnex .bo-photo-caption-row label{font-weight:800;font-size:11px;white-space:nowrap}
+#boPhotoAnnex .bo-photo-caption{font-size:11px;min-width:0;min-height:30px!important;flex:1;border:1px solid #cbd5e1!important;background:#fff!important;padding:5px 7px!important;color:#14344f!important}
+#boPhotoAnnex .bo-photo-caption-print{display:none;font-size:11px;line-height:1.2;min-height:22px;overflow-wrap:anywhere}
+#boPhotoAnnex .bo-photo-slot-actions{display:flex;gap:6px;flex-wrap:wrap}
+#boPhotoAnnex .bo-photo-slot-actions button{font-size:11px;padding:5px 7px;min-height:30px;color:#fff;background:#145e8a;border:0;border-radius:5px}
+#boPhotoAnnex .bo-photo-slot-actions button.danger{background:#a52c36}
+#boPhotoAnnex .bo-photo-page-footer{text-align:right;font-size:10px;margin-top:7px;color:#64748b}
+#boPhotoAnnex .bo-photo-note{margin:6px 0 0;font-size:12px;color:#50667a}
+#boPhotoAnnex .bo-photo-message{font-size:12px;color:#155474;min-height:16px;margin-top:5px}
+#boPhotoAnnex .bo-photo-message.error{color:#9b2330;font-weight:700}
+#boPhotoAnnex .bo-photo-tools{display:flex;gap:7px}
+#boPhotoAnnex .bo-photo-pages{width:100%}
+#boPhotoAnnex .bo-photo-file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(max-width:760px){
+  #boPhotoAnnex .bo-photo-top{padding:8px}
+  #boPhotoAnnex .bo-photo-grid{gap:6px}
+  #boPhotoAnnex .bo-photo-cell{padding:4px}
+  #boPhotoAnnex .bo-photo-image,#boPhotoAnnex .bo-photo-empty{height:130px}
+  #boPhotoAnnex .bo-photo-caption-row{flex-wrap:wrap}
+  #boPhotoAnnex .bo-photo-slot-actions button{min-height:44px;padding:10px 8px}
+  #boPhotoAnnex .bo-photo-caption{min-height:44px!important;font-size:13px}
+  #boPhotoAnnex .bo-photo-page{padding:7px}
+}
+@media print {
+  #boPhotoAnnex{display:block!important;margin:0!important;color:#000!important;break-before:page!important;page-break-before:always!important}
+  #boPhotoAnnex.is-empty{display:none!important}
+  #boPhotoAnnex .bo-photo-top,#boPhotoAnnex .bo-photo-slot-actions,
+  #boPhotoAnnex .bo-photo-caption,#boPhotoAnnex input,#boPhotoAnnex button,
+  #boPhotoAnnex .bo-photo-note,#boPhotoAnnex .bo-photo-message{display:none!important}
+  #boPhotoAnnex .bo-photo-page{display:block!important;break-before:auto!important;page-break-before:auto!important;break-inside:avoid!important;page-break-inside:avoid!important;width:100%!important;max-width:none!important;height:250mm!important;max-height:250mm!important;padding:4mm!important;margin:0!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:hidden!important}
+  #boPhotoAnnex .bo-photo-page+.bo-photo-page{break-before:page!important;page-break-before:always!important}
+  #boPhotoAnnex .bo-photo-page-header{height:17mm;margin-bottom:3mm;padding-bottom:2mm;border-bottom:1px solid #111}
+  #boPhotoAnnex .bo-photo-page-header strong{font-size:13pt!important}
+  #boPhotoAnnex .bo-photo-page-header span{font-size:9pt!important}
+  #boPhotoAnnex .bo-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(2,minmax(0,1fr))!important;gap:3mm!important;height:218mm!important;min-height:0!important}
+  #boPhotoAnnex .bo-photo-cell{display:flex!important;flex-direction:column!important;justify-content:center!important;gap:2mm!important;padding:2mm!important;background:#fff!important;border:1px solid #777!important;border-radius:0!important;overflow:hidden!important}
+  #boPhotoAnnex .bo-photo-image{height:93mm!important;max-height:93mm!important;width:100%!important;max-width:100%!important;object-fit:contain!important;border:0!important;background:#fff!important}
+  #boPhotoAnnex .bo-photo-empty{height:93mm!important;border:0!important;background:#fff!important}
+  #boPhotoAnnex .bo-photo-caption-row{display:block!important;min-height:7mm!important}
+  #boPhotoAnnex .bo-photo-caption-row label{font-size:8pt!important}
+  #boPhotoAnnex .bo-photo-caption-print{display:block!important;font-size:8pt!important}
+  #boPhotoAnnex .bo-photo-page-footer{display:none!important}
+}
+
+/* R246: password-entry overlay; the passphrase exists only in volatile memory. */
+.bo-vault-overlay{position:fixed;inset:0;z-index:25000;display:flex;align-items:center;justify-content:center;background:#10283ce0;padding:14px}
+.bo-vault-card{background:#fff;width:min(500px,100%);max-height:calc(100dvh - 25px);overflow:auto;border-radius:14px;padding:20px;color:#17324b;box-shadow:0 12px 60px #0006;font-family:Arial,Helvetica,sans-serif}
+.bo-vault-card strong{font-size:17px;display:block;margin-bottom:8px}
+.bo-vault-card p{font-size:13px;line-height:1.4}
+.bo-vault-card label{display:block;font-size:12px;font-weight:bold;margin:12px 0}
+.bo-vault-card input{width:100%;min-height:44px;border:1px solid #a6b9c9;border-radius:7px;padding:10px;font:16px Arial;box-sizing:border-box;margin-top:5px}
+.bo-vault-warning{background:#fff6e8;color:#684714;padding:9px;border-radius:7px}
+.bo-vault-buttons{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.bo-vault-buttons button{padding:10px 16px;border:1px solid #93a6ba;border-radius:7px;min-height:44px;background:#e7edf4;color:#193c5a;font-weight:bold}
+.bo-vault-buttons #boVaultUnlock{background:#15547a;color:white}
+#boVaultError{font-size:12px;color:#aa2323;display:block;min-height:16px}
+@media print{.bo-vault-overlay{display:none!important}}
+
+
+</style>
 </head>
 <body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª CPTran</option><option value="2">2ª CPTran</option><option value="3">3ª CPTran</option><option value="4">4ª CPTran</option><option value="5">5ª CPTran</option></select></div></div>
   <main class="page">
@@ -1222,5 +1322,703 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
 <script src="central_cloud.js?v=10.8.16-auth"></script>
 <script src="module_access_gate.js?v=10.8.16"></script>
 <script src="service_flow.js?v=10.8.44-rco-linked-modules"></script>
+<script id="photoFramerScript">
+(function(){
+  if(window.PhotoFramer)return;
+  const modal=document.createElement('div');
+  modal.id='photoFramerModal';modal.setAttribute('aria-hidden','true');
+  modal.innerHTML=`<div class="pf-card"><div class="pf-head"><div class="pf-head-copy"><strong id="pfTitle">Ajustar enquadramento</strong><span>A <b>moldura azul</b> delimita exatamente a área que aparecerá no relatório.</span></div><button type="button" class="pf-btn danger" id="pfCancelTop">Fechar</button></div><div class="pf-stage" id="pfStage"><canvas id="pfCanvas"></canvas><div class="pf-crop-overlay" aria-hidden="true"><span class="pf-crop-badge" id="pfFrameInfo">Área final da fotografia</span><span class="pf-crop-help">Arraste a foto para reposicionar dentro da moldura</span><i class="pf-corner tl"></i><i class="pf-corner tr"></i><i class="pf-corner bl"></i><i class="pf-corner br"></i></div></div><div class="pf-footer"><div class="pf-controls-panel"><div class="pf-controls-label"><strong>Zoom da fotografia</strong><span>Aumente ou reduza sem alterar a moldura final.</span></div><div class="pf-controls"><button type="button" class="pf-zoom-btn" id="pfZoomOut" aria-label="Diminuir zoom">−</button><input id="pfZoom" type="range" min="1" max="3.5" step="0.01" value="1" aria-label="Zoom da fotografia"><button type="button" class="pf-zoom-btn" id="pfZoomIn" aria-label="Aumentar zoom">+</button><span class="pf-zoom-value" id="pfZoomValue">100%</span></div></div><div class="pf-actions"><button type="button" class="pf-btn" id="pfReset">Restaurar</button><button type="button" class="pf-btn" id="pfRotate">Girar 90°</button><button type="button" class="pf-btn danger" id="pfCancel">Cancelar</button><button type="button" class="pf-btn primary" id="pfSave">Usar este enquadramento</button></div><div class="pf-note"><strong>Somente o conteúdo dentro da moldura azul será salvo.</strong> As linhas auxiliam na composição e não aparecem na fotografia final.</div></div></div>`;
+  document.body.appendChild(modal);
+  const stage=modal.querySelector('#pfStage'),canvas=modal.querySelector('#pfCanvas'),ctx=canvas.getContext('2d');
+  const zoomInput=modal.querySelector('#pfZoom'),zoomValue=modal.querySelector('#pfZoomValue');
+  let img=null,state=null,resolver=null,dragging=false,last=null,resizeTimer=null,orientedCanvasCache=null,orientedRotationCache=null;
+  function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+  function ratioLabel(a){const known=[[1,'1:1'],[4/3,'4:3'],[3/2,'3:2'],[5/3,'5:3'],[16/9,'16:9'],[2,'2:1']];const hit=known.find(([v])=>Math.abs(a-v)<.015);return hit?hit[1]:a.toFixed(2)+':1';}
+  function normalizedRotation(){return ((state.rotation%360)+360)%360;}
+  function oriented(){const r=normalizedRotation();return r===90||r===270?{w:img.naturalHeight,h:img.naturalWidth}:{w:img.naturalWidth,h:img.naturalHeight};}
+  function getOrientedCanvas(){
+    const r=normalizedRotation();
+    if(orientedCanvasCache&&orientedRotationCache===r)return orientedCanvasCache;
+    const o=oriented(),oc=document.createElement('canvas');
+    oc.width=Math.max(1,o.w);oc.height=Math.max(1,o.h);
+    const ox=oc.getContext('2d');
+    ox.save();ox.translate(oc.width/2,oc.height/2);ox.rotate(r*Math.PI/180);
+    ox.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2);ox.restore();
+    orientedCanvasCache=oc;orientedRotationCache=r;return oc;
+  }
+  function viewportSize(){
+    const rect=canvas.getBoundingClientRect();
+    return {w:Math.max(1,rect.width||stage.clientWidth||1),h:Math.max(1,rect.height||stage.clientHeight||1)};
+  }
+  function metrics(){const v=viewportSize(),o=oriented();const base=Math.max(v.w/o.w,v.h/o.h);const scale=base*state.zoom;return {w:v.w,h:v.h,scale,ow:o.w,oh:o.h};}
+  function constrain(){if(!img||!state)return;const m=metrics();const mx=Math.max(0,(m.ow*m.scale-m.w)/2),my=Math.max(0,(m.oh*m.scale-m.h)/2);state.x=clamp(state.x,-mx,mx);state.y=clamp(state.y,-my,my);}
+  function currentCrop(){
+    const m=metrics();
+    const cw=Math.min(m.ow,m.w/m.scale),ch=Math.min(m.oh,m.h/m.scale);
+    let sx=m.ow/2-(m.w/2+state.x)/m.scale;
+    let sy=m.oh/2-(m.h/2+state.y)/m.scale;
+    sx=clamp(sx,0,Math.max(0,m.ow-cw));sy=clamp(sy,0,Math.max(0,m.oh-ch));
+    return {x:sx,y:sy,w:cw,h:ch};
+  }
+  function resize(){if(!img||!state)return;const card=modal.querySelector('.pf-card'),head=modal.querySelector('.pf-head'),footer=modal.querySelector('.pf-footer'),cs=getComputedStyle(card),padX=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight),padY=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom),gap=parseFloat(cs.rowGap)||10;const availW=Math.max(120,card.clientWidth-padX-8),availH=Math.max(120,card.clientHeight-padY-head.offsetHeight-footer.offsetHeight-gap*2-8),aspect=state.aspect;let sw=availW,sh=sw/aspect;if(sh>availH){sh=availH;sw=sh*aspect;}stage.style.width=Math.floor(sw)+'px';stage.style.height=Math.floor(sh)+'px';const rect=canvas.getBoundingClientRect(),dpr=Math.max(1,window.devicePixelRatio||1);canvas.width=Math.max(1,Math.round((rect.width||stage.clientWidth||1)*dpr));canvas.height=Math.max(1,Math.round((rect.height||stage.clientHeight||1)*dpr));canvas.style.width='100%';canvas.style.height='100%';constrain();draw();}
+  function draw(targetCtx=ctx,w=null,h=null){
+    if(!img||!state)return;
+    const source=getOrientedCanvas(),crop=currentCrop();
+    const pw=Math.max(1,Math.round(w||targetCtx.canvas.width||1)),ph=Math.max(1,Math.round(h||targetCtx.canvas.height||1));
+    targetCtx.save();targetCtx.setTransform(1,0,0,1,0,0);targetCtx.clearRect(0,0,pw,ph);targetCtx.fillStyle='#111827';targetCtx.fillRect(0,0,pw,ph);
+    targetCtx.imageSmoothingEnabled=true;targetCtx.imageSmoothingQuality='high';
+    targetCtx.drawImage(source,crop.x,crop.y,crop.w,crop.h,0,0,pw,ph);targetCtx.restore();
+  }
+  function cancel(){if(!resolver)return;const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';r(null);}
+  function save(){if(!resolver)return;constrain();const aspect=state.aspect;const maxW=state.maxWidth||1600;let outW=maxW,outH=Math.round(outW/aspect);if(outH>1200){outH=1200;outW=Math.round(outH*aspect);}const out=document.createElement('canvas');out.width=outW;out.height=outH;const octx=out.getContext('2d');draw(octx,outW,outH);const data=out.toDataURL('image/jpeg',state.quality||.88);const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';r(data);}
+  function open(src,opts={}){return new Promise((resolve,reject)=>{if(resolver)cancel();resolver=resolve;img=new Image();img.onload=()=>{orientedCanvasCache=null;orientedRotationCache=null;state={zoom:1,x:0,y:0,rotation:0,aspect:opts.aspect||16/9,maxWidth:opts.maxWidth||1600,quality:opts.quality||.88};modal.querySelector('#pfTitle').textContent=opts.title||'Ajustar enquadramento';modal.querySelector('#pfFrameInfo').textContent='ÁREA FINAL DA FOTO • FORMATO '+ratioLabel(state.aspect);zoomInput.value='1';zoomValue.textContent='100%';stage.style.aspectRatio=String(state.aspect);modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';requestAnimationFrame(()=>setTimeout(resize,40));};img.onerror=()=>{resolver=null;reject(new Error('Não foi possível abrir a fotografia para enquadramento.'));};img.src=src;});}
+  function setZoom(value){if(!state)return;state.zoom=clamp(Number(value)||1,Number(zoomInput.min),Number(zoomInput.max));zoomInput.value=String(state.zoom);zoomValue.textContent=Math.round(state.zoom*100)+'%';constrain();draw();}
+  zoomInput.addEventListener('input',()=>setZoom(zoomInput.value));
+  modal.querySelector('#pfZoomOut').addEventListener('click',()=>setZoom((state?.zoom||1)-.1));
+  modal.querySelector('#pfZoomIn').addEventListener('click',()=>setZoom((state?.zoom||1)+.1));
+  modal.querySelector('#pfReset').addEventListener('click',()=>{if(!state)return;state.zoom=1;state.x=0;state.y=0;state.rotation=0;zoomInput.value='1';zoomValue.textContent='100%';constrain();draw();});
+  modal.querySelector('#pfRotate').addEventListener('click',()=>{if(!state)return;state.rotation=(state.rotation+90)%360;orientedCanvasCache=null;orientedRotationCache=null;state.x=0;state.y=0;constrain();draw();});
+  modal.querySelector('#pfCancel').addEventListener('click',cancel);modal.querySelector('#pfCancelTop').addEventListener('click',cancel);modal.querySelector('#pfSave').addEventListener('click',save);
+  canvas.addEventListener('pointerdown',e=>{if(!state)return;e.preventDefault();dragging=true;last={x:e.clientX,y:e.clientY};stage.classList.add('dragging');try{canvas.setPointerCapture(e.pointerId)}catch(_){}});
+  canvas.addEventListener('pointermove',e=>{if(!dragging||!state)return;e.preventDefault();state.x+=e.clientX-last.x;state.y+=e.clientY-last.y;last={x:e.clientX,y:e.clientY};constrain();draw();});
+  function end(e){dragging=false;last=null;stage.classList.remove('dragging');try{canvas.releasePointerCapture(e.pointerId)}catch(_){}}
+  canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+  window.addEventListener('resize',()=>{if(!modal.classList.contains('open'))return;clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,80);});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))cancel();});
+  window.PhotoFramer={open};
+})();
+</script>
+<script id="boPhotoVaultScript">
+(function(global){
+'use strict';
+if(global.BoPhotoVault)return;
+// R246: local-only encrypted BO photo cache. NOT a substitute for server identity.
+const V=1,ITERATIONS=310000;
+const enc=new TextEncoder(),dec=new TextDecoder();
+let session={scope:'',salt:'',key:null};
+const err=(msg,code)=>{const e=new Error(msg);e.code=code;return e;};
+function toBase64(input){
+ const bytes=new Uint8Array(input),N=16384;
+ let binary='';
+ for(let i=0;i<bytes.length;i+=N)
+  binary+=String.fromCharCode(...bytes.subarray(i,i+N));
+ return btoa(binary);
+}
+function fromBase64(str){
+ if(typeof str!=='string'||str.length>160000000||!/^[A-Za-z0-9+/]*={0,2}$/.test(str))
+  throw err('Dados criptografados inválidos.','VAULT_BASE64_INVALID');
+ const binary=atob(str);
+ const bytes=new Uint8Array(binary.length);
+ for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+ return bytes;
+}
+function isEncrypted(record){
+ return !!(record&&record.cryptoVersion===V&&typeof record.ciphertext==='string'&&
+  typeof record.salt==='string'&&typeof record.iv==='string');
+}
+async function derive(password,salt){
+ if(typeof password!=='string'||password.length<12||password.length>250)
+  throw err('Use uma senha exclusiva de pelo menos 12 caracteres.',
+   'VAULT_WEAK_PASSPHRASE');
+ if(!global.isSecureContext||!crypto.subtle)
+  throw err('Este navegador não oferece criptografia segura neste endereço.',
+   'VAULT_INSECURE_CONTEXT');
+ const km=await crypto.subtle.importKey('raw',enc.encode(password),
+  'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({
+  name:'PBKDF2',salt:fromBase64(salt),iterations:ITERATIONS,hash:'SHA-256'
+ },km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function decryptWith(record,key,scope){
+ if(!isEncrypted(record)||record.key!==scope||
+   !Number.isInteger(record.revision)||record.revision<1)
+  throw err('Registro fotográfico inválido.','VAULT_RECORD_INVALID');
+ const ad=enc.encode(scope+'|'+record.revision);
+ try{
+  const buffer=await crypto.subtle.decrypt({
+   name:'AES-GCM',iv:fromBase64(record.iv),additionalData:ad
+  },key,fromBase64(record.ciphertext));
+  const value=JSON.parse(dec.decode(buffer));
+  if(value.key!==scope||!Array.isArray(value.photos))
+   throw err('Conteúdo do cofre inconsistente.','VAULT_CONTENT_MISMATCH');
+  return {...value,revision:record.revision};
+ }catch(e){
+  if(e&&e.code)throw e;
+  throw err('Senha incorreta ou anexo criptografado corrompido.',
+   'VAULT_DECRYPT_FAILED');
+ }
+}
+async function unlock(scope,password,record){
+ if(typeof scope!=='string'||!scope.startsWith('bo-annex::')||!scope.includes(':'))
+  throw err('Número do BO inválido.','VAULT_SCOPE_INVALID');
+ if(record&&!isEncrypted(record)){
+  throw err('Existe um anexo no formato antigo sem proteção. Não será aberto ou substituído automaticamente. Consulte o administrador para migração segura.',
+   'VAULT_LEGACY_PLAINTEXT_BLOCKED');
+ }
+ const salt=record?record.salt:toBase64(crypto.getRandomValues(new Uint8Array(16)));
+ const key=await derive(password,salt);
+ if(record)await decryptWith(record,key,scope);
+ session={scope,key,salt};
+ return true;
+}
+function has(scope){return !!(scope&&session.key&&session.scope===scope);}
+function lock(){session={scope:'',salt:'',key:null};}
+async function decrypt(scope,record){
+ if(!has(scope))throw err('Desbloqueie o anexo antes de ler as fotografias.',
+  'VAULT_LOCKED');
+ if(!isEncrypted(record)||record.salt!==session.salt)
+  throw err('O formato ou a senha do cofre mudou.','VAULT_SALT_MISMATCH');
+ return decryptWith(record,session.key,scope);
+}
+async function encrypt(scope,record,revision){
+ if(!has(scope))throw err('Cofre bloqueado: não foi possível salvar.',
+  'VAULT_LOCKED');
+ if(!Number.isInteger(revision)||revision<1)
+  throw err('Versão de anexo inválida.','VAULT_VERSION_INVALID');
+ const iv=crypto.getRandomValues(new Uint8Array(12));
+ const data=enc.encode(JSON.stringify(record));
+ const cipher=await crypto.subtle.encrypt({
+  name:'AES-GCM',iv,additionalData:enc.encode(scope+'|'+revision)
+ },session.key,data);
+ return {key:scope,revision,cryptoVersion:V,kdf:'PBKDF2-SHA256',
+  iterations:ITERATIONS,cipher:'AES-256-GCM',salt:session.salt,
+  iv:toBase64(iv),ciphertext:toBase64(cipher)};
+}
+function ask(existing,scope){
+ return new Promise(resolve=>{
+  if(document.getElementById('boVaultOverlay'))return resolve(null);
+  const root=document.createElement('div');
+  root.id='boVaultOverlay';root.className='bo-vault-overlay no-print';
+  root.innerHTML='<form class="bo-vault-card" autocomplete="off">'+
+   '<strong>Proteção local do anexo fotográfico</strong>'+
+   '<p>'+ (existing?
+    'Este BO possui fotos protegidas. Informe a senha do anexo para recuperá-las.':
+    'Defina uma senha exclusiva para proteger as fotos deste BO neste navegador.')+
+   '</p><label>Senha do anexo<input id="boVaultPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="250"></label>'+
+   (existing?'':'<label>Confirmar senha<input id="boVaultConfirm" type="password" autocomplete="new-password" required minlength="12" maxlength="250"></label>')+
+   '<p class="bo-vault-warning">A senha não é salva no navegador. Se perdê-la, não será possível recuperar as fotografias locais. Preserve também os arquivos originais.</p>'+
+   '<span id="boVaultError" role="alert"></span>'+
+   '<div class="bo-vault-buttons"><button type="button" id="boVaultCancel">Cancelar</button>'+
+   '<button type="submit" id="boVaultUnlock">'+(existing?'Desbloquear fotos':'Proteger anexo')+'</button></div></form>';
+  const form=root.querySelector('form');
+  const p=root.querySelector('#boVaultPassword');
+  const c=root.querySelector('#boVaultConfirm');
+  const finish=v=>{
+   p.value='';if(c)c.value='';
+   root.remove();resolve(v);
+  };
+  root.querySelector('#boVaultCancel').onclick=()=>finish(null);
+  form.addEventListener('submit',e=>{
+   e.preventDefault();
+   const value=p.value;
+   if(value.length<12||value.length>250){
+    root.querySelector('#boVaultError').textContent='Use pelo menos 12 caracteres.';
+    return;
+   }
+   if(c&&value!==c.value){
+    root.querySelector('#boVaultError').textContent='As senhas não coincidem.';
+    return;
+   }
+   finish(value);
+  });
+  document.body.appendChild(root);
+  p.focus();
+ });
+}
+global.BoPhotoVault=Object.freeze({
+ has,lock,unlock,decrypt,encrypt,ask,isEncrypted,
+ get cryptoVersion(){return V;}
+});
+})(window);
+
+</script>
+<script id="boPhotoAnnexScript">
+(function(){
+'use strict';
+if(window.BoPhotoAnnex)return;
+const DB='central-bo-photo-annex-v1',STORE='reports',MAX_PHOTOS=96,PER_PAGE=4;
+const $=id=>document.getElementById(id);
+const state={photos:[],visible:false,ready:false,busy:false,key:'',revision:0,locked:false};
+const vault=window.BoPhotoVault;
+if(!vault)throw Error('R246_PHOTO_VAULT_MISSING');
+let readyPromise=null,mutateChain=Promise.resolve(),pendingMutations=0;
+const esc=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const validPhoto=s=>typeof s==='string'&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(s);
+function documentScope(){
+ const q=new URLSearchParams(location.search);
+ const unique=q.get('editId')||q.get('boReportId')||q.get('boId');
+ const formNumber=String(document.getElementById('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
+ const editNumber=String(unique||'').trim().toUpperCase().replace(/\s+/g,'');
+ const number=/^PM20\d{8}$/.test(formNumber)?formNumber:/^PM20\d{8}$/.test(editNumber)?editNumber:'';
+ // The canonical PM number is globally unique within the BO family: same annex
+ // from index, RSD and RCO regardless of the URL's serviceId parameter.
+ // A serviceId alone is never used as a photo key: shifts contain multiple BOs.
+ if(number)return 'bo-annex::number:'+number;
+ if(unique&&/^[a-z0-9_:.-]{5,150}$/i.test(unique))return 'bo-annex::edit:'+unique;
+ return '';
+}
+function openDb(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB)return reject(Error('Armazenamento de fotos indisponível neste navegador.'));
+  const req=indexedDB.open(DB,1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))
+   req.result.createObjectStore(STORE,{keyPath:'key'});};
+  req.onerror=()=>reject(req.error||Error('Erro ao abrir armazenamento de fotos.'));
+  req.onsuccess=()=>resolve(req.result);
+ });
+}
+async function rawRead(key=state.key){
+ const db=await openDb();
+ try{return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(key);
+   req.onsuccess=()=>resolve(req.result||null);
+   req.onerror=()=>reject(req.error||Error('Não foi possível carregar o anexo.'));
+ });}finally{db.close();}
+}
+async function recordRead(key=state.key){
+ const envelope=await rawRead(key);
+ if(!envelope)return null;
+ return vault.decrypt(key,envelope);
+}
+function staleError(){
+ const e=new Error('Este anexo foi atualizado em outra aba. Recarregue o BO antes de adicionar ou alterar fotografias.');
+ e.code='BO_PHOTO_STALE_REVISION';return e;
+}
+async function recordWrite(record){
+ const key=state.key,expected=state.revision;
+ if(!key||!state.ready)throw Error('Informe e confirme o número do BO antes de salvar fotografias.');
+ if(!vault.has(key))throw Error('Cofre de fotografias bloqueado. Clique em Anexo fotográfico.');
+ // Encrypt BEFORE starting the IndexedDB transaction.
+ const encrypted=await vault.encrypt(key,{...record,key},expected+1);
+ const db=await openDb();
+ let committedRevision=0;
+ try{
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+   let failure=null;
+   tx.oncomplete=resolve;
+   tx.onabort=()=>reject(failure||tx.error||Error('Espaço insuficiente para salvar as fotografias.'));
+   tx.onerror=()=>{};
+   const read=store.get(key);
+   read.onsuccess=()=>{
+    const current=read.result&&Number.isInteger(read.result.revision)?read.result.revision:0;
+    if(current!==expected){
+     failure=staleError();tx.abort();return;
+    }
+    if(read.result&&!vault.isEncrypted(read.result)){
+     failure=Error('Registro de fotos antigo não protegido: migração necessária.');
+     tx.abort();return;
+    }
+    if(state.key!==key||!vault.has(key)){
+     failure=Error('O número ou a senha do BO foi alterado durante a gravação.');
+     tx.abort();return;
+    }
+    committedRevision=current+1;
+    store.put(encrypted);
+   };
+  });
+ }finally{db.close();}
+ state.revision=committedRevision;
+ return committedRevision;
+}
+async function recordDelete(){
+ // Tombstone keeps the version monotonic: a stale tab cannot resurrect erased photos.
+ return recordWrite({key:state.key,photos:[],visible:false,
+   deletedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+}
+function message(msg,error=false){
+ const el=$('boPhotoStatus');
+ if(el){el.textContent=msg;el.classList.toggle('error',!!error);}
+}
+async function persist(){
+ await recordWrite({key:state.key,photos:state.photos.map(p=>({...p})),
+   visible:state.visible,updatedAt:new Date().toISOString()});
+}
+function mutate(fn){
+ pendingMutations++;
+ const next=mutateChain.catch(()=>{}).then(fn).finally(()=>{pendingMutations--;});
+ mutateChain=next;return next;
+}
+function validateStoredPhotos(value){
+ if(!Array.isArray(value))return [];
+ return value.slice(0,MAX_PHOTOS).filter(p=>p&&validPhoto(p.original)&&
+  validPhoto(p.rendered)).map(p=>({
+   id:String(p.id||crypto.randomUUID()),original:p.original,
+   rendered:p.rendered,caption:String(p.caption||'').slice(0,220)
+ }));
+}
+function photoMarkup(p,index){
+ const number=index+1,caption='Foto '+String(number).padStart(2,'0');
+ if(!p)return '<article class="bo-photo-cell bo-photo-blank"><div class="bo-photo-empty">'+
+  caption+'<br>Sem fotografia</div><div class="bo-photo-caption-row"><label>'+caption+
+  '</label></div></article>';
+ return '<article class="bo-photo-cell" data-bo-photo-id="'+esc(p.id)+'">'+
+  '<img class="bo-photo-image" src="'+p.rendered+'" alt="'+caption+' do boletim de ocorrência">'+
+  '<div class="bo-photo-caption-row"><label>'+caption+'</label>'+
+  '<input class="bo-photo-caption no-print" type="text" maxlength="220" aria-label="Descrição da foto '+
+  number+'" data-bo-caption="'+esc(p.id)+'" value="'+esc(p.caption)+
+  '" placeholder="Descrição da fotografia"><span class="bo-photo-caption-print">'+
+  esc(p.caption||caption)+'</span></div>'+
+  '<div class="bo-photo-slot-actions no-print"><button type="button" data-bo-crop="'+
+  esc(p.id)+'">Ajustar enquadramento</button> <button type="button" class="danger" data-bo-remove="'+
+  esc(p.id)+'">Remover</button></div></article>';
+}
+function render(){
+ const root=$('boPhotoAnnex');if(!root)return;
+ root.classList.toggle('is-open',state.visible);
+ root.classList.toggle('is-empty',state.photos.length===0);
+ const pages=Math.max(1,Math.ceil(state.photos.length/PER_PAGE));
+ const summary=$('boPhotoSummary');
+ if(summary)summary.textContent=state.photos.length+' fotografia(s) · '+
+   Math.ceil(state.photos.length/PER_PAGE)+' página(s) para PDF';
+ const host=$('boPhotoPages');if(!host)return;
+ if(!state.visible){host.innerHTML='';return;}
+ let html='';
+ for(let page=0;page<pages;page++){
+  const start=page*PER_PAGE;
+  const cells=Array.from({length:PER_PAGE},(_,i)=>photoMarkup(state.photos[start+i],start+i)).join('');
+  html+='<section class="bo-photo-page" data-bo-annex-page="'+(page+1)+
+   '" aria-label="Anexo fotográfico página '+(page+1)+'">'+
+   '<header class="bo-photo-page-header"><strong>ANEXO FOTOGRÁFICO — BOLETIM DE OCORRÊNCIA</strong>'+
+   '<span>Página '+(page+1)+' de '+pages+'</span></header>'+
+   '<div class="bo-photo-grid">'+cells+'</div>'+
+   '<footer class="bo-photo-page-footer">4 posições por página · anexo integrante do BO</footer></section>';
+ }
+ host.innerHTML=html;
+}
+async function load(){
+ const wanted=documentScope();
+ if(state.ready&&wanted===state.key)return !!wanted;
+ if(state.busy)return false;
+ const openBefore=state.visible;
+ if(state.key!==wanted)vault.lock();
+ state.key=wanted;state.ready=false;state.photos=[];state.revision=0;state.visible=openBefore;
+ state.locked=false;
+ if(!wanted){
+  state.ready=true;render();
+  message('Informe o número do BO (PM20XXXXXXXX) antes de adicionar fotografias.',true);
+  return false;
+ }
+ try{
+  if(!vault.has(wanted)){
+   const envelope=await rawRead(wanted);
+   if(state.key!==wanted)return false;
+   state.locked=!!envelope;
+   state.visible=false;
+   state.ready=true;render();
+   message(envelope?
+    'Anexo protegido: clique em Anexo fotográfico e informe a senha para recuperá-lo.':
+    'Clique em Anexo fotográfico para criar a proteção deste BO.');
+   return false;
+  }
+  const saved=await recordRead(wanted);
+  if(state.key!==wanted)return false;
+  state.locked=false;
+  if(saved){
+   state.photos=validateStoredPhotos(saved.photos);
+   state.revision=Number.isInteger(saved.revision)&&saved.revision>=0?saved.revision:0;
+   state.visible=!!saved.visible||state.photos.length>0||openBefore;
+  }
+  state.ready=true;render();
+  if(state.photos.length)message(state.photos.length+' foto(s) recuperada(s) deste BO.');
+  else message('Anexo associado ao BO selecionado.');
+  return true;
+ }catch(e){
+  if(state.key===wanted){state.ready=true;render();
+   message('O armazenamento de fotos não pôde ser lido: '+String(e.message||e),true);}
+  return false;
+ }
+}
+function ensureLoaded(){
+ const wanted=documentScope();
+ if(state.ready&&wanted===state.key)return Promise.resolve(!!wanted);
+ if(readyPromise&&state.key===wanted)return readyPromise;
+ const task=load();readyPromise=task;
+ task.finally(()=>{if(readyPromise===task)readyPromise=null;});
+ return task;
+}
+function fileToData(file){
+ return new Promise((resolve,reject)=>{
+  const r=new FileReader();
+  r.onerror=()=>reject(Error('Não foi possível ler esta fotografia.'));
+  r.onload=()=>resolve(String(r.result||''));
+  r.readAsDataURL(file);
+ });
+}
+async function compressPhoto(source,maxWidth=1600,quality=.84){
+ return new Promise((resolve,reject)=>{
+  const img=new Image();img.onerror=()=>reject(Error('Imagem inválida ou formato incompatível.'));
+  img.onload=()=>{
+   try{
+    const w=img.naturalWidth,h=img.naturalHeight;
+    if(!w||!h||w*h>120000000)throw Error('Resolução acima do limite seguro.');
+    const ratio=Math.min(1,maxWidth/Math.max(w,h));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(w*ratio));
+    canvas.height=Math.max(1,Math.round(h*ratio));
+    const ctx=canvas.getContext('2d');
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    resolve(canvas.toDataURL('image/jpeg',quality));
+   }catch(e){reject(e)}
+  };
+  img.src=source;
+ });
+}
+async function framedPreview(source){
+ return new Promise((resolve,reject)=>{
+  const img=new Image();img.onerror=()=>reject(Error('Não foi possível preparar o enquadramento.'));
+  img.onload=()=>{
+   const w=img.naturalWidth,h=img.naturalHeight,aspect=5/3;
+   const cw=Math.min(w,h*aspect),ch=cw/aspect;
+   const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=600;
+   canvas.getContext('2d').drawImage(img,(w-cw)/2,(h-ch)/2,cw,ch,0,0,1000,600);
+   resolve(canvas.toDataURL('image/jpeg',.85));
+  };
+  img.src=source;
+ });
+}
+
+
+async function unlockWithPassphrase(passphrase){
+ const scope=documentScope();
+ if(!scope)throw Error('Informe um número de BO válido antes de desbloquear o anexo.');
+ const envelope=await rawRead(scope);
+ await vault.unlock(scope,passphrase,envelope);
+ state.ready=false;state.locked=false;
+ if(!(await load()))throw Error('Não foi possível desbloquear as fotografias.');
+ return true;
+}
+async function open(){
+ const scope=documentScope();
+ if(!scope){message('Informe o número do BO antes de abrir o anexo.',true);return;}
+ if(!vault.has(scope)){
+  const envelope=await rawRead(scope);
+  const password=await vault.ask(!!envelope,scope);
+  if(password===null)return;
+  try{await unlockWithPassphrase(password);}
+  catch(e){message('Anexo não desbloqueado: '+String(e.message||e),true);return;}
+ }
+ if(!(await ensureLoaded()))return;
+ state.visible=true;state.locked=false;
+ render();
+ message('Anexo protegido. A senha não foi salva no navegador. Use Adicionar fotografias.');
+ $('boPhotoAnnex')?.scrollIntoView({block:'start',behavior:'smooth'});
+}
+async function addFiles(input){
+ const files=Array.from(input.files||[]);
+ input.value='';
+ if(!files.length)return;
+ if(!(await ensureLoaded())||!vault.has(state.key)){
+  message('Primeiro clique em Anexo fotográfico e desbloqueie o cofre.',true);return;
+ }
+ await mutate(async()=>{
+  if(state.busy)return;
+  state.busy=true;
+  const addButton=$('boAddPhotos');
+  if(addButton)addButton.disabled=true;
+  let accepted=0;
+  try{
+   state.visible=true;
+   for(const file of files){
+    if(state.photos.length>=MAX_PHOTOS){
+     message('Limite de '+MAX_PHOTOS+' fotos por BO atingido. Gere o PDF antes de adicionar mais.',true);
+     break;
+    }
+    if(!file.type.startsWith('image/')){message('Arquivo ignorado: formato diferente de imagem.',true);continue;}
+    if(file.size>35*1024*1024){message('Arquivo acima de 35 MB ignorado.',true);continue;}
+    try{
+     message('Preparando foto '+(accepted+1)+' de '+files.length+'...');
+     const inputSource=await fileToData(file);
+     const original=await compressPhoto(inputSource,1600,.84);
+     const rendered=await framedPreview(original);
+     const candidate={id:crypto.randomUUID(),original,rendered,caption:''};
+     const previous=state.photos.slice();
+     state.photos.push(candidate);
+     try{await persist();}
+     catch(err){state.photos=previous;throw err;}
+     accepted++;
+     render();
+    }catch(e){
+     render();
+     message('Foto não armazenada: '+String(e.message||e)+'. As anteriores foram preservadas.',true);
+     break;
+    }
+   }
+   if(accepted)message(accepted+' foto(s) adicionada(s) e salva(s) neste aparelho. Total: '+
+    state.photos.length+'. Confira o PDF para preservar o anexo.');
+  }finally{
+   state.busy=false;
+   if(addButton)addButton.disabled=false;
+   render();
+  }
+ });
+}
+async function crop(id){
+ await ensureLoaded();
+ const p=state.photos.find(x=>x.id===id);
+ if(!p)return;
+ try{
+  const result=await window.PhotoFramer.open(p.original,{
+   aspect:5/3,maxWidth:1600,quality:.86,
+   title:'Ajustar enquadramento da Foto '+(state.photos.indexOf(p)+1)
+  });
+  if(!result)return;
+  await mutate(async()=>{
+   const target=state.photos.find(x=>x.id===id);if(!target)return;
+   const old=target.rendered;target.rendered=result;
+   try{await persist();render();message('Enquadramento ajustado e salvo.');}
+   catch(e){target.rendered=old;render();message('Não foi possível salvar o ajuste: '+String(e.message||e),true);}
+  });
+ }catch(e){message('Falha ao abrir o enquadrador: '+String(e.message||e),true);}
+}
+async function remove(id){
+ await ensureLoaded();
+ const at=state.photos.findIndex(x=>x.id===id);
+ if(at<0)return;
+ if(!confirm('Remover a fotografia '+(at+1)+' do anexo?'))return;
+ await mutate(async()=>{
+  const old=state.photos.slice();
+  state.photos.splice(at,1);
+  try{await persist();render();message('Fotografia removida.');}
+  catch(e){state.photos=old;render();message('Falha ao remover fotografia: '+String(e.message||e),true);}
+ });
+}
+async function caption(id,text){
+ await ensureLoaded();
+ const target=state.photos.find(x=>x.id===id);if(!target)return;
+ await mutate(async()=>{
+  const old=target.caption;
+  target.caption=String(text||'').slice(0,220);
+  try{await persist();render();message('Descrição salva.');}
+  catch(e){target.caption=old;render();message('Descrição não salva: '+String(e.message||e),true);}
+ });
+}
+async function clearAnnex(){
+ if(!(await ensureLoaded())||!vault.has(state.key)){
+  message('Desbloqueie o cofre antes de excluir fotografias.',true);return false;
+ }
+ if(!confirm('Excluir todas as fotografias deste BO neste aparelho?'))return false;
+ try{
+  await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});
+  render();message('Todas as fotografias foram removidas deste aparelho.');
+  return true;
+ }catch(e){message('Falha ao apagar fotos: '+String(e.message||e),true);return false;}
+}
+async function resetAll(){
+ if(!confirm('Deseja limpar todo o boletim, incluindo o anexo fotográfico deste aparelho?'))return;
+ const scoped=await ensureLoaded();
+ if(state.locked){
+  alert('Desbloqueie o anexo antes de apagar o BO, para não deixar fotos protegidas sem referência.');
+  return;
+ }
+ try{if(scoped&&vault.has(state.key))
+   await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});
+  else {state.photos=[];state.visible=false;}}
+ catch(e){alert('Os anexos não puderam ser apagados. O BO foi preservado: '+String(e.message||e));return;}
+ try{
+  localStorage.removeItem('bo_bptrans_1cprv_v2');
+  localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase());
+ }catch(e){alert('Não foi possível limpar o rascunho. '+String(e.message||e));return;}
+ location.reload();
+}
+function install(){
+ const toolbar=document.querySelector('.toolbar');
+ const form=$('boForm');
+ if(!toolbar||!form)return;
+ if(!$('boAnnexOpenButton')){
+  const button=document.createElement('button');
+  button.type='button';button.id='boAnnexOpenButton';
+  button.className='secondary';button.textContent='Anexo fotográfico';
+  const print=toolbar.querySelector('button');
+  if(print)print.insertAdjacentElement('afterend',button);else toolbar.appendChild(button);
+  button.addEventListener('click',()=>open());
+ }
+ if(!$('boPhotoAnnex')){
+  const root=document.createElement('section');
+  root.id='boPhotoAnnex';root.className='bo-photo-annex is-empty';
+  root.innerHTML='<div class="bo-photo-top no-print"><div>'+
+   '<strong>ANEXO FOTOGRÁFICO DO BO</strong>'+
+   '<small id="boPhotoSummary">0 fotografia(s) · 0 página(s) para PDF</small></div>'+
+   '<div class="bo-photo-actions">'+
+   '<button type="button" id="boAddPhotos">Adicionar fotografias</button>'+
+   '<button type="button" id="boRemoveAllPhotos" class="secondary">Limpar anexo</button>'+
+   '<input type="file" id="boPhotosInput" class="bo-photo-file" accept="image/*" multiple aria-label="Selecionar fotografias do BO">'+
+   '</div><div class="bo-photo-note">Quatro fotografias por página. A 5ª foto cria automaticamente outra página. '+
+   'As fotografias ficam criptografadas neste navegador com senha própria por BO. '+
+   'Não são anexadas à nuvem. Se perder a senha, não poderá recuperar as fotos locais. '+
+   'Preserve os arquivos fotográficos originais quando houver necessidade de cadeia de custódia ou perícia.</div>'+
+   '<div class="bo-photo-message" id="boPhotoStatus" aria-live="polite"></div></div>'+
+   '<div class="bo-photo-pages" id="boPhotoPages"></div>';
+  const sheet=form.closest('.sheet');
+  if(sheet)sheet.insertAdjacentElement('afterend',root);
+  else form.insertAdjacentElement('afterend',root);
+  $('boAddPhotos').addEventListener('click',()=>$('boPhotosInput').click());
+  $('boPhotosInput').addEventListener('change',e=>addFiles(e.target));
+  $('boRemoveAllPhotos').addEventListener('click',()=>clearAnnex());
+  root.addEventListener('click',e=>{
+   const adjust=e.target.closest('[data-bo-crop]');
+   if(adjust){crop(adjust.dataset.boCrop);return;}
+   const removeBtn=e.target.closest('[data-bo-remove]');
+   if(removeBtn)remove(removeBtn.dataset.boRemove);
+  });
+  root.addEventListener('change',e=>{
+   const c=e.target.closest('[data-bo-caption]');
+   if(c)caption(c.dataset.boCaption,c.value);
+  });
+ }
+  if(typeof window.prepareAndPrint==='function'&&!window.__boPhotoPrintGuardInstalled){
+  const printOriginal=window.prepareAndPrint;
+  window.prepareAndPrint=function(){
+   if(!state.ready&&documentScope()){
+    const note='Aguarde a verificação do anexo fotográfico antes de imprimir.';
+    message(note,true);alert(note);return false;
+   }
+   if(state.locked){
+    const note='Há fotografias protegidas neste BO. Desbloqueie o anexo antes de gerar o PDF.';
+    message(note,true);alert(note);return false;
+   }
+   if(state.busy||pendingMutations>0){
+    const note='Aguarde a conclusão do salvamento das fotografias antes de gerar o PDF.';
+    message(note,true);alert(note);return false;
+   }
+   if(state.photos.length){
+    if(!state.ready||!state.key||state.key!==documentScope()){
+     const note='Confira o número do BO e recarregue o anexo antes de imprimir.';
+     message(note,true);alert(note);return false;
+    }
+    const previews=[...document.querySelectorAll('#boPhotoAnnex img.bo-photo-image')];
+    if(previews.length!==state.photos.length||
+      previews.some(img=>!img.complete||img.naturalWidth===0)){
+      const note='Aguarde o carregamento completo das fotos antes de gerar o PDF.';
+      message(note,true);alert(note);return false;
+    }
+   }
+   return printOriginal.apply(this,arguments);
+  };
+  window.__boPhotoPrintGuardInstalled=true;
+ }
+ if(typeof window.clearForm==='function')window.clearForm=resetAll;
+ document.addEventListener('input',e=>{
+  if(e.target&&e.target.id==='ciopCopom'&&!state.busy)
+   ensureLoaded().catch(err=>message('Falha ao mudar o BO do anexo: '+String(err.message||err),true));
+ });
+ window.addEventListener('beforeprint',()=>{if(state.ready)render()});
+ ensureLoaded().catch(err=>message('Falha ao iniciar anexos: '+String(err.message||err),true));
+}
+window.BoPhotoAnnex=Object.freeze({
+ open,unlockWithPassphrase,addFiles,crop,remove,caption,clearAnnex,resetAll,
+ ensureLoaded,get isLocked(){return state.locked;},
+ get isUnlocked(){return vault.has(state.key);},
+ get photoCount(){return state.photos.length;},
+ get pageCount(){return Math.ceil(state.photos.length/PER_PAGE)},
+ get storageScope(){return state.key;},
+ get isReady(){return state.ready;}
+});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
+else install();
+})();
+
+</script>
 </body>
 </html>
