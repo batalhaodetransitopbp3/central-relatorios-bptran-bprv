@@ -1,0 +1,28 @@
+name: R260 unified BO annex + authority review (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/bo-unified-annex-r260-review
+  pull_request:
+    paths:
+      - 'R260_BO_UNIFIED_REVIEW_NO_DEPLOY/**'
+      - 'tests/r260_unified_bo_context_security.test.cjs'
+      - 'boletim_ocorrencia_bptrans_1cprv*.html'
+      - '.github/workflows/r260_bo_unified_review_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  unified-contracts:
+    name: Node24 215 BO renderer + Index/RSD/RCO + security tests (NO GOOGLE)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Synthetic BO contracts, R240 local preview and R252-R259 gates
+        run: node --test tests/r260_unified_bo_context_security.test.cjs tests/bo_photo_annex_ci.test.cjs tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
