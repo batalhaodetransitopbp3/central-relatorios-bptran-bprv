@@ -32,3 +32,13 @@ Antes do novo push: **235/235 testes Node PASS**, Chrome real **8/8 PASS**, e We
 Esses testes executam página **R262 de homologação**, não o BO oficial R240. O login/JWKS, BO, identidade e fotos são fictícios, e o armazenamento é em memória; não existe Google Drive/Sheets real, endpoint institucional, sincronização de fotos do IndexedDB, dispositivo físico Safari/iOS ou aprovação LGPD/custódia/WORM. A conta conectada de Google Drive ainda é **operacional**, não homologação; nenhum acesso de escrita foi feito nela.
 
 Gate externo R163: **NO-GO, 3/16 atendidos e 13 bloqueios independentes**; nunca mesclar/publicar a revisão sem autorização formal externa.
+
+## Correção de concorrência e limites observados
+
+Uma execução positiva do WebKit em contêiner chegou até o logout, mas encontrou **10 gravações em vez de nove** depois de a conta de teste ter sido reativada imediatamente após uma rejeição. Para evitar que ações simultâneas ou requisições atrasadas reaproveitem uma autorização restaurada, a página isolada R262 passou a bloquear todos os botões e a origem do BO enquanto cada ação assíncrona estiver em andamento; os testes mantêm o cadastro **revogado até o logout** e exigem exatamente **nove uploads aceitos + um upload recusado**, sem outras solicitações. Trata-se de proteção da **prévia de homologação**, não de implantação na Central.
+
+A execução local do WebKit Windows com `ignoreHTTPSErrors:true` conseguiu corrigir `Origin`, mas não preservou a interpretação esperada de `SameSite=Strict`. Por isso, **não é considerada homologação positiva de cookie**; o ensaio positivo deve passar em contêiner com certificado de CA confiável e `ignoreHTTPSErrors:false`. Nenhuma verificação de cookie ou origem foi relaxada.
+
+### Verificações adicionais
+
+Após a correção da prévia, o Chrome local percorreu o fluxo de nove fotos sem duplicações, e o WebKit no teste deliberado de `Origin:null` continuou recusando a autenticação. O resultado positivo WebKit precisa ser confirmado novamente no GitHub Actions da versão final.

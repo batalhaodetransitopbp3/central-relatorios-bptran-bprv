@@ -70,9 +70,22 @@
   }
   get('r262-summary').textContent=photos.length+' imagens • '+pages.size+' páginas';
  }
+ let inFlight=false;
  async function safe(action){
+  // Avoid double-click/re-entrant upload during browser touch/pointer events.
+  // A new synthetic requestId must never be generated twice for one action.
+  if(inFlight)return;
+  inFlight=true;
+  for(const id of ['r262-login','r262-upload','r262-refresh','r262-logout'])
+   get(id).disabled=true;
+  get('r262-origin').disabled=true;
   try{await action()}
   catch(error){status('Ação rejeitada: '+String(error.code||error.message||'erro'),true)}
+  finally{
+   inFlight=false;
+   get('r262-origin').disabled=false;
+   setButtons();
+  }
  }
  get('r262-login').addEventListener('click',()=>safe(async()=>{
   const challenge=await client.startLogin();

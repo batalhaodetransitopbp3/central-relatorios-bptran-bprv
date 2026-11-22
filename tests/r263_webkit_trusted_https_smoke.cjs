@@ -354,7 +354,8 @@ async function main(){
    return;
   }
   try{
-   await page.waitForFunction(()=>R262IsolatedPreview.authenticated,
+   await page.waitForFunction(()=>R262IsolatedPreview.authenticated&&
+    document.getElementById('r262-upload').disabled===false,
     null,{timeout:12000});
   }catch(error){
    const debug=await page.evaluate(()=>({
@@ -443,7 +444,7 @@ async function main(){
     .textContent.startsWith('Ação rejeitada'));
    assert.equal(f.state.writeCount,9);
    assert.equal(f.state.photos.size,9);
-   f.row.boPhotoWrite=true;
+   // Keep the roster revoked until logout; late requests cannot gain access.
   });
   await check('new browser tab has no CSRF in memory even with cookie',async()=>{
    const next=await context.newPage();
@@ -467,6 +468,8 @@ async function main(){
    const cookies=await context.cookies(f.origin);
    assert(!cookies.some(x=>x.name===SESSION_COOKIE));
    assert.equal(f.state.writeCount,9);
+   assert.equal(f.state.requestCounts['/bo-api/photos/upload'],10,
+    'exactly nine accepted uploads plus one revoked attempt');
   });
   assert.deepEqual(blocked,[],'Unexpected external browser requests');
   assert.deepEqual(pageErrors,[],'JavaScript page errors');
