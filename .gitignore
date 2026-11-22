@@ -19,3 +19,6 @@ gas_deploy/_pull_check/
 # Contingência exportada no cliente (se salva em disco do repo)
 **/rsd-local-contingency-*.json
 **/*contingencia*local*.json
+
+# Dependências de teste instaladas localmente (não versionar)
+node_modules/

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>R262 — Ensaio local do anexo BO (NÃO OPERACIONAL)</title>
+<link rel="stylesheet" href="/r262-isolated-preview.css">
+<script defer src="/r261-browser-client.js"></script>
+<script defer src="/r262-preview-ui.js"></script>
+</head>
+<body>
+<main>
+ <div class="warning" role="note">AMBIENTE SINTÉTICO • SEM CONEXÃO COM O BO OFICIAL OU COM O GOOGLE DRIVE</div>
+ <h1>Anexos do BO — ensaio de navegador</h1>
+ <p>Somente para homologação local. Todos os identificadores, imagens e credenciais são fictícios; não use dados reais.</p>
+ <section class="actions" aria-label="Fluxo">
+  <button id="r262-login" type="button">Entrar com identidade fictícia</button>
+  <label for="r262-origin">Origem da abertura</label>
+  <select id="r262-origin">
+   <option value="index">Index</option>
+   <option value="rsd">RSD</option>
+   <option value="rco">RCO</option>
+  </select>
+  <button id="r262-upload" type="button" disabled>Enviar foto de teste</button>
+  <button id="r262-refresh" type="button" disabled>Consultar anexos</button>
+  <button id="r262-logout" type="button" disabled>Sair</button>
+ </section>
+ <p role="status" aria-live="polite" id="r262-status">Sem sessão. Nenhuma fotografia enviada.</p>
+ <p id="r262-summary">0 imagens • 0 páginas</p>
+ <div id="r262-gallery" aria-label="Resumo de fotos sintéticas"></div>
+ <small>O pré-visualizador não lê o IndexedDB da Central e não disponibiliza imagens em claro para terceiros. Nenhuma rota de produção foi criada.</small>
+</main>
+</body>
+</html>
