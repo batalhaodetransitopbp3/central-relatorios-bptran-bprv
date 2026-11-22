@@ -1,0 +1,67 @@
+name: R262 real Chromium and WebKit local HTTPS BO staging (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/bo-browser-e2e-r262-review
+  pull_request:
+    paths:
+      - 'R262_BO_BROWSER_REAL_ENGINES_NO_DEPLOY/**'
+      - 'tests/r262_real_browser_canonical_https_smoke.cjs'
+      - '.github/workflows/r262_bo_real_browser_https_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  predecessor-regressions:
+    name: Node24 232 predecessor synthetic BO security regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run R252-R261 tests without Google services
+        run: node --test tests/r261_browser_http_canonical_end_to_end.test.cjs tests/r260_unified_bo_context_security.test.cjs tests/bo_photo_annex_ci.test.cjs tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
+
+  chromium-real-https:
+    name: Chrome browser and secure cookie E2E (localhost only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify installed Chromium and OpenSSL
+        run: |
+          command -v openssl
+          command -v google-chrome || command -v google-chrome-stable || command -v chromium
+      - name: Install isolated Playwright test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Exercise secure browser session, Index/RSD/RCO and 9 synthetic photos
+        run: node tests/r262_real_browser_canonical_https_smoke.cjs chromium
+
+  webkit-ephemeral-ca:
+    name: WebKit HTTPS inside disposable CI container (not physical Safari)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm temporary CA tools exist only in container
+        run: |
+          command -v openssl
+          command -v update-ca-certificates
+      - name: Install matching WebKit test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Exercise HTTPS with one-day test CA in disposable container
+        env:
+          R262_EPHEMERAL_CI_TRUST: 'yes'
+          CI: 'true'
+        run: node tests/r262_real_browser_canonical_https_smoke.cjs webkit
