@@ -1,0 +1,58 @@
+name: R263 Trusted WebKit HTTPS isolated container (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/bo-webkit-trusted-r263-review
+  pull_request:
+    paths:
+      - 'R263_BO_WEBKIT_TRUSTED_CI_NO_DEPLOY/**'
+      - 'tests/r263_webkit_trusted_https_smoke.cjs'
+      - '.github/workflows/r263_trusted_webkit_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  webkit-trusted-positive:
+    name: WebKit HTTPS trusted cert + Index/RSD/RCO 9 photos (disposable CI)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm execution is limited to disposable Linux container
+        run: |
+          test -f /.dockerenv -o -f /run/.containerenv
+          test "$(id -u)" = 0
+          command -v update-ca-certificates
+          command -v openssl
+      - name: Install WebKit Playwright test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Run real WebKit secure HTTPS with one-day ephemeral CA inside container
+        env:
+          R263_CONTAINER_TRUST: 'YES'
+          CI: 'true'
+        run: node tests/r263_webkit_trusted_https_smoke.cjs webkit-trusted
+
+  check-guard:
+    name: No trusted WebKit test allowed outside isolated container
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test driver without browser downloads
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Verify test CA installation fails closed on runner host
+        run: |
+          if node tests/r263_webkit_trusted_https_smoke.cjs webkit-trusted; then
+            echo 'SECURITY FAILURE: test CA trust was not confined to container'
+            exit 1
+          fi
+          echo 'R263_GUARD_PASS: host refused trusted WebKit CA modification'
