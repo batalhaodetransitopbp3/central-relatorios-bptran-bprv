@@ -213,6 +213,12 @@ function localFixture(){
      }
     });return;
    }
+   if(pathname==='/r263-origin-probe'&&req.method==='POST'){
+    res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});
+    res.end(JSON.stringify({origin:req.headers.origin||null,
+     referer:req.headers.referer||null,secFetchSite:req.headers['sec-fetch-site']||null}));
+    return;
+   }
    if(pathname.startsWith('/bo-api/')){
     if(pathname==='/bo-api/login/start'){
      state.actualLoginOrigin=req.headers.origin||null;
@@ -337,6 +343,22 @@ async function main(){
     htmlOrigin:location.origin,
     loaded:!!window.R261BoBrowserPhotoClient
    }));
+   if(trustedWebkit){
+    const probes=await page.evaluate(async()=>{
+     const results={};
+     for(const policy of ['no-referrer','origin','same-origin',
+      'strict-origin-when-cross-origin','default']){
+      const opt={method:'POST',mode:'same-origin',credentials:'same-origin',
+       headers:{'Content-Type':'application/json'},body:'{}'};
+      if(policy!=='default')opt.referrerPolicy=policy;
+      try{const r=await fetch('/r263-origin-probe',opt);
+       results[policy]=await r.json();}
+      catch(e){results[policy]={error:String(e)}}
+     }
+     return results;
+    });
+    console.error('R263_ORIGIN_DIAGNOSTICS',JSON.stringify(probes));
+   }
    console.error('R262_LOGIN_DEBUG',engine,debug,
     'requests',f.state.requestCounts,
     'cookies',await context.cookies(f.origin));
