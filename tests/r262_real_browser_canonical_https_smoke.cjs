@@ -70,18 +70,9 @@ function cert(tempDir){
  ].join(String.fromCharCode(10))+String.fromCharCode(10),{mode:0o600});
  exec(['x509','-req','-in',csr,'-CA',caCrt,'-CAkey',caKey,
   '-CAcreateserial','-out',crt,'-days','1','-extfile',extensions]);
- let trustPath=null;
- if(process.env.R262_EPHEMERAL_CI_TRUST==='yes'){
-  assert(process.env.CI==='true'&&process.platform==='linux'&&
-   typeof process.getuid==='function'&&process.getuid()===0,
-   'CA trust changes restricted to disposable root CI Linux container');
-  trustPath='/usr/local/share/ca-certificates/r262-ephemeral-'+
-   process.pid+'.crt';
-  fs.copyFileSync(caCrt,trustPath);
-  cp.execFileSync('update-ca-certificates',[],
-   {stdio:'ignore',timeout:30000});
- }
- return {key:fs.readFileSync(key),cert:fs.readFileSync(crt),trustPath};
+ // Test certificates are deliberately NEVER added to the operating
+ // system's trust store, on the operator notebook or in CI.
+ return {key:fs.readFileSync(key),cert:fs.readFileSync(crt)};
 }
 function localFixture(){
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'r262-isolated-browser-'));
@@ -234,11 +225,7 @@ function localFixture(){
   challengeStore.close();sessionStore.close();
   await fs.promises.rm(tmp,{recursive:true,force:true,
    maxRetries:50,retryDelay:100});
-  if(tls.trustPath){
-   fs.rmSync(tls.trustPath,{force:true});
-   cp.execFileSync('update-ca-certificates',[],
-    {stdio:'ignore',timeout:30000});
-  }
+  // The synthetic CA was never installed; it disappears with tmp.
  }
  return {state,row,event,assignment,prepare,cleanup,
   get origin(){return origin}};

@@ -44,8 +44,8 @@ jobs:
       - name: Exercise secure browser session, Index/RSD/RCO and 9 synthetic photos
         run: node tests/r262_real_browser_canonical_https_smoke.cjs chromium
 
-  webkit-ephemeral-ca:
-    name: WebKit HTTPS inside disposable CI container (not physical Safari)
+  webkit-untrusted-origin:
+    name: WebKit rejects untrusted HTTPS Origin null (no positive auth claim)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.65.1-noble
     timeout-minutes: 15
@@ -54,14 +54,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Confirm temporary CA tools exist only in container
-        run: |
-          command -v openssl
-          command -v update-ca-certificates
+      - name: Check OpenSSL for local-only test certificates
+        run: command -v openssl
       - name: Install matching WebKit test driver
         run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
-      - name: Exercise HTTPS with one-day test CA in disposable container
-        env:
-          R262_EPHEMERAL_CI_TRUST: 'yes'
-          CI: 'true'
-        run: node tests/r262_real_browser_canonical_https_smoke.cjs webkit
+      - name: Confirm WebKit fails closed on untrusted certificate without writing photos
+        run: node tests/r262_real_browser_canonical_https_smoke.cjs webkit-untrusted
