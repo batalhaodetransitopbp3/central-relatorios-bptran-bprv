@@ -80,7 +80,8 @@
    method:'POST',credentials:'same-origin',mode:'same-origin',
    headers:{'Content-Type':'application/json',
     'X-R262-Synthetic-Only':'yes'},
-   cache:'no-store',body:JSON.stringify({nonce:challenge.nonce})
+   cache:'no-store',referrerPolicy:'origin',
+   body:JSON.stringify({nonce:challenge.nonce})
   });
   if(!response.ok)throw Error('TOKEN_FIXTURE_REJECTED');
   const {idToken}=await response.json();

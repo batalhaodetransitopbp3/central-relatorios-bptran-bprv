@@ -318,6 +318,25 @@ async function main(){
    assert.equal(f.state.requestCounts['/bo-api/photos/upload']||0,0);
    assert.equal(await page.locator('.warning').count(),1);
   });
+  if(trustedWebkit){
+   await check('Referrer-Policy origin preserves HTTPS Origin without BO path',async()=>{
+    const refs=await page.evaluate(async()=>{
+     const out={};
+     for(const policy of ['no-referrer','origin']){
+      const response=await fetch('/r263-origin-probe',{
+       method:'POST',mode:'same-origin',credentials:'same-origin',
+       referrerPolicy:policy,headers:{'Content-Type':'application/json'},
+       body:'{}'
+      });
+      out[policy]=await response.json();
+     }
+     return out;
+    });
+    assert.equal(refs['no-referrer'].origin,'null');
+    assert.equal(refs.origin.origin,f.origin);
+    assert.equal(refs.origin.referer,f.origin+'/');
+   });
+  }
   await page.locator('#r262-login').click();
   if(untrustedWebkit){
    // Under untrusted self-signed TLS, Windows WebKit emits Origin:null.
