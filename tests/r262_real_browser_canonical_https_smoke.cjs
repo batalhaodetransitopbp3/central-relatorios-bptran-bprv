@@ -287,24 +287,34 @@ async function main(){
    assert.equal(f.state.requestCounts['/bo-api/photos/upload']||0,0);
    assert.equal(await page.locator('.warning').count(),1);
   });
-  await page.locator('#r262-login').click();
   if(untrustedWebkit){
-   // Under untrusted self-signed TLS, Windows WebKit emits Origin:null.
-   // The strict server MUST reject it, rather than weakening its origin gate.
-   await page.waitForFunction(()=>document.getElementById('r262-status')
-    .textContent.startsWith('Ação rejeitada'),null,{timeout:12000});
+   // Explicit no-referrer with mode=same-origin can yield Origin:null under
+   // Fetch/Referrer Policy; the R255 server MUST reject that origin.
+   // This negative case does not assume TLS distrust is the root cause.
+   const probe=await page.evaluate(async()=>{
+    const response=await fetch('/bo-api/login/start',{
+     method:'POST',mode:'same-origin',credentials:'same-origin',
+     referrerPolicy:'no-referrer',headers:{'Content-Type':'application/json'},
+     body:'{}'
+    });
+    return {status:response.status,body:await response.json()};
+   });
+   assert.equal(probe.status,403);
+   assert.equal(probe.body.ok,false);
    assert.equal(f.state.sentTokens,0);
    assert.equal(f.state.writeCount,0);
    assert.equal(f.state.photos.size,0);
    assert.equal(await page.evaluate(()=>R262IsolatedPreview.authenticated),false);
    assert.deepEqual(blocked,[]);
    assert.deepEqual(pageErrors,[]);
-   console.log('R262_UNTRUSTED_WEBKIT_FAILS_CLOSED',JSON.stringify({
+   console.log('R262_NULL_ORIGIN_FAILS_CLOSED',JSON.stringify({
     engine,syntheticUploads:0,releaseAllowed:false}));
    return;
   }
+  await page.locator('#r262-login').click();
   try{
-   await page.waitForFunction(()=>R262IsolatedPreview.authenticated,
+   await page.waitForFunction(()=>R262IsolatedPreview.authenticated&&
+    document.getElementById('r262-upload').disabled===false,
     null,{timeout:12000});
   }catch(error){
    const debug=await page.evaluate(()=>({
@@ -375,7 +385,7 @@ async function main(){
     .textContent.startsWith('Ação rejeitada'));
    assert.equal(f.state.writeCount,9);
    assert.equal(f.state.photos.size,9);
-   f.row.boPhotoWrite=true;
+   // Keep the roster revoked until logout; late requests cannot gain access.
   });
   await check('new browser tab has no CSRF in memory even with cookie',async()=>{
    const next=await context.newPage();
@@ -399,6 +409,8 @@ async function main(){
    const cookies=await context.cookies(f.origin);
    assert(!cookies.some(x=>x.name===SESSION_COOKIE));
    assert.equal(f.state.writeCount,9);
+   assert.equal(f.state.requestCounts['/bo-api/photos/upload'],10,
+    'exactly nine accepted uploads plus one revoked attempt');
   });
   assert.deepEqual(blocked,[],'Unexpected external browser requests');
   assert.deepEqual(pageErrors,[],'JavaScript page errors');

@@ -45,7 +45,7 @@ jobs:
         run: node tests/r262_real_browser_canonical_https_smoke.cjs chromium
 
   webkit-untrusted-origin:
-    name: WebKit rejects untrusted HTTPS Origin null (no positive auth claim)
+    name: WebKit rejects explicit Origin null from no-referrer (no auth bypass)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.65.1-noble
     timeout-minutes: 15
@@ -58,5 +58,5 @@ jobs:
         run: command -v openssl
       - name: Install matching WebKit test driver
         run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
-      - name: Confirm WebKit fails closed on untrusted certificate without writing photos
+      - name: Confirm WebKit rejects no-referrer Origin null without writing photos
         run: node tests/r262_real_browser_canonical_https_smoke.cjs webkit-untrusted

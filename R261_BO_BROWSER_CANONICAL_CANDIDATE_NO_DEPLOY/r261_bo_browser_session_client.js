@@ -80,7 +80,7 @@
    // same-origin, Secure+HttpOnly cookies are managed by the browser.
    const response=await fetchImpl('/bo-api/'+endpoint,{
     method:'POST',credentials:'same-origin',mode:'same-origin',
-    cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',
+    cache:'no-store',redirect:'error',referrerPolicy:'origin',
     headers,body:payload
    });
    ok(response&&response.redirected!==true,'UNEXPECTED_REDIRECT');

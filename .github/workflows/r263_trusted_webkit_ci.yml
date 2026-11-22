@@ -1,0 +1,74 @@
+name: R263 Secure WebKit Origin with explicit origin-only referrer (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feature/bo-webkit-trusted-r263-review
+  pull_request:
+    paths:
+      - 'R263_BO_WEBKIT_TRUSTED_CI_NO_DEPLOY/**'
+      - 'tests/r263_webkit_trusted_https_smoke.cjs'
+      - 'tests/r263_referrer_origin_contract.test.cjs'
+      - 'tests/r262_real_browser_canonical_https_smoke.cjs'
+      - 'R261_BO_BROWSER_CANONICAL_CANDIDATE_NO_DEPLOY/r261_bo_browser_session_client.js'
+      - 'R262_BO_BROWSER_REAL_ENGINES_NO_DEPLOY/r262_preview_ui.js'
+      - '.github/workflows/r263_trusted_webkit_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  node-regressions:
+    name: 235 Node contracts R252-R263, isolated (no Google write)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: All 235 synthetic contracts and Referrer Policy regression
+        run: node --test tests/r263_referrer_origin_contract.test.cjs tests/r261_browser_http_canonical_end_to_end.test.cjs tests/r260_unified_bo_context_security.test.cjs tests/bo_photo_annex_ci.test.cjs tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
+
+  webkit-trusted-positive:
+    name: WebKit HTTPS with exact Origin, CSRF and 9 JPEGs (disposable CI)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm execution is limited to disposable Linux container
+        run: |
+          test -f /.dockerenv -o -f /run/.containerenv
+          test "$(id -u)" = 0
+          command -v update-ca-certificates
+          command -v openssl
+      - name: Install WebKit Playwright test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Real WebKit secure HTTPS, origin-only referrer and 4+4+1 photos
+        env:
+          R263_CONTAINER_TRUST: 'YES'
+          CI: 'true'
+        run: node tests/r263_webkit_trusted_https_smoke.cjs webkit-trusted
+
+  check-guard:
+    name: CA trust installation denied on ordinary runner hosts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test driver without browser downloads
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Confirm host cannot enable trusted WebKit test
+        run: |
+          if node tests/r263_webkit_trusted_https_smoke.cjs webkit-trusted; then
+            echo 'SECURITY FAILURE: CA trust was not confined to container'
+            exit 1
+          fi
+          echo 'R263_GUARD_PASS: host refused temporary CA installation'

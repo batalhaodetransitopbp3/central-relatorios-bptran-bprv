@@ -11,8 +11,8 @@ A R262 entrega uma página de ensaio **separada dos arquivos oficiais de BO**. E
 - `r262_isolated_preview.html` e `r262_preview_ui.js`: página que mostra aviso de ambiente sintético e possui cinco controles: login fictício, origem Index/RSD/RCO, adicionar fotografia sintética, consultar anexos e encerrar sessão. O enquadramento é representado por **recorte sintético em canvas**, e a interface de resultados mostra 4 imagens por anexo/página. **Não é a interface R240, não usa foto real ou cofre IndexedDB e não foi conectada à Central.**
 - `tests/r262_real_browser_canonical_https_smoke.cjs`: servidor local **somente 127.0.0.1**, com arquivos permitidos por lista de caminhos, CSP que não permite scripts/requests externos, certificado TLS gerado no diretório temporário do sistema e endpoint exclusivo de testes `/r262-fixture/issue-token`. O endpoint emite **apenas JWTs fictícios**, nunca tokens reais; não existe na API R254 nem no BO oficial.
 - O ensaio automatiza o navegador com Playwright e chama o **servidor HTTP real em loopback**. Confere `Secure; HttpOnly; SameSite=Strict`, proteção CSRF, vinculação pelo mesmo evento canônico em Index/RSD/RCO, nove imagens em três páginas (4+4+1), bloqueio de usuário revogado, segunda aba sem CSRF em memória, logout e ausência de requisições externas.
-- Os certificados e a CA fictícia são gerados apenas em diretório temporário e **não são instalados em nenhum repositório de confiança do sistema**, nem na estação do operador nem no contêiner CI. O ensaio positivo de sessão/CSRF/cookie é Chromium; WebKit verifica que um certificado não confiável não consegue obter sessão por `Origin:null`.
-- Em **WebKit Windows com CA não confiável**, observou-se `Origin:null` em POST HTTPS; o servidor R255 o recusa corretamente, antes de criar sessão ou fotografia. Foi criado um ensaio separado `webkit-untrusted` que comprova esse **fail-closed**, sem dispensar cabeçalho `Origin`.
+- Os certificados e a CA fictícia são gerados apenas em diretório temporário e **não são instalados em nenhum repositório de confiança do sistema**, nem na estação do operador nem no contêiner CI. O ensaio positivo de sessão/CSRF/cookie é Chromium; WebKit verifica a rejeição de POST com `Origin:null` causado explicitamente por `referrerPolicy:no-referrer` em `mode:same-origin`.
+- Em **WebKit**, `mode:same-origin` combinado a `referrerPolicy:no-referrer` faz o POST transmitir `Origin:null`, inclusive quando a CA é confiável. O servidor R255 recusa essa origem corretamente. No teste `webkit-untrusted` (nome preservado por compatibilidade), a requisição negativa declara `no-referrer` explicitamente e comprova esse **fail-closed**, sem dispensar validação de `Origin`.
 
 ## Execução local (Windows)
 
@@ -24,7 +24,7 @@ node tests/r262_real_browser_canonical_https_smoke.cjs chromium
 node tests/r262_real_browser_canonical_https_smoke.cjs webkit-untrusted
 ```
 
-Numa execução local validada, **Chromium: 8/8 verificações funcionais PASS** (9 fotos sintéticas, 0 requisições externas). **WebKit Windows sem CA confiável: acesso negado corretamente, 0 fotografias gravadas**. Também foi tentada uma CA efêmera no contêiner CI, mas WebKit continuou enviando `Origin:null`; a verificação agora testa explicitamente esse bloqueio, sem afrouxar a segurança. Um sucesso Chromium não certifica Safari de iPhone.
+Numa execução local validada, **Chromium: 8/8 verificações funcionais PASS** (9 fotos sintéticas, 0 requisições externas). **WebKit com `no-referrer` explícito: acesso negado corretamente, 0 fotografias gravadas**. Mesmo com CA efêmera confiável, a política `no-referrer` havia produzido `Origin:null`. A R263 corrige o contrato do cliente para `referrerPolicy:origin` e mantém o teste de recusa da política anterior. Um sucesso Chromium não certifica Safari de iPhone.
 
 ## Execução automatizada CI
 
