@@ -1,0 +1,36 @@
+name: R264 16-item release NO-GO observer (never deploys)
+
+on:
+  push:
+    branches:
+      - feature/bo-release-evidence-r264-review
+  pull_request:
+    paths:
+      - 'R264_BO_EVIDENCE_INTAKE_NO_DEPLOY/**'
+      - 'tests/r264_release_readiness_observer.test.cjs'
+      - '.github/workflows/r264_release_evidence_observer_ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  no-go-evidence-and-regressions:
+    name: 254 synthetic checks; branch protected but external gate still NO-GO
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Parsing
+        run: |
+          node --check R264_BO_EVIDENCE_INTAKE_NO_DEPLOY/r264_release_readiness_observer.cjs
+          node --check tests/r264_release_readiness_observer.test.cjs
+      - name: Run 19 release-observer tests and 235 predecessor regressions
+        run: node --test tests/r264_release_readiness_observer.test.cjs tests/r263_referrer_origin_contract.test.cjs tests/r261_browser_http_canonical_end_to_end.test.cjs tests/r260_unified_bo_context_security.test.cjs tests/bo_photo_annex_ci.test.cjs tests/r259_gas_account_workspace_preflight.test.js tests/r258_gas_private_drive_sheets_bridge.test.js tests/r257_signed_backup_restore.test.js tests/r256_photo_ledger_persistent_integration.test.js tests/r255_sqlite_durable_session_integration.test.js tests/r254_server_session_http_integration.test.js tests/r253_google_oidc_signed_jwt_bridge.test.js tests/r252_bo_personal_gate_r239_integration.test.js
+      - name: Confirm CI has no deployment credentials or write capability
+        run: |
+          echo 'R264_NO_GO: This workflow only tests source and never deploys.'
+          test -z "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          test -z "${CLASP_TOKEN:-}"
