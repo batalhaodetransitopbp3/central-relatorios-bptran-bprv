@@ -43,6 +43,24 @@ test('unprotected default branch is flagged as a release blocker',()=>{
   'MAIN_REQUIRED_STATUS_CHECKS_NOT_VERIFIED'));
  assert.equal(x.repositoryProtection.sha,sha);
 });
+test('R264 reflects newly protected main but still flags absence of required CI',()=>{
+ const r=gate.observe({r163:summary(),branch:{
+  sha,protected:true,pullRequestReviewsEnforced:true,
+  requiredCiEnforced:false,directPushRestricted:true,
+  forcePushBlocked:true
+ }});
+ assert.equal(r.repositoryProtection.safeguards.protectionVerified,true);
+ assert.equal(r.repositoryProtection.safeguards.codeReviewRulesVerified,true);
+ assert.equal(r.repositoryProtection.safeguards.noDirectPushVerified,true);
+ assert.equal(r.repositoryProtection.safeguards.noForcePushVerified,true);
+ assert.deepEqual(r.repositoryProtection.warnings,[
+  'MAIN_REQUIRED_STATUS_CHECKS_NOT_VERIFIED'
+ ]);
+ assert.equal(r.observedPrerequisites.passCount,3);
+ assert.equal(r.observedPrerequisites.failCount,13);
+ assert.equal(r.productionRelease,'NO_GO');
+ assert.equal(r.releaseAllowed,false);
+});
 test('a source saying GO rather than actual R163 NO_GO must be rejected',()=>{
  const r=summary();r.decision='GO';
  assert.throws(()=>gate.observe({r163:r}),
