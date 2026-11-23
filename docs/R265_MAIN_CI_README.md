@@ -28,10 +28,21 @@ A fonte do workflow e do guard pode mudar via PR, portanto a segurança depende 
 Executar:
 
 ```powershell
-node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs
+node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs tests/r265_git_diff_hardening.test.cjs
 node ci/r265_main_source_change_guard.cjs  # apenas com R265_TRUSTED_BASE_SHA confiável
 ```
 
 No Windows PowerShell, enumerar caminhos explicitamente para os testes existentes se a expansão de wildcard do comando não funcionar. O workflow Ubuntu utiliza bash e expande `tests/*.test.js`.
 
 **Gate externo inalterado:** R163 **NO-GO, 3/16 requisitos aprovados e 13 externos pendentes**. A conta Google conectada é operacional, não homologação autorizada. Nenhum BO ou fotografia foi sincronizado com o Drive ou a Central oficial. Nenhuma mudança de fonte operacional está incluída na R265.
+
+
+## Revisão de segurança do guard — 23/11/2026
+
+Um teste isolado com um repositório Git 100% fictício demonstrou uma vulnerabilidade concreta da primeira versão de `ci/r265_main_source_change_guard.cjs`: uma renomeação `apps_script_v10.gs` → `tests/payload.json` era exibida por `git diff --name-only` apenas pelo **caminho de destino**, sendo incorretamente classificada como mudança de teste autorizada. O teste não envolveu a Central operacional ou qualquer dado real.
+
+**Correção no mesmo PR #45, antes de merge:** o guard agora analisa `git diff --raw -z --no-abbrev --find-renames`, inspeciona **origem, destino, status de alteração e modos de arquivo**. Rejeita qualquer origem ou destino operacional, exclusões de testes, links simbólicos (`120000`), submódulos (`160000`) e mudanças de permissões executáveis. O comando lê a base em SHA verificável, não aceita caminhos fora da lista e não usa shell. O check obrigatório `main-baseline` continua a retornar apenas `ALLOW_NONPRODUCTION_REVIEW` para alterações documentais e de testes, **jamais GO para produção**.
+
+O novo `tests/r265_git_diff_hardening.test.cjs` contém **sete testes com repositórios Git temporários sintéticos**, cobrindo a renomeação evasiva reproduzida, exclusões, links simbólicos, modos executáveis e renomeações legítimas de testes. Portanto a suíte da R265 passa a conter **37 verificações**: 19 de baseline, 11 de contrato e sete de ataque/regressão. Não houve inclusão de arquivos do diretório temporário no repositório.
+
+**Limite importante:** como a CI é executada sobre o código da PR, alguém com permissão para modificar o próprio guard/workflow pode alterar as verificações em um commit futuro. Por isso **continuam indispensáveis duas revisões humanas independentes, regras de proteção da `main` e revisão explícita das alterações de CI**. A proteção do GitHub permanece como mecanismo externo ao código proposto; a R265 não substitui a auditoria institucional R163.

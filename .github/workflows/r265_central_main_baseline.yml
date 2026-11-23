@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           node --check ci/r265_main_source_change_guard.cjs
-          node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs
+          node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs tests/r265_git_diff_hardening.test.cjs
       - name: Block operational source changes until external R163 approval
         shell: bash
         env:
