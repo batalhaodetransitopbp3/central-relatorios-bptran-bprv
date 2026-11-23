@@ -17,9 +17,9 @@ A R265 parte diretamente do commit `4f9ea78e29484d7883baecece01819d0e82dade1` da
 
 ## Observação importante sobre a configuração de proteção
 
-**Ainda não definir `main-baseline` como check obrigatório na proteção GitHub antes de o PR ter executado corretamente e antes de comprovar que o check existe para um PR direcionado à `main`.** Se a regra for aplicada antes, há risco de bloquear a incorporação do próprio workflow.
+**Atualização administrativa — 23/11/2026:** após confirmar o sucesso do check real `main-baseline` na PR #45, o administrador habilitou-o como **required status check** de `main`, com `strict:true` e origem do check `github-actions` (app_id 15368). A API do GitHub confirmou que a regra está ativa, sem alterar o commit principal.
 
-Após revisão independente e merge do PR (duas aprovações exigidas), um administrador deverá configurar `main-baseline` como required status check, revalidar `strict`/atualização da branch e comprovar em PR de teste que o merge é bloqueado quando o check falha. Não desabilitar as duas aprovações para facilitar a inclusão do workflow.
+A **PR #45 continua DRAFT, `BLOCKED`, com `REVIEW_REQUIRED`**, mesmo com check aprovado. A `main` continua sem o arquivo do workflow até duas revisões independentes e merge autorizado. Outros PRs podem não executar esse check e ficar bloqueados enquanto a infraestrutura não for incorporada. **Não desligar a verificação obrigatória nem reduzir as duas aprovações para contornar esse bloqueio.**
 
 A fonte do workflow e do guard pode mudar via PR, portanto a segurança depende também da revisão por responsáveis distintos e da verificação das regras GitHub. Este CI é um controle técnico, **não prova que R163 foi satisfeito**, tampouco substitui aprovação institucional, LGPD, testes Google reais ou decisão de release assinada.
 
