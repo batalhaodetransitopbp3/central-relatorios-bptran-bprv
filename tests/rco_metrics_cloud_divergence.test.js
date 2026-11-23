@@ -12,7 +12,20 @@ const vm = require('vm');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'relatorio_cpu.html'), 'utf8');
 const gas = fs.readFileSync(path.join(root, 'apps_script_v10.gs'), 'utf8');
-const exact = JSON.parse(fs.readFileSync('C:/Users/yurit/AppData/Local/Temp/reboque01_cloud_payload.json', 'utf8'));
+// Fully synthetic, deterministic fixture. Never depend on private Windows
+// temporary files or copy an operational report into a public repository.
+const exact = Object.freeze({
+  schema: 'pmpb-transito-servico-diario-v2',
+  reportId: 'sd-r265-synthetic-reboque-01',
+  unidade: { batalhao: 'BPTran', companhia: '1\u00aa CPTran', companhiaNumero: 1 },
+  guarnicao: { nome: 'REBOQUE 01' },
+  servico: { data: '2026-11-23' },
+  producao: {
+    'apreensoes-veiculos-recolhimentos': { motocicletas: 8, ciclomotores: 1 },
+    'remocoes-sinistros': { automoveis: 1 }
+  },
+  ocorrencias: [], operacoes: [], veiculosRecuperados: [], tcos: [], cirvc: []
+});
 
 function oneLine(name) {
   const at = html.indexOf(name);
@@ -92,7 +105,7 @@ function boot() {
   return sandbox;
 }
 
-assert.strictEqual(exact.reportId, 'sd-0e20901f-c81b-4e97-abdb-976585d9c0c8');
+assert.strictEqual(exact.reportId, 'sd-r265-synthetic-reboque-01');
 assert.strictEqual(exact.guarnicao.nome, 'REBOQUE 01');
 
 const box = boot();
@@ -108,7 +121,7 @@ assert.deepStrictEqual(synthetic, {
 });
 const persisted = { 'remocoes-sinistros::automoveis': 1 };
 assert.notDeepStrictEqual(synthetic, persisted);
-console.log('OK importDailyV2 do payload exato do REBOQUE 01 produz 8, 1 e 1');
+console.log('OK importDailyV2 do payload sintético do REBOQUE 01 produz 8, 1 e 1');
 
 const manual = boot();
 const metricKey = 'abordagens::motocicletas';
