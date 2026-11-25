@@ -258,7 +258,7 @@ function op(extra) {
 (function cache_bust() {
   ['relatorio_cpu.html', 'relatorio_cpu_ios.html', 'relatorio_operacao.html', 'relatorio_operacao_ios.html', 'auto_remocao_veiculos.html', 'auto_remocao_veiculos_ios.html', 'boletim_ocorrencia_bptrans_1cprv.html', 'boletim_ocorrencia_bptrans_1cprv_ios.html', 'relatorio_servico_diario.html', 'relatorio_servico_diario_ios.html'].forEach(function (file) {
     const src = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.ok(src.includes('service_flow.js?v=10.8.44-rco-linked-modules'), file);
+    assert.ok(src.includes('service_flow.js?v=10.8.44.2-r10-linked-identity'), file);
     assert.ok(!src.includes('service_flow.js"') && !src.includes('service_flow.js?v=10.8.34') && !src.includes('service_flow.js?v=10.8.35') && !src.includes('service_flow.js?v=10.8.16'), file);
   });
   ok('cache. service_flow.js?v=10.8.44-rco-linked-modules nas páginas do fluxo e no RSD');

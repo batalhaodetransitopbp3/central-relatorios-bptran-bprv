@@ -146,6 +146,78 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
 @media(max-width:700px){.central-contingency-panel{position:fixed;left:8px;right:8px;top:58px;min-width:0;max-width:none}.rco-cloud-item .rco-item-actions{grid-column:1/-1}.rco-cloud-item .rco-item-actions button{flex:1 1 45%}}
 @media print{#rcoResponsavelCard,.central-contingency,.rco-sub-results,.rco-sub-selected{display:none!important}}
 </style>
+
+<style id="central-rco-print-readability-20261016">
+@media print {
+  /* Occurrences: never squeeze an entire seven-column table into one of four grid columns. */
+  #guPanels .gu-compact-grid > .rco-occurrences-block {
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    display:block !important;
+    break-inside:auto !important;
+    page-break-inside:auto !important;
+  }
+  #guPanels .rco-occurrences-block .print-occ-wrap {
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+    break-inside:auto !important;
+  }
+  #guPanels .rco-occurrences-block .gu-occ-print {
+    display:table !important;
+    width:100% !important;
+    max-width:100% !important;
+    table-layout:fixed !important;
+    break-inside:auto !important;
+    border-collapse:collapse !important;
+  }
+  #guPanels .gu-occ-print th:nth-child(1), #guPanels .gu-occ-print td:nth-child(1){width:10% !important}
+  #guPanels .gu-occ-print th:nth-child(2), #guPanels .gu-occ-print td:nth-child(2){width:7% !important}
+  #guPanels .gu-occ-print th:nth-child(3), #guPanels .gu-occ-print td:nth-child(3){width:7% !important}
+  #guPanels .gu-occ-print th:nth-child(4), #guPanels .gu-occ-print td:nth-child(4){width:13% !important}
+  #guPanels .gu-occ-print th:nth-child(5), #guPanels .gu-occ-print td:nth-child(5){width:45% !important}
+  #guPanels .gu-occ-print th:nth-child(6), #guPanels .gu-occ-print td:nth-child(6){width:11% !important}
+  #guPanels .gu-occ-print th:nth-child(7), #guPanels .gu-occ-print td:nth-child(7){width:7% !important}
+  #guPanels .gu-occ-print thead{display:table-header-group !important}
+  #guPanels .gu-occ-print tbody{display:table-row-group !important}
+  #guPanels .gu-occ-print tbody tr{break-inside:avoid-page !important;page-break-inside:avoid !important}
+  #guPanels .gu-occ-print td {
+    white-space:normal !important;
+    overflow-wrap:break-word !important;
+    word-break:normal !important;
+    vertical-align:top !important;
+    font-size:calc(6.8px + 2pt) !important;
+    line-height:1.18 !important;
+  }
+  #guPanels .gu-occ-print .occ-print-desc {
+    white-space:pre-wrap !important;
+    overflow-wrap:break-word !important;
+    word-break:normal !important;
+  }
+  /* Do not force a multi-page guarnicao or statistics section to fit on a single page. */
+  #guPanels .gu-card, .stats-block {
+    break-inside:auto !important;
+    page-break-inside:auto !important;
+  }
+  #guPanels .gu-title, #guPanels .occ-label-row {
+    break-after:avoid-page !important;
+    page-break-after:avoid !important;
+  }
+  .stats-block .entry{break-inside:auto !important;page-break-inside:auto !important}
+  .stats-block .entry .grid>.field{break-inside:avoid-page !important}
+
+  /* Add exactly 2 typographic points to the previous computed font sizes for user-entered values. */
+  .print-value{font-size:calc(9.7px + 2pt) !important;line-height:1.2 !important}
+  #guPanels .gu-compact-grid .print-value{font-size:calc(7.5px + 2pt) !important;line-height:1.2 !important}
+  .doc-head>.head-grid.cpu-meta-row .field .print-value{font-size:calc(7.4px + 2pt) !important;line-height:1.2 !important}
+  .print-matrix-chunk tbody td:nth-child(n+3){font-size:calc(5.9px + 2pt) !important;line-height:1.15 !important}
+  .cpu-table tbody td{font-size:calc(8.4px + 2pt) !important;line-height:1.15 !important}
+  .annex-table tbody td,.mini-table tbody td{font-size:calc(7.6px + 2pt) !important;line-height:1.15 !important}
+}
+</style>
 </head><body><main class="page">
 <div class="toolbar no-print">
 <button class="ok" onclick="prepareAndPrint()">Gerar PDF do serviço (RCO)</button>
@@ -254,7 +326,7 @@ function aitTotalKey(){return metricKey('notificacoes','total-aits')}
 function recomputeAitForGuarnicao(g){if(!g)return 0;const total=AIT_COMPONENT_KEYS.reduce((a,k)=>a+num(g.metrics[metricKey('notificacoes',k)]),0);g.metrics[aitTotalKey()]=total;return total}
 function recomputeAllAits(){orderedGuarnicoes().forEach(recomputeAitForGuarnicao)}
 function metricKey(g,i){return `${g}::${i}`}
-function ensureGuarnicao(name){name=String(name||'').trim();if(!name)return null;const id=guId(name);if(!state.guarnicoes[id])state.guarnicoes[id]={id,nome:name,metrics:{},responsavel:'',matricula:'',efetivo:'',viatura:'',alteracoesViatura:'',materialCarga:'',observacoes:'',ocorrencias:[],locked:id!=='cpu'};else if(state.guarnicoes[id].locked==null)state.guarnicoes[id].locked=id!=='cpu';renderGuarnicoes();renderMatrix();return state.guarnicoes[id]}
+function ensureGuarnicao(name){name=String(name||'').trim();if(!name)return null;const id=guId(name);if(!state.guarnicoes[id])state.guarnicoes[id]={id,nome:name,metrics:{},responsavel:'',matricula:'',efetivo:'',viatura:'',alteracoesViatura:'',materialCarga:'',alteracoesServico:'',observacoes:'',ocorrencias:[],locked:id!=='cpu'};else if(state.guarnicoes[id].locked==null)state.guarnicoes[id].locked=id!=='cpu';renderGuarnicoes();renderMatrix();return state.guarnicoes[id]}
 function addGuarnicaoFromInput(){const e=document.getElementById('newGuName');const nome=e.value.trim();if(!nome)return;if(guId(nome)==='cpu'){alert('A coluna CPU já é fixa no quadro consolidado e não precisa ser cadastrada.');e.value='';return}ensureGuarnicao(nome);e.value=''}
 function removeGuarnicao(id){if(id==='cpu'){alert('A coluna CPU é mantida no relatório.');return}if(confirm('Remover esta guarnição e os dados vinculados?')){delete state.guarnicoes[id];renderGuarnicoes();renderMatrix();window.centralAutosave?.()}}
 function addOccurrenceToGuarnicao(id,d={}){const g=state.guarnicoes[id];if(!g)return;g.ocorrencias=g.ocorrencias||[];g.ocorrencias.push({id:d.id||uid('oc'),data:d.data||val('dataInicio'),hora:d.hora||'',numero:d.numero||'',tipo:d.tipo||'BO',descricao:d.descricao||'',tipificacao:d.tipificacao||'',tcoSasp:d.tcoSasp||'Não',numeroTco:d.numeroTco||''});renderGuarnicoes()}
@@ -312,7 +384,7 @@ function rcoPayloadIds(p){
  (p?.operacoes||[]).forEach(x=>{const id=x?.reportId||x?.id;if(id)ids.push(String(id))});
  (p?.veiculosRecuperados||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});
  (p?.tcos||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});
- (p?.arvc||p?.cirvc||[]).forEach(x=>{const id=x?.id||x?.CIRVC_ID;if(id)ids.push(String(id))});
+ (p?.cirvc?.length?p.cirvc:(p?.arvc||p?.cirvc||[])).forEach(x=>{const id=x?.id||x?.CIRVC_ID||x?.cirvcId;if(id)ids.push(String(id))});
  return new Set(ids.filter(Boolean));
 }
 function rcoModuleContext(base, origin){
@@ -364,13 +436,13 @@ function rcoLinkedBlockHtml(g){
 function occurrenceEditor(g,o){const tco=o.tipo==='TCO';return `<div class="gu-occ-row"><input type="date" value="${esc(o.data||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','data',this.value)"><input type="time" value="${esc(o.hora||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','hora',this.value)"><input placeholder="PM2026XXXXXX" value="${esc(o.numero||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','numero',this.value)"><select onchange="updateGuOccurrence('${g.id}','${o.id}','tipo',this.value);renderGuarnicoes()"><option ${o.tipo==='BST'?'selected':''}>BST</option><option ${o.tipo==='TCO'?'selected':''}>TCO</option><option ${o.tipo==='BO'?'selected':''}>BO</option><option ${o.tipo==='Outro'?'selected':''}>Outro</option></select><textarea class="occ-desc-input" rows="2" placeholder="Descrição breve da ocorrência" oninput="updateGuOccurrence('${g.id}','${o.id}','descricao',this.value)">${esc(o.descricao||'')}</textarea>${tco?`<input placeholder="Tipificação" value="${esc(o.tipificacao||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','tipificacao',this.value)"><select onchange="updateGuOccurrence('${g.id}','${o.id}','tcoSasp',this.value);renderGuarnicoes()"><option ${o.tcoSasp!=='Sim'?'selected':''}>Não</option><option ${o.tcoSasp==='Sim'?'selected':''}>Sim</option></select>${o.tcoSasp==='Sim'?`<input placeholder="TCO-..." value="${esc(o.numeroTco||'')}" onchange="updateGuOccurrence('${g.id}','${o.id}','numeroTco',this.value)">`:''}`:''}<button class="small danger no-print" onclick="removeGuOccurrence('${g.id}','${o.id}')">×</button></div>`}
 function renderGuarnicoes(){
  const badges=document.getElementById('guarnicoesBadges'),panels=document.getElementById('guPanels');badges.innerHTML='';panels.innerHTML='';const u=currentUnit();
- orderedGuarnicoes().forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura='';if(!Array.isArray(g.ocorrencias))g.ocorrencias=[];if(g.locked==null)g.locked=g.id!=='cpu';const isCpu=g.id==='cpu';
+ orderedGuarnicoes().forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura='';if(g.alteracoesServico==null)g.alteracoesServico='';if(!Array.isArray(g.ocorrencias))g.ocorrencias=[];if(g.locked==null)g.locked=g.id!=='cpu';const isCpu=g.id==='cpu';
   const b=document.createElement('span');b.className='pill';b.innerHTML=isCpu?esc(g.nome):`${esc(g.nome)} <button class="small danger no-print" onclick="removeGuarnicao('${g.id}')">×</button>`;badges.appendChild(b);
   const p=document.createElement('div');p.className='gu-card';p.dataset.guCard=g.id;const occPrint=occurrencePrintHtml(g);
   const occEdit=isCpu?`<div class="gu-occ-editor no-print">${g.ocorrencias.map(o=>occurrenceEditor(g,o)).join('')}<button class="small secondary" onclick="addOccurrenceToGuarnicao('${g.id}')">+ ocorrência</button></div>`:'';
   const identidade=isCpu?'':`<div class="field span4"><label>Responsável</label><input data-gu="${g.id}" data-k="responsavel" value="${esc(g.responsavel||'')}" placeholder="Posto/grad. e QRA"><span class="print-value"></span></div><div class="field span2"><label>Matrícula</label><input class="matricula" maxlength="9" placeholder="500.000-0" data-gu="${g.id}" data-k="matricula" value="${esc(g.matricula||'')}"><span class="print-value"></span></div>`;
   const materialLabel=u.batalhao==='BPRv'?'Material da base':'Material cautelado';const materialDefault='Não houve alteração no material cautelado.';
-  p.innerHTML=`<div class="gu-title"><span>${esc(g.nome)}</span><span class="status-badge">Guarnição</span></div><div class="grid gu-compact-grid">${identidade}<div class="field span2"><label>Efetivo</label><input data-gu="${g.id}" data-k="efetivo" value="${esc(g.efetivo||'')}" placeholder="Ex.: 03 PMs"><span class="print-value"></span></div><div class="field span1"><label>Viatura</label><input class="vtr-prefix" maxlength="5" data-gu="${g.id}" data-k="viatura" value="${esc(g.viatura||'')}" placeholder="Ex.: 9157"><span class="print-value"></span></div><div class="field span3"><label>${materialLabel}</label><textarea data-default="${materialDefault}" data-gu="${g.id}" data-k="materialCarga" placeholder="Registre somente falta, avaria, substituição ou alteração do material cautelado.">${esc(g.materialCarga||'')}</textarea><span class="print-value"></span></div><div class="field span3"><label>Alterações da viatura</label><textarea data-default="Não houve alteração na VTR." data-gu="${g.id}" data-k="alteracoesViatura" placeholder="Registre somente avaria, indisponibilidade, substituição ou outra alteração na VTR.">${esc(g.alteracoesViatura||'')}</textarea><span class="print-value"></span></div><div class="field span4"><label>Observações</label><textarea data-default="Sem observações" data-gu="${g.id}" data-k="observacoes" placeholder="Registre somente informação relevante não contemplada nos campos anteriores.">${esc(g.observacoes||'')}</textarea><span class="print-value"></span></div><div class="field span12"><div class="occ-label-row"><label>Ocorrências (BST/TCO/BO)</label>${isCpu?'<span class="no-print">Preenchimento manual do CPU</span>':''}</div>${occEdit}<div class="print-occ-wrap">${occPrint}</div></div>${rcoLinkedBlockHtml(g)}</div>`;panels.appendChild(p)
+  p.innerHTML=`<div class="gu-title"><span>${esc(g.nome)}</span><span class="status-badge">Guarnição</span></div><div class="grid gu-compact-grid">${identidade}<div class="field span2"><label>Efetivo</label><input data-gu="${g.id}" data-k="efetivo" value="${esc(g.efetivo||'')}" placeholder="Ex.: 03 PMs"><span class="print-value"></span></div><div class="field span1"><label>Viatura</label><input class="vtr-prefix" maxlength="5" data-gu="${g.id}" data-k="viatura" value="${esc(g.viatura||'')}" placeholder="Ex.: 9157"><span class="print-value"></span></div><div class="field span3"><label>${materialLabel}</label><textarea data-default="${materialDefault}" data-gu="${g.id}" data-k="materialCarga" placeholder="Registre somente falta, avaria, substituição ou alteração do material cautelado.">${esc(g.materialCarga||'')}</textarea><span class="print-value"></span></div><div class="field span3"><label>Alterações da viatura</label><textarea data-default="Não houve alteração na VTR." data-gu="${g.id}" data-k="alteracoesViatura" placeholder="Registre somente avaria, indisponibilidade, substituição ou outra alteração na VTR.">${esc(g.alteracoesViatura||'')}</textarea><span class="print-value"></span></div><div class="field span4"><label>Alterações no serviço</label><textarea data-gu="${g.id}" data-k="alteracoesServico" placeholder="Alterações registradas pela guarnição no RSD.">${esc(g.alteracoesServico||'')}</textarea><span class="print-value"></span></div><div class="field span4"><label>Observações</label><textarea data-default="Sem observações" data-gu="${g.id}" data-k="observacoes" placeholder="Registre somente informação relevante não contemplada nos campos anteriores.">${esc(g.observacoes||'')}</textarea><span class="print-value"></span></div><div class="field span12 rco-occurrences-block"><div class="occ-label-row"><label>Ocorrências (BST/TCO/BO)</label>${isCpu?'<span class="no-print">Preenchimento manual do CPU</span>':''}</div>${occEdit}<div class="print-occ-wrap">${occPrint}</div></div>${rcoLinkedBlockHtml(g)}</div>`;panels.appendChild(p)
  });
  panels.querySelectorAll('[data-gu][data-k]').forEach(e=>e.addEventListener('input',()=>{const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}));panels.querySelectorAll('.matricula').forEach(e=>{e.oninput=()=>{e.value=formatMatricula(e.value);const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}});panels.querySelectorAll('.vtr-prefix').forEach(e=>{e.oninput=()=>{e.value=String(e.value||'').toUpperCase().replace(/[^A-Z0-9-]/g,'').slice(0,5);const g=state.guarnicoes[e.dataset.gu];if(g)g[e.dataset.k]=e.value;syncPrintValue(e)}});panels.querySelectorAll('input,textarea,select').forEach(syncPrintValue)
 }
@@ -399,10 +471,30 @@ function togglePodStatus(select){
 }
 function togglePodLocation(entry){const e=entry?.closest?.('.entry')||entry;if(!e)return;const check=e.querySelector('[data-k="localDiferente"]'),box=e.querySelector('.pod-specific-local'),prev=e.querySelector('[data-k="localPrevisto"]'),local=e.querySelector('[data-k="local"]');const dif=!!check?.checked;if(box)box.classList.toggle('hidden',!dif);if(!dif&&local)local.value=prev?.value||'';if(local)syncPrintValue(local)}
 function syncPodLocalPrevisto(input){const e=input?.closest('.entry');if(e&&!e.querySelector('[data-k="localDiferente"]')?.checked)togglePodLocation(e)}
+function podTurnosFromLegacy(value){
+ const v=String(value||'').trim().toLowerCase();
+ if(!v)return [];
+ if(v==='24h'||v==='24 horas')return ['Manhã','Tarde','Noite'];
+ if(v==='12h (dia)'||v==='12h dia')return ['Manhã','Tarde'];
+ if(v==='12h (noite)'||v==='12h noite'||v==='madrugada')return ['Noite'];
+ return ['Manhã','Tarde','Noite'].filter(t=>v.replaceAll(',',' ').replaceAll(';',' ').replaceAll('/',' ').split(' ').filter(Boolean).includes(t.toLowerCase()));
+}
+function restaurarTurnosPod(entry){
+ const input=entry?.querySelector('[data-k="turno"]');if(!input)return;
+ const current=podTurnosFromLegacy(input.value);
+ entry.querySelectorAll('[data-turno-op]').forEach(box=>{box.checked=current.includes(box.dataset.turnoOp)});
+ if(current.length)input.value=current.join(', ');
+ syncPrintValue(input);
+}
+function atualizarTurnosPod(box){
+ const entry=box?.closest('.entry'),input=entry?.querySelector('[data-k="turno"]');if(!entry||!input)return;
+ input.value=Array.from(entry.querySelectorAll('[data-turno-op]')).filter(b=>b.checked).map(b=>b.dataset.turnoOp).join(', ');
+ syncPrintValue(input);window.centralAutosave?.();
+}
 function addCpuOperation(d={}){
- d={...d,guarnicao:d.guarnicao||'CPU',statusCumprimento:d.statusCumprimento||'Não informado'};const e=document.createElement('div');e.className='entry cpu-op-entry';e.dataset.id=d.id||uid('op');
- e.innerHTML=`<div class="entry-head"><div class="entry-title">Plano Operacional Diário</div><button class="small danger no-print" onclick="this.closest('.entry').remove();window.centralAutosave?.()">Remover</button></div><div class="grid cpu-op-grid"><div class="field span2"><label>Guarnição responsável</label><input data-k="guarnicao" readonly><span class="print-value"></span></div><div class="field span3"><label>Operação</label>${operationSelectHtml()}<span class="print-value"></span></div><div class="field span3"><label>Cumprimento do POD</label><select data-k="statusCumprimento" onchange="togglePodStatus(this)"><option>Não informado</option><option>Executado conforme previsto</option><option>Executado em local diverso</option><option>Executado parcialmente</option><option>Não executado</option></select><span class="print-value"></span></div><div class="field span4"><label>Turno</label><select data-k="turno"><option></option><option>12h (dia)</option><option>12h (noite)</option><option>24h</option></select><span class="print-value"></span></div><div class="field span12"><label>Local previsto no POD</label><input data-k="localPrevisto" placeholder="Local originalmente designado" oninput="syncPodLocalPrevisto(this)"><span class="print-value"></span></div><div class="field span12 no-print"><label class="pill"><input type="checkbox" data-k="localDiferente" onchange="togglePodLocation(this.closest('.entry'))"> Local / circunscrição específica diferente do local previsto no POD</label></div><div class="field span6 pod-specific-local hidden"><label>Local / circunscrição específica</label><input data-k="local" placeholder="Via, rodovia, bairro, município ou ponto efetivamente realizado"><span class="print-value"></span></div><div class="field span6"><label>Coordenadas da localização efetivamente realizada</label><input data-k="coordenadas" placeholder="-7.123456, -34.123456"><span class="print-value"></span></div><div class="field span6 pod-change-reason hidden"><label>Motivo da alteração</label><textarea data-k="motivoAlteracao" placeholder="Justifique a mudança, execução parcial ou não execução do POD."></textarea><span class="print-value"></span></div><div class="field span12 support-desc hidden"><label>Descrição do apoio em eventos</label><input data-k="descricaoApoio"><span class="print-value"></span></div><div class="field span4"><label>Apreensões de veículos</label><input type="number" min="0" data-k="apreensoesVeiculos"><span class="print-value"></span></div><div class="field span4"><label>Total de AITs</label><input type="number" min="0" data-k="totalAits"><span class="print-value"></span></div><div class="field span4"><label>Prisões</label><input type="number" min="0" data-k="prisoes"><span class="print-value"></span></div></div>`;
- const sel=e.querySelector('select:not([data-k])');sel.dataset.k='nome';sel.onchange=()=>e.querySelector('.support-desc').classList.toggle('hidden',sel.value!=='Apoio em eventos');document.getElementById('cpuOperations').appendChild(e);if(d.localDiferente===undefined)d.localDiferente=!!(d.local&&d.localPrevisto&&d.local!==d.localPrevisto);populateEntry(e,d);e.querySelector('[data-k="guarnicao"]').value=d.guarnicao||'CPU';e.querySelector('.support-desc').classList.toggle('hidden',sel.value!=='Apoio em eventos');togglePodStatus(e.querySelector('[data-k="statusCumprimento"]'));togglePodLocation(e);
+ d={...d,guarnicao:d.guarnicao||'CPU',guarnicoesParticipantes:d.guarnicoesParticipantes===undefined?(d.guarnicao||'CPU'):d.guarnicoesParticipantes,statusCumprimento:d.statusCumprimento||'Não informado'};const e=document.createElement('div');e.className='entry cpu-op-entry';e.dataset.id=d.id||uid('op');if(!d.id)e.dataset.localOnly='1';
+ e.innerHTML=`<div class="entry-head"><div class="entry-title">Plano Operacional Diário</div><button class="small danger no-print" onclick="this.closest('.entry').remove();window.centralAutosave?.()">Remover</button></div><div class="grid cpu-op-grid"><div class="field span2"><label>Guarnição responsável</label><input data-k="guarnicao" readonly><span class="print-value"></span></div><div class="field span12"><label>Guarnições participantes</label><input data-k="guarnicoesParticipantes" placeholder="Ex.: BST 02, TOR 01"><span class="print-value"></span></div><div class="field span3"><label>Operação</label>${operationSelectHtml()}<span class="print-value"></span></div><div class="field span3"><label>Cumprimento do POD</label><select data-k="statusCumprimento" onchange="togglePodStatus(this)"><option>Não informado</option><option>Executado conforme previsto</option><option>Executado em local diverso</option><option>Executado parcialmente</option><option>Não executado</option></select><span class="print-value"></span></div><div class="field span4"><label>Turno</label><input type="hidden" data-k="turno"><div class="pod-turnos no-print" role="group" aria-label="Turnos do Plano Operacional Diário"><label><input type="checkbox" data-turno-op="Manhã" onchange="atualizarTurnosPod(this)"> Manhã</label> <label><input type="checkbox" data-turno-op="Tarde" onchange="atualizarTurnosPod(this)"> Tarde</label> <label><input type="checkbox" data-turno-op="Noite" onchange="atualizarTurnosPod(this)"> Noite</label></div><span class="print-value"></span></div><div class="field span12"><label>Local previsto no POD</label><input data-k="localPrevisto" placeholder="Local originalmente designado" oninput="syncPodLocalPrevisto(this)"><span class="print-value"></span></div><div class="field span12 no-print"><label class="pill"><input type="checkbox" data-k="localDiferente" onchange="togglePodLocation(this.closest('.entry'))"> Local / circunscrição específica diferente do local previsto no POD</label></div><div class="field span6 pod-specific-local hidden"><label>Local / circunscrição específica</label><input data-k="local" placeholder="Via, rodovia, bairro, município ou ponto efetivamente realizado"><span class="print-value"></span></div><div class="field span6"><label>Coordenadas da localização efetivamente realizada</label><input data-k="coordenadas" placeholder="-7.123456, -34.123456"><span class="print-value"></span></div><div class="field span6 pod-change-reason hidden"><label>Motivo da alteração</label><textarea data-k="motivoAlteracao" placeholder="Justifique a mudança, execução parcial ou não execução do POD."></textarea><span class="print-value"></span></div><div class="field span12 support-desc hidden"><label>Descrição do apoio em eventos</label><input data-k="descricaoApoio"><span class="print-value"></span></div><div class="field span4"><label>Apreensões de veículos</label><input type="number" min="0" data-k="apreensoesVeiculos"><span class="print-value"></span></div><div class="field span4"><label>Total de AITs</label><input type="number" min="0" data-k="totalAits"><span class="print-value"></span></div><div class="field span4"><label>Prisões</label><input type="number" min="0" data-k="prisoes"><span class="print-value"></span></div></div>`;
+ const sel=e.querySelector('select:not([data-k])');sel.dataset.k='nome';sel.onchange=()=>e.querySelector('.support-desc').classList.toggle('hidden',sel.value!=='Apoio em eventos');e.insertAdjacentHTML('beforeend','<input type="hidden" data-k="knownPodFingerprint">');document.getElementById('cpuOperations').appendChild(e);if(d.localDiferente===undefined)d.localDiferente=!!(d.local&&d.localPrevisto&&d.local!==d.localPrevisto);populateEntry(e,d);restaurarTurnosPod(e);e.querySelector('[data-k="guarnicao"]').value=d.guarnicao||'CPU';e.querySelector('.support-desc').classList.toggle('hidden',sel.value!=='Apoio em eventos');togglePodStatus(e.querySelector('[data-k="statusCumprimento"]'));togglePodLocation(e);
 }
 function cpuVehicleTemplate(){return `<div class="entry-head"><div class="entry-title">Veículo recuperado</div><button class="small danger no-print" onclick="this.closest('.entry').remove();window.centralAutosave?.()">Remover</button></div><div class="grid cpu-vehicle-grid"><div class="field span2"><label>Guarnição</label><input data-k="guarnicao" readonly><span class="print-value"></span></div><div class="field span2"><label>Placa/UF</label><input data-k="placaUf" placeholder="ABC1D23/PB" style="text-transform:uppercase" oninput="formatPlateUf(this)" pattern="(?:[A-Z]{3}[0-9]{4}|[A-Z]{3}[0-9][A-Z][0-9]{2})/[A-Z]{2}" title="Informe no formato AAA1111/UF ou AAA1A11/UF"><span class="print-value"></span></div><div class="field span2"><label>Tipo</label>${vehicleTypeSelectHtml()}<span class="print-value"></span></div><div class="field span1"><label>Ano</label><input data-k="ano" type="number" min="1900" max="2100" inputmode="numeric" placeholder="2025"><span class="print-value"></span></div><div class="field span5"><label>Marca/Modelo</label><input data-k="marcaModelo"><span class="print-value"></span></div><div class="field span2"><label>Situação</label><select data-k="situacao" onchange="toggleClone(this)"><option>SIVA-R</option><option>CLONE (ROUBADO)</option><option>ADULTERAÇÃO</option></select><span class="print-value"></span></div><div class="field span3"><label>Local</label><input data-k="local"><span class="print-value"></span></div><div class="field span2"><label>Conduzidos?</label><select data-k="houveConduzidos" onchange="toggleConduzidos(this)"><option>Não</option><option>Sim</option></select><span class="print-value"></span></div><div class="field span1 conduzidos-qtd hidden"><label>Qtd.</label><input type="number" min="0" data-k="quantidadeConduzidos"><span class="print-value"></span></div><div class="field span2"><label>Valor FIPE</label><input data-k="valorFipe" inputmode="decimal" placeholder="R$ 0,00" oninput="formatFipeCpu(this)"><span class="print-value"></span></div><div class="field span2 no-print"><a class="fipe-link" href="#" onclick="openFipe(this);return false">Pesquisar FIPE</a></div><div class="field span12 clone-fields hidden"><div class="grid"><div class="field span4"><label>Placa original identificada?</label><select data-k="placaOriginalIdentificada" onchange="toggleOriginal(this)"><option>Não</option><option>Sim</option></select><span class="print-value"></span></div><div class="field span8 original-fields hidden"><div class="grid"><div class="field span6"><label>Possível placa original/UF</label><input data-k="placaOriginalUf" placeholder="ABC1D23/PB" style="text-transform:uppercase" oninput="formatPlateUf(this)" pattern="(?:[A-Z]{3}[0-9]{4}|[A-Z]{3}[0-9][A-Z][0-9]{2})/[A-Z]{2}" title="Informe no formato AAA1111/UF ou AAA1A11/UF"><span class="print-value"></span></div><div class="field span6"><label>Restrição roubo/furto?</label><select data-k="restricaoOriginal"><option>Não</option><option>Sim</option><option>Não verificado</option></select><span class="print-value"></span></div></div></div></div></div></div>`}
 function addCpuVehicle(d={}){d={...d,guarnicao:d.guarnicao||'CPU'};if(d.ano==null&&d.anoModelo!=null)d.ano=d.anoModelo;const e=document.createElement('div');e.className='entry vehicle-entry';e.dataset.id=d.id||uid('vr');e.innerHTML=cpuVehicleTemplate();const t=e.querySelector('select:not([data-k])');t.dataset.k='tipo';document.getElementById('cpuVehicles').appendChild(e);populateEntry(e,d)}
@@ -416,15 +508,15 @@ function cpuPeopleData(){return Array.from(document.querySelectorAll('#cpuPeople
 function appendText(oldV,newV,label=''){newV=String(newV||'').trim();if(!newV)return oldV||'';const piece=label?`[${label}] ${newV}`:newV;if(!oldV)return piece;if(oldV.includes(piece))return oldV;return `${oldV}\n${piece}`}
 function productionMapV2(prod){const out={};for(const [gk,gt,items] of SOMATORIO)for(const [ik] of items)out[metricKey(gk,ik)]=num(prod?.[gk]?.[ik]);out[metricKey('sinistros-sem-embriaguez','s-vitimas-s-cnh')]=num(prod?.['sinistros-sem-embriaguez']?.['c-vitimas-s-cnh']);out[metricKey('sinistros-sem-embriaguez','atropelamentos')]=num(prod?.['sinistros-sem-embriaguez']?.['atropelamento']);out[metricKey('sinistros-embriaguez','atropelamentos')]=num(prod?.['sinistros-embriaguez']?.['atropelamento']);out[metricKey('acionamentos','vtr-bst-apoio')]=num(prod?.acionamentos?.['apoio-outras-unidades']);out[metricKey('sem-grupo','cnhs-recolhidas')]=num(prod?.['cnh-etilometro']?.['cnhs-recolhidas']);out[metricKey('sem-grupo','testes-etilometro')]=num(prod?.['cnh-etilometro']?.['testes-etilometro']);return out}
 function addMetricMap(g,map){Object.entries(map).forEach(([k,v])=>g.metrics[k]=num(g.metrics[k])+num(v));recomputeAitForGuarnicao(g)}
-function dedupeAppend(addFn,records){records.forEach(r=>{if(r.id&&state.importedRecordIds.includes(r.id))return;if(r.id)state.importedRecordIds.push(r.id);addFn(r)})}
+function dedupeAppend(addFn,records){records.forEach(r=>{const id=String(r?.id||r?.cirvcId||r?.CIRVC_ID||r?.reportId||'');if(id&&state.importedRecordIds.includes(id))return;if(id)state.importedRecordIds.push(id);addFn(id&&String(r.id||'')!==id?{...r,id}:r)})}
 function canonicalUnitObject(u={}){const rawB=String(u.batalhao||u.batalhaoSigla||'').replace(/\u00a0/g,' ').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');const b=rawB==='BPRV'?'BPRv':(rawB==='BPTRAN'?'BPTran':'');let c=Number(u.companhiaNumero)||Number(String(u.companhia||'').match(/\d+/)?.[0])||0;if(!b||!c)return {batalhao:b||'',batalhaoSigla:b||'',batalhaoNome:'',companhiaNumero:c||0,companhiaTipo:'',companhia:'',companhiaCodigo:''};c=Math.min(5,Math.max(1,c));const tipo=b==='BPRv'?'CPRv':'CPTran';return {batalhao:b,batalhaoSigla:b,batalhaoNome:(UNIT_TYPES[b]||UNIT_TYPES.BPTran).nome,companhiaNumero:c,companhiaTipo:tipo,companhia:`${c}ª ${tipo}`,companhiaCodigo:`${b.toUpperCase()}_${c}_${tipo.toUpperCase()}`}}
 function sameOperationalUnit(a,b){const x=canonicalUnitObject(a),y=canonicalUnitObject(b);return x.batalhao===y.batalhao&&x.companhiaNumero===y.companhiaNumero}
 function validateImportedUnit(p,fileName='arquivo'){if(!p?.unidade){alert(`${fileName} sem unidade (batalhão/companhia). Não será importado automaticamente.`);return false}const src=canonicalUnitObject(p.unidade),dst=canonicalUnitObject(currentUnit());if(sameOperationalUnit(src,dst))return true;alert(`${fileName} pertence a ${src.batalhao} / ${src.companhia}. O RCO atual está em ${dst.batalhao} / ${dst.companhia}. Ajuste o cabeçalho antes de cadastrar o relatório.`);return false}
-function importDailyV2(p,fileName){if(!validateImportedUnit(p,fileName))return 'ign';if(state.importedReportIds.includes(p.reportId))return 'duplicado';const name=p.guarnicao?.nome||'Guarnição importada';const g=ensureGuarnicao(name);addMetricMap(g,productionMapV2(p.producao||{}));g.responsavel=p.guarnicao?.responsavel||g.responsavel;g.matricula=p.guarnicao?.matricula||g.matricula;g.efetivo=p.guarnicao?.efetivo||g.efetivo;g.viatura=String(p.guarnicao?.viatura||g.viatura||'').toUpperCase().slice(0,80);const lbl=fmtDateISO(p.servico?.data)||fileName;g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,lbl);g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,lbl);g.observacoes=appendText(g.observacoes,p.observacoes,lbl);for(const o of p.ocorrencias||[]){if(o.id&&!state.importedRecordIds.includes(o.id)){state.importedRecordIds.push(o.id);g.ocorrencias.push(o)}}dedupeAppend(addCpuOperation,(p.operacoes||[]).filter(o=>o.incluirNoCpu!==false).map(o=>({...o,guarnicao:o.guarnicao||name})));dedupeAppend(addCpuVehicle,(p.veiculosRecuperados||[]).map(o=>({...o,guarnicao:o.guarnicao||name})));for(const t of (p.tcos||[])){if(!g.ocorrencias.some(o=>(t.id&&o.id===t.id)||(t.numeroTco&&o.numeroTco===t.numeroTco))){g.ocorrencias.push({id:t.id||uid('oc'),data:p.servico?.data||val('dataInicio'),hora:t.hora||'',numero:t.numero||'',tipo:'TCO',descricao:t.descricao||'',tipificacao:t.tipificacao||'',tcoSasp:t.tcoSasp||'Sim',numeroTco:t.numeroTco||''})}}dedupeAppend(addCpuArvc,(p.cirvc||p.arvc||[]).map(o=>({...o,guarnicao:o.guarnicao||name})));state.importedReportIds.push(p.reportId);renderGuarnicoes();renderMatrix();renderFisco();return 'ok'}
+function importDailyV2(p,fileName){if(!validateImportedUnit(p,fileName))return 'ign';if(state.importedReportIds.includes(p.reportId))return 'duplicado';const name=p.guarnicao?.nome||'Guarnição importada';const g=ensureGuarnicao(name);addMetricMap(g,productionMapV2(p.producao||{}));g.responsavel=p.guarnicao?.responsavel||g.responsavel;g.matricula=p.guarnicao?.matricula||g.matricula;g.efetivo=p.guarnicao?.efetivo||g.efetivo;g.viatura=String(p.guarnicao?.viatura||g.viatura||'').toUpperCase().slice(0,80);const lbl=fmtDateISO(p.servico?.data)||fileName;g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,lbl);g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,lbl);g.alteracoesServico=appendText(g.alteracoesServico,p.alteracoes?.servico,lbl);g.observacoes=appendText(g.observacoes,p.observacoes,lbl);for(const o of p.ocorrencias||[]){if(o.id&&!state.importedRecordIds.includes(o.id)){state.importedRecordIds.push(o.id);g.ocorrencias.push(JSON.parse(JSON.stringify(o)))}}dedupeAppend(addCpuOperation,(p.operacoes||[]).filter(o=>o.incluirNoCpu!==false).map(o=>({...o,guarnicao:o.guarnicao||name})));dedupeAppend(addCpuVehicle,(p.veiculosRecuperados||[]).map(o=>({...o,guarnicao:o.guarnicao||name})));for(const t of (p.tcos||[])){if(!g.ocorrencias.some(o=>(t.id&&o.id===t.id)||(t.numeroTco&&o.numeroTco===t.numeroTco))){g.ocorrencias.push({id:t.id||uid('oc'),data:p.servico?.data||val('dataInicio'),hora:t.hora||'',numero:t.numero||'',tipo:'TCO',descricao:t.descricao||'',tipificacao:t.tipificacao||'',tcoSasp:t.tcoSasp||'Sim',numeroTco:t.numeroTco||''})}}dedupeAppend(addCpuArvc,(p.cirvc?.length?p.cirvc:(p.arvc||p.cirvc||[])).map(o=>({...o,guarnicao:o.guarnicao||name})));state.importedReportIds.push(p.reportId);renderGuarnicoes();renderMatrix();renderFisco();return 'ok'}
 function legacyColName(p){const d=p.destinoCampo9||'';return d==='base01'?'Base 1':d==='base02'?'Base 2':d==='tatico'?'TOR':d==='cpu'?'CPU':p.guarnicao||'Guarnição antiga'}
-function importLegacy(p){const g=ensureGuarnicao(legacyColName(p));for(const [grp,itens] of Object.entries(p.campo9||{}))for(const [it,v] of Object.entries(itens||{})){const alias={'check-points-blitz':'checkpoints','total-de-aits-lavrados':'total-aits','quantidade-de-teste-de-etilometro-realizados':'testes-etilometro','cnh-s-recolhidas':'cnhs-recolhidas'};g.metrics[metricKey(grp,alias[it]||it)]=num(g.metrics[metricKey(grp,alias[it]||it)])+num(v)}g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,'JSON legado');g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,'JSON legado');renderGuarnicoes();renderMatrix()}
-function importOperationV2(p){if(!validateImportedUnit(p,'Relatório de Operação'))return 'ign';if(state.importedReportIds.includes(p.reportId))return 'duplicado';const sm=p.resumoCpu||p.resumo||{},pod=p.pod||{},source=(p.operacao?.guarnicoes||sm.guarnicoes||'CPU').trim()||'CPU';addCpuOperation({id:p.reportId,guarnicao:source,nome:p.operacao?.nome||sm.nome,local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',turno:p.operacao?.turno||sm.turno,apreensoesVeiculos:sm.apreensoesVeiculos,totalAits:sm.totalAits,prisoes:sm.prisoes});state.importedReportIds.push(p.reportId);return 'ok'}
-function importArvcV2(p){if(!validateImportedUnit(p,'Relatório de remoção'))return 'ign';if(p.reportId&&state.importedReportIds.includes(p.reportId))return 'duplicado';const recs=p.registros||p.cirvc||p.arvc||[];dedupeAppend(addCpuArvc,recs.map(o=>({...o,guarnicao:o.guarnicao||'CPU'})));if(p.reportId)state.importedReportIds.push(p.reportId);return 'ok'}
+function importLegacy(p){const g=ensureGuarnicao(legacyColName(p));for(const [grp,itens] of Object.entries(p.campo9||{}))for(const [it,v] of Object.entries(itens||{})){const alias={'check-points-blitz':'checkpoints','total-de-aits-lavrados':'total-aits','quantidade-de-teste-de-etilometro-realizados':'testes-etilometro','cnh-s-recolhidas':'cnhs-recolhidas'};g.metrics[metricKey(grp,alias[it]||it)]=num(g.metrics[metricKey(grp,alias[it]||it)])+num(v)}g.alteracoesViatura=appendText(g.alteracoesViatura,p.alteracoes?.viatura,'JSON legado');g.materialCarga=appendText(g.materialCarga,p.alteracoes?.materialCarga,'JSON legado');g.alteracoesServico=appendText(g.alteracoesServico,p.alteracoes?.servico,'JSON legado');renderGuarnicoes();renderMatrix()}
+function importOperationV2(p){if(!validateImportedUnit(p,'Relatório de Operação'))return 'ign';if(state.importedReportIds.includes(p.reportId))return 'duplicado';const sm=p.resumoCpu||p.resumo||{},pod=p.pod||{},source=(p.operacao?.guarnicoes||sm.guarnicoes||'CPU').trim()||'CPU';addCpuOperation({id:p.reportId,guarnicao:source,knownPodFingerprint:typeof p.podFingerprint==='string'?p.podFingerprint:'',guarnicoesParticipantes:p.operacao?.guarnicoes||sm.guarnicoes||source,nome:p.operacao?.nome||sm.nome,local:p.local?.descricao||sm.local||'',coordenadas:p.local?.coordenadas||'',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',turno:p.operacao?.turno||sm.turno,apreensoesVeiculos:sm.apreensoesVeiculos,totalAits:sm.totalAits,prisoes:sm.prisoes});state.importedReportIds.push(p.reportId);return 'ok'}
+function importArvcV2(p){if(!validateImportedUnit(p,'Relatório de remoção'))return 'ign';if(p.reportId&&state.importedReportIds.includes(p.reportId))return 'duplicado';const recs=(p.registros?.length?p.registros:(p.cirvc?.length?p.cirvc:(p.arvc||p.cirvc||[])));dedupeAppend(addCpuArvc,recs.map(o=>({...o,guarnicao:o.guarnicao||'CPU'})));if(p.reportId)state.importedReportIds.push(p.reportId);return 'ok'}
 async function importarDados(files){let ok=0,dup=0,ign=0;for(const f of Array.from(files||[])){try{const p=JSON.parse(await f.text());let r='';if(p.schema==='pmpb-transito-servico-diario-v2')r=importDailyV2(p,f.name);else if(p.schema==='pmpb-transito-operacao-v2')r=importOperationV2(p);else if(p.schema==='pmpb-transito-arvc-v2'||p.schema==='pmpb-transito-cirvc-v1')r=importArvcV2(p);else if(p.schema==='bptrans-1cprv-guarnicao-v1'){importLegacy(p);r='ok'}else r='ign';if(r==='ok')ok++;else if(r==='duplicado')dup++;else ign++}catch(e){console.error(e);ign++}}alert(`Importação concluída: ${ok} incorporado(s), ${dup} duplicado(s), ${ign} ignorado(s).`);renderGuarnicoes();renderMatrix();renderFisco()}
 function renderFisco(){}
 function atualizarFiscoVisibility(){}
@@ -434,7 +526,7 @@ function importarOperacoesDoDiaCpu(){const data=val('dataInicio'),u=currentUnit(
 function salvarRascunho(s=false){saveRcoHistory();localStorage.setItem(DRAFT,JSON.stringify(collectState()));if(!s)alert('Rascunho salvo neste aparelho.')}
 function carregarRascunho(){const raw=localStorage.getItem(DRAFT);if(!raw){alert('Nenhum rascunho salvo.');return}try{applyCpu(JSON.parse(raw));alert('Rascunho carregado.')}catch(e){console.error(e);alert('Rascunho inválido.')}}
 function clearContainer(ids){ids.forEach(id=>document.getElementById(id).innerHTML='')}
-function applyCpu(p){if(p.unidade){document.getElementById('batalhao').value=p.unidade.batalhao||'BPTran';document.getElementById('companhiaNumero').value=String(p.unidade.companhiaNumero||1)}for(const [id,v] of Object.entries({dataInicio:p.periodo?.inicio,horarioServico:'07:00 às 07:00',observacoesGerais:p.observacoes,substitutoLegal:p.passagem?.substituto,dataFinal:p.passagem?.data,nomeAssinante:p.assinante?.nome,patenteAssinante:p.assinante?.posto})){const e=document.getElementById(id);if(e)e.value=v||''}state=p.state||state;if(!state.guarnicoes)state.guarnicoes={};if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];Object.values(state.guarnicoes).forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura=''});ensureGuarnicao('CPU');clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);(p.cpu||[]).forEach(addCpuPerson);(p.alteracoesEfetivo||[]).forEach(addEfetivoChange);(p.operacoes||[]).forEach(addCpuOperation);(p.veiculosRecuperados||[]).forEach(addCpuVehicle);(p.tcos||[]).forEach(addCpuTco);(p.cirvc||p.arvc||[]).forEach(addCpuArvc);(p.anexos||[]).forEach(addAnexo);syncUnitHeader();rcoSyncServiceWindow();atualizarDiaCpu();renderGuarnicoes();renderMatrix();renderFisco();syncDefaultFiscoAnexo();syncAll()}
+function applyCpu(p){if(p.unidade){document.getElementById('batalhao').value=p.unidade.batalhao||'BPTran';document.getElementById('companhiaNumero').value=String(p.unidade.companhiaNumero||1)}for(const [id,v] of Object.entries({dataInicio:p.periodo?.inicio,horarioServico:'07:00 às 07:00',observacoesGerais:p.observacoes,substitutoLegal:p.passagem?.substituto,dataFinal:p.passagem?.data,nomeAssinante:p.assinante?.nome,patenteAssinante:p.assinante?.posto})){const e=document.getElementById(id);if(e)e.value=v||''}state=p.state||state;if(!state.guarnicoes)state.guarnicoes={};if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];Object.values(state.guarnicoes).forEach(g=>{if(g.alteracoesViatura==null)g.alteracoesViatura=''});ensureGuarnicao('CPU');clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);(p.cpu||[]).forEach(addCpuPerson);(p.alteracoesEfetivo||[]).forEach(addEfetivoChange);(p.operacoes||[]).forEach(addCpuOperation);(p.veiculosRecuperados||[]).forEach(addCpuVehicle);(p.tcos||[]).forEach(addCpuTco);(p.cirvc?.length?p.cirvc:(p.arvc||p.cirvc||[])).forEach(addCpuArvc);(p.anexos||[]).forEach(addAnexo);syncUnitHeader();rcoSyncServiceWindow();atualizarDiaCpu();renderGuarnicoes();renderMatrix();renderFisco();syncDefaultFiscoAnexo();syncAll()}
 function limparFormulario(){if(!confirm('Limpar todo o relatório CPU?'))return;try{localStorage.removeItem(DRAFT);localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase())}catch(_){}state={reportId:uid('cpu'),guarnicoes:{},importedReportIds:[],importedRecordIds:[],rcoLinkedRecords:[],fisco:[]};clearContainer(['cpuPeople','efetivoChanges','cpuOperations','cpuVehicles','cpuTcos','cpuArvcs','anexos']);setDates();ensureGuarnicao('CPU');addCpuPerson();defaultAnexos();document.querySelectorAll('textarea').forEach(e=>e.value='');syncAll()}
 function syncDefaultFiscoAnexo(){const tbody=document.getElementById('anexos');if(!tbody)return;[...tbody.querySelectorAll('tr.entry')].filter(r=>r.dataset.autoDefault==='fisco'||r.querySelector('[data-k="descricao"]')?.value==='Relatório de Ocorrências do Fisco Estadual').forEach(r=>r.remove())}
 function defaultAnexos(){
@@ -515,8 +607,33 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
   function lockPreviousRows(){ensureCpuSlot(auditState.activeSlot)}
   function toggleCpuAddButton(){const sec=document.querySelector('#cpuPeople')?.closest('section');const b=[...(sec?.querySelectorAll('button')||[])].find(x=>/\+\s*militar/i.test(x.textContent||''));if(b)b.hidden=!!auditState.activated}
   function updateUiState(){if(auditState.activated)lockPreviousRows();toggleCpuAddButton();const btn=document.getElementById('rcoAuditToggle');if(btn)btn.hidden=!auditState.activated;const status=document.getElementById('rcoAuditStatus');if(status)status.textContent=auditState.activated?('Auditoria ativa • '+actorLabel(actor())):'Auditoria será ativada na passagem de serviço.'}
+  function renderRcoAnteriores_(){
+    const snapshots=Object.entries(auditState.snapshots||{}).filter(([k,v])=>/^cpu\d+AtPassage$/.test(k)&&v&&typeof v==='object');
+    let card=document.getElementById('rcoHistoricoRecebido');
+    if(!auditState.activated||!snapshots.length){card?.remove();return}
+    if(!card){
+      card=document.createElement('section');card.id='rcoHistoricoRecebido';card.className='card no-print';
+      const anchor=document.getElementById('rcoResponsavelCard')||document.querySelector('.service-state-bar');
+      if(anchor)anchor.insertAdjacentElement('afterend',card);else document.querySelector('header.doc-head')?.after(card);
+    }
+    card.replaceChildren();
+    const head=document.createElement('h3');head.textContent='Dados registrados pelos coordenadores anteriores';card.appendChild(head);
+    const explain=document.createElement('p');explain.className='hint';
+    explain.textContent='Os registros anteriores também devem aparecer normalmente no RCO. Abaixo estão cópias preservadas no momento de cada passagem, disponíveis somente para conferência, sem alteração dos registros originais.';
+    card.appendChild(explain);
+    snapshots.sort((a,b)=>Number(a[0].match(/\d+/)?.[0]||0)-Number(b[0].match(/\d+/)?.[0]||0)).forEach(([key,snapshot])=>{
+      const num=Number(key.match(/\d+/)?.[0]||0),a=auditState.actors?.[String(num)]||{};
+      const details=document.createElement('details'),summary=document.createElement('summary');
+      summary.textContent='CPU '+num+' — '+[a.graduacao,a.nome].filter(Boolean).join(' ')+' — visualizar informações anteriores';
+      details.appendChild(summary);
+      const units=Object.keys(snapshot.state?.guarnicoes||{}).length;
+      const desc=document.createElement('p');desc.textContent='Guarnições: '+units+' | Operações do CPU: '+(snapshot.operacoes||[]).length+' | Ocorrências/alterações e demais campos preservados no conteúdo abaixo.';details.appendChild(desc);
+      const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto;max-width:100%';
+      pre.textContent=JSON.stringify(snapshot,null,2);details.appendChild(pre);card.appendChild(details);
+    });
+  }
   function render(){
-    const card=document.getElementById('rcoAuditCard');if(!card)return;updateUiState();
+    const card=document.getElementById('rcoAuditCard');if(!card)return;updateUiState();renderRcoAnteriores_();
     const sum=document.getElementById('rcoAuditSummary');if(sum){const slots=Array.from({length:Math.max(auditState.activeSlot,Object.keys(auditState.actors||{}).length,1)},(_,i)=>i+1);sum.innerHTML=slots.map(slot=>{const a=actor(slot),evs=auditState.events.filter(e=>e.autor?.slot==='CPU '+slot);return '<div class="audit-person"><strong>CPU '+slot+'</strong><div>'+escHtml([a.graduacao,a.nome].filter(Boolean).join(' ')||'Não identificado')+'</div><div>'+escHtml(a.matricula?('Matrícula: '+a.matricula):'')+'</div><div>'+evs.length+' alteração(ões) auditada(s)</div></div>'}).join('')}
     const tb=document.getElementById('rcoAuditRows');if(tb){const evs=auditState.events.slice(-150).reverse();tb.innerHTML=evs.length?evs.map(e=>'<tr><td>'+new Date(e.em).toLocaleString('pt-BR')+'</td><td>'+escHtml(trim(actorLabel(e.autor||{}),85))+'</td><td>'+escHtml(trim(e.tipo,40))+'</td><td>'+escHtml(trim(e.item,85))+'</td><td>'+escHtml(trim(e.antes,75))+'</td><td>'+escHtml(trim(e.depois,75))+'</td></tr>').join(''):'<tr><td colspan="6">A auditoria ainda não possui alterações posteriores à passagem.</td></tr>'}
   }
@@ -540,25 +657,84 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
   function safeName(s,f='CPU'){return text(s).replace(/[\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim()||f}
   function fmtDateFile(s){if(!s)return new Date().toLocaleDateString('pt-BR').replaceAll('/','.');const [y,m,d]=String(s).split('-');return d&&m&&y?`${d}.${m}.${y}`:s}
   window.exportarPassagemRcoContingencia=function(){const p=window.collectState?window.collectState():(baseCollect?baseCollect():{}),a=actor(auditState.activeSlot),data=p?.periodo?.inicio||'';dlJSON('PASSAGEM RCO - '+safeName(a.nome||'CPU')+' - '+fmtDateFile(data)+'.json',{schema:PASS_SCHEMA,schemaVersion:2,generatedAt:new Date().toISOString(),relatorio:p})};
+  async function rcoPassagemConferidaNaNuvem_(pass,base,expectedStatus='AGUARDANDO_RECEBIMENTO'){
+    const reportId=String(base?.state?.reportId||base?.reportId||'').trim(),data=String(base?.periodo?.inicio||'').slice(0,10),u=base?.unidade||{};
+    const token=String(sessionStorage.getItem('pmpb-rco-role-token-v1')||'');
+    if(!reportId||!data||!token||!u.batalhao||!u.companhia)throw new Error('Identificação do RCO, data, unidade ou sessão incompleta.');
+    const reply=await CentralCloud.jsonp('rco-draft-get',{reportId,data,batalhao:u.batalhao,companhia:u.companhia,token},{timeout:30000});
+    const cloud=reply?.rco||{},audit=cloud.auditoria||{};
+    if(String(cloud.state?.reportId||cloud.reportId||'')!==reportId)throw new Error('O RCO retornado não corresponde ao relatório entregue.');
+    const found=(audit.passagens||[]).find(x=>String(x.id||'')===String(pass.id||''));
+    if(!found||String(found.status||'')!==expectedStatus)throw new Error('Passagem ainda não registrada como disponível na Central.');
+    const key='cpu'+pass.slot+'AtPassage',local=auditState.snapshots?.[key],remote=audit.snapshots?.[key];
+    if(!local||!remote||JSON.stringify(remote)!==JSON.stringify(local))throw new Error('O histórico anterior não foi encontrado integralmente no RCO armazenado.');
+    // The existence of a snapshot alone is NOT proof the live RCO survived.
+    // During delivery, compare the actual production fields before confirming.
+    if(expectedStatus==='AGUARDANDO_RECEBIMENTO'){
+      const operational=['state','cpu','alteracoesEfetivo','operacoes','veiculosRecuperados','tcos','cirvc','arvc','observacoes','anexos','rcoOrigens','rcoCloudPayloads'];
+      for(const field of operational){
+        if(!Object.prototype.hasOwnProperty.call(local,field))continue;
+        if(JSON.stringify(cloud[field]??null)!==JSON.stringify(local[field]??null))
+          throw new Error('A Central não preservou os dados operacionais do campo '+field+' durante a passagem. Não considere a entrega concluída.');
+      }
+    }
+    if(expectedStatus==='RECEBIDA'&&Number(audit.activeSlot||0)<Number(pass.slot||0)+1)throw new Error('O novo coordenador ainda não consta como responsável no RCO da nuvem.');
+    return true;
+  }
   window.gerarPassagemServicoRco=async function(){
-    try{const ok=await window.centralRcoSyncNow?.(false);if(ok===false&&!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar mesmo assim?'))return}catch(_){if(!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar mesmo assim?'))return}
-    syncActors();const slot=auditState.activeSlot,a=actor(slot),formal=window.rcoResponsibleData?.()||{};
-    if(!a.nome&&!a.matricula){alert('Identifique o Coordenador atual antes de realizar a passagem de serviço.');return}
-    if(!window.__rcoResponsavelRegistrado||!formal.matricula){alert('Registre formalmente o CPU/Coordenador antes de realizar a passagem de serviço.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
-    const last=auditState.passagens?.[auditState.passagens.length-1];
-    if(last&&String(last.status||'AGUARDANDO_RECEBIMENTO')==='AGUARDANDO_RECEBIMENTO'&&Number(auditState.activeSlot||1)<=Number(last.slot||0)){alert('Já existe uma passagem deste RCO aguardando recebimento.');renderRcoOutgoingPassage();return}
-    const base=baseCollect?baseCollect():{};auditState.activated=true;auditState.actors[String(slot)]={...auditState.actors[String(slot)],nome:a.nome,matricula:a.matricula,graduacao:a.graduacao,turno:a.turno};auditState.snapshots['cpu'+slot+'AtPassage']=clone({...base,auditoria:undefined});
-    auditState.passagens.push({id:'rco-pass-'+Date.now().toString(36),em:new Date().toISOString(),de:actorLabel(a),slot,reportId:base?.state?.reportId||base?.reportId||'',status:'AGUARDANDO_RECEBIMENTO',observacao:''});
-    auditMuted=false;log('PASSAGEM','Passagem disponibilizada pelo CPU '+slot,'','','Aguardando recebimento pelo próximo Coordenador');setRowLocked([...document.querySelectorAll('#cpuPeople tr')][slot-1],true);render();renderRcoOutgoingPassage();
-    try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralRcoSyncNow?.(false),120);
-    alert('Passagem disponibilizada na nuvem. O próximo Coordenador deverá usar “Receber passagem de serviço”.');
+    if(window.__rcoPassPublishBusy)return;
+    window.__rcoPassPublishBusy=true;
+    try{
+      syncActors();const slot=auditState.activeSlot,a=actor(slot),formal=window.rcoResponsibleData?.()||{};
+      if(!a.nome&&!a.matricula){alert('Identifique o Coordenador atual antes de realizar a passagem de serviço.');return}
+      if(!window.__rcoResponsavelRegistrado||!formal.matricula){alert('Registre formalmente o CPU/Coordenador antes da passagem.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
+      let last=auditState.passagens?.[auditState.passagens.length-1];
+      const existing=!!(last&&last.status==='AGUARDANDO_RECEBIMENTO'&&Number(slot)<=Number(last.slot||0));
+      if(existing&&Number(last.slot||0)!==Number(slot)){alert('Existe uma passagem pendente de outro coordenador. Não crie outra.');return}
+      if(!existing){
+        let confirmed=false;try{confirmed=await window.centralRcoSyncNow?.(false)===true}catch(_){}
+        if(!confirmed){alert('PASSAGEM NÃO REALIZADA: os dados deste RCO ainda não foram confirmados na nuvem. O conteúdo deste aparelho foi preservado.');return}
+        const base=baseCollect?baseCollect():{},id=base?.state?.reportId||base?.reportId||'';
+        if(!id){alert('RCO sem identificador. Não foi criada passagem.');return}
+        auditState.activated=true;auditState.actors[String(slot)]={...auditState.actors[String(slot)],nome:a.nome,matricula:a.matricula,graduacao:a.graduacao,turno:a.turno};
+        auditState.snapshots['cpu'+slot+'AtPassage']=clone({...base,auditoria:undefined});
+        last={id:'rco-pass-'+Date.now().toString(36),em:new Date().toISOString(),de:actorLabel(a),slot,reportId:id,status:'AGUARDANDO_RECEBIMENTO',observacao:''};
+        auditState.passagens.push(last);auditMuted=false;
+        log('PASSAGEM','Passagem preparada pelo CPU '+slot,'','','Aguardando confirmação integral na nuvem');
+        setRowLocked([...document.querySelectorAll('#cpuPeople tr')][slot-1],true);render();renderRcoOutgoingPassage();
+        try{window.salvarRascunho?.(true)}catch(_){}
+      }
+      const current=baseCollect?baseCollect():{};
+      // When a previous response was lost, verify the committed passage BEFORE retrying a write.
+      try{await rcoPassagemConferidaNaNuvem_(last,current);alert('Passagem confirmada na nuvem, incluindo os dados anteriores. O próximo CPU pode receber o RCO.');return}catch(_){}
+      let sent=false;try{sent=await window.centralRcoSyncNow?.(false)===true}catch(_){}
+      if(!sent){alert('PASSAGEM SEM CONFIRMAÇÃO: o envio pode não ter sido concluído. O rascunho local foi preservado; clique novamente em Realizar passagem para conferir o mesmo registro antes de entregar.');return}
+      try{await rcoPassagemConferidaNaNuvem_(last,current);alert('Passagem confirmada na nuvem, com histórico e dados anteriores preservados. O próximo CPU pode receber este RCO.');}
+      catch(err){alert('PASSAGEM SEM CONFIRMAÇÃO INTEGRAL: os dados não foram comprovados na leitura do banco. Não considere o serviço entregue. '+(err?.message||err))}
+    }finally{window.__rcoPassPublishBusy=false}
   };
   window.receberPassagemServicoRco=async function(files){const f=Array.from(files||[])[0];if(!f)return;try{const x=JSON.parse(await f.text()),r=x?.relatorio||x;if(!r||!(r.schema||'').includes('cpu'))throw new Error('schema');auditMuted=true;baseApply(r);auditState=normalize(r.auditoria);auditState.activated=true;auditState.activeSlot=Math.max(1,Number(auditState.activeSlot||1))+1;ensureCpuSlot(auditState.activeSlot);syncActors();auditState.snapshots['cpu'+auditState.activeSlot+'Start']=clone(baseCollect?baseCollect():{});auditMuted=false;log('PASSAGEM','Início do CPU '+auditState.activeSlot,'','', 'Serviço recebido por JSON: '+f.name);render();try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralInstallCompactMenus?.(),40);alert('Serviço recebido. Os Coordenadores anteriores permanecem bloqueados para auditoria e foi aberto um novo cadastro para o Coordenador atual.');}catch(e){console.error(e);alert('Arquivo de passagem de serviço do RCO incompatível ou inválido.') }};
-  window.centralRcoReceiveCloudPassage=function(){
+  window.centralRcoReceiveCloudPassage=async function(){
     if(!auditState.activated)return false;
-    const last=auditState.passagens?.[auditState.passagens.length-1];if(!last||String(last.status||'AGUARDANDO_RECEBIMENTO')!=='AGUARDANDO_RECEBIMENTO'){alert('Este RCO não possui passagem aguardando recebimento.');return false}
-    const expected=Number(last.slot||0)+1;if(expected>1&&auditState.activeSlot>=expected)return true;
-    auditMuted=true;last.status='RECEBIDA';last.recebidaEm=new Date().toISOString();auditState.activeSlot=Math.max(2,expected||auditState.activeSlot+1);ensureCpuSlot(auditState.activeSlot);syncActors();auditState.snapshots['cpu'+auditState.activeSlot+'Start']=clone(baseCollect?baseCollect():{});auditMuted=false;log('PASSAGEM','Início do CPU '+auditState.activeSlot,'','','Serviço recebido pela nuvem');render();renderRcoOutgoingPassage();try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralInstallCompactMenus?.(),40);setTimeout(()=>window.centralRcoSyncNow?.(false),120);return true;
+    const last=auditState.passagens?.[auditState.passagens.length-1];
+    if(!last){alert('Nenhuma passagem de RCO está registrada no relatório recebido.');return false}
+    const expected=Math.max(2,Number(last.slot||1)+1);
+    if(last.status==='AGUARDANDO_RECEBIMENTO'){
+      auditMuted=true;last.status='RECEBIDA';last.recebidaEm=new Date().toISOString();
+      auditState.activeSlot=Math.max(expected,Number(auditState.activeSlot||1));ensureCpuSlot(auditState.activeSlot);syncActors();
+      auditState.snapshots['cpu'+auditState.activeSlot+'Start']=clone(baseCollect?baseCollect():{});
+      auditMuted=false;log('PASSAGEM','Início do CPU '+auditState.activeSlot,'','','Recebimento pendente de confirmação na nuvem');
+      render();renderRcoOutgoingPassage();try{window.salvarRascunho?.(true)}catch(_){}
+    }else if(!(last.status==='RECEBIDA'&&auditState.activeSlot>=expected)){
+      alert('A passagem do RCO não está disponível para este coordenador.');return false
+    }
+    const original=baseCollect?baseCollect():{};
+    // Lost response after a completed write: read back BEFORE retrying any mutation.
+    try{await rcoPassagemConferidaNaNuvem_(last,original,'RECEBIDA');return true}catch(_){}
+    let saved=false;try{saved=await window.centralRcoSyncNow?.(false)===true}catch(_){}
+    if(!saved){alert('RECEBIMENTO NÃO CONFIRMADO: a Central não comprovou a gravação. Os dados permaneceram neste aparelho; não considere a passagem encerrada.');return false}
+    try{await rcoPassagemConferidaNaNuvem_(last,original,'RECEBIDA');return true}
+    catch(err){alert('RECEBIMENTO NÃO CONFIRMADO: a Central não devolveu o histórico íntegro. '+(err?.message||err));return false}
   };
   function pendingRcoPassage(){const last=auditState.passagens?.[auditState.passagens.length-1];return last&&String(last.status||'AGUARDANDO_RECEBIMENTO')==='AGUARDANDO_RECEBIMENTO'&&Number(auditState.activeSlot||1)<=Number(last.slot||0)?last:null}
   function clearRcoOutgoingPassageUi(){const el=document.getElementById('rcoOutgoingPassage');if(el){el.hidden=true;el.style.display='none';el.innerHTML='';el.remove()}}
@@ -714,8 +890,8 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
   function p3ProductionRows(rco,data,u){const rows=[];const gs=Object.values(rco?.state?.guarnicoes||{});for(const g of gs){for(const [grupoCodigo,grupoNome,itens] of (typeof SOMATORIO!=='undefined'?SOMATORIO:[])){for(const [indicadorCodigo,indicadorNome] of itens){rows.push({registroId:`prod-${rco?.state?.reportId||'rco'}-${g.id||'gu'}-${grupoCodigo}-${indicadorCodigo}`,reportId:rco?.state?.reportId||'',dataServico:data,batalhao:u.batalhao,companhia:u.companhia,guarnicao:g.nome||g.id||'',grupoCodigo,grupoNome,indicadorCodigo,indicadorNome,quantidade:Number(g.metrics?.[`${grupoCodigo}::${indicadorCodigo}`]||0),origemRelatorio:'RCO',origemRegistroId:g.id||''})}}}return rows}
   function p3VehicleRows(rco,data,u){return (rco?.veiculosRecuperados||[]).map((v,i)=>{const c=p3VehicleClass(v.situacao),mm=p3SplitBrandModel(v.marcaModelo);return {registroId:v.id||`veic-${i+1}`,reportId:rco?.state?.reportId||'',data,batalhao:u.batalhao,companhia:u.companhia,guarnicao:v.guarnicao||'',placaUf:String(v.placaUf||'').toUpperCase(),tipo:v.tipo||'',marcaModelo:v.marcaModelo||'',marca:mm.marca,modelo:mm.modelo,ano:v.ano||v.anoModelo||'',situacao:v.situacao||'',classificacaoP3:c.legado,tipoRecuperacaoDetalhada:c.detalhada,contaComoRecuperado:c.recuperado,placaOriginalIdentificada:v.placaOriginalIdentificada||'',placaOriginalUf:v.placaOriginalUf||'',restricaoOriginal:v.restricaoOriginal||'',local:v.local||'',houveConduzidos:v.houveConduzidos||'Não',quantidadeConduzidos:Number(v.quantidadeConduzidos||0),valorFipe:p3MoneyNumber(v.valorFipe),origemRelatorio:'RCO',origemRegistroId:v.id||''}})}
   function p3CirvcRows(rco,cirvcs,data,u){const inline=(rco?.arvc||[]).map(x=>({...x,sourceReportId:rco?.state?.reportId||'',unidade:u}));const all=p3UniqueRows([...(cirvcs||[]),...inline],x=>x.id||[x.sourceReportId,x.numeroTermo,x.data,x.hora,x.placa].join('|'));return all.map((c,i)=>({registroId:c.id||`cirvc-${i+1}`,reportId:rco?.state?.reportId||'',data:c.data||data,hora:c.hora||'',batalhao:u.batalhao,companhia:u.companhia,guarnicao:c.guarnicao||'',numeroTermo:c.numeroTermo||'',placa:String(c.placa||'').toUpperCase(),vtr:c.vtr||c.guarnicao||'',responsavelCirvc:c.militarResponsavelAit||c.militarResponsavel||'',localDeixado:c.local||c.localDestino||'',origemRelatorio:'RCO',origemRegistroId:c.id||c.sourceReportId||''}))}
-  function p3PodRows(rco,ops,data,u){const base=(rco?.operacoes||[]).map(o=>({...o,_source:'RCO'}));const ids=new Set(base.map(o=>o.id).filter(Boolean));for(const p of (ops||[])){if(p?.reportId&&ids.has(p.reportId))continue;const sm=p?.resumoCpu||p?.resumo||{};const pod=p?.pod||{};base.push({id:p?.reportId||'',guarnicao:p?.operacao?.guarnicoes||sm.guarnicoes||'',nome:p?.operacao?.nome||sm.nome||'',turno:p?.operacao?.turno||sm.turno||'',local:p?.local?.descricao||sm.local||'',coordenadas:p?.local?.coordenadas||'',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',_source:'ROP'})}
-    return base.map((o,i)=>{let status=o.statusCumprimento||'Não informado';let previsto=o.localPrevisto||'';if(status==='Executado conforme previsto'&&!previsto)previsto=o.local||'';const houve=['Executado em local diverso','Executado parcialmente','Não executado'].includes(status);return {registroId:o.id||`pod-${i+1}`,reportId:rco?.state?.reportId||'',data,batalhao:u.batalhao,companhia:u.companhia,guarnicao:o.guarnicao||'',operacao:o.nome||'',turno:o.turno||'',statusCumprimento:status,localPrevisto:previsto,localExecutado:o.local||'',coordenadasExecutadas:o.coordenadas||'',horaInicio:o.horaInicio||'',horaFim:o.horaFim||'',houveAlteracao:houve,motivoAlteracao:o.motivoAlteracao||'',origemRelatorio:o._source||'RCO',origemRegistroId:o.id||''}})}
+  function p3PodRows(rco,ops,data,u){const base=(rco?.operacoes||[]).map(o=>({...o,_source:'RCO'}));const ids=new Set(base.map(o=>o.id).filter(Boolean));for(const p of (ops||[])){if(p?.reportId&&ids.has(p.reportId))continue;const sm=p?.resumoCpu||p?.resumo||{};const pod=p?.pod||{};base.push({id:p?.reportId||'',knownPodFingerprint:typeof p?.podFingerprint==='string'?p.podFingerprint:'',guarnicao:p?.operacao?.guarnicoes||sm.guarnicoes||'',guarnicoesParticipantes:p?.operacao?.guarnicoes||sm.guarnicoes||'',nome:p?.operacao?.nome||sm.nome||'',turno:p?.operacao?.turno||sm.turno||'',local:p?.local?.descricao||sm.local||'',coordenadas:p?.local?.coordenadas||'',localPrevisto:pod.localPrevisto||sm.localPrevisto||'',statusCumprimento:pod.statusCumprimento||sm.statusCumprimento||'Não informado',motivoAlteracao:pod.motivoAlteracao||sm.motivoAlteracao||'',_source:'ROP'})}
+    return base.map((o,i)=>{let status=o.statusCumprimento||'Não informado';let previsto=o.localPrevisto||'';if(status==='Executado conforme previsto'&&!previsto)previsto=o.local||'';const houve=['Executado em local diverso','Executado parcialmente','Não executado'].includes(status);return {registroId:o.id||`pod-${i+1}`,reportId:rco?.state?.reportId||'',data,batalhao:u.batalhao,companhia:u.companhia,guarnicao:o.guarnicao||'',guarnicoesParticipantes:o.guarnicoesParticipantes||o.guarnicoes||o.guarnicao||'',operacao:o.nome||'',turno:o.turno||'',statusCumprimento:status,localPrevisto:previsto,localExecutado:o.local||'',coordenadasExecutadas:o.coordenadas||'',horaInicio:o.horaInicio||'',horaFim:o.horaFim||'',houveAlteracao:houve,motivoAlteracao:o.motivoAlteracao||'',...(o.knownPodFingerprint?{knownPodFingerprint:o.knownPodFingerprint}:{}),origemRelatorio:o._source||'RCO',origemRegistroId:o.id||''}})}
   function p3BuildStatistics(rco,ops,cirvcs,data,u){return {schema:'pmpb-p3-estatistica-v2',schemaVersion:2,reportId:rco?.state?.reportId||'',producao:p3ProductionRows(rco,data,u),veiculos:p3VehicleRows(rco,data,u),cirvcs:p3CirvcRows(rco,cirvcs,data,u),podExecucao:p3PodRows(rco,ops,data,u)}}
 
   function p3BuildPackage(){
@@ -726,10 +902,12 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
     const u=p3CanonicalUnit(rco.unidade||currentUnit());
     rco.unidade=u;
     rco.batalhao=u.batalhao;rco.batalhaoCodigo=u.batalhaoCodigo;rco.companhiaNumero=u.companhiaNumero;rco.companhia=u.companhia;rco.companhiaTipo=u.companhiaTipo;rco.companhiaCodigo=u.companhiaCodigo;
-    const ops=p3ReadArray(P3_OPERATIONS_STORE).filter(p=>p3DataRegistro(p)===data && p3SameUnit(p,u));
+    const activeIds=new Set((rco.operacoes||[]).map(o=>String(o.id||'')));
+    const removedIds=new Set((rco.podRemovals||[]).filter(x=>!activeIds.has(String(x.registroId||''))).map(x=>String(x.registroId||'')));
+    const ops=p3ReadArray(P3_OPERATIONS_STORE).filter(p=>p3DataRegistro(p)===data && p3SameUnit(p,u) && !removedIds.has(String(p.reportId||p.id||'')));
     const cirvcs=p3ReadArray(P3_CIRVC_STORE).filter(c=>p3DataRegistro(c)===data && p3SameUnit(c,u));
     const estatisticaP3=p3BuildStatistics(rco,ops,cirvcs,data,u);
-    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,estatisticaP3};
+    return {schema:P3_SCHEMA,schemaVersion:1,schemaExtension:'pmpb-p3-estatistica-v2',clientVersion:'RCO-v9-P3-extensao',sentAt:new Date().toISOString(),unidade:u,batalhao:u.batalhao,batalhaoCodigo:u.batalhaoCodigo,companhiaNumero:u.companhiaNumero,companhia:u.companhia,companhiaTipo:u.companhiaTipo,companhiaCodigo:u.companhiaCodigo,rco,operacoesCompletas:ops,cirvcsCompletos:cirvcs,podRemovals:(Array.isArray(rco.podRemovals)?rco.podRemovals:[]).filter(x=>!(rco.operacoes||[]).some(o=>String(o.id||'')===String(x.registroId||''))),estatisticaP3};
   }
   window.centralP3BuildPackage=p3BuildPackage;
   function p3SetStatus(msg){const el=document.getElementById('p3Status');if(el)el.textContent=msg||''}
@@ -870,7 +1048,7 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
     }catch(err){
       if(CentralCloud.isAuthError?.(err)){try{sessionStorage.removeItem('pmpb-rco-role-token-v1');sessionStorage.removeItem('central-module-auth-rco-v1')}catch(_){}alert(RCO_SESSION_EXPIRED_MSG);setTimeout(()=>window.centralReturnToAccess?.('rco'),0);}
       else alert('Não foi possível consolidar o RCO: '+(err.message||err));
-      p3SetStatus('Falha na consolidação.');
+      p3SetStatus(/RCO_(POD|OPERATION)_CONFLICT/.test(String(err?.message||err||''))?'Conflito de vínculo ou versão do POD/operação: consolidação bloqueada antes da escrita. Confira os dados e reabra o registro.':'Falha na consolidação.');
     }finally{setRcoOpBusy(false)}
   };
 })();
@@ -1108,7 +1286,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       throw new Error('RCO_SCOPE_SELECTION_INVALID: unidade do RCO inconsistente. Atualize a lista; nenhum relatório foi assumido.');
     return scope;
   }
-  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken='',opts={}){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const selectedScope=rcoClaimScopeFromItem_(item);const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,data:claimData,...selectedScope},token,{popup:false});window.__rcoContextAbandoned=false;rcoRevisionNotified=false;rcoRememberRevision(item.reportId||r.rco?.state?.reportId||r.rco?.reportId,r.revision);const hintResp=r.rco?.responsavelRco||r.responsavel||null;const uniqueness=!!(opts&&opts.uniqueness);if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else if(!uniqueness)window.__rcoPendingContinueResponsible=true;else window.__rcoPendingContinueResponsible=false;window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else if(uniqueness&&hintResp&&hintResp.matricula){window.__rcoPendingContinueResponsible=false;const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='RCO desta companhia e período aberto. Os dados salvos foram preservados.';}else if(uniqueness){window.__rcoPendingContinueResponsible=true;window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='Identifique o responsável deste RCO. Nenhum dado já gravado será apagado.';}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token,opts)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
+  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken='',opts={}){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const selectedScope=rcoClaimScopeFromItem_(item);const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);if(receivePassage){let peek;try{peek=await CentralCloud.jsonp('rco-draft-get',{reportId:item.reportId,data:claimData,token,...selectedScope},{timeout:30000})}catch(e){alert('RECEBIMENTO BLOQUEADO: não foi possível consultar o histórico do RCO antes de assumir. Nenhum bloqueio de edição foi solicitado. '+(e.message||e));return false}const p=peek?.rco||{},h=p.auditoria||{},passes=h.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(String(p.state?.reportId||p.reportId||'')!==String(item.reportId||'')||!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!h.snapshots?.[key]||String(h.snapshots[key]?.state?.reportId||'')!==String(item.reportId||'')||!['state','cpu','alteracoesEfetivo','operacoes','veiculosRecuperados','tcos','cirvc','arvc','observacoes','anexos','rcoOrigens','rcoCloudPayloads'].every(k=>!Object.prototype.hasOwnProperty.call(h.snapshots[key],k)||JSON.stringify(p[k]??null)===JSON.stringify(h.snapshots[key][k]??null))){alert('RECEBIMENTO BLOQUEADO: o RCO da Central não contém uma passagem íntegra com os dados anteriores. Nenhum bloqueio de edição foi realizado. Solicite conferência do histórico.');return false}}const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,receivePassage:!!receivePassage,data:claimData,...selectedScope},token,{popup:false});window.__rcoContextAbandoned=false;rcoRevisionNotified=false;rcoRememberRevision(item.reportId||r.rco?.state?.reportId||r.rco?.reportId,r.revision);const hintResp=r.rco?.responsavelRco||r.responsavel||null;const uniqueness=!!(opts&&opts.uniqueness);if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else if(!uniqueness)window.__rcoPendingContinueResponsible=true;else window.__rcoPendingContinueResponsible=false;if(receivePassage){const a=r.rco?.auditoria||{},passes=a.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!a.snapshots?.[key]){window.__rcoPendingReceiveAfterResponsible=false;alert('RECEBIMENTO BLOQUEADO: este RCO na nuvem não contém uma passagem pendente com cópia integral dos dados anteriores. Não inicie um relatório vazio nem substitua informações; solicite conferência do histórico ao coordenador anterior.');return false}}window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else if(uniqueness&&hintResp&&hintResp.matricula){window.__rcoPendingContinueResponsible=false;const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='RCO desta companhia e período aberto. Os dados salvos foram preservados.';}else if(uniqueness){window.__rcoPendingContinueResponsible=true;window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='Identifique o responsável deste RCO. Nenhum dado já gravado será apagado.';}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token,opts)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
   async function continueRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false}
 
   window.centralRcoContinueCloud=continueRcoCloud;
@@ -1197,6 +1375,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
         try{evs=((await CentralCloud.jsonp('service-event-list',q,{timeout:20000})).items||[]).filter(e=>String(e.tipo||'').toUpperCase()==='BO')}catch(_){evs=[]}
         const planned=rcoPlanLinkedMerge([...rcoKnownIds()],{operacoes:ops.map(rcoFlatOperation),cirvc:cir.map(rcoFlatCirvc),boletins:evs.map(rcoFlatBo)},scope);
         planned.accept.forEach(item=>{
+          if(item.kind==='operacao'&&(window.__rcoPodRemovals||[]).some(x=>String(x.registroId||'')===String(item.id||'')))return;
           const data=rcoLinkedDataFromAccept(item,opDate);
           if(item.kind==='operacao')addCpuOperation(Object.assign({id:item.id,guarnicao:g.nome},data));
           else if(item.kind==='cirvc')addCpuArvc(Object.assign({id:item.id,guarnicao:g.nome},data));
@@ -1218,11 +1397,31 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   window.centralRcoToggleSemCpu=function(){const on=semCpu();document.getElementById('rcoConsolidadorFields')?.classList.toggle('hidden',!on);if(on&&document.getElementById('rcoConsolidadorMatricula'))document.getElementById('rcoConsolidadorMatricula').value=CentralCloud?.formatMatricula(document.getElementById('rcoConsolidadorMatricula').value)||'';hideCpuColumns();window.centralAutosave?.()}
   if(baseRenderMatrix)window.renderMatrix=function(){const r=baseRenderMatrix.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
   if(baseRenderPrint)window.renderPrintMatrix=function(){const r=baseRenderPrint.apply(this,arguments);setTimeout(hideCpuColumns,0);return r}
-  window.collectState=function(){const p=baseCollect();p.rcoOrigens=origins.slice();p.rcoCloudPayloads=JSON.parse(JSON.stringify(cloudPayloads||{}));p.consolidacaoResponsavel=consolidator();p.semGuarnicaoCpu=semCpu();const cf=window.__rcoClosureFlags||{};p.pdfGerado=!!(p.pdfGerado||cf.pdfGerado);p.pdfGeradoEm=p.pdfGeradoEm||cf.pdfGeradoEm||'';p.p3Consolidado=!!(p.p3Consolidado||cf.p3Consolidado);p.p3ConsolidadoEm=p.p3ConsolidadoEm||cf.p3ConsolidadoEm||'';p.encerrado=!!(p.encerrado||cf.encerrado);p.encerradoEm=p.encerradoEm||cf.encerradoEm||'';if(semCpu()){p.cpu=[];p.state=JSON.parse(JSON.stringify(p.state||{}));if(p.state.guarnicoes)delete p.state.guarnicoes.cpu;const keep=x=>String(x?.guarnicao||'').trim().toUpperCase()!=='CPU';p.operacoes=(p.operacoes||[]).filter(keep);p.veiculosRecuperados=(p.veiculosRecuperados||[]).filter(keep);p.tcos=(p.tcos||[]).filter(keep);p.arvc=(p.arvc||[]).filter(keep)}return p}
-  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu();window.__rcoClosureFlags={pdfGerado:!!p?.pdfGerado,pdfGeradoEm:String(p?.pdfGeradoEm||''),p3Consolidado:!!p?.p3Consolidado,p3ConsolidadoEm:String(p?.p3ConsolidadoEm||''),encerrado:!!p?.encerrado,encerradoEm:String(p?.encerradoEm||'')};try{window.p3RefreshClosureStatus?.();const el=document.getElementById('p3Status');if(el&&!el.textContent){const f=window.__rcoClosureFlags;if(f.pdfGerado&&!f.p3Consolidado)el.textContent='PDF gerado. Ainda falta Consolidar P3.';else if(!f.pdfGerado&&f.p3Consolidado)el.textContent='Dados consolidados. Ainda falta Gerar PDF do RCO.';else if(f.pdfGerado&&f.p3Consolidado&&!f.encerrado)el.textContent='PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.'}}catch(_){}try{window.centralRcoRefreshLinkedRecords?.()}catch(_){}}
+  window.__rcoPodRemovals=Array.isArray(window.__rcoPodRemovals)?window.__rcoPodRemovals:[];
+  document.addEventListener('click',function(event){
+    const button=event.target.closest?.('#cpuOperations .cpu-op-entry .entry-head button.danger');
+    if(!button)return;
+    const entry=button.closest('.cpu-op-entry');
+    const id=String(entry?.dataset.id||''),fingerprint=String(entry?.querySelector('[data-k="knownPodFingerprint"]')?.value||'');
+    if(!id)return;
+    if(!fingerprint){
+      if(entry?.dataset.localOnly==='1')return; // never detached from P3
+      event.preventDefault();event.stopImmediatePropagation();
+      window.alert('Este POD nao possui versao verificada. Atualize o registro vinculado antes de remove-lo, para evitar perda de dados.');
+      return;
+    }
+    if(!window.confirm('Remover este POD do RCO? O registro estatistico original permanece no P3.')){
+      event.preventDefault();event.stopImmediatePropagation();return;
+    }
+    const prior=Array.isArray(window.__rcoPodRemovals)?window.__rcoPodRemovals:[];
+    window.__rcoPodRemovals=prior.filter(x=>String(x.registroId||'')!==id).concat([{registroId:id,knownPodFingerprint:fingerprint}]);
+    if(Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=state.rcoLinkedRecords.filter(x=>String(x.id||'')!==id);
+  },true);
+  window.collectState=function(){const p=baseCollect();p.rcoOrigens=origins.slice();p.podRemovals=Array.isArray(window.__rcoPodRemovals)?window.__rcoPodRemovals.map(x=>({...x})):[];p.rcoCloudPayloads=JSON.parse(JSON.stringify(cloudPayloads||{}));p.consolidacaoResponsavel=consolidator();p.semGuarnicaoCpu=semCpu();const cf=window.__rcoClosureFlags||{};p.pdfGerado=!!(p.pdfGerado||cf.pdfGerado);p.pdfGeradoEm=p.pdfGeradoEm||cf.pdfGeradoEm||'';p.p3Consolidado=!!(p.p3Consolidado||cf.p3Consolidado);p.p3ConsolidadoEm=p.p3ConsolidadoEm||cf.p3ConsolidadoEm||'';p.encerrado=!!(p.encerrado||cf.encerrado);p.encerradoEm=p.encerradoEm||cf.encerradoEm||'';if(semCpu()){p.cpu=[];p.state=JSON.parse(JSON.stringify(p.state||{}));if(p.state.guarnicoes)delete p.state.guarnicoes.cpu;const keep=x=>String(x?.guarnicao||'').trim().toUpperCase()!=='CPU';p.operacoes=(p.operacoes||[]).filter(keep);p.veiculosRecuperados=(p.veiculosRecuperados||[]).filter(keep);p.tcos=(p.tcos||[]).filter(keep);p.arvc=(p.arvc||[]).filter(keep)}return p}
+  if(baseApply)window.applyCpu=function(p){baseApply(p);origins=Array.isArray(p?.rcoOrigens)?p.rcoOrigens.slice():[];window.__rcoPodRemovals=Array.isArray(p?.podRemovals)?p.podRemovals.map(x=>({...x})):[];if(!Array.isArray(state.rcoLinkedRecords))state.rcoLinkedRecords=[];cloudPayloads=p?.rcoCloudPayloads&&typeof p.rcoCloudPayloads==='object'?JSON.parse(JSON.stringify(p.rcoCloudPayloads)):{};const cr=p?.consolidacaoResponsavel||{};document.getElementById('rcoSemCpu').checked=!!(cr.semCpu||p?.semGuarnicaoCpu);for(const [id,v] of Object.entries({rcoConsolidadorPosto:cr.postoGrad,rcoConsolidadorNome:cr.nome,rcoConsolidadorMatricula:cr.matricula,rcoConsolidadorTurno:cr.turno})){const e=document.getElementById(id);if(e)e.value=v||''}centralRcoToggleSemCpu();window.__rcoClosureFlags={pdfGerado:!!p?.pdfGerado,pdfGeradoEm:String(p?.pdfGeradoEm||''),p3Consolidado:!!p?.p3Consolidado,p3ConsolidadoEm:String(p?.p3ConsolidadoEm||''),encerrado:!!p?.encerrado,encerradoEm:String(p?.encerradoEm||'')};try{window.p3RefreshClosureStatus?.();const el=document.getElementById('p3Status');if(el&&!el.textContent){const f=window.__rcoClosureFlags;if(f.pdfGerado&&!f.p3Consolidado)el.textContent='PDF gerado. Ainda falta Consolidar P3.';else if(!f.pdfGerado&&f.p3Consolidado)el.textContent='Dados consolidados. Ainda falta Gerar PDF do RCO.';else if(f.pdfGerado&&f.p3Consolidado&&!f.encerrado)el.textContent='PDF e Consolidação P3 concluídos. Confirme o encerramento quando desejar.'}}catch(_){}try{window.centralRcoRefreshLinkedRecords?.()}catch(_){}}
   function rcoLinkedDataFromAccept(item, opDate){
     const raw=item.rec?.raw||item.rec||{};
-    if(item.kind==='operacao')return {nome:raw.operacao?.nome||raw.resumoCpu?.nome||'',local:raw.local?.descricao||raw.resumoCpu?.local||'',localPrevisto:raw.pod?.localPrevisto||raw.resumoCpu?.localPrevisto||'',coordenadas:raw.local?.coordenadas||'',statusCumprimento:raw.pod?.statusCumprimento||raw.resumoCpu?.statusCumprimento||'Não informado',motivoAlteracao:raw.pod?.motivoAlteracao||raw.resumoCpu?.motivoAlteracao||'',turno:raw.operacao?.turno||raw.resumoCpu?.turno||''};
+    if(item.kind==='operacao')return {knownPodFingerprint:typeof raw.podFingerprint==='string'?raw.podFingerprint:'',nome:raw.operacao?.nome||raw.resumoCpu?.nome||'',guarnicoesParticipantes:raw.pod?.guarnicoesParticipantes||raw.operacao?.guarnicoes||raw.resumoCpu?.guarnicoes||'',local:raw.local?.descricao||raw.resumoCpu?.local||'',localPrevisto:raw.pod?.localPrevisto||raw.resumoCpu?.localPrevisto||'',coordenadas:raw.local?.coordenadas||'',statusCumprimento:raw.pod?.statusCumprimento||raw.resumoCpu?.statusCumprimento||'Não informado',motivoAlteracao:raw.pod?.motivoAlteracao||raw.resumoCpu?.motivoAlteracao||'',turno:raw.operacao?.turno||raw.resumoCpu?.turno||''};
     if(item.kind==='cirvc')return {data:raw.data||opDate,hora:raw.hora||'',numeroTermo:raw.numeroTermo||'',placa:raw.placa||'',local:raw.local||'',militarResponsavelAit:raw.militarResponsavelAit||''};
     if(item.kind==='bopm')return {data:raw.data||opDate,hora:raw.hora||'',numero:raw.numeroDocumento||raw.referenciaId||item.id,descricao:raw.resumo||raw.titulo||'',tipificacao:'',tcoSasp:'Não',numeroTco:''};
     return {};
@@ -1255,18 +1454,119 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     });
   }
   function removeDynamicForGu(name){['cpuOperations','cpuVehicles','cpuTcos','cpuArvcs'].forEach(id=>document.querySelectorAll('#'+id+' .entry').forEach(e=>{const g=e.querySelector('[data-k="guarnicao"]');if(g&&String(g.value||'').trim().toLowerCase()===String(name||'').trim().toLowerCase())e.remove()}))}
-  function payloadIds(p){const ids=[];(p?.ocorrencias||[]).forEach(x=>{const id=x?.referenciaId||x?.id;if(id)ids.push(String(id));if(x?.id&&String(x.id)!==String(id||''))ids.push(String(x.id))});(p?.operacoes||[]).forEach(x=>{const id=x?.reportId||x?.id;if(id)ids.push(String(id))});(p?.veiculosRecuperados||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.tcos||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.arvc||p?.cirvc||[]).forEach(x=>{const id=x?.id||x?.CIRVC_ID;if(id)ids.push(String(id))});return new Set(ids.filter(Boolean))}
+  function payloadIds(p){const ids=[];(p?.ocorrencias||[]).forEach(x=>{const id=x?.referenciaId||x?.id;if(id)ids.push(String(id));if(x?.id&&String(x.id)!==String(id||''))ids.push(String(x.id))});(p?.operacoes||[]).forEach(x=>{const id=x?.reportId||x?.id;if(id)ids.push(String(id))});(p?.veiculosRecuperados||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.tcos||[]).forEach(x=>{if(x?.id)ids.push(String(x.id))});(p?.cirvc?.length?p.cirvc:(p?.arvc||p?.cirvc||[])).forEach(x=>{const id=x?.id||x?.CIRVC_ID||x?.cirvcId;if(id)ids.push(String(id))});return new Set(ids.filter(Boolean))}
   function clearCloudGuarnicao(name){const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());if(name&&guId(name)!=='cpu')delete state.guarnicoes[guId(name)];removeDynamicForGu(name);const ids=new Set();related.forEach(o=>(o.recordIds||[]).forEach(id=>ids.add(id)));state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!ids.has(id));const reports=new Set(related.map(o=>o.rsdReportId));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!reports.has(id))}
   function rebuildCloudGuarnicao(name){const keep=new Set((state.rcoLinkedRecords||[]).filter(r=>String(r.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).map(r=>String(r.id)));clearCloudGuarnicao(name);if(keep.size){state.importedRecordIds=(state.importedRecordIds||[]).filter(id=>!keep.has(String(id)));state.importedReportIds=(state.importedReportIds||[]).filter(id=>!keep.has(String(id)))}const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).sort((a,b)=>Number(a.segmento||0)-Number(b.segmento||0));related.forEach(o=>{const p=cloudPayloads[o.rsdReportId];if(!p)return;importDailyV2(p,'RSD em nuvem');o.recordIds=Array.from(payloadIds(p))});if(typeof rcoReapplyLinkedRecords==='function')rcoReapplyLinkedRecords(name)}
   function rcoSnapshotIsNewer(origin,item){if(!origin||!item)return false;const latestVersion=Number(item.version||item.versao||0),storedVersion=Number(origin.versao||0);if(latestVersion&&storedVersion&&latestVersion!==storedVersion)return latestVersion>storedVersion;return Number(item.draftRevision||0)>Number(origin.draftRevision||0)}
   function rcoColumnDivergesFromSnapshot(name,payload){const g=state.guarnicoes?.[guId(name)];if(!g||!payload)return false;const expected=productionMapV2(payload.producao||{});const keys=new Set([...Object.keys(expected||{}),...Object.keys(g.metrics||{})]);for(const k of keys){if(num(g.metrics?.[k])!==num(expected[k]))return true}return false}
-  function rcoForceDraftIsEmpty(p){const map=productionMapV2((p||{}).producao||{});const hasProd=Object.values(map).some(v=>num(v)>0);const hasOcc=Array.isArray(p?.ocorrencias)&&p.ocorrencias.length>0;const hasObs=String(p?.observacoes||'').trim().length>0;const hasOther=['operacoes','veiculosRecuperados','tcos','arvc','cirvc'].some(k=>Array.isArray(p?.[k])&&p[k].length>0);return !hasProd&&!hasOcc&&!hasObs&&!hasOther}
+  function rcoForceDraftIsEmpty(p){const map=productionMapV2((p||{}).producao||{});const hasProd=Object.values(map).some(v=>num(v)>0);const hasOcc=Array.isArray(p?.ocorrencias)&&p.ocorrencias.length>0;const hasObs=String(p?.observacoes||'').trim().length>0;const hasAlteracoes=Object.values(p?.alteracoes||{}).some(v=>String(v??'').trim().length>0);const hasOther=['operacoes','veiculosRecuperados','tcos','arvc','cirvc'].some(k=>Array.isArray(p?.[k])&&p[k].length>0);return !hasProd&&!hasOcc&&!hasObs&&!hasAlteracoes&&!hasOther}
+  function rcoImportedDynamicEdits(name){
+    // Compare only fields provided by the imported RSD source. Default values
+    // generated by the RCO UI must not be mistaken for intentional edits.
+    const norm=v=>String(v==null?'':v).trim();
+    const key=norm(name).toLowerCase();
+    const sources={cpuOperations:new Map(),cpuVehicles:new Map(),cpuArvcs:new Map()};
+    origins.filter(o=>norm(o.guarnicao).toLowerCase()===key).forEach(o=>{
+      const p=cloudPayloads[o.rsdReportId];if(!p)return;
+      [
+        [sources.cpuOperations,(p.operacoes||[]).filter(x=>x.incluirNoCpu!==false)],
+        [sources.cpuVehicles,p.veiculosRecuperados||[]],
+        [sources.cpuArvcs,p.cirvc?.length?p.cirvc:(p.arvc||p.cirvc||[])]
+      ].forEach(([map,rows])=>rows.forEach(row=>{
+        const id=String(row?.id||row?.cirvcId||row?.CIRVC_ID||row?.reportId||'');if(!id)return;
+        map.set(id,{...row,id,guarnicao:row.guarnicao||name});
+      }));
+    });
+    const changes=[];
+    for(const [container,label] of [['cpuOperations','Operações'],['cpuVehicles','Veículos'],['cpuArvcs','CIRVC']]){
+      if(typeof document==='undefined'||typeof document.querySelectorAll!=='function')continue;
+      for(const entry of document.querySelectorAll('#'+container+' .entry')){
+        const gu=entry.querySelector('[data-k="guarnicao"]');
+        if(!gu||norm(gu.value).toLowerCase()!==key)continue;
+        const id=String(entry.dataset?.id||''),baseline=sources[container].get(id);
+        if(!baseline)continue;
+        const actual=recordFromEntry(entry);
+        const changed=Object.keys(actual).some(k=>
+          k!=='id'&&Object.prototype.hasOwnProperty.call(baseline,k)&&norm(actual[k])!==norm(baseline[k]));
+        if(changed){changes.push(label);break}
+      }
+    }
+    return changes;
+  }
+  function rcoManualOverlayBeforeUpdate(name){
+    const g=state.guarnicoes?.[guId(name)];if(!g)return null;
+    const related=origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).sort((a,b)=>Number(a.segmento||0)-Number(b.segmento||0));
+    const expected={observacoes:'',alteracoesServico:'',alteracoesViatura:'',materialCarga:''},sourceOcc=new Map();
+    related.forEach(o=>{
+      const p=cloudPayloads[o.rsdReportId];if(!p)return;
+      const lbl=fmtDateISO(p.servico?.data)||'RSD em nuvem';
+      expected.observacoes=appendText(expected.observacoes,p.observacoes,lbl);
+      expected.alteracoesServico=appendText(expected.alteracoesServico,p.alteracoes?.servico,lbl);
+      expected.alteracoesViatura=appendText(expected.alteracoesViatura,p.alteracoes?.viatura,lbl);
+      expected.materialCarga=appendText(expected.materialCarga,p.alteracoes?.materialCarga,lbl);
+      (p.ocorrencias||[]).forEach(x=>{if(x.id)sourceOcc.set(String(x.id),x)});
+      (p.tcos||[]).forEach(x=>{if(x.id)sourceOcc.set(String(x.id),x)});
+    });
+    const texts={};
+    for(const k of Object.keys(expected)){
+      const current=String(g[k]||''),base=String(expected[k]||'');
+      texts[k]=current===base?'':(base&&current.startsWith(base)?current.slice(base.length).trim():current.trim());
+    }
+    // Record dynamic entries created only inside the RCO, not imported from any RSD/linked module.
+    // Clear/rebuild removes every entry for the guarnicao, including these local additions.
+    const sourceIds=new Set();
+    related.forEach(o=>{
+      (o.recordIds||[]).forEach(id=>sourceIds.add(String(id)));
+      const p=cloudPayloads[o.rsdReportId];if(p)payloadIds(p).forEach(id=>sourceIds.add(String(id)));
+    });
+    (state.rcoLinkedRecords||[]).filter(r=>String(r.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase())
+      .forEach(r=>sourceIds.add(String(r.id||'')));
+    const dynamic=[];
+    if(typeof document!=='undefined'&&typeof document.querySelectorAll==='function'){
+      const containers={cpuOperations:'operacao',cpuVehicles:'veiculo',cpuTcos:'tco',cpuArvcs:'cirvc'};
+      Object.entries(containers).forEach(([container,kind])=>{
+        document.querySelectorAll('#'+container+' .entry').forEach(entry=>{
+          const gu=entry.querySelector('[data-k="guarnicao"]');
+          if(!gu||String(gu.value||'').trim().toLowerCase()!==String(name||'').trim().toLowerCase())return;
+          const id=String(entry.dataset?.id||'');
+          if(id&&!sourceIds.has(id))dynamic.push({kind,data:recordFromEntry(entry)});
+        });
+      });
+    }
+    const ocorrencias=(g.ocorrencias||[]).filter(x=>{
+      const id=String(x?.id||'');const source=id?sourceOcc.get(id):null;
+      if(!source)return true;
+      // Preserve RCO edits of an imported occurrence, rather than silently dropping them.
+      const fields=['data','hora','tipo','numero','descricao','tipificacao','numeroTco','tcoSasp','naturezaPrincipal'];
+      return fields.some(k=>Object.prototype.hasOwnProperty.call(source,k)&&String(x[k]??'')!==String(source[k]??''));
+    }).map(x=>JSON.parse(JSON.stringify(x)));
+    return {texts,ocorrencias,dynamic};
+  }
+  function rcoRestoreManualOverlayAfterUpdate(name,overlay){
+    if(!overlay)return;
+    const g=state.guarnicoes?.[guId(name)];if(!g)return;
+    Object.entries(overlay.texts||{}).forEach(([key,value])=>{if(String(value||'').trim())g[key]=appendText(g[key],value)});
+    // Recreate RCO-only dynamic records after the RSD/linked modules have been rebuilt.
+    const containers={operacao:['cpuOperations',addCpuOperation],veiculo:['cpuVehicles',addCpuVehicle],tco:['cpuTcos',addCpuTco],cirvc:['cpuArvcs',addCpuArvc]};
+    (overlay.dynamic||[]).forEach(item=>{
+      const config=containers[item.kind];if(!config||!item.data)return;
+      const [container,add]=config,id=String(item.data.id||'');
+      if(!id||typeof document==='undefined'||typeof document.querySelectorAll!=='function')return;
+      const exists=Array.from(document.querySelectorAll('#'+container+' .entry')).some(e=>String(e.dataset?.id||'')===id);
+      if(!exists)add(item.data);
+    });
+    (overlay.ocorrencias||[]).forEach(x=>{
+      if(!x)return;const id=String(x.id||'');
+      const i=id?(g.ocorrencias||[]).findIndex(y=>String(y?.id||'')===id):-1;
+      if(i>=0)g.ocorrencias[i]=x;else (g.ocorrencias||(g.ocorrencias=[])).push(x);
+    });
+  }
   function rcoImportWouldEraseWork(name,item,p){
     const g=state.guarnicoes?.[guId(name)]||{};
     const old=cloudPayloads[item.reportId]||null;
     const incoming=rcoForceDraftIsEmpty(p);
     const hadSnapshot=!!(old&&!rcoForceDraftIsEmpty(old));
-    const hadManual=Object.values(g.metrics||{}).some(v=>num(v)>0)||(g.ocorrencias||[]).length>0||String(g.observacoes||'').trim().length>0;
+    const hadManual=Object.values(g.metrics||{}).some(v=>num(v)>0)||(g.ocorrencias||[]).length>0||String(g.observacoes||'').trim().length>0||String(g.alteracoesServico||'').trim().length>0;
     return incoming&&(hadSnapshot||hadManual);
   }
   function rcoSnapshotWouldDiscardFields(old,p){
@@ -1277,14 +1577,16 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     for(const key of arrays){
       const prev=Array.isArray(old[key])?old[key]:[];
       const next=Array.isArray(p[key])?p[key]:[];
-      const ids=new Set(next.map(x=>String(x?.id||'')).filter(Boolean));
-      if(prev.some(x=>x?.id&&!ids.has(String(x.id))))return true;
+      const stableId=x=>key==='cirvc'||key==='arvc'?String(x?.id||x?.cirvcId||x?.CIRVC_ID||''):key==='operacoes'?String(x?.id||x?.reportId||''):key==='tcos'?String(x?.id||x?.numeroTco||''):String(x?.id||'');
+      const ids=new Set(next.map(stableId).filter(Boolean));
+      if(prev.some(x=>{const id=stableId(x);return id&&!ids.has(id)}))return true;
       if(prev.length&&next.length<prev.length)return true;
     }
     if(String(old.observacoes||'').trim()&&!String(p.observacoes||'').trim())return true;
+    if(String(old.alteracoes?.servico||'').trim()&&!String(p.alteracoes?.servico||'').trim())return true;
     return false;
   }
-  function rcoApplyCloudSnapshot(item,p,opDate){const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&!rcoSnapshotIsNewer(oldOrigin,item))return 'atual';const name=item.guarnicao||p?.guarnicao?.nome||'';if(rcoImportWouldEraseWork(name,item,p)){alert('ATUALIZAÇÃO BLOQUEADA: o RSD retornou vazio, mas esta guarnição já possui dados no RCO. Os indicadores, ocorrências e ajustes foram preservados. Confira o salvamento do RSD na Central antes de substituir informações.');return 'cancelado'}if(oldOrigin&&rcoSnapshotWouldDiscardFields(cloudPayloads[item.reportId],p)){if(!confirm('O RSD atualizado contém redução ou retirada de indicadores, ocorrências ou outros registros já importados. Confira se a retificação é intencional.\n\nOK — Substituir pelo pacote mais recente\nCancelar — Preservar os dados do RCO'))return 'cancelado'}if(oldOrigin&&rcoColumnDivergesFromSnapshot(name,cloudPayloads[item.reportId])){if(!confirm('Esta guarnição possui ajustes feitos manualmente no RCO. Atualizar pelos dados do RSD substituirá esses valores.\n\nOK — Atualizar e substituir pelos dados do RSD\nCancelar — manter os ajustes manuais'))return 'cancelado'}cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:name,versao:Number(item.version||p.versao||p.version||0),draftRevision:Number(item.draftRevision||p.draftRevision||0),ultimoRascunhoEm:item.ultimoRascunhoEm||p.ultimoRascunhoEm||'',snapshotAt:p.generatedAt||'',status:item.status||'INCLUIDO',data:item.operationalDate||item.data||opDate||'',batalhao:item.batalhao||p.unidade?.batalhao||'',companhia:item.companhia||p.unidade?.companhia||'',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(name);return oldOrigin?'atualizado':'incluido'}
+  function rcoApplyCloudSnapshot(item,p,opDate){const oldOrigin=origins.find(o=>o.rsdReportId===item.reportId);if(oldOrigin&&!rcoSnapshotIsNewer(oldOrigin,item))return 'atual';const name=item.guarnicao||p?.guarnicao?.nome||'';if(rcoImportWouldEraseWork(name,item,p)){alert('ATUALIZAÇÃO BLOQUEADA: o RSD retornou vazio, mas esta guarnição já possui dados no RCO. Os indicadores, ocorrências e ajustes foram preservados. Confira o salvamento do RSD na Central antes de substituir informações.');return 'cancelado'}if(oldOrigin&&rcoSnapshotWouldDiscardFields(cloudPayloads[item.reportId],p)){if(!confirm('O RSD atualizado contém redução ou retirada de indicadores, ocorrências ou outros registros já importados. Confira se a retificação é intencional.\n\nOK — Substituir pelo pacote mais recente\nCancelar — Preservar os dados do RCO'))return 'cancelado'}if(oldOrigin&&rcoColumnDivergesFromSnapshot(name,cloudPayloads[item.reportId])){if(!confirm('Esta guarnição possui ajustes feitos manualmente no RCO. Atualizar pelos dados do RSD substituirá esses valores.\n\nOK — Atualizar e substituir pelos dados do RSD\nCancelar — manter os ajustes manuais'))return 'cancelado'}const editedImported=oldOrigin?rcoImportedDynamicEdits(name):[];if(editedImported.length&&!confirm('O RCO contém correções manuais em registros importados do RSD ('+editedImported.join(', ')+'). Atualizar agora substituirá essas correções pelos dados mais recentes da guarnição.\n\nOK — substituir pelos dados do RSD\nCancelar — preservar as correções do RCO'))return 'cancelado';const manualOverlay=oldOrigin?rcoManualOverlayBeforeUpdate(name):null;cloudPayloads[item.reportId]=p;origins=origins.filter(o=>o.rsdReportId!==item.reportId);origins.push({rsdReportId:item.reportId,serviceId:item.serviceId||p.serviceId||'',segmento:Number(item.segmento||p.segmento||1),guarnicao:name,versao:Number(item.version||p.versao||p.version||0),draftRevision:Number(item.draftRevision||p.draftRevision||0),ultimoRascunhoEm:item.ultimoRascunhoEm||p.ultimoRascunhoEm||'',snapshotAt:p.generatedAt||'',status:item.status||'INCLUIDO',data:item.operationalDate||item.data||opDate||'',batalhao:item.batalhao||p.unidade?.batalhao||'',companhia:item.companhia||p.unidade?.companhia||'',recordIds:Array.from(payloadIds(p)),adicionadoEm:oldOrigin?.adicionadoEm||new Date().toISOString()});rebuildCloudGuarnicao(name);rcoRestoreManualOverlayAfterUpdate(name,manualOverlay);return oldOrigin?'atualizado':'incluido'}
   window.rcoStaleIncludedGuarnicoes=function(){return origins.filter(o=>{const item=(cloudItems||[]).find(x=>x.reportId===o.rsdReportId);return !!(item&&rcoSnapshotIsNewer(o,item))}).map(o=>o.guarnicao||o.rsdReportId)}
 
   function rcoRoleActor(){const a=window.rcoResponsibleData?.()||{};return {perfil:String(a.perfil||'CPU').toUpperCase(),matricula:a.matricula||'',nome:a.nome||''}}
@@ -1351,8 +1653,54 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       alert('Não foi possível forçar a finalização do RSD: '+msg)
     }
   }
-  function removeFromRco(item,silent=false){
-    const o=origins.find(y=>y.rsdReportId===item.reportId);if(!o)return false;const name=o.guarnicao||item.guarnicao;clearCloudGuarnicao(name);origins=origins.filter(y=>y.rsdReportId!==item.reportId);delete cloudPayloads[item.reportId];rebuildCloudGuarnicao(name);renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();if(!silent)alert('RSD removido desta consolidação. O registro original permanece na Central.');return true
+  async function removeFromRco(item,silent=false){
+    const o=origins.find(y=>y.rsdReportId===item.reportId);if(!o)return false;
+    const name=o.guarnicao||item.guarnicao,overlay=rcoManualOverlayBeforeUpdate(name);
+    // Removing a source RSD must not erase notes, occurrences or records created in RCO.
+    const sourceIds=new Set((o.recordIds||[]).map(x=>String(x)));
+    const source=cloudPayloads[item.reportId];
+    if(source)payloadIds(source).forEach(id=>sourceIds.add(String(id)));
+    if(!silent){
+      const edited=rcoImportedDynamicEdits(name);
+      const ownSourceEdits=(overlay?.ocorrencias||[]).some(x=>[x?.id,x?.referenciaId].some(id=>id&&sourceIds.has(String(id))));
+      const currentMetrics=state.guarnicoes?.[guId(name)]?.metrics||{},expectedMetrics={};
+      origins.filter(y=>String(y.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).forEach(y=>{
+        const p=cloudPayloads[y.rsdReportId];if(!p)return;
+        Object.entries(productionMapV2(p.producao||{})).forEach(([key,value])=>{expectedMetrics[key]=(expectedMetrics[key]||0)+num(value)});
+      });
+      const editedMetrics=Array.from(new Set([...Object.keys(currentMetrics),...Object.keys(expectedMetrics)]))
+        .some(key=>num(currentMetrics[key])!==num(expectedMetrics[key]));
+      if((edited.length||ownSourceEdits||editedMetrics)&&!confirm('Há alterações feitas no RCO que podem ser afetadas pela retirada deste RSD'+(editedMetrics?' (inclusive indicadores de produção)':'')+'. Remover a origem recalculará os dados importados. Os registros exclusivos do Coordenador permanecerão. Deseja continuar?'))return false;
+    }
+    origins=origins.filter(y=>y.rsdReportId!==item.reportId);
+    delete cloudPayloads[item.reportId];
+    rebuildCloudGuarnicao(name);
+    if(overlay){
+      overlay.ocorrencias=(overlay.ocorrencias||[]).filter(x=>![x?.id,x?.referenciaId].some(id=>id&&sourceIds.has(String(id))));
+      const ownWork=Object.values(overlay.texts||{}).some(x=>String(x||'').trim())||!!overlay.ocorrencias.length||!!(overlay.dynamic||[]).length;
+      if(!state.guarnicoes?.[guId(name)]&&ownWork)ensureGuarnicao(name);
+      rcoRestoreManualOverlayAfterUpdate(name,overlay);
+    }
+    renderGuarnicoes();renderMatrix();renderFisco();salvarRascunho(true);renderCloud();
+    // A local-only removal can reappear from an older cloud draft on another device.
+    let persisted=false;
+    try{persisted=!!(await syncRcoDraft(false))}catch(_){}
+    if(!persisted){
+      if(!silent)alert('O RSD foi retirado somente neste aparelho. O salvamento do RCO na nuvem NÃO foi confirmado. Preserve este RCO aberto e tente Salvar RCO na nuvem antes de sair.');
+      return 'local-only';
+    }
+    if(!silent)alert('RSD retirado desta consolidação e RCO salvo na nuvem. O registro RSD original permanece na Central.');
+    return true;
+  }
+  async function rcoRefreshAfterReviewedRemoval(item,successMessage){
+    const outcome=await removeFromRco(item,true);
+    if(outcome==='local-only'){
+      alert('A decisão sobre o RSD foi registrada na Central, mas a retirada do RCO NÃO foi salva na nuvem. Os dados deste aparelho foram preservados. NÃO feche nem atualize esta página; use Salvar RCO na nuvem e confira o resultado antes de sair.');
+      return false;
+    }
+    await loadCloud();
+    alert(successMessage);
+    return true;
   }
   async function decideAndAdd(item){
     const st=String(item.status||'').toUpperCase();
@@ -1392,7 +1740,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     });if(!ans)return;
     const motivo=composeReason(ans.choice,ans.choice==='Outro'?ans.note:'');
     const orientacao=ans.note||motivo;
-    if(await reviewRsd(item,'RETIFICACAO_SOLICITADA',motivo,orientacao)){removeFromRco(item,true);await loadCloud();alert('RSD devolvido para retificação. O comandante verá a orientação ao continuar o serviço.')}
+    if(await reviewRsd(item,'RETIFICACAO_SOLICITADA',motivo,orientacao)){await rcoRefreshAfterReviewedRemoval(item,'RSD devolvido para retificação. O comandante verá a orientação ao continuar o serviço.')}
   }
   async function cancelRsdByCoordinator(item){
     const options=['Cadastro duplicado','Cadastro de teste','Guarnição incorreta','Companhia incorreta','Serviço registrado novamente por engano','Outro'].map(x=>({value:x,label:x}));
@@ -1410,26 +1758,28 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const motivo=composeReason(ans.choice,ans.note);
     if(!confirm('Confirmar exclusão deste registro?\n\nEsta ação é auditável e não apaga fisicamente os dados.'))return;
     const token=rcoRoleToken();if(!token)return;const a=rcoRoleActor();
-    try{await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,motivo,perfil:a.perfil||'CPU',autorMatricula:a.matricula,autorNome:a.nome},token,{popup:false});removeFromRco(item,true);await loadCloud();alert('Registro cancelado e preservado para auditoria.')}catch(e){alert('Não foi possível excluir o registro: '+e.message)}
+    try{await CentralCloud.submitForm('rsd-cancel',{reportId:item.reportId,motivo,perfil:a.perfil||'CPU',autorMatricula:a.matricula,autorNome:a.nome},token,{popup:false});await rcoRefreshAfterReviewedRemoval(item,'Registro cancelado e preservado para auditoria.')}catch(e){alert('Não foi possível excluir o registro: '+e.message)}
   }
-  async function denyRsd(item){const motivo=prompt('Motivo do indeferimento:','Contate o Coordenador para orientação.')||'';if(!motivo.trim())return;if(await reviewRsd(item,'INDEFERIDO',motivo.trim(),motivo.trim())){removeFromRco(item,true);await loadCloud();alert('RSD indeferido. A devolutiva ficará disponível ao comandante.')}}
+  async function denyRsd(item){const motivo=prompt('Motivo do indeferimento:','Contate o Coordenador para orientação.')||'';if(!motivo.trim())return;if(await reviewRsd(item,'INDEFERIDO',motivo.trim(),motivo.trim())){await rcoRefreshAfterReviewedRemoval(item,'RSD indeferido. A devolutiva ficará disponível ao comandante.')}}
   function cloudDocumentPage(base){
     const ios=/relatorio_cpu_ios\.html/i.test(location.pathname);
     if(base==='rsd')return ios?'relatorio_servico_diario_ios.html':'relatorio_servico_diario.html';
     if(base==='reboque')return ios?'relatorio_traslados_reboque_ios.html':'relatorio_traslados_reboque.html';
     return '';
   }
-  function prepareCloudViewer(token){
+  function prepareCloudViewer(token,scope){
     const viewer=window.open('about:blank','_blank');
     if(!viewer)return null;
-    try{viewer.sessionStorage.setItem('pmpb-cloud-viewer-token-v1',String(token||''));viewer.opener=null}catch(_){}
+    try{viewer.sessionStorage.setItem('pmpb-cloud-viewer-token-v1',String(token||''));if(scope)viewer.sessionStorage.setItem('pmpb-cloud-viewer-rco-scope-v1',JSON.stringify(scope));viewer.opener=null}catch(_){}
     return viewer;
   }
   function openCloudRsdPdf(item){
     if(!item?.reportId)return;
     const token=rcoWorkflowToken(false);if(!token)return;
-    const viewer=prepareCloudViewer(token);if(!viewer){alert('O navegador bloqueou a nova aba do PDF. Permita pop-ups para a Central e tente novamente.');return}
-    const url=cloudDocumentPage('rsd')+'?cloudView='+encodeURIComponent(item.reportId);
+    const u=currentUnit(),data=rcoOperationalDate(val('dataInicio'));
+    if(!data){alert('Defina a data operacional do RCO para consultar o PDF da guarnição.');return}
+    const viewer=prepareCloudViewer(token,{reportId:item.reportId,batalhao:u.batalhao,companhia:u.companhia,companhiaNumero:u.companhiaNumero,data});if(!viewer){alert('O navegador bloqueou a nova aba do PDF. Permita pop-ups para a Central e tente novamente.');return}
+    const url=cloudDocumentPage('rsd')+'?cloudView='+encodeURIComponent(item.reportId)+'&autoPdf=1';
     viewer.location.replace(url);
   }
   async function openCloudReboquePdf(item){
@@ -1491,7 +1841,47 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
   function reconcileCancelledOrigins(){
     const ids=new Set(cloudItems.filter(x=>String(x.status||'').toUpperCase()==='CANCELADO').map(x=>String(x.reportId||''))),affected=origins.filter(o=>ids.has(String(o.rsdReportId||'')));
     if(!affected.length)return 0;
-    const names=[...new Set(affected.map(o=>o.guarnicao).filter(Boolean))];names.forEach(clearCloudGuarnicao);affected.forEach(o=>delete cloudPayloads[o.rsdReportId]);origins=origins.filter(o=>!ids.has(String(o.rsdReportId||'')));names.forEach(rebuildCloudGuarnicao);
+    const names=[...new Set(affected.map(o=>o.guarnicao).filter(Boolean))];
+    // A cancelled RSD must be removed, but it does not own coordinator-only additions.
+    // Snapshot the RCO overlay BEFORE clear/rebuild, including when this was the last RSD.
+    const overlays=new Map(names.map(name=>[name,rcoManualOverlayBeforeUpdate(name)]));
+    const cancelledSourceIds=new Set();
+    affected.forEach(o=>{
+      (o.recordIds||[]).forEach(id=>cancelledSourceIds.add(String(id)));
+      const p=cloudPayloads[o.rsdReportId];
+      if(p)payloadIds(p).forEach(id=>cancelledSourceIds.add(String(id)));
+    });
+    // If the coordinator edited imported metrics or an occurrence from a now-cancelled
+    // RSD, removing that source is destructive. Require an explicit decision.
+    const editedMetrics=names.some(name=>{
+      const g=state.guarnicoes?.[guId(name)];if(!g?.metrics)return false;
+      const expected={};
+      origins.filter(o=>String(o.guarnicao||'').trim().toLowerCase()===String(name||'').trim().toLowerCase()).forEach(o=>{
+        const p=cloudPayloads[o.rsdReportId];if(!p)return;
+        const map=productionMapV2(p.producao||{});
+        Object.entries(map).forEach(([k,v])=>{expected[k]=(expected[k]||0)+num(v)});
+      });
+      const keys=new Set([...Object.keys(expected),...Object.keys(g.metrics)]);
+      return Array.from(keys).some(k=>num(g.metrics?.[k])!==num(expected[k]));
+    });
+    const editedCancelledOccurrence=Array.from(overlays.values()).some(overlay=>
+      (overlay?.ocorrencias||[]).some(o=>[o?.id,o?.referenciaId].some(id=>id&&cancelledSourceIds.has(String(id)))));
+    const editedImported=names.flatMap(name=>rcoImportedDynamicEdits(name));
+    if((editedMetrics||editedCancelledOccurrence||editedImported.length)&&!confirm(
+      'O RSD cancelado possui alterações no RCO (indicadores, ocorrências ou registros importados: '+(editedImported.join(', ')||'verificar dados')+'). A retirada poderá descartar essas correções.\\n\\nOK — retirar o RSD cancelado e recalcular os indicadores pelas fontes restantes.\\nCancelar — preservar o RCO como está até uma conferência manual.'
+    ))return 0;
+    affected.forEach(o=>delete cloudPayloads[o.rsdReportId]);
+    origins=origins.filter(o=>!ids.has(String(o.rsdReportId||'')));
+    names.forEach(name=>{
+      rebuildCloudGuarnicao(name);
+      const overlay=overlays.get(name);if(!overlay)return;
+      // Edited occurrences still belonging to the cancelled source cannot be revived.
+      overlay.ocorrencias=(overlay.ocorrencias||[]).filter(o=>![o?.id,o?.referenciaId].some(id=>id&&cancelledSourceIds.has(String(id))));
+      const hasOwnWork=Object.values(overlay.texts||{}).some(v=>String(v||'').trim())||
+        !!overlay.ocorrencias.length||!!(overlay.dynamic||[]).length;
+      if(!state.guarnicoes?.[guId(name)]&&hasOwnWork)ensureGuarnicao(name);
+      rcoRestoreManualOverlayAfterUpdate(name,overlay);
+    });
     renderGuarnicoes();renderMatrix();renderFisco();try{salvarRascunho(true)}catch(_){}return affected.length
   }
   function toggleCancelledRsd(){showCancelledRsd=!showCancelledRsd;renderCloud()}
@@ -1533,10 +1923,43 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       (r.items||[]).forEach(x=>{if(rsdBelongsToRcoUnit(x,u)&&rsdBelongsToRcoWindow(x,opDate))map.set(x.reportId,x)});
       cloudItems=Array.from(map.values()).sort((a,b)=>rcoCloudStatusRank(a.status)-rcoCloudStatusRank(b.status)||String(a.guarnicao||'').localeCompare(String(b.guarnicao||''),'pt-BR'));
       const removed=reconcileCancelledOrigins();renderCloud();
-      if(removed)alert(removed+' RSD(s) cancelado(s) foi(ram) retirado(s) automaticamente desta consolidação. Os registros permanecem disponíveis em “Mostrar cancelados” para auditoria.');
+      if(removed){
+        // An automatic source cancellation changes the RCO draft. Do not silently
+        // report success while the change exists only on this device.
+        const persisted=await syncRcoDraft(false);
+        if(!persisted){
+          alert(removed+' RSD(s) cancelado(s) foram retirados deste RCO somente neste aparelho. O salvamento na nuvem NÃO foi confirmado. Preserve esta página e use Salvar RCO na nuvem antes de sair. Os RSDs cancelados permanecem disponíveis em “Mostrar cancelados” para auditoria.');
+        }else{
+          alert(removed+' RSD(s) cancelado(s) foram retirados desta consolidação e a alteração foi salva no RCO da nuvem. Os RSDs cancelados permanecem disponíveis em “Mostrar cancelados” para auditoria.');
+        }
+      }
     }catch(e){alert('Não foi possível consultar os RSDs: '+e.message)}
   }
   window.centralRcoRefreshCloud=loadCloud;
+
+  async function refreshCloudGuarnicao(item){
+    if(!item?.reportId)return;
+    const token=rcoWorkflowToken(false);if(!token)return;
+    const u=currentUnit(),opDate=rcoOperationalDate(val('dataInicio'));
+    if(!opDate){alert('Informe a data operacional para atualizar a guarnição.');return}
+    try{
+      const listed=await CentralCloud.jsonp('rsd-list',{...CentralCloud.unitParams(u),data:opDate,showCancelled:'1',token},{timeout:20000});
+      const fresh=(listed.items||[]).find(x=>String(x.reportId||'')===String(item.reportId)&&rsdBelongsToRcoUnit(x,u)&&rsdBelongsToRcoWindow(x,opDate));
+      if(!fresh)throw new Error('O RSD não foi localizado na companhia e no período deste RCO.');
+      const status=String(fresh.status||'').toUpperCase();
+      if(['CANCELADO','INDEFERIDO','RETIFICACAO_SOLICITADA'].includes(status)){
+        alert('Este RSD está '+status.replaceAll('_',' ')+'. A atualização não foi executada; confira a situação da guarnição.');
+        return;
+      }
+      const origin=origins.find(o=>o.rsdReportId===fresh.reportId);
+      if(origin&&!rcoSnapshotIsNewer(origin,fresh)){
+        alert('Não há progressão mais recente do RSD confirmada na Central para esta guarnição.');
+        return;
+      }
+      cloudItems=(cloudItems||[]).map(x=>String(x.reportId||'')===String(fresh.reportId)?fresh:x);
+      await addCloud(fresh);
+    }catch(e){alert('Não foi possível atualizar os dados da guarnição: '+String(e.message||e))}
+  }
   async function addAll(){for(const x of cloudItems.filter(x=>['DEFERIDO','DEFERIDO_COM_RESSALVAS'].includes(String(x.status||'').toUpperCase())))await addCloud(x)}
   function renderCloud(){
     const box=document.getElementById('rcoCloudList');if(!box)return;
@@ -1554,12 +1977,12 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       const partialNote=statusUp==='EM_SERVICO'?'<div class="rco-origin-note" style="font-weight:800">Em andamento — dados parciais</div>':'';const cancelNote=isCancelled?'<div class="rco-origin-note rco-cancel-note">Motivo: '+esc(x.canceladoMotivo||'Não informado')+(x.canceladoPorNome?' • Por: '+esc(x.canceladoPorNome):'')+(x.canceladoEm?' • '+esc(formatWhen(x.canceladoEm)):'')+'</div>':'';
       const actions=isCancelled
         ?'<div class="rco-item-actions"><button type="button" class="secondary small" data-act="view">Visualizar auditoria</button></div>'
-        :'<div class="rco-item-actions"><button type="button" class="small '+(newer?'ok':'secondary')+'" data-act="add" '+(blocked?'disabled':'')+'>'+esc(o?(newer?'Atualizar dados':'Adicionado'):'Adicionar')+'</button>'+(statusUp==='EM_SERVICO'?'<button type="button" class="small warn" data-act="force-finalize">Forçar finalização do RSD</button>':'')+'<button type="button" class="small secondary" data-act="pdf">PDF da guarnição</button>'+(/^REBOQUE\b/i.test(String(x.guarnicao||''))?'<button type="button" class="small secondary" data-act="towpdf">PDF de traslados</button>':'')+'<button type="button" class="small warn" data-act="return">Devolver para retificação</button><button type="button" class="small danger" data-act="cancel">Excluir</button>'+(x.possibleDuplicate?'<button type="button" class="small secondary" data-act="compare">Comparar registros</button><button type="button" class="small warn" data-act="dup-return">Solicitar conferência</button>':'')+'<details class="rco-cloud-more"><summary>⋮</summary><div><button type="button" class="secondary small" data-act="view">Visualizar RSD</button><button type="button" class="secondary small" data-act="deny">Indeferir</button>'+(o?'<button type="button" class="secondary small" data-act="remove">Remover do RCO</button>':'')+'</div></details></div>';
+        :'<div class="rco-item-actions"><button type="button" class="small '+(newer?'ok':'secondary')+'" data-act="add" '+(blocked?'disabled':'')+'>'+esc(o?'Atualizar dados da guarnição':'Adicionar')+'</button>'+(statusUp==='EM_SERVICO'?'<button type="button" class="small warn" data-act="force-finalize">Forçar finalização do RSD</button>':'')+'<button type="button" class="small secondary" data-act="pdf">PDF da guarnição</button>'+(/^REBOQUE\b/i.test(String(x.guarnicao||''))?'<button type="button" class="small secondary" data-act="towpdf">PDF de traslados</button>':'')+'<button type="button" class="small warn" data-act="return">Devolver para retificação</button><button type="button" class="small danger" data-act="cancel">Excluir</button>'+(x.possibleDuplicate?'<button type="button" class="small secondary" data-act="compare">Comparar registros</button><button type="button" class="small warn" data-act="dup-return">Solicitar conferência</button>':'')+'<details class="rco-cloud-more"><summary>⋮</summary><div><button type="button" class="secondary small" data-act="view">Visualizar RSD</button><button type="button" class="secondary small" data-act="deny">Indeferir</button>'+(o?'<button type="button" class="secondary small" data-act="remove">Remover do RCO</button>':'')+'</div></details></div>';
       return '<div class="rco-cloud-item '+(x.possibleDuplicate&&!isCancelled?'duplicate ':'')+(isCancelled?'cancelled':'')+'" data-rsd-card="'+esc(x.reportId)+'"><div><strong>'+esc(x.guarnicao||'Guarnição')+'</strong><div class="rco-origin-note">'+esc(sub||'Sem detalhes adicionais')+'</div>'+duplicateNote+forcedNote+partialNote+cancelNote+'</div><span class="rco-cloud-status '+status+'">'+esc(newer?'NOVA VERSÃO v'+x.version:(x.status||''))+'</span>'+actions+'</div>'
     }).join('');
     box.querySelectorAll('[data-rsd-card]').forEach(card=>{
       const x=cloudItems.find(y=>y.reportId===card.dataset.rsdCard);if(!x)return;const o=origins.find(y=>y.rsdReportId===x.reportId),newer=rcoSnapshotIsNewer(o,x);
-      const add=card.querySelector('[data-act="add"]');if(add){add.disabled=add.disabled||(!!o&&!newer);add.onclick=()=>decideAndAdd(x)}
+      const add=card.querySelector('[data-act="add"]');if(add){add.disabled=add.disabled;add.onclick=()=>o?refreshCloudGuarnicao(x):decideAndAdd(x)}
       const ret=card.querySelector('[data-act="return"]');if(ret)ret.onclick=()=>returnForCorrection(x);
       const force=card.querySelector('[data-act="force-finalize"]');if(force)force.onclick=()=>forceFinalizeRsd(x);
       const cancel=card.querySelector('[data-act="cancel"]');if(cancel)cancel.onclick=()=>cancelRsdByCoordinator(x);
@@ -1567,7 +1990,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       const towpdf=card.querySelector('[data-act="towpdf"]');if(towpdf)towpdf.onclick=()=>openCloudReboquePdf(x);
       const view=card.querySelector('[data-act="view"]');if(view)view.onclick=()=>viewRsd(x);
       const deny=card.querySelector('[data-act="deny"]');if(deny)deny.onclick=()=>denyRsd(x);
-      const rem=card.querySelector('[data-act="remove"]');if(rem)rem.onclick=()=>removeFromRco(x);
+      const rem=card.querySelector('[data-act="remove"]');if(rem)rem.onclick=async()=>{await removeFromRco(x)};
       const cmp=card.querySelector('[data-act="compare"]');if(cmp)cmp.onclick=()=>compareDuplicateGroup(x);
       const dupRet=card.querySelector('[data-act="dup-return"]');if(dupRet)dupRet.onclick=()=>returnForCorrection(x,'Possível duplicidade: conferir se este registro corresponde ao serviço efetivamente realizado e cancelar o cadastro indevido, se houver.');
     });
@@ -1743,7 +2166,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       setResponsibleProgress('Validando matrícula e credencial…',true);const v=await validateResponsibleCredential();if(!v){setResponsibleProgress('',false);return}if(v.pending){setResponsibleProgress('Cadastro complementar necessário.',false);return}
       setResponsibleProgress('Registrando responsável…',true);const mm=v.r.militar||{},mat=fmt(mm.matricula||e('rcoResponsavelMatricula').value);applyResponsible({NOME:mm.nome||'',POSTO_GRAD:mm.postoGrad||'',MATRICULA:mat},v.perfil,v.turno,false);
       try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);
-      if(window.__rcoPendingReceiveAfterResponsible){const recebido=window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
+      if(window.__rcoPendingReceiveAfterResponsible){const recebido=await window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
       window.__rcoPendingContinueResponsible=false;
       window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Clique em “Entrar no RCO” para prosseguir.',false);
     }catch(err){setResponsibleLocked(false);window.__rcoResponsavelRegistrado=false;setResponsibleProgress('Falha no registro.',false);alert('Não foi possível registrar o responsável: '+err.message)}
@@ -1765,5 +2188,5 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
 })();
 </script>
 <script src="service_access_layers.js?v=10.8.43"></script>
-<script src="service_flow.js?v=10.8.44-rco-linked-modules"></script>
+<script src="service_flow.js?v=10.8.44.2-r10-linked-identity"></script>
 </body></html>
