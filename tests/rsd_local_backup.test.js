@@ -23,7 +23,7 @@ const busted={getItem:()=>null,setItem:()=>{throw new Error('QuotaExceededError'
 assert.throws(()=>api.save(busted,record,()=>true),/QuotaExceededError/);
 for(const f of ['relatorio_servico_diario.html','relatorio_servico_diario_ios.html']){
  const html=fs.readFileSync(path.join(root,f),'utf8');
- assert.match(html,/src="rsd_local_backup.js\?v=1"/);
+ assert.match(html,/src="rsd_local_backup.js\?v=2"/);
  assert.match(html,/onclick="salvarCopiaLocalRsd\(\)"/);
  assert.match(html,/onclick="recuperarCopiaLocalRsd\(\)"/);
  const start=html.indexOf('function salvarCopiaLocalRsd('),end=html.indexOf('function salvarRascunhoGuarnicao(s=false)',start);
