@@ -1,0 +1,78 @@
+name: BO Photo Annex - Static Chromium WebKit QA
+
+on:
+  pull_request:
+    paths:
+      - 'boletim_ocorrencia_bptrans_1cprv*.html'
+      - 'tests/bo_photo_annex_ci.test.cjs'
+      - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_actual_entrypoints_smoke.cjs'
+      - 'tests/bo_photo_annex_webkit_smoke.cjs'
+      - '.github/workflows/bo_photo_annex_ci.yml'
+  push:
+    branches:
+      - 'feature/bo-anexo-fotografico-r240-review'
+    paths:
+      - 'boletim_ocorrencia_bptrans_1cprv*.html'
+      - 'tests/bo_photo_annex_ci.test.cjs'
+      - 'tests/bo_photo_annex_browser_smoke.cjs'
+      - 'tests/bo_photo_actual_entrypoints_smoke.cjs'
+      - 'tests/bo_photo_annex_webkit_smoke.cjs'
+      - '.github/workflows/bo_photo_annex_ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bo-photo-static-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bo-photo-static-contracts:
+    name: Static contracts (not production approval)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test both BO HTML variants (7 static checks, no secrets)
+        run: node --test tests/bo_photo_annex_ci.test.cjs
+  bo-photo-chromium-smoke:
+    name: Chromium crop and two-page PDF (not physical mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Confirm Chrome is installed
+        run: command -v google-chrome || command -v google-chrome-stable || command -v chromium
+      - name: Install CI browser driver and PDF inspection library
+        run: npm install --no-save --no-package-lock --ignore-scripts puppeteer-core@24 pdf-lib@1
+      - name: Check synthetic photographs and PDFs in Chrome
+        run: node tests/bo_photo_annex_browser_smoke.cjs
+      - name: Validate real index/RSD/RCO source routing with synthetic BOs
+        run: node tests/bo_photo_actual_entrypoints_smoke.cjs
+  bo-photo-webkit-smoke:
+    name: WebKit mobile transient annex (not physical Safari)
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.1-noble
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright WebKit test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
+      - name: Validate synthetic print-only photographs in WebKit
+        run: node tests/bo_photo_annex_webkit_smoke.cjs
