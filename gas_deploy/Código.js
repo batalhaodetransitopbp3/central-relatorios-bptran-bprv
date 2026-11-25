@@ -6162,7 +6162,10 @@ function rcoSupplementalUpsertBody_(payload,opts) {
   rcoPerfStart_(perf,'relinkRsd');
   var rsdIdx=opts.rsdIdx||rcoLoadIndex_(sheet_(P3_SHEET_ID,'RSD'),'REPORT_ID',perf);
   (rsdIdx.list||[]).forEach(function(rr){
-    var rid=String(rr.REPORT_ID||''),linked=String(rr.RCO_REPORT_ID||'')===reportId,current=!!originSet[rid];
+    var rid=String(rr.REPORT_ID||'');
+    // Resolve from the current index: the list is the pre-finalization snapshot.
+    rr=rcoIndexGet_(rsdIdx,rid)||rr;
+    var linked=String(rr.RCO_REPORT_ID||'')===reportId,current=!!originSet[rid];
     if(linked&&!current){
       var next=Object.assign({},rr,{RCO_REPORT_ID:'',INCLUIDO_RCO_EM:'',SINCRONIZADO_EM:nowIso_()});
       if(String(rr.STATUS||'')==='INCLUIDO_RCO'){

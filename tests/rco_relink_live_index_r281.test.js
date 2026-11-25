@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../apps_script_v10.gs'),'utf8');
+assert.equal(source,fs.readFileSync(path.join(__dirname,'../gas_deploy/Código.js'),'utf8'));
+const start=source.indexOf('(rsdIdx.list||[]).forEach(function(rr){',source.indexOf('function rcoSupplementalUpsertBody_('));
+const end=source.indexOf('rcoIndexFlush_(rsdIdx,perf);',start);
+assert(start>0&&end>start);
+const body=source.slice(start,end);
+const a={REPORT_ID:'rsd-a',STATUS:'EM_SERVICO',VERSAO:1,RCO_REPORT_ID:''};
+const b={REPORT_ID:'rsd-b',STATUS:'PASSAGEM_DISPONIVEL',VERSAO:1,RCO_REPORT_ID:''};
+const c={REPORT_ID:'rsd-c',STATUS:'INCLUIDO_RCO',VERSAO:3,RCO_REPORT_ID:'rco-old',REVIEW_STATUS:'DEFERIDO'};
+const liveA={...a,STATUS:'DEFERIDO',VERSAO:2,FINALIZACAO_FORCADA:'SIM',PAYLOAD_HASH:'current-a'};
+const liveB={...b,STATUS:'DEFERIDO',VERSAO:2,FINALIZACAO_FORCADA:'SIM',PAYLOAD_HASH:'current-b'};
+const idx={list:[a,b,c],byKey:{'rsd-a':liveA,'rsd-b':liveB,'rsd-c':c}};
+const updates=[],audits=[];
+vm.runInNewContext(body,{rsdIdx:idx,reportId:'rco-new',originSet:{'rsd-a':true,'rsd-b':true},rcoIndexGet_:(i,k)=>i.byKey[k],rcoIndexUpsert_:(i,k,o)=>{updates.push(k);i.byKey[k]=o},nowIso_:()=> '2026-11-25T12:00:00Z',audit_:(...args)=>audits.push(args),obj:{CONSOLIDADOR_NOME:'FICTICIO'},batt:'BPTran',comp:'TESTE'});
+assert.deepEqual(updates,['rsd-a','rsd-b']);
+for(const [id,hash] of [['rsd-a','current-a'],['rsd-b','current-b']]){const r=idx.byKey[id];assert.equal(r.STATUS,'INCLUIDO_RCO');assert.equal(r.RCO_REPORT_ID,'rco-new');assert.equal(r.VERSAO,2);assert.equal(r.FINALIZACAO_FORCADA,'SIM');assert.equal(r.PAYLOAD_HASH,hash)}
+assert.equal(idx.byKey['rsd-c'].RCO_REPORT_ID,'rco-old');
+assert.equal(a.STATUS,'EM_SERVICO');assert.equal(b.STATUS,'PASSAGEM_DISPONIVEL');assert.equal(audits.length,0);
+console.log('PASS R281 live-index RSD relink preserves latest revision, forced closure and unrelated RCO');
