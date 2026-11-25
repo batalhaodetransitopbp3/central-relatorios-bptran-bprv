@@ -1,178 +1,46 @@
 'use strict';
-/* Portable Chromium smoke test for PR #30. Synthetic images on 127.0.0.1 only.
- * Uses puppeteer-core + pdf-lib installed by CI, or local env module paths.
- * This is NOT Safari, an Android device, or production acceptance.
- */
-const assert=require('node:assert/strict');
-const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),
- http=require('node:http');
-const requireExternal=(pkg,env)=>{
- try{return require(pkg)}catch(e){
-  if(!process.env[env])throw e;
-  return require(process.env[env]);
- }
-};
-const puppeteer=requireExternal('puppeteer-core','PUPPETEER_MODULE');
-const {PDFDocument}=requireExternal('pdf-lib','PDF_LIB_MODULE');
-const root=path.resolve(__dirname,'..');
-const pages=[
- {name:'boletim_ocorrencia_bptrans_1cprv.html',bo:'PM2026123456',width:1280},
- {name:'boletim_ocorrencia_bptrans_1cprv_ios.html',bo:'PM2026123457',width:375}
-];
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'bo-photo-ci-'));
-const profile=path.join(tmp,'chrome-profile');
-function chromePath(){
- const possibilities=[process.env.CHROME_PATH,
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  '/usr/bin/google-chrome','/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium','/usr/bin/chromium-browser'].filter(Boolean);
- return possibilities.find(p=>fs.existsSync(p))||undefined;
-}
-async function main(){
- const server=http.createServer((req,res)=>{
-  const file=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname.slice(1));
-  if(pages.some(p=>p.name===file)){
-   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8',
-    'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
-   res.end(fs.readFileSync(path.join(root,file)));return;
-  }
-  if(['central_cloud.js','service_flow.js','module_access_gate.js'].includes(file)){
-   res.writeHead(200,{'Content-Type':'text/javascript','Cache-Control':'no-store'});
-   res.end('/* Synthetic, no production service or credentials */');return;
-  }
-  res.writeHead(404);res.end();
- });
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const origin='http://127.0.0.1:'+server.address().port;
- let browser,external=0;const results=[],errors=[];
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),os=require('node:os');
+const puppeteer=require(process.env.PUPPETEER_MODULE||'puppeteer-core');
+const {PDFDocument}=require(process.env.PDF_LIB_MODULE||'pdf-lib');
+const root=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'bo-print-only-'));
+const variants=['boletim_ocorrencia_bptrans_1cprv.html','boletim_ocorrencia_bptrans_1cprv_ios.html'];
+const BO='PM2026123456',OTHER='PM2026987654';
+(async()=>{
+ const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://127.0.0.1').pathname.slice(1);if(variants.includes(p)){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(fs.readFileSync(path.join(root,p)));}else if(['central_cloud.js','service_flow.js','module_access_gate.js'].includes(p)){res.writeHead(200,{'Content-Type':'application/javascript'});res.end('/* offline fixture */');}else{res.writeHead(404);res.end();}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
+ let b;const errors=[];let count=0;
  try{
-  const executablePath=chromePath();
-  assert(executablePath,'Google Chrome/Chromium was not installed on this runner');
-  browser=await puppeteer.launch({executablePath,headless:true,userDataDir:profile,
-   args:['--no-first-run','--no-sandbox','--disable-dev-shm-usage',
-     '--disable-background-networking','--disable-extensions','--disable-sync',
-     '--disable-component-update','--no-default-browser-check',
-     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']
-  });
-  for(const info of pages){
-   const page=await browser.newPage();
-   await page.setViewport({width:info.width,height:900,
-    isMobile:info.width<500,hasTouch:info.width<500,deviceScaleFactor:1});
-   await page.setRequestInterception(true);
-   page.on('request',r=>{
-    if(r.url().startsWith(origin+'/')||r.url().startsWith('data:')||
-      r.url().startsWith('blob:'))return r.continue();
-    if(r.url().startsWith('http://gc.kis.v2.scr.kaspersky-labs.com/')){
-      external++;return r.abort();
-    }
-    errors.push('UNEXPECTED_REQUEST '+r.url().slice(0,100));
-    external++;return r.abort();
-   });
-   page.on('pageerror',e=>errors.push(e.message));
-   page.on('dialog',async d=>d.accept());
-   await page.goto(origin+'/'+info.name+'?from=ci-test',
-    {waitUntil:'domcontentloaded',timeout:15000});
-   await page.waitForFunction(()=>BoPhotoAnnex&&BoPhotoAnnex.isReady,
-    {timeout:12000});
-   assert(await page.$('#boAnnexOpenButton'));
-   assert.equal(await page.evaluate(()=>BoPhotoAnnex.photoCount),0);
-   await page.$eval('#ciopCopom',(el,num)=>{
-    el.value=num;el.dispatchEvent(new Event('input',{bubbles:true}));
-   },info.bo);
-   await page.waitForFunction((num)=>BoPhotoAnnex.isReady&&
-    BoPhotoAnnex.storageScope==='bo-annex::number:'+num,
-    {timeout:12000},info.bo);
-   await page.$eval('#boAnnexOpenButton',el=>el.click());
-   await page.waitForSelector('#boVaultPassword',{timeout:10000});
-   assert.equal(await page.$eval('#boVaultPassword',el=>el.type),'password');
-   await page.$eval('#boVaultPassword',el=>{el.value='FAKE-R246-Strong-Secret-1234!'});
-   await page.$eval('#boVaultConfirm',el=>{el.value='FAKE-R246-Strong-Secret-1234!'});
-   await page.$eval('#boVaultUnlock',el=>el.click());
-   await page.waitForFunction(()=>BoPhotoAnnex.isUnlocked&&
-      document.getElementById('boPhotoAnnex').classList.contains('is-open'),
-      {timeout:15000});
-   const data=await page.evaluate(()=>{
-    const c=document.createElement('canvas');c.width=800;c.height=600;
-    const g=c.getContext('2d');g.fillStyle='#153a5d';g.fillRect(0,0,800,600);
-    g.fillStyle='#e5c97d';g.fillRect(30,45,330,190);
-    return c.toDataURL('image/jpeg',.83).split(',')[1];
-   });
-   const photo=path.join(tmp,info.bo+'.jpg');
-   fs.writeFileSync(photo,Buffer.from(data,'base64'));
-   const input=await page.$('#boPhotosInput');
-   await input.uploadFile(photo,photo,photo,photo,photo);
-   await page.waitForFunction(()=>BoPhotoAnnex.photoCount===5&&
-     document.querySelectorAll('.bo-photo-image').length===5&&
-     !document.getElementById('boAddPhotos').disabled,{timeout:20000});
-   assert.equal(await page.evaluate(()=>BoPhotoAnnex.pageCount),2);
-   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll(
-    '[data-bo-annex-page]')].map(el=>
-     el.querySelectorAll('.bo-photo-image').length)),[4,1]);
-   const envelope=await page.evaluate(async()=>{
-     const db=await new Promise((resolve,reject)=>{
-       const r=indexedDB.open('central-bo-photo-annex-v1');
-       r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
-     });
-     const saved=await new Promise((resolve,reject)=>{
-       const r=db.transaction('reports','readonly').objectStore('reports')
-         .get(BoPhotoAnnex.storageScope);
-       r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
-     });
-     db.close();return saved;
-   });
-   assert.equal(envelope.cryptoVersion,1);
-   assert.equal(envelope.cipher,'AES-256-GCM');
-   assert.equal(envelope.kdf,'PBKDF2-SHA256');
-   assert.equal(envelope.revision,5);
-   assert(!Object.hasOwn(envelope,'photos'));
-   assert(!JSON.stringify(envelope).includes('data:image/jpeg'));
-   await page.evaluate(()=>window.centralPrepareNavigation?.());
-   await page.reload({waitUntil:'domcontentloaded'});
-   await page.waitForFunction(()=>BoPhotoAnnex?.isReady,{timeout:12000});
-   await page.$eval('#ciopCopom',(el,num)=>{
-     el.value=num;el.dispatchEvent(new Event('input',{bubbles:true}));
-   },info.bo);
-   await page.waitForFunction(()=>BoPhotoAnnex.isReady&&BoPhotoAnnex.isLocked,
-     {timeout:12000});
-   assert.equal(await page.evaluate(()=>BoPhotoAnnex.photoCount),0);
-   const denied=await page.evaluate(async()=>{
-     try{await BoPhotoAnnex.unlockWithPassphrase('WRONG-FAKE-12345!!');return false}
-     catch(e){return /Senha incorreta|corrompido/.test(String(e.message))}
-   });
-   assert(denied,'Wrong vault password must be rejected');
-   await page.evaluate(async p=>BoPhotoAnnex.unlockWithPassphrase(p),
-     'FAKE-R246-Strong-Secret-1234!');
-   assert.equal(await page.evaluate(()=>BoPhotoAnnex.photoCount),5);
-   await page.$eval('[data-bo-crop]',el=>el.click());
-   await page.waitForSelector('#photoFramerModal.open',{timeout:10000});
-   await page.$eval('#pfZoomIn',el=>el.click());
-   await page.$eval('#pfRotate',el=>el.click());
-   await page.$eval('#pfSave',el=>el.click());
-   await page.waitForFunction(()=>document.getElementById('boPhotoStatus')
-    .textContent.includes('Enquadramento ajustado'),{timeout:12000});
-   await page.evaluate(()=>document.getElementById('boPhotoAnnex')
-    .style.setProperty('display','none','important'));
-   const baseline=(await PDFDocument.load(await page.pdf({
-    format:'A4',printBackground:true,preferCSSPageSize:true}))).getPageCount();
-   await page.evaluate(()=>document.getElementById('boPhotoAnnex')
-    .style.removeProperty('display'));
-   const withAnnex=(await PDFDocument.load(await page.pdf({
-    format:'A4',printBackground:true,preferCSSPageSize:true}))).getPageCount();
-   assert.equal(withAnnex,baseline+2,
-    '5 photos must produce exactly 2 extra PDF sheets in '+info.name);
-   results.push({file:info.name,photos:5,annexPages:2,
-    boPages:baseline,totalPdfPages:withAnnex,crop:true,pass:true});
-   await page.close();
-  }
-  assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({status:'PASS',chrome:await browser.version(),
-    cases:results.length,results,blockedAntivirusScripts:external,
-    externalAppRequests:0,realDevice:false,productionAccess:false}));
- }finally{
-  if(browser)await browser.close().catch(()=>{});
-  await new Promise(r=>server.close(r));
-  fs.rmSync(tmp,{recursive:true,force:true});
+ b=await puppeteer.launch({headless:true,executablePath:[process.env.CHROME_PATH,'C:/Program Files/Google/Chrome/Application/chrome.exe','/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium'].filter(Boolean).find(fs.existsSync),args:['--no-sandbox','--disable-background-networking','--disable-sync','--disable-extensions','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
+ for(const [i,file] of variants.entries())for(const entry of ['index','rsd','rco']){
+ const p=await b.newPage();await p.setViewport({width:i?375:1280,height:900,isMobile:!!i,hasTouch:!!i});
+ await p.setRequestInterception(true);p.on('request',r=>{if(r.url().startsWith(origin+'/')||r.url().startsWith('data:')||r.url().startsWith('blob:'))return r.continue();if(!r.url().includes('gc.kis.v2.scr.kaspersky-labs.com'))errors.push('Unexpected outbound');return r.abort();});
+ p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
+ await p.evaluateOnNewDocument(()=>{window.__photoWrites=0;const open=indexedDB.open.bind(indexedDB);indexedDB.open=function(n,...a){if(/bo.photo|bo-photo|annex/i.test(n))window.__photoWrites++;return open(n,...a)};const set=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(/bo.photo|bo-photo|annex/i.test(k)||String(v).includes('data:image/jpeg'))window.__photoWrites++;return set.call(this,k,v)};});
+ const goto=()=>p.goto(origin+'/'+file+'?from='+entry,{waitUntil:'domcontentloaded'});
+ const setBo=n=>p.$eval('#ciopCopom',(e,n)=>{e.value=n;e.dispatchEvent(new Event('input',{bubbles:true}));},n);
+ const open=async()=>{await p.$eval('#boAnnexOpenButton',e=>e.click());await p.waitForFunction(()=>document.getElementById('boPhotoAnnex').classList.contains('is-open'));};
+ const ready=async n=>p.waitForFunction(n=>BoPhotoAnnex.photoCount===n&&!document.getElementById('boAddPhotos').disabled&&[...document.querySelectorAll('.bo-photo-image')].every(x=>x.complete&&x.naturalWidth),{timeout:25000},n);
+ await goto();await p.waitForFunction(()=>window.BoPhotoAnnex?.isReady);await setBo(BO);
+ assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),0);
+ assert.equal(await p.$eval('#boPhotoAnnex',e=>e.classList.contains('is-empty')),true);
+ const baseline=await PDFDocument.load(await p.pdf({format:'A4',printBackground:true}));
+ await open();assert.equal(await p.$('#boVaultPassword'),null);
+ const data=await p.evaluate(()=>{const c=document.createElement('canvas');c.width=800;c.height=600;const g=c.getContext('2d');g.fillStyle='#123456';g.fillRect(0,0,800,600);g.fillStyle='#f1a23b';g.fillRect(0,0,200,250);return c.toDataURL('image/jpeg').split(',')[1];});
+ const photo=path.join(tmp,'synthetic.jpg');fs.writeFileSync(photo,Buffer.from(data,'base64'));
+ const add=async n=>{await (await p.$('#boPhotosInput')).uploadFile(...Array(n).fill(photo));};
+ await add(1);await ready(1);await add(3);await ready(4);assert.equal(await p.evaluate(()=>BoPhotoAnnex.pageCount),1);
+ await add(1);await ready(5);assert.equal(await p.evaluate(()=>BoPhotoAnnex.pageCount),2);
+ await add(4);await ready(9);assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('[data-bo-annex-page]')].map(e=>e.querySelectorAll('img').length)),[4,4,1]);
+ await p.$eval('[data-bo-caption]',e=>{e.value='SYNTHETIC CAPTION';e.dispatchEvent(new Event('input',{bubbles:true}));});assert.equal(await p.$eval('.bo-photo-caption-print',e=>e.textContent),'SYNTHETIC CAPTION');
+ await p.$eval('[data-bo-crop]',e=>e.click());await p.waitForSelector('#photoFramerModal.open');await p.$eval('#pfCancel',e=>e.click());await p.waitForFunction(()=>!document.querySelector('#photoFramerModal.open'));
+ await p.$eval('[data-bo-crop]',e=>e.click());await p.waitForSelector('#photoFramerModal.open');await p.$eval('#pfRotate',e=>e.click());await p.$eval('#pfSave',e=>e.click());await ready(9);
+ const pdf=await PDFDocument.load(await p.pdf({format:'A4',printBackground:true}));assert.equal(pdf.getPageCount()-baseline.getPageCount(),3,'PDF must add three pages');
+ await p.$eval('[data-bo-remove]',e=>e.click());await ready(8);
+ assert.equal(await p.evaluate(()=>window.__photoWrites),0);
+ await setBo(OTHER);await ready(0);await setBo(BO);await ready(0);await open();await add(1);await ready(1);
+ await p.reload({waitUntil:'domcontentloaded'});await p.waitForFunction(()=>window.BoPhotoAnnex?.isReady);await setBo(BO);await ready(0);assert.equal(await p.evaluate(()=>window.__photoWrites),0);
+ await p.close();console.log('PASS',file,entry,'0/1/4/5/9, crop, caption, removal, PDF +3 pages, scope/reload, no photo writes');count++;
  }
-}
-main().catch(err=>{console.error('BO_PHOTO_CI_BROWSER_FAILURE',err.stack||err);
- process.exitCode=1});
+ assert.deepEqual(errors,[]);console.log('RESULT',JSON.stringify({passed:count,total:6,production:false}));
+ }finally{await b?.close();await new Promise(r=>server.close(r));fs.rmSync(tmp,{recursive:true,force:true});}
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1});

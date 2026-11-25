@@ -632,21 +632,7 @@
   #boPhotoAnnex .bo-photo-page-footer{display:none!important}
 }
 
-/* R246: password-entry overlay; the passphrase exists only in volatile memory. */
-.bo-vault-overlay{position:fixed;inset:0;z-index:25000;display:flex;align-items:center;justify-content:center;background:#10283ce0;padding:14px}
-.bo-vault-card{background:#fff;width:min(500px,100%);max-height:calc(100dvh - 25px);overflow:auto;border-radius:14px;padding:20px;color:#17324b;box-shadow:0 12px 60px #0006;font-family:Arial,Helvetica,sans-serif}
-.bo-vault-card strong{font-size:17px;display:block;margin-bottom:8px}
-.bo-vault-card p{font-size:13px;line-height:1.4}
-.bo-vault-card label{display:block;font-size:12px;font-weight:bold;margin:12px 0}
-.bo-vault-card input{width:100%;min-height:44px;border:1px solid #a6b9c9;border-radius:7px;padding:10px;font:16px Arial;box-sizing:border-box;margin-top:5px}
-.bo-vault-warning{background:#fff6e8;color:#684714;padding:9px;border-radius:7px}
-.bo-vault-buttons{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
-.bo-vault-buttons button{padding:10px 16px;border:1px solid #93a6ba;border-radius:7px;min-height:44px;background:#e7edf4;color:#193c5a;font-weight:bold}
-.bo-vault-buttons #boVaultUnlock{background:#15547a;color:white}
-#boVaultError{font-size:12px;color:#aa2323;display:block;min-height:16px}
-@media print{.bo-vault-overlay{display:none!important}}
-
-
+@media print{#boPhotoAnnex.bo-photo-print-blocked{display:none!important}}
 </style>
 </head>
 <body><div class="institution-config no-print"><div><label>Batalhão</label><select id="globalBatalhao"><option>BPTran</option><option>BPRv</option></select></div><div><label>Companhia</label><select id="globalCompanhia"><option value="1">1ª CPTran</option><option value="2">2ª CPTran</option><option value="3">3ª CPTran</option><option value="4">4ª CPTran</option><option value="5">5ª CPTran</option></select></div></div>
@@ -1369,9 +1355,10 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
     targetCtx.imageSmoothingEnabled=true;targetCtx.imageSmoothingQuality='high';
     targetCtx.drawImage(source,crop.x,crop.y,crop.w,crop.h,0,0,pw,ph);targetCtx.restore();
   }
-  function cancel(){if(!resolver)return;const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';r(null);}
-  function save(){if(!resolver)return;constrain();const aspect=state.aspect;const maxW=state.maxWidth||1600;let outW=maxW,outH=Math.round(outW/aspect);if(outH>1200){outH=1200;outW=Math.round(outH*aspect);}const out=document.createElement('canvas');out.width=outW;out.height=outH;const octx=out.getContext('2d');draw(octx,outW,outH);const data=out.toDataURL('image/jpeg',state.quality||.88);const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';r(data);}
-  function open(src,opts={}){return new Promise((resolve,reject)=>{if(resolver)cancel();resolver=resolve;img=new Image();img.onload=()=>{orientedCanvasCache=null;orientedRotationCache=null;state={zoom:1,x:0,y:0,rotation:0,aspect:opts.aspect||16/9,maxWidth:opts.maxWidth||1600,quality:opts.quality||.88};modal.querySelector('#pfTitle').textContent=opts.title||'Ajustar enquadramento';modal.querySelector('#pfFrameInfo').textContent='ÁREA FINAL DA FOTO • FORMATO '+ratioLabel(state.aspect);zoomInput.value='1';zoomValue.textContent='100%';stage.style.aspectRatio=String(state.aspect);modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';requestAnimationFrame(()=>setTimeout(resize,40));};img.onerror=()=>{resolver=null;reject(new Error('Não foi possível abrir a fotografia para enquadramento.'));};img.src=src;});}
+  function releaseImage(){if(img){img.onload=null;img.onerror=null;img.src="";}img=null;state=null;orientedCanvasCache=null;orientedRotationCache=null;dragging=false;last=null;clearTimeout(resizeTimer);canvas.width=1;canvas.height=1;}
+  function cancel(){if(!resolver){releaseImage();return;}const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';releaseImage();r(null);}
+  function save(){if(!resolver)return;constrain();const aspect=state.aspect;const maxW=state.maxWidth||1600;let outW=maxW,outH=Math.round(outW/aspect);if(outH>1200){outH=1200;outW=Math.round(outH*aspect);}const out=document.createElement('canvas');out.width=outW;out.height=outH;const octx=out.getContext('2d');draw(octx,outW,outH);const data=out.toDataURL('image/jpeg',state.quality||.88);const r=resolver;resolver=null;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.style.overflow='';releaseImage();r(data);}
+  function open(src,opts={}){return new Promise((resolve,reject)=>{if(resolver)cancel();resolver=resolve;img=new Image();img.onload=()=>{orientedCanvasCache=null;orientedRotationCache=null;state={zoom:1,x:0,y:0,rotation:0,aspect:opts.aspect||16/9,maxWidth:opts.maxWidth||1600,quality:opts.quality||.88};modal.querySelector('#pfTitle').textContent=opts.title||'Ajustar enquadramento';modal.querySelector('#pfFrameInfo').textContent='ÁREA FINAL DA FOTO • FORMATO '+ratioLabel(state.aspect);zoomInput.value='1';zoomValue.textContent='100%';stage.style.aspectRatio=String(state.aspect);modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.style.overflow='hidden';requestAnimationFrame(()=>setTimeout(resize,40));};img.onerror=()=>{resolver=null;releaseImage();reject(new Error('Não foi possível abrir a fotografia para enquadramento.'));};img.src=src;});}
   function setZoom(value){if(!state)return;state.zoom=clamp(Number(value)||1,Number(zoomInput.min),Number(zoomInput.max));zoomInput.value=String(state.zoom);zoomValue.textContent=Math.round(state.zoom*100)+'%';constrain();draw();}
   zoomInput.addEventListener('input',()=>setZoom(zoomInput.value));
   modal.querySelector('#pfZoomOut').addEventListener('click',()=>setZoom((state?.zoom||1)-.1));
@@ -1385,267 +1372,27 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
   canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
   window.addEventListener('resize',()=>{if(!modal.classList.contains('open'))return;clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,80);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))cancel();});
-  window.PhotoFramer={open};
+  window.PhotoFramer={open,cancel};
 })();
 </script>
-<script id="boPhotoVaultScript">
-(function(global){
-'use strict';
-if(global.BoPhotoVault)return;
-// R246: local-only encrypted BO photo cache. NOT a substitute for server identity.
-const V=1,ITERATIONS=310000;
-const enc=new TextEncoder(),dec=new TextDecoder();
-let session={scope:'',salt:'',key:null};
-const err=(msg,code)=>{const e=new Error(msg);e.code=code;return e;};
-function toBase64(input){
- const bytes=new Uint8Array(input),N=16384;
- let binary='';
- for(let i=0;i<bytes.length;i+=N)
-  binary+=String.fromCharCode(...bytes.subarray(i,i+N));
- return btoa(binary);
-}
-function fromBase64(str){
- if(typeof str!=='string'||str.length>160000000||!/^[A-Za-z0-9+/]*={0,2}$/.test(str))
-  throw err('Dados criptografados inválidos.','VAULT_BASE64_INVALID');
- const binary=atob(str);
- const bytes=new Uint8Array(binary.length);
- for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
- return bytes;
-}
-function isEncrypted(record){
- return !!(record&&record.cryptoVersion===V&&typeof record.ciphertext==='string'&&
-  typeof record.salt==='string'&&typeof record.iv==='string');
-}
-async function derive(password,salt){
- if(typeof password!=='string'||password.length<12||password.length>250)
-  throw err('Use uma senha exclusiva de pelo menos 12 caracteres.',
-   'VAULT_WEAK_PASSPHRASE');
- if(!global.isSecureContext||!crypto.subtle)
-  throw err('Este navegador não oferece criptografia segura neste endereço.',
-   'VAULT_INSECURE_CONTEXT');
- const km=await crypto.subtle.importKey('raw',enc.encode(password),
-  'PBKDF2',false,['deriveKey']);
- return crypto.subtle.deriveKey({
-  name:'PBKDF2',salt:fromBase64(salt),iterations:ITERATIONS,hash:'SHA-256'
- },km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function decryptWith(record,key,scope){
- if(!isEncrypted(record)||record.key!==scope||
-   !Number.isInteger(record.revision)||record.revision<1)
-  throw err('Registro fotográfico inválido.','VAULT_RECORD_INVALID');
- const ad=enc.encode(scope+'|'+record.revision);
- try{
-  const buffer=await crypto.subtle.decrypt({
-   name:'AES-GCM',iv:fromBase64(record.iv),additionalData:ad
-  },key,fromBase64(record.ciphertext));
-  const value=JSON.parse(dec.decode(buffer));
-  if(value.key!==scope||!Array.isArray(value.photos))
-   throw err('Conteúdo do cofre inconsistente.','VAULT_CONTENT_MISMATCH');
-  return {...value,revision:record.revision};
- }catch(e){
-  if(e&&e.code)throw e;
-  throw err('Senha incorreta ou anexo criptografado corrompido.',
-   'VAULT_DECRYPT_FAILED');
- }
-}
-async function unlock(scope,password,record){
- if(typeof scope!=='string'||!scope.startsWith('bo-annex::')||!scope.includes(':'))
-  throw err('Número do BO inválido.','VAULT_SCOPE_INVALID');
- if(record&&!isEncrypted(record)){
-  throw err('Existe um anexo no formato antigo sem proteção. Não será aberto ou substituído automaticamente. Consulte o administrador para migração segura.',
-   'VAULT_LEGACY_PLAINTEXT_BLOCKED');
- }
- const salt=record?record.salt:toBase64(crypto.getRandomValues(new Uint8Array(16)));
- const key=await derive(password,salt);
- if(record)await decryptWith(record,key,scope);
- session={scope,key,salt};
- return true;
-}
-function has(scope){return !!(scope&&session.key&&session.scope===scope);}
-function lock(){session={scope:'',salt:'',key:null};}
-async function decrypt(scope,record){
- if(!has(scope))throw err('Desbloqueie o anexo antes de ler as fotografias.',
-  'VAULT_LOCKED');
- if(!isEncrypted(record)||record.salt!==session.salt)
-  throw err('O formato ou a senha do cofre mudou.','VAULT_SALT_MISMATCH');
- return decryptWith(record,session.key,scope);
-}
-async function encrypt(scope,record,revision){
- if(!has(scope))throw err('Cofre bloqueado: não foi possível salvar.',
-  'VAULT_LOCKED');
- if(!Number.isInteger(revision)||revision<1)
-  throw err('Versão de anexo inválida.','VAULT_VERSION_INVALID');
- const iv=crypto.getRandomValues(new Uint8Array(12));
- const data=enc.encode(JSON.stringify(record));
- const cipher=await crypto.subtle.encrypt({
-  name:'AES-GCM',iv,additionalData:enc.encode(scope+'|'+revision)
- },session.key,data);
- return {key:scope,revision,cryptoVersion:V,kdf:'PBKDF2-SHA256',
-  iterations:ITERATIONS,cipher:'AES-256-GCM',salt:session.salt,
-  iv:toBase64(iv),ciphertext:toBase64(cipher)};
-}
-function ask(existing,scope){
- return new Promise(resolve=>{
-  if(document.getElementById('boVaultOverlay'))return resolve(null);
-  const root=document.createElement('div');
-  root.id='boVaultOverlay';root.className='bo-vault-overlay no-print';
-  root.innerHTML='<form class="bo-vault-card" autocomplete="off">'+
-   '<strong>Proteção local do anexo fotográfico</strong>'+
-   '<p>'+ (existing?
-    'Este BO possui fotos protegidas. Informe a senha do anexo para recuperá-las.':
-    'Defina uma senha exclusiva para proteger as fotos deste BO neste navegador.')+
-   '</p><label>Senha do anexo<input id="boVaultPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="250"></label>'+
-   (existing?'':'<label>Confirmar senha<input id="boVaultConfirm" type="password" autocomplete="new-password" required minlength="12" maxlength="250"></label>')+
-   '<p class="bo-vault-warning">A senha não é salva no navegador. Se perdê-la, não será possível recuperar as fotografias locais. Preserve também os arquivos originais.</p>'+
-   '<span id="boVaultError" role="alert"></span>'+
-   '<div class="bo-vault-buttons"><button type="button" id="boVaultCancel">Cancelar</button>'+
-   '<button type="submit" id="boVaultUnlock">'+(existing?'Desbloquear fotos':'Proteger anexo')+'</button></div></form>';
-  const form=root.querySelector('form');
-  const p=root.querySelector('#boVaultPassword');
-  const c=root.querySelector('#boVaultConfirm');
-  const finish=v=>{
-   p.value='';if(c)c.value='';
-   root.remove();resolve(v);
-  };
-  root.querySelector('#boVaultCancel').onclick=()=>finish(null);
-  form.addEventListener('submit',e=>{
-   e.preventDefault();
-   const value=p.value;
-   if(value.length<12||value.length>250){
-    root.querySelector('#boVaultError').textContent='Use pelo menos 12 caracteres.';
-    return;
-   }
-   if(c&&value!==c.value){
-    root.querySelector('#boVaultError').textContent='As senhas não coincidem.';
-    return;
-   }
-   finish(value);
-  });
-  document.body.appendChild(root);
-  p.focus();
- });
-}
-global.BoPhotoVault=Object.freeze({
- has,lock,unlock,decrypt,encrypt,ask,isEncrypted,
- get cryptoVersion(){return V;}
-});
-})(window);
 
-</script>
 <script id="boPhotoAnnexScript">
 (function(){
 'use strict';
 if(window.BoPhotoAnnex)return;
-const DB='central-bo-photo-annex-v1',STORE='reports',MAX_PHOTOS=96,PER_PAGE=4;
+const MAX_PHOTOS=96,PER_PAGE=4;
 const $=id=>document.getElementById(id);
-const state={photos:[],visible:false,ready:false,busy:false,key:'',revision:0,locked:false};
-const vault=window.BoPhotoVault;
-if(!vault)throw Error('R246_PHOTO_VAULT_MISSING');
-let readyPromise=null,mutateChain=Promise.resolve(),pendingMutations=0;
+const state={photos:[],visible:false,ready:true,busy:false,key:'',epoch:0};
+let pending=0;
 const esc=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const validPhoto=s=>typeof s==='string'&&/^data:image\/jpeg;base64,[a-z0-9+/=]+$/i.test(s);
 function documentScope(){
- const q=new URLSearchParams(location.search);
- const unique=q.get('editId')||q.get('boReportId')||q.get('boId');
- const formNumber=String(document.getElementById('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
- const editNumber=String(unique||'').trim().toUpperCase().replace(/\s+/g,'');
- const number=/^PM20\d{8}$/.test(formNumber)?formNumber:/^PM20\d{8}$/.test(editNumber)?editNumber:'';
- // The canonical PM number is globally unique within the BO family: same annex
- // from index, RSD and RCO regardless of the URL's serviceId parameter.
- // A serviceId alone is never used as a photo key: shifts contain multiple BOs.
- if(number)return 'bo-annex::number:'+number;
- if(unique&&/^[a-z0-9_:.-]{5,150}$/i.test(unique))return 'bo-annex::edit:'+unique;
- return '';
-}
-function openDb(){
- return new Promise((resolve,reject)=>{
-  if(!window.indexedDB)return reject(Error('Armazenamento de fotos indisponível neste navegador.'));
-  const req=indexedDB.open(DB,1);
-  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))
-   req.result.createObjectStore(STORE,{keyPath:'key'});};
-  req.onerror=()=>reject(req.error||Error('Erro ao abrir armazenamento de fotos.'));
-  req.onsuccess=()=>resolve(req.result);
- });
-}
-async function rawRead(key=state.key){
- const db=await openDb();
- try{return await new Promise((resolve,reject)=>{
-   const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(key);
-   req.onsuccess=()=>resolve(req.result||null);
-   req.onerror=()=>reject(req.error||Error('Não foi possível carregar o anexo.'));
- });}finally{db.close();}
-}
-async function recordRead(key=state.key){
- const envelope=await rawRead(key);
- if(!envelope)return null;
- return vault.decrypt(key,envelope);
-}
-function staleError(){
- const e=new Error('Este anexo foi atualizado em outra aba. Recarregue o BO antes de adicionar ou alterar fotografias.');
- e.code='BO_PHOTO_STALE_REVISION';return e;
-}
-async function recordWrite(record){
- const key=state.key,expected=state.revision;
- if(!key||!state.ready)throw Error('Informe e confirme o número do BO antes de salvar fotografias.');
- if(!vault.has(key))throw Error('Cofre de fotografias bloqueado. Clique em Anexo fotográfico.');
- // Encrypt BEFORE starting the IndexedDB transaction.
- const encrypted=await vault.encrypt(key,{...record,key},expected+1);
- const db=await openDb();
- let committedRevision=0;
- try{
-  await new Promise((resolve,reject)=>{
-   const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
-   let failure=null;
-   tx.oncomplete=resolve;
-   tx.onabort=()=>reject(failure||tx.error||Error('Espaço insuficiente para salvar as fotografias.'));
-   tx.onerror=()=>{};
-   const read=store.get(key);
-   read.onsuccess=()=>{
-    const current=read.result&&Number.isInteger(read.result.revision)?read.result.revision:0;
-    if(current!==expected){
-     failure=staleError();tx.abort();return;
-    }
-    if(read.result&&!vault.isEncrypted(read.result)){
-     failure=Error('Registro de fotos antigo não protegido: migração necessária.');
-     tx.abort();return;
-    }
-    if(state.key!==key||!vault.has(key)){
-     failure=Error('O número ou a senha do BO foi alterado durante a gravação.');
-     tx.abort();return;
-    }
-    committedRevision=current+1;
-    store.put(encrypted);
-   };
-  });
- }finally{db.close();}
- state.revision=committedRevision;
- return committedRevision;
-}
-async function recordDelete(){
- // Tombstone keeps the version monotonic: a stale tab cannot resurrect erased photos.
- return recordWrite({key:state.key,photos:[],visible:false,
-   deletedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+ const number=String($('ciopCopom')?.value||'').trim().toUpperCase().replace(/\s+/g,'');
+ return /^PM20\d{8}$/.test(number)?'bo-annex::number:'+number:'';
 }
 function message(msg,error=false){
  const el=$('boPhotoStatus');
  if(el){el.textContent=msg;el.classList.toggle('error',!!error);}
-}
-async function persist(){
- await recordWrite({key:state.key,photos:state.photos.map(p=>({...p})),
-   visible:state.visible,updatedAt:new Date().toISOString()});
-}
-function mutate(fn){
- pendingMutations++;
- const next=mutateChain.catch(()=>{}).then(fn).finally(()=>{pendingMutations--;});
- mutateChain=next;return next;
-}
-function validateStoredPhotos(value){
- if(!Array.isArray(value))return [];
- return value.slice(0,MAX_PHOTOS).filter(p=>p&&validPhoto(p.original)&&
-  validPhoto(p.rendered)).map(p=>({
-   id:String(p.id||crypto.randomUUID()),original:p.original,
-   rendered:p.rendered,caption:String(p.caption||'').slice(0,220)
- }));
 }
 function photoMarkup(p,index){
  const number=index+1,caption='Foto '+String(number).padStart(2,'0');
@@ -1686,57 +1433,19 @@ function render(){
  }
  host.innerHTML=html;
 }
-async function load(){
- const wanted=documentScope();
- if(state.ready&&wanted===state.key)return !!wanted;
- if(state.busy)return false;
- const openBefore=state.visible;
- if(state.key!==wanted)vault.lock();
- state.key=wanted;state.ready=false;state.photos=[];state.revision=0;state.visible=openBefore;
- state.locked=false;
- if(!wanted){
-  state.ready=true;render();
-  message('Informe o número do BO (PM20XXXXXXXX) antes de adicionar fotografias.',true);
-  return false;
- }
- try{
-  if(!vault.has(wanted)){
-   const envelope=await rawRead(wanted);
-   if(state.key!==wanted)return false;
-   state.locked=!!envelope;
-   state.visible=false;
-   state.ready=true;render();
-   message(envelope?
-    'Anexo protegido: clique em Anexo fotográfico e informe a senha para recuperá-lo.':
-    'Clique em Anexo fotográfico para criar a proteção deste BO.');
-   return false;
-  }
-  const saved=await recordRead(wanted);
-  if(state.key!==wanted)return false;
-  state.locked=false;
-  if(saved){
-   state.photos=validateStoredPhotos(saved.photos);
-   state.revision=Number.isInteger(saved.revision)&&saved.revision>=0?saved.revision:0;
-   state.visible=!!saved.visible||state.photos.length>0||openBefore;
-  }
-  state.ready=true;render();
-  if(state.photos.length)message(state.photos.length+' foto(s) recuperada(s) deste BO.');
-  else message('Anexo associado ao BO selecionado.');
-  return true;
- }catch(e){
-  if(state.key===wanted){state.ready=true;render();
-   message('O armazenamento de fotos não pôde ser lido: '+String(e.message||e),true);}
-  return false;
- }
+function discard(){
+ state.epoch++;state.photos=[];state.visible=false;
+ window.PhotoFramer?.cancel?.();
+ const input=$('boPhotosInput');if(input)input.value='';
+ render();
 }
-function ensureLoaded(){
+function syncScope(){
  const wanted=documentScope();
- if(state.ready&&wanted===state.key)return Promise.resolve(!!wanted);
- if(readyPromise&&state.key===wanted)return readyPromise;
- const task=load();readyPromise=task;
- task.finally(()=>{if(readyPromise===task)readyPromise=null;});
- return task;
+ if(state.key!==wanted){discard();state.key=wanted;}
+ return !!wanted;
 }
+function still(epoch,key){return epoch===state.epoch&&key===documentScope()&&key===state.key;}
+function ensureLoaded(){return Promise.resolve(syncScope());}
 function fileToData(file){
  return new Promise((resolve,reject)=>{
   const r=new FileReader();
@@ -1780,147 +1489,62 @@ async function framedPreview(source){
 }
 
 
-async function unlockWithPassphrase(passphrase){
- const scope=documentScope();
- if(!scope)throw Error('Informe um número de BO válido antes de desbloquear o anexo.');
- const envelope=await rawRead(scope);
- await vault.unlock(scope,passphrase,envelope);
- state.ready=false;state.locked=false;
- if(!(await load()))throw Error('Não foi possível desbloquear as fotografias.');
- return true;
-}
 async function open(){
- const scope=documentScope();
- if(!scope){message('Informe o número do BO antes de abrir o anexo.',true);return;}
- if(!vault.has(scope)){
-  const envelope=await rawRead(scope);
-  const password=await vault.ask(!!envelope,scope);
-  if(password===null)return;
-  try{await unlockWithPassphrase(password);}
-  catch(e){message('Anexo não desbloqueado: '+String(e.message||e),true);return;}
- }
- if(!(await ensureLoaded()))return;
- state.visible=true;state.locked=false;
- render();
- message('Anexo protegido. A senha não foi salva no navegador. Use Adicionar fotografias.');
+ if(!syncScope()){alert('Informe o número do BO antes de abrir o anexo.');return;}
+ state.visible=true;render();
+ message('Fotografias temporárias: gere e confira o PDF antes de fechar ou recarregar a página.');
  $('boPhotoAnnex')?.scrollIntoView({block:'start',behavior:'smooth'});
 }
 async function addFiles(input){
- const files=Array.from(input.files||[]);
- input.value='';
- if(!files.length)return;
- if(!(await ensureLoaded())||!vault.has(state.key)){
-  message('Primeiro clique em Anexo fotográfico e desbloqueie o cofre.',true);return;
- }
- await mutate(async()=>{
-  if(state.busy)return;
-  state.busy=true;
-  const addButton=$('boAddPhotos');
-  if(addButton)addButton.disabled=true;
-  let accepted=0;
-  try{
-   state.visible=true;
-   for(const file of files){
-    if(state.photos.length>=MAX_PHOTOS){
-     message('Limite de '+MAX_PHOTOS+' fotos por BO atingido. Gere o PDF antes de adicionar mais.',true);
-     break;
-    }
-    if(!file.type.startsWith('image/')){message('Arquivo ignorado: formato diferente de imagem.',true);continue;}
-    if(file.size>35*1024*1024){message('Arquivo acima de 35 MB ignorado.',true);continue;}
-    try{
-     message('Preparando foto '+(accepted+1)+' de '+files.length+'...');
-     const inputSource=await fileToData(file);
-     const original=await compressPhoto(inputSource,1600,.84);
-     const rendered=await framedPreview(original);
-     const candidate={id:crypto.randomUUID(),original,rendered,caption:''};
-     const previous=state.photos.slice();
-     state.photos.push(candidate);
-     try{await persist();}
-     catch(err){state.photos=previous;throw err;}
-     accepted++;
-     render();
-    }catch(e){
-     render();
-     message('Foto não armazenada: '+String(e.message||e)+'. As anteriores foram preservadas.',true);
-     break;
-    }
-   }
-   if(accepted)message(accepted+' foto(s) adicionada(s) e salva(s) neste aparelho. Total: '+
-    state.photos.length+'. Confira o PDF para preservar o anexo.');
-  }finally{
-   state.busy=false;
-   if(addButton)addButton.disabled=false;
-   render();
+ const files=Array.from(input.files||[]);input.value='';
+ if(!files.length||state.busy||!syncScope()||!state.visible)return;
+ const epoch=state.epoch,key=state.key;state.busy=true;pending++;
+ const add=$('boAddPhotos');if(add)add.disabled=true;
+ let accepted=0;
+ try{
+  for(const file of files){
+   if(!still(epoch,key))break;
+   if(state.photos.length>=MAX_PHOTOS){message('Limite de '+MAX_PHOTOS+' fotos atingido.',true);break;}
+   if(!file.type.startsWith('image/')||file.size>35*1024*1024){message('Arquivo incompatível ou acima de 35 MB.',true);continue;}
+   try{
+    const original=await compressPhoto(await fileToData(file),1600,.84);
+    if(!still(epoch,key))break;
+    const rendered=await framedPreview(original);
+    if(!still(epoch,key))break;
+    const id='photo-'+epoch+'-'+Date.now()+'-'+accepted+'-'+state.photos.length;
+    state.photos.push({id,original,rendered,caption:''});accepted++;render();
+   }catch(e){if(still(epoch,key))message('Foto não adicionada: '+String(e.message||e),true);}
   }
- });
+  if(accepted&&still(epoch,key))message(accepted+' foto(s) adicionada(s) temporariamente. Confira o PDF.');
+ }finally{pending--;state.busy=false;if(add)add.disabled=false;syncScope();render();}
 }
 async function crop(id){
- await ensureLoaded();
- const p=state.photos.find(x=>x.id===id);
- if(!p)return;
+ if(state.busy||!syncScope())return;
+ const p=state.photos.find(x=>x.id===id);if(!p)return;
+ const epoch=state.epoch,key=state.key;state.busy=true;pending++;
  try{
-  const result=await window.PhotoFramer.open(p.original,{
-   aspect:5/3,maxWidth:1600,quality:.86,
-   title:'Ajustar enquadramento da Foto '+(state.photos.indexOf(p)+1)
-  });
-  if(!result)return;
-  await mutate(async()=>{
-   const target=state.photos.find(x=>x.id===id);if(!target)return;
-   const old=target.rendered;target.rendered=result;
-   try{await persist();render();message('Enquadramento ajustado e salvo.');}
-   catch(e){target.rendered=old;render();message('Não foi possível salvar o ajuste: '+String(e.message||e),true);}
-  });
- }catch(e){message('Falha ao abrir o enquadrador: '+String(e.message||e),true);}
+  const result=await window.PhotoFramer.open(p.original,{aspect:5/3,maxWidth:1600,quality:.86,title:'Ajustar enquadramento da Foto '+(state.photos.indexOf(p)+1)});
+  if(result&&validPhoto(result)&&still(epoch,key)&&state.photos.includes(p)){p.rendered=result;render();message('Enquadramento ajustado.');}
+ }catch(e){if(still(epoch,key))message('Falha no enquadramento: '+String(e.message||e),true);}
+ finally{pending--;state.busy=false;syncScope();}
 }
 async function remove(id){
- await ensureLoaded();
- const at=state.photos.findIndex(x=>x.id===id);
- if(at<0)return;
+ if(state.busy||!syncScope())return;
+ const at=state.photos.findIndex(x=>x.id===id);if(at<0)return;
  if(!confirm('Remover a fotografia '+(at+1)+' do anexo?'))return;
- await mutate(async()=>{
-  const old=state.photos.slice();
-  state.photos.splice(at,1);
-  try{await persist();render();message('Fotografia removida.');}
-  catch(e){state.photos=old;render();message('Falha ao remover fotografia: '+String(e.message||e),true);}
- });
+ state.photos.splice(at,1);render();message('Fotografia removida.');
 }
-async function caption(id,text){
- await ensureLoaded();
+function caption(id,text){
+ if(!syncScope())return;
  const target=state.photos.find(x=>x.id===id);if(!target)return;
- await mutate(async()=>{
-  const old=target.caption;
-  target.caption=String(text||'').slice(0,220);
-  try{await persist();render();message('Descrição salva.');}
-  catch(e){target.caption=old;render();message('Descrição não salva: '+String(e.message||e),true);}
- });
+ target.caption=String(text||'').slice(0,220);
+ const el=Array.from(document.querySelectorAll('[data-bo-caption]')).find(x=>x.dataset.boCaption===id);
+ const span=el?.parentElement?.querySelector('.bo-photo-caption-print');
+ if(span)span.textContent=target.caption||('Foto '+String(state.photos.indexOf(target)+1).padStart(2,'0'));
 }
 async function clearAnnex(){
- if(!(await ensureLoaded())||!vault.has(state.key)){
-  message('Desbloqueie o cofre antes de excluir fotografias.',true);return false;
- }
- if(!confirm('Excluir todas as fotografias deste BO neste aparelho?'))return false;
- try{
-  await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});
-  render();message('Todas as fotografias foram removidas deste aparelho.');
-  return true;
- }catch(e){message('Falha ao apagar fotos: '+String(e.message||e),true);return false;}
-}
-async function resetAll(){
- if(!confirm('Deseja limpar todo o boletim, incluindo o anexo fotográfico deste aparelho?'))return;
- const scoped=await ensureLoaded();
- if(state.locked){
-  alert('Desbloqueie o anexo antes de apagar o BO, para não deixar fotos protegidas sem referência.');
-  return;
- }
- try{if(scoped&&vault.has(state.key))
-   await mutate(async()=>{await recordDelete();state.photos=[];state.visible=false;});
-  else {state.photos=[];state.visible=false;}}
- catch(e){alert('Os anexos não puderam ser apagados. O BO foi preservado: '+String(e.message||e));return;}
- try{
-  localStorage.removeItem('bo_bptrans_1cprv_v2');
-  localStorage.removeItem('central-autosave::'+(location.pathname.split('/').pop()||'relatorio').toLowerCase());
- }catch(e){alert('Não foi possível limpar o rascunho. '+String(e.message||e));return;}
- location.reload();
+ if(!confirm('Remover todas as fotografias temporárias deste BO?'))return false;
+ discard();message('Anexo removido.');return true;
 }
 function install(){
  const toolbar=document.querySelector('.toolbar');
@@ -1945,8 +1569,8 @@ function install(){
    '<button type="button" id="boRemoveAllPhotos" class="secondary">Limpar anexo</button>'+
    '<input type="file" id="boPhotosInput" class="bo-photo-file" accept="image/*" multiple aria-label="Selecionar fotografias do BO">'+
    '</div><div class="bo-photo-note">Quatro fotografias por página. A 5ª foto cria automaticamente outra página. '+
-   'As fotografias ficam criptografadas neste navegador com senha própria por BO. '+
-   'Não são anexadas à nuvem. Se perder a senha, não poderá recuperar as fotos locais. '+
+   'As fotografias ficam somente na memória desta página, para impressão/PDF. '+
+   'Fechar, recarregar ou trocar o BO descarta as fotografias. '+
    'Preserve os arquivos fotográficos originais quando houver necessidade de cadeia de custódia ou perícia.</div>'+
    '<div class="bo-photo-message" id="boPhotoStatus" aria-live="polite"></div></div>'+
    '<div class="bo-photo-pages" id="boPhotoPages"></div>';
@@ -1962,58 +1586,43 @@ function install(){
    const removeBtn=e.target.closest('[data-bo-remove]');
    if(removeBtn)remove(removeBtn.dataset.boRemove);
   });
-  root.addEventListener('change',e=>{
+  root.addEventListener('input',e=>{
    const c=e.target.closest('[data-bo-caption]');
    if(c)caption(c.dataset.boCaption,c.value);
   });
  }
-  if(typeof window.prepareAndPrint==='function'&&!window.__boPhotoPrintGuardInstalled){
+ if(typeof window.prepareAndPrint==='function'&&!window.__boPhotoPrintGuardInstalled){
   const printOriginal=window.prepareAndPrint;
   window.prepareAndPrint=function(){
-   if(!state.ready&&documentScope()){
-    const note='Aguarde a verificação do anexo fotográfico antes de imprimir.';
-    message(note,true);alert(note);return false;
-   }
-   if(state.locked){
-    const note='Há fotografias protegidas neste BO. Desbloqueie o anexo antes de gerar o PDF.';
-    message(note,true);alert(note);return false;
-   }
-   if(state.busy||pendingMutations>0){
-    const note='Aguarde a conclusão do salvamento das fotografias antes de gerar o PDF.';
-    message(note,true);alert(note);return false;
-   }
+   syncScope();
+   if(state.busy||pending>0){alert('Aguarde a preparação ou o ajuste das fotografias antes de gerar o PDF.');return false;}
    if(state.photos.length){
-    if(!state.ready||!state.key||state.key!==documentScope()){
-     const note='Confira o número do BO e recarregue o anexo antes de imprimir.';
-     message(note,true);alert(note);return false;
-    }
     const previews=[...document.querySelectorAll('#boPhotoAnnex img.bo-photo-image')];
-    if(previews.length!==state.photos.length||
-      previews.some(img=>!img.complete||img.naturalWidth===0)){
-      const note='Aguarde o carregamento completo das fotos antes de gerar o PDF.';
-      message(note,true);alert(note);return false;
+    if(previews.length!==state.photos.length||previews.some(img=>!img.complete||img.naturalWidth===0)){
+     alert('Aguarde o carregamento completo das fotos antes de gerar o PDF.');return false;
     }
    }
    return printOriginal.apply(this,arguments);
   };
   window.__boPhotoPrintGuardInstalled=true;
  }
- if(typeof window.clearForm==='function')window.clearForm=resetAll;
- document.addEventListener('input',e=>{
-  if(e.target&&e.target.id==='ciopCopom'&&!state.busy)
-   ensureLoaded().catch(err=>message('Falha ao mudar o BO do anexo: '+String(err.message||err),true));
+ document.addEventListener('input',e=>{if(e.target?.id==='ciopCopom')syncScope();});
+ document.addEventListener('change',e=>{if(e.target?.id==='ciopCopom')syncScope();});
+ window.addEventListener('beforeprint',()=>{
+  syncScope();
+  const root=$('boPhotoAnnex');
+  if(root)root.classList.toggle('bo-photo-print-blocked',state.busy||pending>0||
+   [...root.querySelectorAll('img.bo-photo-image')].some(img=>!img.complete||!img.naturalWidth));
  });
- window.addEventListener('beforeprint',()=>{if(state.ready)render()});
- ensureLoaded().catch(err=>message('Falha ao iniciar anexos: '+String(err.message||err),true));
+ window.addEventListener('afterprint',()=>$('boPhotoAnnex')?.classList.remove('bo-photo-print-blocked'));
+ window.addEventListener('pagehide',()=>discard());
+ syncScope();
 }
 window.BoPhotoAnnex=Object.freeze({
- open,unlockWithPassphrase,addFiles,crop,remove,caption,clearAnnex,resetAll,
- ensureLoaded,get isLocked(){return state.locked;},
- get isUnlocked(){return vault.has(state.key);},
+ open,addFiles,crop,remove,caption,clearAnnex,ensureLoaded,
  get photoCount(){return state.photos.length;},
- get pageCount(){return Math.ceil(state.photos.length/PER_PAGE)},
- get storageScope(){return state.key;},
- get isReady(){return state.ready;}
+ get pageCount(){return Math.ceil(state.photos.length/PER_PAGE);},
+ get storageScope(){return state.key;},get isReady(){return state.ready;}
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);
 else install();

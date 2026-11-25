@@ -7,7 +7,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http
 const puppeteer=require(process.env.PUPPETEER_MODULE||'puppeteer-core');
 const root=path.resolve(__dirname,'..');
 const qa=root;
-const BO='PM2026123456',OTHER='PM2026987654',PASS='FAKE-R251-DO-NOT-REUSE-STRONG-BO-PASSWORD';
+const BO='PM2026123456',OTHER='PM2026987654',PRINT_ONLY=true;
 const allowed=['boletim_ocorrencia_bptrans_1cprv.html',
  'boletim_ocorrencia_bptrans_1cprv_ios.html'];
 const results=[];
@@ -147,66 +147,30 @@ async function main(){
    return page;
   }
   const index=await openBo(allowed[0],'?from=index',null);
-  await check('index BO creates encrypted images under canonical number',async()=>{
+  await check('index BO has transient photos, no vault',async()=>{
    await index.click('#boAnnexOpenButton');
-   await index.waitForSelector('#boVaultPassword');
-   await index.$eval('#boVaultPassword',(el,p)=>el.value=p,PASS);
-   await index.$eval('#boVaultConfirm',(el,p)=>el.value=p,PASS);
-   await index.click('#boVaultUnlock');
-   await index.waitForFunction(()=>BoPhotoAnnex.isUnlocked,{timeout:15000});
-   const buffer=await index.evaluate(()=>{
-    const c=document.createElement('canvas');c.width=550;c.height=410;
-    const ctx=c.getContext('2d');ctx.fillStyle='#24516e';ctx.fillRect(0,0,550,410);
-    return c.toDataURL('image/jpeg',.85).split(',')[1];
+   await index.waitForFunction(()=>document.getElementById('boPhotoAnnex').classList.contains('is-open'));
+   assert.equal(await index.$('#boVaultPassword'),null);
+   const data=await index.evaluate(()=>{const c=document.createElement('canvas');c.width=550;c.height=410;const ctx=c.getContext('2d');ctx.fillStyle='#24516e';ctx.fillRect(0,0,550,410);return c.toDataURL('image/jpeg').split(',')[1]});
+   const temp=path.join(os.tmpdir(),'R270_SYNTHETIC_JPEG_'+process.pid+'.jpg');
+   try{fs.writeFileSync(temp,Buffer.from(data,'base64'));await (await index.$('#boPhotosInput')).uploadFile(temp,temp);await index.waitForFunction(()=>BoPhotoAnnex.photoCount===2&&!document.getElementById('boAddPhotos').disabled,{timeout:20000});}finally{fs.rmSync(temp,{force:true})}
+  });
+  for(const [file,entry,scope] of [[allowed[0],'rsd',{serviceId:'SVC-R270-SHIFT',rsdReportId:'RSD-R270-FAKE',segmento:2,unidade:{batalhao:'BPTran',companhiaNumero:1}}],[allowed[1],'rco',{returnModule:'rco',returnUrl:'relatorio_cpu_ios.html',rcoReportId:'RCO-R270-FAKE',guarnicao:'TEST-CREW',unidade:{batalhao:'BPTran',companhiaNumero:1}}]]){
+   await check(entry+' route opens BO without recovering photos from a separate tab',async()=>{
+    const p=await openBo(file,'?from='+entry+'&returnTo='+(entry==='rsd'?'relatorio_servico_diario.html':'relatorio_cpu_ios.html')+'&module=bo&editId=EDIT-R270-FAKE',scope);
+    await p.waitForFunction(()=>document.getElementById('centralSaveBoReturn')!==null,{timeout:12000});
+    assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),0);
+    await p.$eval('#boAnnexOpenButton',e=>e.click());
+    await p.waitForFunction(()=>document.getElementById('boPhotoAnnex').classList.contains('is-open'));
+    assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),0);
+    assert.equal(await index.evaluate(()=>BoPhotoAnnex.photoCount),2);
+    await p.close();
    });
-   const pathName=path.join(os.tmpdir(),'R251_SYNTHETIC_JPEG_TEMP_'+process.pid+'.jpg');
-   try{
-    fs.writeFileSync(pathName,Buffer.from(buffer,'base64'));
-    await (await index.$('#boPhotosInput')).uploadFile(pathName,pathName);
-    await index.waitForFunction(()=>BoPhotoAnnex.photoCount===2&&
-     !document.getElementById('boAddPhotos').disabled,{timeout:20000});
-   }finally{fs.rmSync(pathName,{force:true})}
-   assert.equal(await index.evaluate(()=>BoPhotoAnnex.photoCount),2);
-  });
-  await check('RSD-linked BO recovers index images after password, no cloud',async()=>{
-   const scope={serviceId:'SVC-R251-SHIFT-1',rsdReportId:'RSD-R251-FAKE',
-    segmento:2,unidade:{batalhao:'BPTran',companhiaNumero:1},data:'2026-11-19'};
-   const r=await openBo(allowed[0],
-    '?from=rsd&returnTo=relatorio_servico_diario.html&serviceId=SVC-R251-SHIFT-1&rsdReportId=RSD-R251-FAKE&segmento=2&module=bo',scope);
-   await r.waitForFunction(()=>document.getElementById('centralSaveBoReturn')!==null,{timeout:12000});
-   assert.equal(await r.evaluate(()=>BoPhotoAnnex.isLocked),true);
-   assert.equal(await r.evaluate(()=>BoPhotoAnnex.photoCount),0);
-   await r.evaluate(async p=>BoPhotoAnnex.unlockWithPassphrase(p),PASS);
-   assert.equal(await r.evaluate(()=>BoPhotoAnnex.photoCount),2);
-   assert.equal(await r.evaluate(()=>BoPhotoAnnex.storageScope),
-    await index.evaluate(()=>BoPhotoAnnex.storageScope));
-   await r.close();
-  });
-  await check('RCO-linked iOS BO recovers same photos with different service ID',async()=>{
-   const scope={returnModule:'rco',returnUrl:'relatorio_cpu_ios.html',
-    rcoReportId:'RCO-R251-FAKE',rsdReportId:'RSD-R251-DIFFERENT',
-    serviceId:'SVC-R251-SHIFT-2',segmento:4,guarnicao:'TEST-CREW',
-    unidade:{batalhao:'BPTran',companhiaNumero:1}};
-   const p=await openBo(allowed[1],
-    '?from=rco&returnTo=relatorio_cpu_ios.html&module=bo&editId=EDIT-R251-FAKE',scope);
-   await p.waitForFunction(()=>document.getElementById('centralSaveBoReturn')!==null,{timeout:12000});
-   assert.equal(await p.evaluate(()=>BoPhotoAnnex.isLocked),true);
-   assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),0);
-   await p.evaluate(async pass=>BoPhotoAnnex.unlockWithPassphrase(pass),PASS);
-   assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),2);
-   await p.$eval('#ciopCopom',(el,number)=>{
-    el.value=number;el.dispatchEvent(new Event('input',{bubbles:true}));
-   },OTHER);
-   await p.waitForFunction(number=>BoPhotoAnnex.isReady&&
-    BoPhotoAnnex.storageScope==='bo-annex::number:'+number,{timeout:15000},OTHER);
-   assert.equal(await p.evaluate(()=>BoPhotoAnnex.photoCount),0);
-   assert.equal(await p.evaluate(()=>BoPhotoAnnex.isUnlocked),false);
-   await p.close();
-  });
+  }
   const unexpected=blocked.filter(url=>!url.includes('gc.kis.v2.scr.kaspersky-labs.com'));
   assert.deepEqual(unexpected,[],'Unexpected outbound URLs: '+unexpected.join('; '));
   assert.deepEqual(errors,[],'BO JavaScript exceptions: '+errors.join('; '));
-  const report={date:'2026-11-19',marker:'R251_SOURCE_ROUTING_AND_REAL_BROWSER_OFFLINE',
+  const report={date:'2026-11-25',marker:'R270_SOURCE_ROUTING_PRINT_ONLY_OFFLINE',
    result:'PASS',testCount:results.length,realRsdRcoLoggedIn:false,
    realDevices:false,officialBackendCalled:false,imagesSynthetic:true,
    localStorageServiceContextsSynthetic:true,tests:results,

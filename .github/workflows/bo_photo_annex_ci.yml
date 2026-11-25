@@ -39,7 +39,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test both BO HTML variants (11 static checks, no secrets)
+      - name: Test both BO HTML variants (7 static checks, no secrets)
         run: node --test tests/bo_photo_annex_ci.test.cjs
   bo-photo-chromium-smoke:
     name: Chromium crop and two-page PDF (not physical mobile)
@@ -61,7 +61,7 @@ jobs:
       - name: Validate real index/RSD/RCO source routing with synthetic BOs
         run: node tests/bo_photo_actual_entrypoints_smoke.cjs
   bo-photo-webkit-smoke:
-    name: WebKit mobile photo vault (not physical Safari)
+    name: WebKit mobile transient annex (not physical Safari)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.65.1-noble
     timeout-minutes: 15
@@ -74,5 +74,5 @@ jobs:
           node-version: '22'
       - name: Install Playwright WebKit test dependency
         run: npm install --no-save --no-package-lock --ignore-scripts playwright@1.65.1
-      - name: Validate synthetic encrypted photographs in WebKit
+      - name: Validate synthetic print-only photographs in WebKit
         run: node tests/bo_photo_annex_webkit_smoke.cjs
