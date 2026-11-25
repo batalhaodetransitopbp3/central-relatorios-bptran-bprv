@@ -1,0 +1,47 @@
+name: Central Main Baseline - no deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r265-main-baseline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  main-baseline:
+    name: main-baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout without credentials or deploy
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run legacy baseline + synthetic fixture + release guard tests
+        shell: bash
+        run: |
+          node --check ci/r265_main_source_change_guard.cjs
+          node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs tests/r265_git_diff_hardening.test.cjs
+      - name: Block operational source changes until external R163 approval
+        shell: bash
+        env:
+          R265_TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node ci/r265_main_source_change_guard.cjs
+      - name: Declare NO-GO is NOT a deployment authorization
+        shell: bash
+        run: |
+          echo 'R265 is an advisory protected-main CI baseline, not deployment.'
+          echo 'R163 remains NO_GO; never publish the operational Central from this job.'
