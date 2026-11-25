@@ -243,6 +243,7 @@ async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
  const anchor=String(c.serviceId||'').trim()||String(c.rcoReportId||'').trim();
  if(!anchor){alert('Registre o serviço ou o RCO antes de vincular o BO.');return}
+ if(global.BoPhotoAnnex?.photoCount>0&&!confirm('O anexo fotográfico é temporário. Ao voltar, as fotografias serão descartadas. Confirme somente se já conferiu e salvou o PDF com o anexo.'))return;
  const token=centralToken(true);if(!token)return;
  const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),opDate=c.data||c.operationalDate||today(),date=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):opDate;
  const home=homeName();
@@ -253,7 +254,7 @@ async function saveBoLink(){
 }
 function installBo(){
  if(!fromLinked)return;contextBanner('Boletim de Ocorrência vinculado ao '+homeName());const c=ctx();
- setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}const opDate=c.data||c.operationalDate||'';if(opDate&&$('#dataOcorrencia')){const p=opDate.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):opDate}const editId=qs.get('editId')||c.editId||'';const numEl=$('#ciopCopom');if(fromRco&&editId&&numEl&&!String(numEl.value||'').trim())numEl.value=editId;global.syncInstitutionSpecific?.()}catch(_){}},100);
+ setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}const opDate=c.data||c.operationalDate||'';if(opDate&&$('#dataOcorrencia')){const p=opDate.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):opDate}const editId=qs.get('editId')||c.editId||'';const numEl=$('#ciopCopom');if(fromRco&&editId&&numEl&&!String(numEl.value||'').trim()){numEl.value=editId;numEl.dispatchEvent(new Event('input',{bubbles:true}));}global.syncInstitutionSpecific?.()}catch(_){}},100);
  const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao '+homeName();b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
