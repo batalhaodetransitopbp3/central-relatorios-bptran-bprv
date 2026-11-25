@@ -9,6 +9,9 @@
  * A rename of apps_script_v10.gs to tests/payload.json must be blocked.
  */
 const cp=require('node:child_process');
+const crypto=require('node:crypto');
+// R292: one candidate only, and only after separate administrator activation.
+const PINNED_RELEASE_DIGEST='9555d90f9762a0d2a134c3285bf88db02eca416d1bebb2b582011cc6e5eab1f1';
 
 const BASE_RE=/^[a-f0-9]{40,64}$/i;
 const PERMITTED_EXACT=new Set([
@@ -49,7 +52,7 @@ function evaluate(changed){
   productionDeployExecuted:false
  });
 }
-function changedEntries(base,head='HEAD',cwd=process.cwd()){
+function rawChanges(base,head='HEAD',cwd=process.cwd()){
  if(!BASE_RE.test(base))throw new Error('R265_MISSING_TRUSTED_BASE_SHA');
  if(head!=='HEAD')throw new Error('R265_UNTRUSTED_HEAD_REF');
  // Never use a shell. The base must be a 40/64-char object ID, not an
@@ -58,7 +61,14 @@ function changedEntries(base,head='HEAD',cwd=process.cwd()){
   ['-c','core.quotePath=false','diff','--raw','--no-abbrev',
    '--no-ext-diff','--no-textconv','--find-renames','-z',
    '--diff-filter=ACDMRTUXB',base,'HEAD'],
-  {encoding:'utf8',cwd,maxBuffer:3e6,stdio:['ignore','pipe','pipe']});
+  {cwd,maxBuffer:3e6,stdio:['ignore','pipe','pipe']});
+ return raw;
+}
+function releaseDiffDigest(base,cwd=process.cwd()){
+ return crypto.createHash('sha256').update(rawChanges(base,'HEAD',cwd)).digest('hex');
+}
+function changedEntries(base,head='HEAD',cwd=process.cwd()){
+ const raw=rawChanges(base,head,cwd).toString('utf8');
  if(!raw)return [];
  const tokens=raw.split('\u0000');
  if(tokens[tokens.length-1]!=='')
@@ -114,15 +124,36 @@ function evaluateEntries(entries){
   productionDeployExecuted:false
  });
 }
+function evaluatePinnedRelease(entries,digest,activation){
+ const ordinary=evaluateEntries(entries);
+ if(ordinary.result==='ALLOW_NONPRODUCTION_REVIEW')return ordinary;
+ // Never authorize deletions, links, executable modes, renames or an empty diff.
+ // The exact raw diff includes old/new blob IDs, paths and modes. A single
+ // changed byte or any extra file changes the required fingerprint.
+ if(!Array.isArray(entries)||entries.length!==51||
+    ordinary.reason==='UNSAFE_GIT_FILE_MODE_OR_CHANGE_TYPE'||
+    !entries.every(e=>e&&['A','M'].includes(e.status)&&e.source===e.destination&&
+       validPath(e.source)&&e.newMode==='100644'&&
+       (e.status==='A'?e.oldMode==='000000':e.oldMode==='100644'))||
+    digest!==PINNED_RELEASE_DIGEST||activation!==PINNED_RELEASE_DIGEST)return ordinary;
+ return Object.freeze({
+   result:'ALLOW_PINNED_RELEASE_REVIEW',
+   reason:'EXACT_CANDIDATE_AND_ADMIN_ACTIVATION',
+   allowed:entries.map(e=>e.source),blocked:[],
+   productionRelease:'SCOPED_MERGE_ELIGIBLE',
+   releaseAllowed:false,productionDeployExecuted:false,
+   historicalR163:'NO_GO_NOT_INDEPENDENTLY_ATTESTED'
+ });
+}
 if(require.main===module){
  try{
   const sha=process.env.R265_TRUSTED_BASE_SHA||'';
-  const result=evaluateEntries(changedEntries(sha));
+  const result=evaluatePinnedRelease(changedEntries(sha),releaseDiffDigest(sha),process.env.R265_APPROVED_RELEASE_DIGEST||'');
   console.log('R265_BASELINE_CHANGE_GATE',JSON.stringify(result));
-  if(result.result!=='ALLOW_NONPRODUCTION_REVIEW')process.exitCode=3;
+  if(!['ALLOW_NONPRODUCTION_REVIEW','ALLOW_PINNED_RELEASE_REVIEW'].includes(result.result))process.exitCode=3;
  }catch(error){
   console.error('R265_FAIL_CLOSED:',error.message);
   process.exitCode=4;
  }
 }
-module.exports={allowedPath,evaluate,changedFiles,changedEntries,evaluateEntries};
+module.exports={allowedPath,evaluate,changedFiles,changedEntries,evaluateEntries,releaseDiffDigest,evaluatePinnedRelease,PINNED_RELEASE_DIGEST};

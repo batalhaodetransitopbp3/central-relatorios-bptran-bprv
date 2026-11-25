@@ -35,13 +35,19 @@ jobs:
         run: |
           node --check ci/r265_main_source_change_guard.cjs
           node --test tests/*.test.js tests/r265_main_source_change_guard.test.cjs tests/r265_git_diff_hardening.test.cjs
-      - name: Block operational source changes until external R163 approval
+      - name: Check exact operational release against trusted base and admin activation
         shell: bash
         env:
           R265_TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: node ci/r265_main_source_change_guard.cjs
-      - name: Declare NO-GO is NOT a deployment authorization
+          R265_APPROVED_RELEASE_DIGEST: ${{ vars.CENTRAL_RELEASE_APPROVED_DIGEST }}
+        run: |
+          set -euo pipefail
+          [[ "$R265_TRUSTED_BASE_SHA" =~ ^[a-f0-9]{40,64}$ ]]
+          # Evaluate using the guard committed in the protected base, not the PR.
+          git show "${R265_TRUSTED_BASE_SHA}:ci/r265_main_source_change_guard.cjs" > "$RUNNER_TEMP/r265-trusted-guard.cjs"
+          node "$RUNNER_TEMP/r265-trusted-guard.cjs"
+      - name: Declare CI is not deployment authorization
         shell: bash
         run: |
-          echo 'R265 is an advisory protected-main CI baseline, not deployment.'
-          echo 'R163 remains NO_GO; never publish the operational Central from this job.'
+          echo 'This job does not deploy Apps Script or authorize a production cutover.'
+          echo 'R163 historical evidence has not been independently attested.'
