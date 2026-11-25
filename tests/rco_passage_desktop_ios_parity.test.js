@@ -12,6 +12,12 @@ for(const [begin,end] of [
  assert(a>0&&b>a&&c>0&&e>c,'missing RCO block '+begin);
  assert.equal(desktop.slice(a,b),ios.slice(c,e),'desktop/iOS parity for '+begin);
 }
-assert(desktop.includes('const recebido=await window.centralRcoReceiveCloudPassage?.()'));
-assert(ios.includes('const recebido=await window.centralRcoReceiveCloudPassage?.()'));
+for(const html of [desktop,ios]){
+ const received=html.indexOf('recebido=await window.centralRcoReceiveCloudPassage?.()');
+ const guard=html.lastIndexOf('window.__rcoReceiveSyncAuthorized=true',received);
+ const release=html.indexOf('finally{window.__rcoReceiveSyncAuthorized=false}',received);
+ assert(guard>=0&&received>guard&&release>received,'recebimento sincronizado somente durante registro validado');
+ const complete=html.indexOf('window.__rcoPendingReceiveAfterResponsible=false',release);
+ assert(complete>release&&html.slice(release,complete).includes('if(!recebido)throw new Error'),'não confirma passagem quando gravação falha');
+}
 console.log('PASS RCO previous snapshots, passage, receipt and claim guards identical on desktop/iOS');

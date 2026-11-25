@@ -288,6 +288,7 @@ function doPost(e) {
       out = rcoSupplementalUpsert_(payload);
     } else if (action === 'rco-consolidate-final') {
       assertToken_(token, 'coord');
+      if(payload.administrativeConsolidation===true)assertToken_(token,'comando');
       out = rcoConsolidateFinal_(payload);
     } else if (action === 'rco-mark-pdf') {
       assertToken_(token, 'coord');
@@ -4552,6 +4553,10 @@ function rcoDraftUpsert_(payload){
   }
 
   if(old&&['EM_ANDAMENTO','EM_RETIFICACAO'].indexOf(String(old.STATUS||''))<0)throw new Error('Este RCO já foi finalizado. Para alterar dados consolidados, solicite retificação e aguarde autorização da Gestão de Sistema.');
+  if(old&&String(old.RESPONSAVEL_MATRICULA||'').trim()&&!normMat_((r.responsavelRco||{}).matricula||'')){
+    var persistedIdentity=loadJsonPayload_(old)||{};
+    if(normMat_((persistedIdentity.responsavelRco||{}).matricula||''))throw new Error('RCO_RESPONSAVEL_AUSENTE: confirme o responsável antes de salvar; a identificação original foi preservada.');
+  }
   if(old){
     var revGate=rcoAssertDraftRevision_(old, rcoKnownRevision_(payload), rcoKnownRevisionPresent_(payload));
     if(!revGate.ok){
@@ -5133,9 +5138,10 @@ function rcoWriteClosureFlags_(reportId,flags,opts){
     try{
       var p=loadJsonPayload_(row)||{};
       p=rcoApplyClosureFlagsToPayload_(p,flags);
+      if(opts.consolidacaoResponsavel)p.consolidacaoResponsavel=opts.consolidacaoResponsavel;
       var json=JSON.stringify(p),saved=saveJsonPayload_(String(reportId),'flags-'+Number(row.REVISAO||1),json,'RCO_DRAFT_FOLDER_ID','Central RCO - Rascunhos',row.PAYLOAD_FILE_ID||'');
       row.PAYLOAD_JSON=saved.json;row.PAYLOAD_FILE_ID=saved.fileId;row.PAYLOAD_FILE_URL=saved.fileUrl;row.PAYLOAD_HASH=hash_(json);
-    }catch(_){}
+    }catch(err){if(opts.consolidacaoResponsavel)throw err;}
   }
   rcoDraftUpsertRow_(s,String(reportId),row);
   return flags;
@@ -6062,6 +6068,23 @@ function rcoSupplementalUpsert_(payload) {
   try{return rcoSupplementalUpsertBody_(payload,{});}
   finally{lock.releaseLock();}
 }
+function rcoConsolidateAdministrativeIdentity_(pkg,rco,draft){
+  if(pkg.administrativeConsolidation!==true)return;
+  var original=rco.responsavelRco||{},saved=loadJsonPayload_(draft)||{},historical=saved.responsavelRco||{},actor=pkg.coordenador||{};
+  if(!normMat_(historical.matricula||'')||normMat_(historical.matricula)!==normMat_(draft.RESPONSAVEL_MATRICULA||'')||
+      normMat_(original.matricula||'')!==normMat_(historical.matricula)||String(original.nome||'')!==String(historical.nome||'')||
+      String(original.postoGrad||'')!==String(historical.postoGrad||'')||String(original.perfil||'')!==String(historical.perfil||'')||
+      String(original.turno||'')!==String(historical.turno||''))throw new Error('RCO_ADMIN_ORIGEM_INVALIDA: confira a identificação original do rascunho.');
+  if(!!rco.semGuarnicaoCpu!==!!saved.semGuarnicaoCpu)throw new Error('RCO_ADMIN_MODO_DIVERGENTE: preserve a composição operacional do serviço.');
+  if(String(actor.perfil||'')!=='GESTAO_SISTEMA'||!normMat_(actor.matricula||''))throw new Error('RCO_ADMIN_CONSOLIDADOR_INVALIDO: identifique a Gestão de Sistema.');
+  var mat=normMat_(actor.matricula),items=cadastroSearch_({tipo:'militar',q:mat}).items||[],mil=null;
+  for(var i=0;i<items.length;i++)if(normMat_(items[i].MATRICULA||'')===mat){mil=items[i];break;}
+  if(!mil||String(mil.SITUACAO||'').toUpperCase()!=='ATIVO'||!mil.NOME||!mil.POSTO_GRAD)throw new Error('RCO_ADMIN_CONSOLIDADOR_INVALIDO: militar ativo não localizado no Cadastro Mestre.');
+  var canonical={perfil:'GESTAO_SISTEMA',matricula:mat,nome:String(mil.NOME),postoGrad:String(mil.POSTO_GRAD),turno:'ADMINISTRATIVO',semCpu:!!rco.semGuarnicaoCpu};
+  rco.responsavelRco=historical;
+  rco.consolidacaoResponsavel=canonical;
+  pkg.coordenador=canonical;
+}
 function rcoConsolidateFinal_(payload) {
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   var perf=rcoPerfNew_();
@@ -6077,6 +6100,7 @@ function rcoConsolidateFinal_(payload) {
     var rcoSheet=sheet_(P3_SHEET_ID,'RCO');ensureHeaders_(rcoSheet,['VERSAO']);
     var existing=findOne_(rcoSheet,'REPORT_ID',reportId);
     if(perf)perf.trackedDriveOps++;
+    rcoConsolidateAdministrativeIdentity_(pkg,rco,draft);
     var flags=rcoMergeClosureFromClient_(draft,Object.assign({},loadJsonPayload_(draft)||{},rco||{},pkg||{}));
     var fp=rcoConsolidateFingerprint_(pkg,reportId);
     rcoPerfEnd_(perf,'prepare');
@@ -6138,7 +6162,7 @@ function rcoConsolidateFinal_(payload) {
     rcoDraftUpsertRow_(draftSheet,reportId,draft);
 
     var resolved=rcoConsolidateResolveRsdStatuses_(pkg,reportId,cons,perf,shared);
-    var wantEncerrar=!!(pkg.encerrar||payload.encerrar);
+    var wantEncerrar=pkg.administrativeConsolidation!==true&&!!(pkg.encerrar||payload.encerrar);
     var out=rcoSupplementalUpsertBody_(pkg,{
       fromConsolidate:true,
       wasRetificacao:draftStatus==='EM_RETIFICACAO',
@@ -6151,7 +6175,7 @@ function rcoConsolidateFinal_(payload) {
 
     rcoPerfStart_(perf,'closureFlags');
     flags.p3Consolidado=true;flags.p3ConsolidadoEm=nowIso_();
-    rcoWriteClosureFlags_(reportId,flags);
+    rcoWriteClosureFlags_(reportId,flags,pkg.administrativeConsolidation===true?{consolidacaoResponsavel:cons}:{});
     // Só após writes + flags: marca conclusão integral inequívoca
     var draft2=findOne_(draftSheet,'RCO_REPORT_ID',reportId)||draft;
     draft2.P3_CONSOLIDADO='SIM';draft2.P3_CONSOLIDADO_EM=flags.p3ConsolidadoEm||nowIso_();

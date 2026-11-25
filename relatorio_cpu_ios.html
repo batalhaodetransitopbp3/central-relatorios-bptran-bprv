@@ -261,7 +261,7 @@ input,select,textarea{min-height:32px;border-radius:7px;padding:6px 7px;font-siz
  </div>
  <div id="rcoContinuarComoBox" class="hidden" style="margin-top:9px;padding:9px;border:1px solid #c5d6e6;border-radius:9px;background:#f4f8fc">
   <div id="rcoContinuarComoMsg" class="hint" style="margin:0 0 8px"></div>
-  <div class="actions" style="margin:0;gap:6px;flex-wrap:wrap"><button type="button" class="ok small" id="rcoContinuarComoBtn" onclick="rcoConfirmarContinuidadeResponsavel()">Confirmar continuidade</button><button type="button" class="secondary small" id="rcoContinuarOutraMatriculaBtn" onclick="rcoContinuarComOutraMatricula()">Usar outra matrícula</button></div>
+  <div class="actions" style="margin:0;gap:6px;flex-wrap:wrap"><button type="button" class="ok small" id="rcoContinuarComoBtn" onclick="rcoConfirmarContinuidadeResponsavel()">Confirmar continuidade</button><button type="button" class="secondary small" id="rcoContinuarOutraMatriculaBtn" onclick="rcoContinuarComOutraMatricula()">Usar outra matrícula</button><button type="button" class="secondary small" id="rcoAdminConsolidarBtn" hidden onclick="rcoRegistrarConsolidadorAdministrativo()">Consolidar pela Gestão de Sistema (preservar responsável original)</button></div>
  </div>
  <div class="actions" id="rcoResponsavelActions" style="margin-top:7px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="ok small" id="rcoResponsavelRegistrarBtn" onclick="rcoRegistrarResponsavel()">Identificar e registrar responsável</button><button type="button" class="ok" id="centralEnterRcoBtn" hidden>Entrar no RCO</button><span id="rcoResponsavelProgresso" class="hint" role="status" aria-live="polite"></span></div>
  <div id="rcoResponsavelResultado" class="hint">Informe matrícula, função e a única credencial correspondente. O sistema localizará o militar no Cadastro Mestre.</div>
@@ -682,6 +682,7 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
     return true;
   }
   window.gerarPassagemServicoRco=async function(){
+    if(window.__rcoAdministrativeConsolidation){alert('A sessão administrativa destina-se à consolidação, não à passagem de serviço.');return}
     if(window.__rcoPassPublishBusy)return;
     window.__rcoPassPublishBusy=true;
     try{
@@ -973,6 +974,7 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
     return window.__rcoClosureFlags;
   };
   window.centralRcoEncerrarServico=async function(){
+    if(window.__rcoAdministrativeConsolidation){alert('A sessão administrativa destina-se à consolidação. O encerramento permanece a cargo do responsável.');return false}
     if(window.__rcoContextAbandoned||rcoOpBusy())return false;
     let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
     if(!token){alert(RCO_SESSION_EXPIRED_MSG);try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralReturnToAccess?.('rco'),0);return false}
@@ -1005,12 +1007,14 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
   };
   window.abrirConsolidacaoP3=async function(){
     if(rcoOpBusy())return;
+    if(!window.__rcoResponsavelRegistrado||window.__rcoPendingContinueResponsible||window.__rcoPendingReceiveAfterResponsible){alert('Identifique o responsável antes de consolidar.');return}
     try{const ok=await window.centralRcoSyncNow?.(false);if(ok===false&&!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar a consolidação mesmo assim?'))return}catch(_){if(!confirm('Não foi possível salvar na nuvem agora. Os dados deste aparelho não foram apagados.\n\nDeseja continuar a consolidação mesmo assim?'))return}
     try{await window.centralRcoRefreshCloud?.()}catch(_){}try{const stale=window.rcoStaleIncludedGuarnicoes?.()||[];if(stale.length){alert('Há guarnições com dados mais recentes disponíveis. Atualize antes de consolidar.\n\n'+stale.join('\n'));return}}catch(_){}
     const resp=window.rcoResponsibleData?.()||{};
     if(!window.__rcoResponsavelRegistrado||!resp.matricula){alert('Registre primeiro o CPU ou o P3/oficial responsável pelo RCO.');document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     const semCpu=!!document.getElementById('rcoSemCpu')?.checked;
-    if(semCpu&&!['P3','OFICIAL'].includes(String(resp.perfil||'').toUpperCase())){alert('No modo de consolidação sem CPU, identifique e registre um responsável com perfil P3 ou Oficial.');return}
+    const admin=window.__rcoAdministrativeConsolidation;
+    if(semCpu&&!admin&&!['P3','OFICIAL'].includes(String(resp.perfil||'').toUpperCase())){alert('No modo de consolidação sem CPU, identifique e registre um responsável com perfil P3 ou Oficial.');return}
     let token='';try{token=sessionStorage.getItem('pmpb-rco-role-token-v1')||''}catch(_){}
     if(!token){alert(RCO_SESSION_EXPIRED_MSG);try{window.salvarRascunho?.(true)}catch(_){}setTimeout(()=>window.centralReturnToAccess?.('rco'),0);return}
     try{await window.centralRcoRefreshLinkedRecords?.()}catch(_){}
@@ -1019,6 +1023,13 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
     pkg.rsdReportIds=originsList.map(o=>o.rsdReportId).filter(Boolean);
     pkg.serviceIds=[...new Set(originsList.map(o=>o.serviceId).filter(Boolean))];
     pkg.coordenador={matricula:resp.matricula||'',nome:resp.nome||'',postoGrad:resp.postoGrad||'',turno:resp.turno||'',perfil:resp.perfil||'CPU'};
+    if(admin){
+      if(String(pkg.rco?.state?.reportId||'')!==admin.reportId||semCpu!==admin.semCpu||!CentralCloud.getToken('comando')){alert('A sessão administrativa não corresponde ao RCO.');return}
+      token=CentralCloud.getToken('comando');
+      pkg.administrativeConsolidation=true;
+      pkg.coordenador={...admin.actor};
+      pkg.rco.consolidacaoResponsavel={...admin.actor,semCpu};
+    }
     pkg.encerrar=false;
     const confirmTxt='CONFIRMAR CONSOLIDAÇÃO P3?\n\nOs dados deste RCO serão enviados à estatística e as pendências de fluxo dos RSDs vinculados serão resolvidas.\n\nO serviço NÃO será encerrado automaticamente — é necessário Gerar PDF e confirmar o encerramento depois.';
     if(!confirm(confirmTxt))return;
@@ -1027,6 +1038,7 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
       if(typeof salvarRascunho==='function')salvarRascunho(true);
       p3SetStatus('Consolidando o RCO na Central…');
       const rr=await CentralCloud.submitForm('rco-consolidate-final',pkg,token,{popup:false,timeout:90000});
+      if(admin&&rr.p3Consolidado!==false)admin.committed=true;
       const flags=p3ApplyClosureLocal({
         pdfGerado:!!rr.pdfGerado||!!(window.__rcoClosureFlags||{}).pdfGerado,
         pdfGeradoEm:rr.pdfGeradoEm||(window.__rcoClosureFlags||{}).pdfGeradoEm||'',
@@ -1039,6 +1051,8 @@ function initCpu(){bindCommon();rcoLockServiceWindowFields();setDates();ensureGu
         alert(rr.message||'RCO consolidado e encerrado.');
       }else if(!flags.pdfGerado){
         alert('Dados consolidados. Ainda falta Gerar PDF do RCO.');
+      }else if(admin){
+        alert('Dados consolidados pela Gestão de Sistema. O serviço permanece aberto.');
       }else if(confirm('PDF e Consolidação P3 foram concluídos. Deseja encerrar este serviço?\n\nSIM — finaliza o RCO e remove de Continuar.\nNÃO — mantém o RCO aberto.')){
         setRcoOpBusy(false);
         await window.centralRcoEncerrarServico?.();
@@ -1159,10 +1173,11 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     return '';
   }
   async function syncRcoDraft(silent=true){
-    if(window.__rcoContextAbandoned||!navigator.onLine)return false;
+    if(window.__rcoContextAbandoned||!navigator.onLine||window.__rcoPendingContinueResponsible||(window.__rcoPendingReceiveAfterResponsible&&!window.__rcoReceiveSyncAuthorized))return false;
     let token=rcoWorkflowToken(silent);if(!token)return false;
     let rco;try{rco=window.collectState()}catch(_){return false}
     const reportId=String(rco?.state?.reportId||rco?.reportId||'');
+    const admin=window.__rcoAdministrativeConsolidation;if(admin&&(admin.reportId!==reportId||admin.semCpu!==!!rco.semGuarnicaoCpu))return false;
     const known=rcoKnownRevisionFor(reportId);
     const body={rco,deviceId:rcoDeviceId};
     if(known!=null){body.knownDraftRevision=known;body.draftRevision=known}
@@ -1287,7 +1302,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       throw new Error('RCO_SCOPE_SELECTION_INVALID: unidade do RCO inconsistente. Atualize a lista; nenhum relatório foi assumido.');
     return scope;
   }
-  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken='',opts={}){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const selectedScope=rcoClaimScopeFromItem_(item);const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);if(receivePassage){let peek;try{peek=await CentralCloud.jsonp('rco-draft-get',{reportId:item.reportId,data:claimData,token,...selectedScope},{timeout:30000})}catch(e){alert('RECEBIMENTO BLOQUEADO: não foi possível consultar o histórico do RCO antes de assumir. Nenhum bloqueio de edição foi solicitado. '+(e.message||e));return false}const p=peek?.rco||{},h=p.auditoria||{},passes=h.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(String(p.state?.reportId||p.reportId||'')!==String(item.reportId||'')||!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!h.snapshots?.[key]||String(h.snapshots[key]?.state?.reportId||'')!==String(item.reportId||'')||!['state','cpu','alteracoesEfetivo','operacoes','veiculosRecuperados','tcos','cirvc','arvc','observacoes','anexos','rcoOrigens','rcoCloudPayloads'].every(k=>!Object.prototype.hasOwnProperty.call(h.snapshots[key],k)||JSON.stringify(p[k]??null)===JSON.stringify(h.snapshots[key][k]??null))){alert('RECEBIMENTO BLOQUEADO: o RCO da Central não contém uma passagem íntegra com os dados anteriores. Nenhum bloqueio de edição foi realizado. Solicite conferência do histórico.');return false}}const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,receivePassage:!!receivePassage,data:claimData,...selectedScope},token,{popup:false});window.__rcoContextAbandoned=false;rcoRevisionNotified=false;rcoRememberRevision(item.reportId||r.rco?.state?.reportId||r.rco?.reportId,r.revision);const hintResp=r.rco?.responsavelRco||r.responsavel||null;const uniqueness=!!(opts&&opts.uniqueness);if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else if(!uniqueness)window.__rcoPendingContinueResponsible=true;else window.__rcoPendingContinueResponsible=false;if(receivePassage){const a=r.rco?.auditoria||{},passes=a.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!a.snapshots?.[key]){window.__rcoPendingReceiveAfterResponsible=false;alert('RECEBIMENTO BLOQUEADO: este RCO na nuvem não contém uma passagem pendente com cópia integral dos dados anteriores. Não inicie um relatório vazio nem substitua informações; solicite conferência do histórico ao coordenador anterior.');return false}}window.applyCpu(r.rco);try{window.salvarRascunho?.(true)}catch(_){}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else if(uniqueness&&hintResp&&hintResp.matricula){window.__rcoPendingContinueResponsible=false;const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='RCO desta companhia e período aberto. Os dados salvos foram preservados.';}else if(uniqueness){window.__rcoPendingContinueResponsible=true;window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='Identifique o responsável deste RCO. Nenhum dado já gravado será apagado.';}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token,opts)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
+  async function claimRcoDraft(item,force=false,receivePassage=false,providedToken='',opts={}){const token=String(providedToken||rcoWorkflowToken(false)).trim();if(!token)return false;if(providedToken)try{sessionStorage.setItem('pmpb-rco-role-token-v1',token);sessionStorage.setItem('central-module-auth-rco-v1','1')}catch(_){}try{const selectedScope=rcoClaimScopeFromItem_(item);const claimData=String(item.data||item.DATA_SERVICO||rcoOperationalDate(val('dataInicio'))||'').slice(0,10);if(receivePassage){let peek;try{peek=await CentralCloud.jsonp('rco-draft-get',{reportId:item.reportId,data:claimData,token,...selectedScope},{timeout:30000})}catch(e){alert('RECEBIMENTO BLOQUEADO: não foi possível consultar o histórico do RCO antes de assumir. Nenhum bloqueio de edição foi solicitado. '+(e.message||e));return false}const p=peek?.rco||{},h=p.auditoria||{},passes=h.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(String(p.state?.reportId||p.reportId||'')!==String(item.reportId||'')||!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!h.snapshots?.[key]||String(h.snapshots[key]?.state?.reportId||'')!==String(item.reportId||'')||!['state','cpu','alteracoesEfetivo','operacoes','veiculosRecuperados','tcos','cirvc','arvc','observacoes','anexos','rcoOrigens','rcoCloudPayloads'].every(k=>!Object.prototype.hasOwnProperty.call(h.snapshots[key],k)||JSON.stringify(p[k]??null)===JSON.stringify(h.snapshots[key][k]??null))){alert('RECEBIMENTO BLOQUEADO: o RCO da Central não contém uma passagem íntegra com os dados anteriores. Nenhum bloqueio de edição foi realizado. Solicite conferência do histórico.');return false}}const r=await CentralCloud.submitForm('rco-draft-claim',{reportId:item.reportId,deviceId:rcoDeviceId,forceTakeover:force,receivePassage:!!receivePassage,data:claimData,...selectedScope},token,{popup:false});window.__rcoContextAbandoned=false;rcoRevisionNotified=false;rcoRememberRevision(item.reportId||r.rco?.state?.reportId||r.rco?.reportId,r.revision);const hintResp=r.rco?.responsavelRco||r.responsavel||null;const uniqueness=!!(opts&&opts.uniqueness);if(receivePassage)window.__rcoPendingReceiveAfterResponsible=true;else if(!uniqueness)window.__rcoPendingContinueResponsible=true;else window.__rcoPendingContinueResponsible=false;if(receivePassage){const a=r.rco?.auditoria||{},passes=a.passagens||[],last=passes[passes.length-1],key=last?('cpu'+last.slot+'AtPassage'):'';if(!last||last.status!=='AGUARDANDO_RECEBIMENTO'||!a.snapshots?.[key]){window.__rcoPendingReceiveAfterResponsible=false;alert('RECEBIMENTO BLOQUEADO: este RCO na nuvem não contém uma passagem pendente com cópia integral dos dados anteriores. Não inicie um relatório vazio nem substitua informações; solicite conferência do histórico ao coordenador anterior.');return false}}window.applyCpu(r.rco);if(!window.__rcoPendingContinueResponsible&&!window.__rcoPendingReceiveAfterResponsible){try{window.salvarRascunho?.(true)}catch(_){}}rcoConflictNotified=false;renderRcoRetificationBanner(r);if(receivePassage){window.rcoPrepareIncomingResponsible?.();document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO selecionado para recebimento. Confirme agora a matrícula do novo CPU/Coordenador. A passagem só será concluída após essa confirmação.')}else if(String(r.status||'')==='EM_RETIFICACAO'){window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO EM RETIFICAÇÃO\n\nMotivo: '+(r.retificacaoMotivo||'Não informado')+(r.retificacaoAbertaPor?'\nAutorizado por: '+r.retificacaoAbertaPor:'')+(r.retificacaoAbertaEm?'\nAutorizado em: '+new Date(r.retificacaoAbertaEm).toLocaleString('pt-BR'):'')+'\n\nIdentifique o responsável desta sessão e, em seguida, corrija este mesmo RCO e use Consolidar P3 para reenviar a versão retificada.')}else if(uniqueness&&hintResp&&hintResp.matricula){window.__rcoPendingContinueResponsible=false;const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='RCO desta companhia e período aberto. Os dados salvos foram preservados.';}else if(uniqueness){window.__rcoPendingContinueResponsible=true;window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});const stU=document.getElementById('rcoProgressaoStatus');if(stU)stU.textContent='Identifique o responsável deste RCO. Nenhum dado já gravado será apagado.';}else{window.rcoPrepareContinueResponsible?.(hintResp);document.getElementById('rcoResponsavelCard')?.scrollIntoView({behavior:'smooth',block:'start'});alert('RCO carregado da nuvem. Identifique o responsável que continuará este RCO antes de editar ou consolidar.')}return true}catch(e){if(!force&&/outro aparelho/i.test(String(e.message||e))){if(confirm('Este RCO está aberto em outro aparelho. Deseja assumir a edição neste dispositivo?'))return claimRcoDraft(item,true,receivePassage,token,opts)}alert('Não foi possível carregar o RCO: '+e.message);return false}}
   async function continueRcoCloud(){if(typeof window.centralOpenServicePicker==='function'){window.centralOpenServicePicker('rco','continue');return true}alert('Atualize a página para usar o painel de serviços em aberto por companhia.');return false}
 
   window.centralRcoContinueCloud=continueRcoCloud;
@@ -2101,10 +2116,33 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     const box=e('rcoContinuarComoBox'),msg=e('rcoContinuarComoMsg');if(!box||!msg)return;
     const label=[hint.postoGrad||hint.posto||'',hint.nome||'',hint.matricula||''].filter(Boolean).join(' ').trim();
     if(!hint?.matricula||!label){box.classList.add('hidden');return}
-    window.__rcoContinueHint=hint;
+    window.__rcoContinueHint=hint;const admin=e('rcoAdminConsolidarBtn');if(admin)admin.hidden=!rcoGestaoSession();
     msg.textContent='Continuar como '+label+'? Confirme para revalidar no Cadastro Mestre e registrar a responsabilidade nesta sessão, ou use outra matrícula.';
     box.classList.remove('hidden');
   }
+  function rcoGestaoSession(){
+    try{const a=JSON.parse(sessionStorage.getItem('pmpb-comando-session-v1')||'null');return a?.matricula&&window.CentralCloud?.getToken('comando')?a:null}catch(_){return null}
+  }
+  window.rcoRegistrarConsolidadorAdministrativo=async function(){
+    const original=window.__rcoContinueHint,session=rcoGestaoSession(),reportId=String(state.reportId||'');
+    if(!session||!original?.matricula||!reportId||!window.__rcoPendingContinueResponsible||window.__rcoPendingReceiveAfterResponsible){alert('Abra um RCO em andamento com responsável original identificado e autentique a Gestão de Sistema.');return}
+    if(!confirm('Consolidar administrativamente com a identidade da Gestão de Sistema, preservando o responsável original?'))return;
+    try{
+      const token=CentralCloud.getToken('comando');
+      const r=await CentralCloud.jsonp('sistema-auth',{token,matricula:session.matricula},{timeout:25000,tokenKind:'comando',forceJsonp:true});
+      const m=r?.militar||{};
+      if(!m.matricula||!m.nome||!m.postoGrad||fmt(m.matricula)!==fmt(session.matricula)||String(state.reportId||'')!==reportId||!window.__rcoPendingContinueResponsible)throw new Error('Identificação ou contexto da Gestão de Sistema inválido.');
+      const actor={perfil:'GESTAO_SISTEMA',matricula:fmt(m.matricula),nome:m.nome,postoGrad:m.postoGrad,turno:'ADMINISTRATIVO'};
+      window.__rcoAdministrativeConsolidation={reportId,original:{...original},actor,semCpu:!!e('rcoSemCpu')?.checked};
+      window.__rcoResponsavel=actor;window.__rcoResponsavelRegistrado=true;
+      const out=e('rcoResponsavelResultado');if(out)out.textContent='Responsável original preservado: '+original.postoGrad+' '+original.nome+' / Consolidador administrativo: '+actor.postoGrad+' '+actor.nome;
+      const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Gestão de Sistema registrada para consolidação';badge.classList.add('ok')}
+      setResponsibleLocked(true);hideContinuarComo();if(e('rcoSemCpu'))e('rcoSemCpu').disabled=true;
+      window.__rcoPendingContinueResponsible=false;
+      window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:actor}));
+      setResponsibleProgress('Consolidador administrativo identificado. O responsável original permanece no relatório.',false);
+    }catch(err){alert('Não foi possível identificar o consolidador administrativo: '+err.message)}
+  };
   async function validateResponsibleCredential(){
     if(!window.CentralCloud||!await CentralCloud.probe()){alert('A Central em nuvem não está disponível.');return null}
     const inp=e('rcoResponsavelMatricula'),mat=fmt(inp.value);inp.value=mat;if(!/^\d{3}\.\d{3}-\d$/.test(mat)){alert('Informe uma matrícula válida no padrão 000.000-0.');return null}
@@ -2143,7 +2181,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     else{e('rcoSemCpu').checked=true;e('rcoConsolidadorPosto').value=data.postoGrad;e('rcoConsolidadorNome').value=data.nome;e('rcoConsolidadorMatricula').value=data.matricula;e('rcoConsolidadorTurno').value=data.turno;centralRcoToggleSemCpu?.()}
   }
   function unlockResponsibleCard(){
-    selectedResponsible=null;window.__rcoResponsavel=null;window.__rcoResponsavelRegistrado=false;
+    selectedResponsible=null;if(e('rcoSemCpu'))e('rcoSemCpu').disabled=false;window.__rcoAdministrativeConsolidation=null;window.__rcoResponsavel=null;window.__rcoResponsavelRegistrado=false;
     setResponsibleLocked(false);setResponsibleProgress('',false);
     clearExternalResponsibleFields();setExternalResponsibleFields(false);
     const badge=e('rcoResponsavelBadge');if(badge){badge.textContent='Não registrado';badge.classList.remove('ok')}
@@ -2193,7 +2231,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
       setResponsibleProgress('Validando matrícula e credencial…',true);const v=await validateResponsibleCredential();if(!v){setResponsibleProgress('',false);return}if(v.pending){setResponsibleProgress('Cadastro complementar necessário.',false);return}
       setResponsibleProgress('Registrando responsável…',true);const mm=v.r.militar||{},mat=fmt(mm.matricula||e('rcoResponsavelMatricula').value);applyResponsible({NOME:mm.nome||'',POSTO_GRAD:mm.postoGrad||'',MATRICULA:mat},v.perfil,v.turno,false);
       try{sessionStorage.setItem('pmpb-rco-role-token-v1',v.senha)}catch(_){}e('rcoResponsavelSenha').value='';clearExternalResponsibleFields();setExternalResponsibleFields(false);
-      if(window.__rcoPendingReceiveAfterResponsible){const recebido=await window.centralRcoReceiveCloudPassage?.();if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
+      if(window.__rcoPendingReceiveAfterResponsible){let recebido=false;window.__rcoReceiveSyncAuthorized=true;try{recebido=await window.centralRcoReceiveCloudPassage?.()}finally{window.__rcoReceiveSyncAuthorized=false}if(!recebido)throw new Error('Não foi possível concluir a passagem do RCO.');window.__rcoPendingReceiveAfterResponsible=false}
       window.__rcoPendingContinueResponsible=false;
       window.centralAutosave?.();setTimeout(()=>window.centralRcoSyncNow?.(false),120);window.dispatchEvent(new CustomEvent('central-rco-responsavel-registrado',{detail:window.rcoResponsibleData()}));setResponsibleProgress('Responsável registrado. Clique em “Entrar no RCO” para prosseguir.',false);
     }catch(err){setResponsibleLocked(false);window.__rcoResponsavelRegistrado=false;setResponsibleProgress('Falha no registro.',false);alert('Não foi possível registrar o responsável: '+err.message)}
@@ -2208,7 +2246,7 @@ body.rco-sem-cpu #rcoCpuSection{display:none!important}
     e('rcoResponsavelMatricula')?.addEventListener('input',ev=>{ev.target.value=fmt(ev.target.value);selectedResponsible=null;clearExternalResponsibleFields();setExternalResponsibleFields(false)});e('rcoResponsavelPerfil')?.addEventListener('change',()=>{selectedResponsible=null;clearExternalResponsibleFields();setExternalResponsibleFields(false)});
     e('rcoHasSubstituto')?.addEventListener('change',ev=>{e('rcoSubstitutoFields').classList.toggle('hidden',!ev.target.checked);if(!ev.target.checked)rcoRemoverSubstituto()});
     e('rcoSubstitutoBusca')?.addEventListener('input',()=>{clearTimeout(subTimer);subTimer=setTimeout(searchSub,220)});
-    const baseCollect=window.collectState;if(baseCollect&&!baseCollect.__respWrapped){const w=function(){const p=baseCollect();p.responsavelRco=window.rcoResponsibleData();p.substitutoLegalCadastro=window.__rcoSubstituto;return p};w.__respWrapped=true;window.collectState=w}
+    const baseCollect=window.collectState;if(baseCollect&&!baseCollect.__respWrapped){const w=function(){const p=baseCollect();const admin=window.__rcoAdministrativeConsolidation;p.responsavelRco=admin&&String(p.state?.reportId||'')===admin.reportId?{...admin.original}:window.rcoResponsibleData();if(admin?.committed&&String(p.state?.reportId||'')===admin.reportId)p.consolidacaoResponsavel={...admin.actor,semCpu:!!p.semGuarnicaoCpu};p.substitutoLegalCadastro=window.__rcoSubstituto;return p};w.__respWrapped=true;window.collectState=w}
     const baseApply=window.applyCpu;if(baseApply&&!baseApply.__respWrapped){const w=function(p){const r=baseApply(p);const gate=!!(window.__rcoPendingContinueResponsible||window.__rcoPendingReceiveAfterResponsible);if(p?.responsavelRco?.matricula){if(gate){e('rcoResponsavelPerfil').value=p.responsavelRco.perfil||'CPU';e('rcoResponsavelMatricula').value=fmt(p.responsavelRco.matricula||'');if(p.responsavelRco.turno)e('rcoResponsavelTurno').value=p.responsavelRco.turno;window.__rcoContinueHint=p.responsavelRco;window.__rcoResponsavel=null;window.__rcoResponsavelRegistrado=false}else applyResponsible({matricula:p.responsavelRco.matricula,nome:p.responsavelRco.nome,postoGrad:p.responsavelRco.postoGrad},p.responsavelRco.perfil||'CPU',p.responsavelRco.turno||'',true)}if(p?.substitutoLegalCadastro){e('rcoHasSubstituto').checked=true;e('rcoSubstitutoFields').classList.remove('hidden');setSub(p.substitutoLegalCadastro)}else if(p?.passagem?.substituto){const x=String(p.passagem.substituto);e('substitutoLegal').value=x;const pr=document.querySelector('[data-print-for="substitutoLegal"]');if(pr)pr.textContent=x}return r};w.__respWrapped=true;window.applyCpu=w}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,100));else setTimeout(init,100);
