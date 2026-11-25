@@ -1240,7 +1240,7 @@
   let centralDirty=false, centralSuppressExit=false, saveTimer=null;
   function fieldKey(el,index){return el.id?('id:'+el.id):el.name?('name:'+el.name):(el.dataset&&el.dataset.name)?('data-name:'+el.dataset.name):(el.dataset&&el.dataset.k)?('data-k:'+el.dataset.k+':'+index):('idx:'+index)}
   function snapshotGeneric(){
-    const fields=Array.from(document.querySelectorAll('input,select,textarea')).filter(e=>e.type!=='file'&&e.type!=='hidden');
+    const fields=Array.from(document.querySelectorAll('input,select,textarea')).filter(e=>e.type!=='file'&&e.type!=='hidden'&&!e.closest('#boPhotoAnnex, #photoFramerModal'));
     const values={};fields.forEach((e,i)=>{values[fieldKey(e,i)]=e.type==='checkbox'||e.type==='radio'?!!e.checked:e.value});
     return {savedAt:new Date().toISOString(),values};
   }
@@ -1249,7 +1249,7 @@
     let raw='';try{raw=localStorage.getItem(genericKey)||''}catch(_){}
     if(!raw)return false;
     try{
-      const snap=JSON.parse(raw), fields=Array.from(document.querySelectorAll('input,select,textarea')).filter(e=>e.type!=='file'&&e.type!=='hidden');
+      const snap=JSON.parse(raw), fields=Array.from(document.querySelectorAll('input,select,textarea')).filter(e=>e.type!=='file'&&e.type!=='hidden'&&!e.closest('#boPhotoAnnex, #photoFramerModal'));
       fields.forEach((e,i)=>{const k=fieldKey(e,i);if(!(k in (snap.values||{})))return;const v=snap.values[k];if(e.type==='checkbox'||e.type==='radio')e.checked=!!v;else e.value=v??'';e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('input',{bubbles:true}))});
       return true;
     }catch(_){return false}
@@ -1299,8 +1299,8 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
       bar.innerHTML='<button type="button" class="secondary small" onclick="centralStartService()">Início do serviço</button><button type="button" class="secondary small" onclick="centralContinueService()">Continuar serviço</button><a class="secondary small central-home-link" href="index.html" aria-label="Home" title="Home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5.5 9.5V21h5v-6h3v6h5V9.5"></path></svg></a><span class="state-note">Rascunho temporário salvo automaticamente neste aparelho.</span>';
       ref.insertAdjacentElement('afterend',bar);
     }
-    document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
-    document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,180)}},true);
+    document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea')&&!e.target.closest('#boPhotoAnnex, #photoFramerModal')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,450)}},true);
+    document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea')&&!e.target.closest('#boPhotoAnnex, #photoFramerModal')){centralDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(window.centralAutosave,180)}},true);
     document.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;const txt=(b.textContent||'').toLowerCase();if(/salvar rascunho|consolidar relatório|gerar pdf|exportar json|realizar passagem/.test(txt))setTimeout(()=>{centralDirty=false;saveGeneric()},100)},true);
     window.addEventListener('beforeunload',e=>{if(centralDirty&&!centralSuppressExit){saveGeneric();saveSpecific();e.preventDefault();e.returnValue=''}});
   }

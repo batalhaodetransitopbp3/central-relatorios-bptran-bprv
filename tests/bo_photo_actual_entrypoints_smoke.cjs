@@ -33,6 +33,17 @@ function extractRcoBoRouting(){
  return src;
 }
 async function main(){
+ await check('R284 BO linked return requires consent before transient photographs are discarded',async()=>{
+  const start=sourceFlow.indexOf('async function saveBoLink(){'),end=sourceFlow.indexOf('function installBo(){',start);
+  assert(start>=0&&end>start);
+  let prompted=0,tokenCalls=0,submitted=0,returned=0,allow=false;
+  const elements={'#ciopCopom':{value:BO},'#dataOcorrencia':{value:'25/11/2026'}};
+  const sand={global:{BoPhotoAnnex:{photoCount:1},saveDraft(){}},ctx:()=>({rcoReportId:'RCO-TEST',unidade:{}}),$:k=>elements[k],boNumberValid:n=>n===BO,confirm:()=>{prompted++;return allow},centralToken:()=>{tokenCalls++;return 'SYNTHETIC'},homeName:()=> 'RCO',today:()=> '2026-11-25',nowTime:()=> '10:00',CentralCloud:{submitForm:async()=>{submitted++;return {ok:true}}},goBack:()=>returned++,alert(){}};
+  vm.createContext(sand);vm.runInContext(sourceFlow.slice(start,end),sand);
+  await sand.saveBoLink();assert.deepEqual([prompted,tokenCalls,submitted,returned],[1,0,0,0]);
+  allow=true;await sand.saveBoLink();assert.deepEqual([prompted,tokenCalls,submitted,returned],[2,1,1,1]);
+  sand.global.BoPhotoAnnex.photoCount=0;await sand.saveBoLink();assert.deepEqual([prompted,tokenCalls,submitted,returned],[2,2,2,2]);
+ });
  await check('actual RCO context preserves RSD origin but allows standalone RCO',()=>{
   const src=extractRcoContext();
   const sand={};vm.createContext(sand);vm.runInContext(src,sand);
