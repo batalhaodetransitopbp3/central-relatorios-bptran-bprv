@@ -16,11 +16,11 @@
   if(!p||typeof p!=='object')return false;
   const g=p.guarnicao||{};
   if([g.nome,g.responsavel,g.matricula,g.viatura,g.tipo,p.observacoes,p.alteracoes?.servico,p.alteracoes?.viatura,p.alteracoes?.planoOperacionalDiario].some(nonempty))return true;
-  if(['ocorrencias','operacoes','cirvc','arvc','tcos','veiculosRecuperados','anexos'].some(k=>list(p,k)>0))return true;
+  if(['ocorrencias','operacoes','operacoesAcumuladas','cirvc','arvc','tcos','veiculosRecuperados','anexos'].some(k=>list(p,k)>0))return true;
   return anyPositive(p.producao||{});
  };
  const footprint=p=>({
-  ocorrencias:list(p,'ocorrencias'),operacoes:list(p,'operacoes'),cirvc:Math.max(list(p,'cirvc'),list(p,'arvc')),
+  ocorrencias:list(p,'ocorrencias'),operacoes:list(p,'operacoes'),operacoesAcumuladas:list(p,'operacoesAcumuladas'),cirvc:Math.max(list(p,'cirvc'),list(p,'arvc')),
   tcos:list(p,'tcos'),veiculos:list(p,'veiculosRecuperados'),
   efetivo:list(p?.guarnicao,'equipe'),viaturas:list(p,'viaturas'),
   anexos:list(p,'anexos'),fisco:list(p?.fisco,'acionamentos'),
@@ -46,6 +46,7 @@
  const savedArraysChanged=(oldP,newP)=>{
   const pairs=[
    [oldP?.ocorrencias,newP?.ocorrencias],[oldP?.operacoes,newP?.operacoes],
+   [oldP?.operacoesAcumuladas,newP?.operacoesAcumuladas],
    [oldP?.cirvc,newP?.cirvc],[oldP?.arvc,newP?.arvc],
    [oldP?.tcos,newP?.tcos],[oldP?.veiculosRecuperados,newP?.veiculosRecuperados],
    [oldP?.viaturas,newP?.viaturas],[oldP?.guarnicao?.equipe,newP?.guarnicao?.equipe],
@@ -110,5 +111,38 @@
   if(confirmed!==serialized)return {ok:false,reason:'GRAVACAO_NAO_CONFIRMADA'};
   return {ok:true,savedAt:packet.savedAt,bytes:serialized.length};
  }
- return {VERSION,PREFIX,key,read,save,hasMeaningfulContent,losesContent};
+ // Restore only missing full operation records from an explicitly selected backup.
+ // Never replace a newer local operation, or rewrite an invalid/corrupt store.
+ function restoreMissingOperations(storage,storeKey,payload,isValid){
+  const items=payload?.operacoesAcumuladas;
+  if(items==null||Array.isArray(items)&&items.length===0)return {added:0,preserved:0};
+  if(!Array.isArray(items)||typeof isValid!=='function')throw Error('Operações detalhadas da cópia inválidas.');
+  const rid=clean(payload.reportId),sid=clean(payload.serviceId||payload.servico?.serviceId);
+  const day=clean(payload.servico?.data),unit=payload.unidade||{},seg=Number(payload.segmento||payload.servico?.segmento||1);
+  if(!rid||!day)throw Error('Identidade das operações da cópia ausente.');
+  const raw=storage.getItem(storeKey),before=raw==null?[]:JSON.parse(raw);
+  if(!Array.isArray(before))throw Error('Armazenamento de operações inválido; preservado.');
+  const ids=new Set(before.map(x=>clean(x?.reportId)).filter(Boolean)),seen=new Set(),add=[];
+  let preserved=0;
+  for(const op of items){
+   const id=clean(op?.reportId),ctx=op?.contextoServico||{},opRid=clean(op?.rsdReportId||ctx.rsdReportId),opSid=clean(op?.serviceId||ctx.serviceId);
+   const opSeg=op?.segmento??ctx.segmento;
+   if(!id||seen.has(id)||!isValid(op)||clean(op.operacao?.data)!==day||
+      (opRid&&opRid!==rid)||(!opRid&&seg>1)||(opSid&&sid&&opSid!==sid)||
+      (opSeg!=null&&Number(opSeg)!==seg)||
+      (op.unidade?.batalhao&&unit.batalhao&&clean(op.unidade.batalhao)!==clean(unit.batalhao))||
+      (op.unidade?.companhiaNumero&&unit.companhiaNumero&&Number(op.unidade.companhiaNumero)!==Number(unit.companhiaNumero)))
+     throw Error('Operação da cópia fora do serviço ou inválida; armazenamento preservado.');
+   seen.add(id);
+   if(ids.has(id)){preserved++;continue;}
+   add.push(JSON.parse(JSON.stringify(op)));
+  }
+  if(add.length){
+   const serialized=JSON.stringify(before.concat(add));
+   storage.setItem(storeKey,serialized);
+   if(storage.getItem(storeKey)!==serialized)throw Error('Recuperação das operações não confirmada.');
+  }
+  return {added:add.length,preserved};
+ }
+ return {VERSION,PREFIX,key,read,save,hasMeaningfulContent,losesContent,restoreMissingOperations};
 });
