@@ -233,28 +233,110 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
 })();
 </script>
 
-<script src="central_cloud.js?v=10.8.16-auth"></script>
+<script src="central_cloud.js?v=10.8.44.2-pod-etag-guard"></script>
 <script src="module_access_gate.js?v=10.8.16"></script>
 <script id="operation-cloud-v10">
 (function(){
   function install(){
     if(!window.CentralCloud||typeof window.payload!=='function'||typeof window.validar!=='function')return;
     const old=window.registrarOperacaoDoDia;
+    let operationKnownVersion=null,operationKnownPodFingerprint=null,operationLoadedId='',operationLoadedSource=null;
     function serviceContext(){try{return JSON.parse(localStorage.getItem('pmpb-active-service-v1')||'{}')||{}}catch(_){return {}}}
-    function enrichOperation(p){const ctx=serviceContext();if(ctx?.rsdReportId||ctx?.rcoReportId){p.serviceId=p.serviceId||ctx.serviceId||'';p.rsdReportId=p.rsdReportId||ctx.rsdReportId||'';p.rcoReportId=ctx.rcoReportId||p.rcoReportId||'';p.segmento=p.segmento||ctx.segmento||'';p.comandanteMatricula=p.comandanteMatricula||ctx.comandanteMatricula||'';p.contextoServico=Object.assign({},ctx,p.contextoServico||{})}return p}
+    function enrichOperation(p){
+      const ctx=serviceContext(),q=new URLSearchParams(location.search);
+      const requestedEditId=q.get('from')==='rco'?(q.get('editId')||''):'';
+      if(requestedEditId&&operationLoadedSource&&String(operationLoadedId)===String(requestedEditId)){
+        // The operation's original RSD, service, shift and author must not be
+        // reassigned to the receiving coordinator after a RCO handover.
+        const source=operationLoadedSource;
+        p.serviceId=source.serviceId||'';
+        p.rsdReportId=source.rsdReportId||'';
+        p.rcoReportId=source.rcoReportId||ctx.rcoReportId||'';
+        p.segmento=source.segmento||'';
+        p.comandanteMatricula=source.comandanteMatricula||'';
+        p.contextoServico=Object.assign({},ctx,p.contextoServico||{},{
+          serviceId:p.serviceId,rsdReportId:p.rsdReportId,rcoReportId:p.rcoReportId,
+          segmento:p.segmento,comandanteMatricula:p.comandanteMatricula
+        });
+        return p;
+      }
+      if(ctx?.rsdReportId||ctx?.rcoReportId){
+        p.serviceId=p.serviceId||ctx.serviceId||'';
+        p.rsdReportId=p.rsdReportId||ctx.rsdReportId||'';
+        p.rcoReportId=ctx.rcoReportId||p.rcoReportId||'';
+        p.segmento=p.segmento||ctx.segmento||'';
+        p.comandanteMatricula=p.comandanteMatricula||ctx.comandanteMatricula||'';
+        p.contextoServico=Object.assign({},ctx,p.contextoServico||{});
+      }
+      return p;
+    }
     function applyServiceContext(){const ctx=serviceContext();if(!ctx?.rsdReportId&&!ctx?.rcoReportId)return;try{if(ctx.unidade?.batalhao)document.getElementById('batalhao').value=ctx.unidade.batalhao;if(ctx.unidade?.companhiaNumero)document.getElementById('companhiaNumero').value=String(ctx.unidade.companhiaNumero);const opDate=ctx.data||ctx.operationalDate;if(opDate)document.getElementById('data').value=opDate;if(ctx.guarnicao&&!val('guarnicoes'))document.getElementById('guarnicoes').value=ctx.guarnicao;if(Array.isArray(ctx.vtrs)&&ctx.vtrs.length&&!val('vtrs'))document.getElementById('vtrs').value=ctx.vtrs.join(', ');if(ctx.comandante&&!val('responsavel'))document.getElementById('responsavel').value=ctx.comandante;syncUnitHeader()}catch(_){}}
-    async function hydrateOperationEdit(){const q=new URLSearchParams(location.search);const editId=q.get('editId')||serviceContext().editId||'';if(q.get('from')!=='rco'||!editId||!window.CentralCloud)return;const ctx=serviceContext();const token=CentralCloud.getToken('central');if(!token||!ctx.rcoReportId){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.');return}try{const r=await CentralCloud.jsonp('operation-list',{rcoReportId:ctx.rcoReportId,data:ctx.data||ctx.operationalDate,token},{timeout:20000});const found=(r.items||[]).find(x=>String(x.reportId||'')===String(editId));if(!found||!window.rcoApplyOperationRecord?.(found)){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.');return}}catch(_){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.')}}
+    async function hydrateOperationEdit(){const q=new URLSearchParams(location.search);const editId=q.get('editId')||'';if(q.get('from')!=='rco'||!editId||!window.CentralCloud)return;const ctx=serviceContext();const token=CentralCloud.getToken('central');if(!token||!ctx.rcoReportId){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.');return}try{const r=await CentralCloud.jsonp('operation-list',{rcoReportId:ctx.rcoReportId,data:ctx.data||ctx.operationalDate,includeRsdOrigins:'1',token},{timeout:20000});const found=(r.items||[]).find(x=>String(x.reportId||'')===String(editId));if(!found||!window.rcoApplyOperationRecord?.(found)){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.');return}operationKnownVersion=Number(found.version);operationKnownPodFingerprint=typeof found.podFingerprint==='string'?found.podFingerprint:null;operationLoadedId=String(found.reportId);operationLoadedSource={serviceId:found.serviceId||'',rsdReportId:found.rsdReportId||'',rcoReportId:found.rcoReportId||'',segmento:found.segmento||'',comandanteMatricula:found.comandanteMatricula||''};if(!Number.isSafeInteger(operationKnownVersion)||operationKnownVersion<1||operationKnownPodFingerprint===null)throw new Error('Versão do ROP/POD não identificada')}catch(_){alert('Não foi possível carregar esta operação para edição. O módulo foi aberto sem alterar o registro existente.')}}
+    // A retry must replay the exact original operation request. Do not rebuild
+    // from a changed form after a Sheets multi-table partial commit.
+    function operationPendingKey_(id){return 'pmpb-operation-inflight-v1:'+String(id||'');}
+    function getPendingOperation_(id){
+      try{const x=JSON.parse(localStorage.getItem(operationPendingKey_(id))||'null');
+        return x&&x.schema==='pmpb-transito-operacao-v2'&&String(x.reportId)===String(id)&&
+          /^opwrite-[a-zA-Z0-9-]{8,100}$/.test(String(x.requestId||''))?x:null;
+      }catch(_){return null;}
+    }
+    function clearPendingOperation_(id){try{localStorage.removeItem(operationPendingKey_(id))}catch(_){}}
     window.registrarOperacaoDoDiaCloud=async function(){
-      if(!window.validar())return;
-      const p=enrichOperation(window.payload());
-      try{ if(typeof old==='function') old(); registrarOperacaoPayload(p,true); }catch(_){}
+      const rawPayload=window.payload();
+      if(!getPendingOperation_(rawPayload.reportId)&&!window.validar())return;
+      let p=enrichOperation(rawPayload);
+      const q=new URLSearchParams(location.search),editId=q.get('from')==='rco'?(q.get('editId')||''):'';
+      if(q.get('from')==='rco'){
+        if(editId){
+          if(String(p.reportId)!==String(editId)||String(operationLoadedId)!==String(editId)||!Number.isSafeInteger(operationKnownVersion)||operationKnownVersion<1||operationKnownPodFingerprint===null){
+            alert('Esta operação não foi carregada com sua versão atual. Reabra-a pelo RCO antes de tentar salvar.');return false;
+          }
+          p.knownVersion=operationKnownVersion;
+          p.knownPodFingerprint=operationKnownPodFingerprint;
+        }else if(String(operationLoadedId)===String(p.reportId)&&Number.isSafeInteger(operationKnownVersion)&&operationKnownVersion>=1&&operationKnownPodFingerprint!==null){p.knownVersion=operationKnownVersion;p.knownPodFingerprint=operationKnownPodFingerprint;}
+        else {p.knownVersion=0;p.knownPodFingerprint='';}
+      }
+      const previousAttempt=getPendingOperation_(p.reportId);
+      if(previousAttempt){
+        if(!confirm('Existe uma tentativa anterior de gravação desta operação, que pode ter sido parcialmente salva no Google. Deseja retomar EXATAMENTE os dados daquela tentativa? As alterações feitas depois não serão enviadas agora.'))return false;
+        p=previousAttempt;
+      }else{
+        p.requestId='opwrite-'+(globalThis.crypto?.randomUUID?.()||uid('request'));
+        try{localStorage.setItem(operationPendingKey_(p.reportId),JSON.stringify(p))}
+        catch(_){alert('Não foi possível guardar uma cópia recuperável da operação neste aparelho. Libere espaço antes de sincronizar.');return false}
+      }
+      // Persist the exact submission locally before the server starts writing.
+      try{if(!editId&&typeof old==='function')old();registrarOperacaoPayload(p,true)}catch(_){}
       const token=CentralCloud.getToken('central')||CentralCloud.askToken('central');
       if(!token){ alert('Operação salva localmente. A chave operacional é necessária para sincronizar com a Central.'); return; }
       try{const r=await CentralCloud.postOrQueue('operation-upsert',{operacaoPayload:p},{token,unit:p.unidade,popup:false});
       if(r.queued){alert('Operação salva neste aparelho. A sincronização com a Central ficou pendente; permaneça neste módulo ou use a contingência se necessário.');return false}
+      if(!r?.ok)throw new Error(r?.message||'O servidor não confirmou o salvamento.');
+      if(q.get('from')==='rco'){operationLoadedId=String(p.reportId);operationKnownVersion=Number(r.version||operationKnownVersion);operationKnownPodFingerprint=typeof r.podFingerprint==='string'?r.podFingerprint:null;}
+      clearPendingOperation_(p.reportId);
       alert('Operação salva e registrada individualmente na Central.');return true;}
-      catch(e){alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+e.message);return false}
+      catch(e){
+        const message=String(e&&e.message||e);
+        if(!previousAttempt && /OPERATION_(VERSION_CONFLICT|POD_CONFLICT|ORIGIN_CONFLICT|REQUEST_CONFLICT|RECOVERY_REQUIRED)/.test(message))
+          clearPendingOperation_(p.reportId); // rejected BEFORE a new write
+        alert('Operação salva neste aparelho, mas não foi possível sincronizar: '+message+
+          (/OPERATION_PARTIAL_PERSISTENCE/.test(message)?'\\n\\nPreserve este aparelho e toque novamente em Salvar para retomar somente a tentativa original. Não inicie nova operação antes da conferência.':''));
+        return false;
+      }
     };
+    // A new ROP linked to RSD/RCO must never reuse the last operation ID
+    // left in localStorage by an earlier editor. Persist the new ID in the
+    // URL so refreshing an unfinished operation keeps the same identity.
+    const launch=new URL(location.href);
+    if(['rco','rsd'].includes(launch.searchParams.get('from'))&&!launch.searchParams.get('editId')){
+      let newId=launch.searchParams.get('newOpId')||'';
+      if(!/^op-[a-zA-Z0-9-]{8,80}$/.test(newId)){
+        newId=uid('op');launch.searchParams.set('newOpId',newId);
+        history.replaceState(history.state,'',launch.pathname+launch.search+launch.hash);
+      }
+      window.rcoBindOperationReportId(newId);
+    }
     applyServiceContext();hydrateOperationEdit();
     const oldNova=window.novaOperacao;if(typeof oldNova==='function'&&!oldNova.__serviceWrapped){const wrapped=function(){const r=oldNova.apply(this,arguments);setTimeout(applyServiceContext,20);return r};wrapped.__serviceWrapped=true;window.novaOperacao=wrapped}
     document.querySelectorAll('button').forEach(btn=>{
@@ -268,5 +350,5 @@ window.centralPrepareNavigation=function(){centralDirty=false;centralSuppressExi
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
 </script>
-<script src="service_flow.js?v=10.8.44-rco-linked-modules"></script>
+<script src="service_flow.js?v=10.8.44.2-r10-linked-identity"></script>
 </body></html>

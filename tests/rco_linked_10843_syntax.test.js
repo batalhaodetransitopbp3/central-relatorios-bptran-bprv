@@ -14,7 +14,7 @@ for(const f of files){
     checked++;
  }
  assert.ok(count>0,f+' nao tem scripts internos');
- assert.ok(html.includes('service_flow.js?v=10.8.44-rco-linked-modules'),f+' nao carrega fluxo revisado');
+ assert.ok(html.includes('service_flow.js?v=10.8.44.2-r10-linked-identity'),f+' nao carrega fluxo revisado');
  console.log('OK '+f+' scripts='+count);
 }
 const a=fs.readFileSync(path.join(root,'apps_script_v10.gs'),'utf8');

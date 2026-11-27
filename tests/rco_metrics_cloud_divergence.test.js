@@ -166,11 +166,15 @@ assert.ok(addFn.includes('rcoApplyCloudSnapshot(item,p,opDate)'));
 assert.ok(addFn.includes("if(applied==='atual')"));
 assert.ok(addFn.includes('return'));
 assert.ok(html.includes('function rcoSnapshotIsNewer(origin,item)'));
-assert.ok(html.includes('add.disabled=add.disabled||(!!o&&!newer)'));
+assert.ok(html.includes('if(origin&&!rcoSnapshotIsNewer(origin,fresh))'));
+assert.ok(html.includes('add.onclick=()=>o?refreshCloudGuarnicao(x):decideAndAdd(x)'));
 
-const directCalls = html.split('rebuildCloudGuarnicao(').length - 1;
-assert.strictEqual(directCalls, 3);
-assert.strictEqual(html.split('forEach(rebuildCloudGuarnicao)').length - 1, 1);
+// Cancellation now rebuilds per guarnicao with explicit overlay preservation.
+// Do not assert a fragile count of textual call sites: covered behaviorally by
+// rco_cancelled_origin_manual_overlay.test.js for both desktop and iOS.
+assert.ok(html.includes('function reconcileCancelledOrigins()'));
+assert.ok(html.includes('rcoRestoreManualOverlayAfterUpdate(name,overlay)'));
+assert.ok(html.includes('rebuildCloudGuarnicao(name)'));
 
 const upsert = between(gas, 'function rcoDraftUpsert_', 'function rcoDraftClaim_');
 const guard = upsert.indexOf('if(!old&&data){');

@@ -1,0 +1,44 @@
+name: R271 - Central regression review (no deploy)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/central-10-melhorias-r271-review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r271-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate-regression:
+    name: Candidate regression (no deploy)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify GAS mirrors and run all tracked local test suites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mirror = 'gas_deploy/C' + [char]0xF3 + 'digo.js'
+          if ((Get-FileHash -Algorithm SHA256 apps_script_v10.gs).Hash -ne (Get-FileHash -Algorithm SHA256 $mirror).Hash) { throw 'GAS mirror mismatch' }
+          $files = @(git ls-files 'tests/*.test.js')
+          if ($LASTEXITCODE -ne 0 -or $files.Count -lt 41) { throw 'Tracked test inventory incomplete' }
+          $passed = 0
+          $failed = @()
+          foreach ($file in $files) {
+            Write-Host "RUN $file"
+            & node $file
+            if ($LASTEXITCODE -eq 0) { $passed++ } else { $failed += $file }
+          }
+          Write-Host "R271 regression: $passed/$($files.Count) passed"
+          if ($failed.Count -ne 0) { throw ('Failed: ' + ($failed -join ', ')) }

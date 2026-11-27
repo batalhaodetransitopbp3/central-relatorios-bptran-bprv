@@ -46,6 +46,7 @@ function boot() {
     dedupeAppend: function () {},
     addCpuOperation: function () {},
     addCpuVehicle: function () {},
+    addCpuTco: function () {},
     addCpuArvc: function () {},
     renderGuarnicoes: function () {},
     renderMatrix: function () {},
@@ -62,6 +63,7 @@ function boot() {
     oneLine('function num('),
     oneLine('function metricKey('),
     oneLine('function guId('),
+    oneLine('function appendText('),
     oneLine('const SOMATORIO='),
     oneLine('function productionMapV2('),
     oneLine('function addMetricMap('),
@@ -74,6 +76,7 @@ function boot() {
     oneLine('function rcoSnapshotIsNewer('),
     oneLine('function rcoColumnDivergesFromSnapshot('),
     oneLine('function rcoForceDraftIsEmpty('),
+    html.slice(html.indexOf('  function rcoImportedDynamicEdits('),html.indexOf('  function rcoImportWouldEraseWork(')),
     html.slice(html.indexOf('  function rcoImportWouldEraseWork('), html.indexOf('  function rcoApplyCloudSnapshot(')),
     oneLine('function rcoApplyCloudSnapshot('),
     oneLine('window.rcoStaleIncludedGuarnicoes='),
@@ -108,7 +111,8 @@ assert.strictEqual(box.rcoSnapshotIsNewer(origin, newerDraft), true);
 assert.strictEqual(box.rcoSnapshotIsNewer(origin, { version: 1, draftRevision: 1 }), false);
 pages.forEach(function (file) {
   const src = fs.readFileSync(path.join(root, file), 'utf8');
-  assert.ok(src.includes("newer?'Atualizar dados':'Adicionado'"), file);
+  assert.ok(src.includes("o?'Atualizar dados da guarnição':'Adicionar'"), file);
+  assert.ok(src.includes('if(origin&&!rcoSnapshotIsNewer(origin,fresh))'), file);
   assert.ok(src.includes('Em andamento — dados parciais'), file);
   assert.ok(src.includes('rcoSnapshotIsNewer(o,x)'), file);
   assert.ok(src.includes('Dados existentes apenas no aparelho da guarnição não poderão ser recuperados por esta finalização.'), file);

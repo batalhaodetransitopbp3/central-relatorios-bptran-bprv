@@ -210,10 +210,18 @@ function contextBanner(label){
 function goBack(){markReturnIntent();try{global.centralPrepareNavigation?.()||global.centralMarkSaved?.()}catch(_){}try{global.CentralCloud?.beginProgress?.('Retornando ao '+homeName()+'…')}catch(_){}const target=new URL(returnUrl(),location.href).href;location.assign(target)}
 function installOperation(){
  if(!fromLinked)return;contextBanner('Relatório de Operação vinculado ao '+homeName());
- const c=ctx(),u=c.unidade||{};
+ const c=ctx(),u=c.unidade||{},editingExisting=!!new URLSearchParams(location.search).get('editId');
  const applyLockedContext=()=>{
-   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero,data:c.data||c.operationalDate,responsavel:c.comandante,guarnicoes:c.guarnicao,vtrs:Array.isArray(c.vtrs)?c.vtrs.join(', '):''};
+   const map={batalhao:u.batalhao,companhiaNumero:u.companhiaNumero};
+   // A saved ROP has its own original operation date and responsible, which may differ
+   // from the current coordinator after a service handover. Do not replace them on edit.
+   if(!editingExisting){map.data=c.data||c.operationalDate;map.responsavel=c.comandante}
    Object.entries(map).forEach(([id,v])=>{const el=$('#'+id);if(!el||v==null||v==='')return;el.value=String(v);el.dispatchEvent(new Event('change',{bubbles:true}));if(/batalhao|companhiaNumero/.test(id))el.disabled=true;else el.readOnly=true});
+   if(editingExisting){['data','responsavel'].forEach(id=>{const el=$('#'+id);if(el)el.readOnly=true})}
+   // Participants and vehicles may cover several teams. Never replace loaded ROP
+   // fields with the active CPU context, including the delayed context pass.
+   const teams=$('#guarnicoes');if(teams){teams.readOnly=false;if(!teams.value&&c.guarnicao){teams.value=String(c.guarnicao);teams.dispatchEvent(new Event('change',{bubbles:true}))}}
+   const vehicles=$('#vtrs');if(vehicles){vehicles.readOnly=false;if(!editingExisting&&!vehicles.value&&Array.isArray(c.vtrs)&&c.vtrs.length){vehicles.value=c.vtrs.join(', ');vehicles.dispatchEvent(new Event('change',{bubbles:true}))}}
    global.syncUnitHeader?.();
  };
  applyLockedContext();setTimeout(applyLockedContext,80);
@@ -229,8 +237,17 @@ function installCirvc(){
    const b=$('#globalBatalhao'),co=$('#globalCompanhia');if(b&&u.batalhao){b.value=u.batalhao;b.disabled=true}if(co&&u.companhiaNumero){co.value=String(u.companhiaNumero);co.disabled=true}
    $$('.auto-card').forEach(card=>{
      const data=card.querySelector('[data-name="dataEntrega"]'),gv=card.querySelector('[data-name="guarnicaoVtr"]'),mr=card.querySelector('[data-name="militarResponsavel"]');
-     if(data&&!data.value&&(c.data||c.operationalDate))data.value=c.data||c.operationalDate;if(gv&&guVtr){gv.value=guVtr;gv.readOnly=true}if(mr&&c.comandante){mr.value=c.comandante;mr.readOnly=true}
-     card.dataset.rsdReportId=c.rsdReportId||card.dataset.rsdReportId||'';card.dataset.rcoReportId=c.rcoReportId||card.dataset.rcoReportId||'';card.dataset.serviceId=c.serviceId||card.dataset.serviceId||'';card.dataset.segmento=String(c.segmento||card.dataset.segmento||1);card.dataset.guarnicao=c.guarnicao||card.dataset.guarnicao||'';
+     // Multi-CIRVC: a different team or previous service segment may own this
+     // card. Context is a DEFAULT only; never rewrite restored vehicle/officer
+     // data or source IDs when the new CPU opens this linked module.
+     if(data&&!data.value&&(c.data||c.operationalDate))data.value=c.data||c.operationalDate;
+     if(gv){if(!gv.value&&guVtr)gv.value=guVtr;gv.readOnly=false}
+     if(mr){if(!mr.value&&c.comandante)mr.value=c.comandante;mr.readOnly=false}
+     card.dataset.rsdReportId=card.dataset.rsdReportId||c.rsdReportId||'';
+     card.dataset.rcoReportId=card.dataset.rcoReportId||c.rcoReportId||'';
+     card.dataset.serviceId=card.dataset.serviceId||c.serviceId||'';
+     card.dataset.segmento=String(card.dataset.segmento||c.segmento||1);
+     card.dataset.guarnicao=card.dataset.guarnicao||c.guarnicao||'';
    });
  };
  lockContext();const mo=new MutationObserver(()=>lockContext());const box=$('#autosContainer');if(box)mo.observe(box,{childList:true,subtree:true});
@@ -243,6 +260,7 @@ async function saveBoLink(){
  const c=ctx(),num=String($('#ciopCopom')?.value||'').toUpperCase().replace(/\s+/g,'');if(!boNumberValid(num)){alert('Informe o número do BO no padrão PM20XXXXXXXX, por exemplo PM2026123456.');$('#ciopCopom')?.focus();return}
  const anchor=String(c.serviceId||'').trim()||String(c.rcoReportId||'').trim();
  if(!anchor){alert('Registre o serviço ou o RCO antes de vincular o BO.');return}
+ if(global.BoPhotoAnnex?.photoCount>0&&!confirm('O anexo fotográfico é temporário. Ao voltar, as fotografias serão descartadas. Confirme somente se já conferiu e salvou o PDF com o anexo.'))return;
  const token=centralToken(true);if(!token)return;
  const dateRaw=$('#dataOcorrencia')?.value||'',parts=dateRaw.split('/'),opDate=c.data||c.operationalDate||today(),date=parts.length===3?[parts[2],parts[1],parts[0]].join('-'):opDate;
  const home=homeName();
@@ -253,11 +271,11 @@ async function saveBoLink(){
 }
 function installBo(){
  if(!fromLinked)return;contextBanner('Boletim de Ocorrência vinculado ao '+homeName());const c=ctx();
- setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}const opDate=c.data||c.operationalDate||'';if(opDate&&$('#dataOcorrencia')){const p=opDate.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):opDate}const editId=qs.get('editId')||c.editId||'';const numEl=$('#ciopCopom');if(fromRco&&editId&&numEl&&!String(numEl.value||'').trim())numEl.value=editId;global.syncInstitutionSpecific?.()}catch(_){}},100);
+ setTimeout(()=>{try{const u=c.unidade||{},b=$('#globalBatalhao'),co=$('#globalCompanhia');if(u.batalhao&&b){b.value=u.batalhao;b.disabled=true}if(u.companhiaNumero&&co){co.value=String(u.companhiaNumero);co.disabled=true}const opDate=c.data||c.operationalDate||'';if(opDate&&$('#dataOcorrencia')){const p=opDate.split('-');$('#dataOcorrencia').value=p.length===3?p.reverse().join('/'):opDate}const editId=qs.get('editId')||c.editId||'';const numEl=$('#ciopCopom');if(fromRco&&editId&&numEl&&!String(numEl.value||'').trim()){numEl.value=editId;numEl.dispatchEvent(new Event('input',{bubbles:true}));}global.syncInstitutionSpecific?.()}catch(_){}},100);
  const tb=$('.toolbar');if(tb&&!$('#centralSaveBoReturn')){const b=document.createElement('button');b.id='centralSaveBoReturn';b.type='button';b.className='success no-print';b.textContent='Vincular BO e voltar ao '+homeName();b.onclick=saveBoLink;tb.prepend(b)}
 }
 function installRcoAuto(){
- const hideLegacy=()=>{$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
+ const hideLegacy=()=>{$$('.toolbar button').forEach(b=>{if((b.textContent||'').trim()==='Carregar operações do dia')b.style.display='none'})};
  const canRefresh=()=>{
   if(document.getElementById('centralAccessLayer')||document.getElementById('centralAccessKeyOverlay')||document.body.classList.contains('central-service-setup'))return false;
   try{return !!sessionStorage.getItem('pmpb-rco-role-token-v1')}catch(_){return false}
